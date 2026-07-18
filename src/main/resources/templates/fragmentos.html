@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<!-- Fragmentos comunes de las tres pantallas del asistente. -->
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(titulo)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="|${titulo} · Packing Lists|">Packing Lists</title>
+    <link rel="stylesheet" th:href="@{/estilo.css}">
+</head>
+<body>
+<header class="cabecera" th:fragment="cabecera(paso)">
+    <div class="titulo">
+        Generador de Packing Lists
+        <span class="paso" th:text="${paso}">paso</span>
+    </div>
+</header>
+</body>
+</html>

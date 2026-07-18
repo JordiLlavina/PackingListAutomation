@@ -34,14 +34,15 @@ class EnvioImportServiceTest {
 
         assertEquals(3, importado.getDestinos().size());
 
-        // PARIS: rango 1-30 + cajas 31,32 (USL728) y 33,35 (USL737) = 34 cajas
+        // PARIS: rango 1-30 + cajas 31,32 (USL728) y 33,35 en DOS colores de
+        // USL737 (caja mixta: el mismo número aparece en ROJO y NOIR) = 36 cajas
         List<CajaData> paris = importado.getDestinos().get(0).getDestino().getCajas();
-        assertEquals(34, paris.size());
+        assertEquals(36, paris.size());
 
         CajaData caja30 = paris.get(29);
         assertEquals(30, caja30.getNumeroCaja());
         assertEquals(50, caja30.getCantidad());               // del rango, unidadesPorCaja
-        assertEquals("USL728.AL217.001", caja30.getReferencia());
+        assertEquals("USL728.AL217", caja30.getReferencia());
         assertEquals("NOIR", caja30.getCodigoColor());
         assertEquals("60x40x40", caja30.getTamanoCaja());
         assertEquals("07685", caja30.getNumeroPedido());
@@ -72,14 +73,19 @@ class EnvioImportServiceTest {
     void avisaCuandoLaSumaDeUnidadesNoCuadraConCantidadTotal() throws Exception {
         EnvioImportado importado = importarJsonDePrueba();
 
-        // En el JSON de prueba, las dos referencias de PARIS no cuadran:
+        // El JSON de prueba contiene 4 avisos a propósito. Dos descuadres:
         // USL728: 30x50+50+47 = 1597 vs cantidadTotal 1897
-        // USL737: 34+37 = 71 vs cantidadTotal 67
-        assertEquals(2, importado.getAvisos().size());
+        // USL737 NOIR: 34+37 = 71 vs cantidadTotal 67
+        // Y dos duplicados: las cajas 33 y 35 aparecen en dos colores de
+        // USL737 (caja mixta), que hoy se reporta como número repetido.
+        assertEquals(4, importado.getAvisos().size());
         assertTrue(importado.getAvisos().get(0).contains("1597"));
         assertTrue(importado.getAvisos().get(0).contains("1897"));
         assertTrue(importado.getAvisos().get(1).contains("71"));
         assertTrue(importado.getAvisos().get(1).contains("67"));
+        assertTrue(importado.getAvisos().get(2).contains("33"));
+        assertTrue(importado.getAvisos().get(2).contains("más de una vez"));
+        assertTrue(importado.getAvisos().get(3).contains("35"));
     }
 
     @Test

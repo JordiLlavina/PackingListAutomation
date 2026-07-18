@@ -23,11 +23,23 @@
     </properties>
 
     <dependencies>
-        <!-- Núcleo de Spring Boot: contexto de beans, application.yml,
-             @ConfigurationProperties. Sin web todavía. -->
+        <!-- Web MVC con servidor embebido: el asistente de generación de
+             packing lists (pegar JSON -> revisar -> descargar excels). -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Plantillas de las pantallas del asistente. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!-- Validación de formularios (@NotBlank, @Pattern en EnvioForm). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
         <!-- Apache POI: lectura/escritura de .xlsx (formato OOXML).

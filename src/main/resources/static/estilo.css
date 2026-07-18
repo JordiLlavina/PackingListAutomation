@@ -1,0 +1,165 @@
+/* Estilo mínimo del asistente de packing lists, sin frameworks. */
+
+:root {
+    --tinta: #1c2733;
+    --borde: #d4dae1;
+    --fondo-suave: #f5f7f9;
+    --acento: #1a6feb;
+    --aviso-fondo: #fff7e0;
+    --aviso-borde: #e6c34a;
+    --error-fondo: #fdecec;
+    --error-borde: #d9534f;
+    --ok-fondo: #e8f5ec;
+    --ok-borde: #3d9960;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    color: var(--tinta);
+    background: var(--fondo-suave);
+    margin: 0;
+}
+
+main {
+    max-width: 72rem;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 3rem;
+}
+
+header.cabecera {
+    background: var(--tinta);
+    color: #fff;
+    padding: 0.9rem 1rem;
+}
+
+header.cabecera .titulo {
+    max-width: 72rem;
+    margin: 0 auto;
+    font-size: 1.15rem;
+    font-weight: 600;
+}
+
+header.cabecera .paso {
+    font-weight: 400;
+    opacity: 0.75;
+}
+
+h2 { margin-top: 2rem; }
+
+.alerta {
+    border: 1px solid var(--aviso-borde);
+    background: var(--aviso-fondo);
+    border-left-width: 4px;
+    padding: 0.6rem 0.9rem;
+    margin: 0.5rem 0;
+    border-radius: 4px;
+}
+
+.alerta.error {
+    border-color: var(--error-borde);
+    background: var(--error-fondo);
+}
+
+.alerta.ok {
+    border-color: var(--ok-borde);
+    background: var(--ok-fondo);
+}
+
+form.tarjeta, .tarjeta {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+}
+
+label { display: block; font-weight: 600; margin: 0.8rem 0 0.25rem; }
+
+input[type="text"], textarea {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+}
+
+textarea.json {
+    min-height: 18rem;
+    font-family: Consolas, monospace;
+    font-size: 0.85rem;
+}
+
+.campos-cabecera {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0 1rem;
+}
+
+.error-campo { color: var(--error-borde); font-size: 0.85rem; }
+
+button, a.boton {
+    display: inline-block;
+    margin-top: 1.2rem;
+    margin-right: 0.6rem;
+    padding: 0.55rem 1.2rem;
+    border: 1px solid var(--acento);
+    border-radius: 4px;
+    background: var(--acento);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+button.secundario, a.boton.secundario {
+    background: #fff;
+    color: var(--acento);
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    font-size: 0.9rem;
+}
+
+th, td {
+    border: 1px solid var(--borde);
+    padding: 0.35rem 0.55rem;
+    text-align: left;
+}
+
+th { background: var(--fondo-suave); }
+
+td input[type="number"] {
+    width: 6.5rem;
+    padding: 0.25rem 0.4rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+}
+
+tr.pendiente td { background: var(--aviso-fondo); }
+
+.badge {
+    display: inline-block;
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge.pendiente {
+    background: var(--aviso-fondo);
+    border: 1px solid var(--aviso-borde);
+}
+
+.badge.ok {
+    background: var(--ok-fondo);
+    border: 1px solid var(--ok-borde);
+}
+
+.sin-palet { color: var(--error-borde); font-weight: 700; }

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Entrada')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· 1. Entrada del envío')}"></header>
+<main>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${errorJson}" th:text="${errorJson}"></div>
+
+    <form class="tarjeta" th:action="@{/importar}" th:object="${envioForm}" method="post">
+        <label for="json">JSON del envío</label>
+        <textarea id="json" class="json" th:field="*{json}"
+                  placeholder='{"cliente": "AMI", "destinos": [ ... ]}'></textarea>
+        <p class="error-campo" th:errors="*{json}"></p>
+
+        <div class="campos-cabecera">
+            <div>
+                <label for="temporada">Temporada</label>
+                <input type="text" id="temporada" th:field="*{temporada}" placeholder="H26">
+                <p class="error-campo" th:errors="*{temporada}"></p>
+            </div>
+            <div>
+                <label for="numeroFactura">Nº de factura</label>
+                <input type="text" id="numeroFactura" th:field="*{numeroFactura}" placeholder="FA-26-1189">
+                <p class="error-campo" th:errors="*{numeroFactura}"></p>
+            </div>
+            <div>
+                <label for="fechaFactura">Fecha factura (dd/MM/yyyy)</label>
+                <input type="text" id="fechaFactura" th:field="*{fechaFactura}">
+                <p class="error-campo" th:errors="*{fechaFactura}"></p>
+            </div>
+            <div>
+                <label for="fechaEnvio">Fecha envío (dd/MM/yyyy)</label>
+                <input type="text" id="fechaEnvio" th:field="*{fechaEnvio}">
+                <p class="error-campo" th:errors="*{fechaEnvio}"></p>
+            </div>
+        </div>
+
+        <button type="submit">Importar y revisar</button>
+    </form>
+</main>
+</body>
+</html>

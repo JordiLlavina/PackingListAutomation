@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Resultados')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· 3. Resultados')}"></header>
+<main>
+    <div class="tarjeta">
+        <p>
+            Factura <strong th:text="${cabecera.numeroFactura}"></strong> ·
+            temporada <strong th:text="${cabecera.temporada}"></strong> ·
+            <span th:text="${excels.size()}"></span> packing lists generados.
+        </p>
+        <table>
+            <thead>
+            <tr>
+                <th>Fichero</th>
+                <th>Referencia</th>
+                <th>Color</th>
+                <th>Pesos</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="excel : ${excels}">
+                <td th:text="${excel.nombreFichero}"></td>
+                <td th:text="${excel.referencia}"></td>
+                <td th:text="${excel.color}"></td>
+                <td>
+                    <span th:if="${excel.tienePesosPendientes()}" class="badge pendiente"
+                          th:text="|${excel.cajasPendientes.size()} cajas sin peso|"></span>
+                    <span th:if="${!excel.tienePesosPendientes()}" class="badge ok">completos</span>
+                </td>
+                <td>
+                    <a th:href="@{/descargar/{fichero}(fichero=${excel.nombreFichero})}">Descargar</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <a class="boton" th:href="@{/descargar-todo}">Descargar todo (ZIP)</a>
+        <a class="boton secundario" th:href="@{/revision}">Volver a revisión</a>
+        <a class="boton secundario" th:href="@{/nuevo}">Nuevo envío</a>
+    </div>
+</main>
+</body>
+</html>
