@@ -22,6 +22,9 @@ import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
 
+import static com.puntotres.packinglist.testutil.TestDatos.caja;
+import static com.puntotres.packinglist.testutil.TestDatos.palet;
+
 class PackingListGenerationServiceTest {
 
     private final PackingListGenerationService service =
@@ -53,6 +56,17 @@ class PackingListGenerationServiceTest {
             assertEquals(2, (int) hoja.getRow(20).getCell(4).getNumericCellValue());  // E21 nº caja
             assertEquals("SUM(G20:G21)", hoja.getRow(21).getCell(6).getCellFormula());
         }
+    }
+
+    @Test
+    void elNombreDeFicheroSaneaCaracteresInvalidosEnWindows() throws Exception {
+        DestinoData destino = new DestinoData();
+        destino.setNombreDestino("New York/Boston");
+        destino.setCajas(List.of(caja(1, "OF-1", "BOLSO: TOTE", "NAT 03", 25, 11.5, 12.7)));
+
+        List<ExcelGenerado> excels = service.generarPorModeloYColor(destino, envio());
+
+        assertEquals("PKL_New_York_Boston_BOLSO_TOTE_NAT_03.xlsx", excels.get(0).getNombreFichero());
     }
 
     @Test
@@ -128,28 +142,5 @@ class PackingListGenerationServiceTest {
         envio.setFechaFactura("10/07/2026");
         envio.setFechaEnvio("24/07/2026");
         return envio;
-    }
-
-    private static CajaData caja(int numero, String pedido, String referencia, String color,
-                                 int cantidad, Double neto, Double bruto) {
-        CajaData caja = new CajaData();
-        caja.setNumeroCaja(numero);
-        caja.setNumeroPedido(pedido);
-        caja.setReferencia(referencia);
-        caja.setCodigoColor(color);
-        caja.setTamanoCaja("60x40x40");
-        caja.setCantidad(cantidad);
-        caja.setPesoNetoKg(neto);
-        caja.setPesoBrutoKg(bruto);
-        return caja;
-    }
-
-    private static PaletData palet(String destino, int numero, int inicio, int fin) {
-        PaletData palet = new PaletData();
-        palet.setDestino(destino);
-        palet.setNumeroPalet(numero);
-        palet.setCajaInicio(inicio);
-        palet.setCajaFin(fin);
-        return palet;
     }
 }

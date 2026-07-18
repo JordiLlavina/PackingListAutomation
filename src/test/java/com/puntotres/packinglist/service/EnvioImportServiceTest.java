@@ -81,4 +81,71 @@ class EnvioImportServiceTest {
         assertTrue(importado.getAvisos().get(1).contains("71"));
         assertTrue(importado.getAvisos().get(1).contains("67"));
     }
+
+    @Test
+    void sinCantidadTotalNoGeneraAvisoDeDescuadre() {
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            referencia.setCajas(List.of(cajaSuelta(1, 50)));
+        });
+
+        EnvioImportado importado = service.importar(envio);
+
+        assertTrue(importado.getAvisos().isEmpty());
+        assertEquals(1, importado.getDestinos().get(0).getDestino().getCajas().size());
+    }
+
+    /**
+     * Comportamiento actual, documentado a propósito: un rango invertido
+     * (cajaInicio > cajaFin, p. ej. por un error de lectura de imagen) no
+     * genera ninguna caja ni ningún aviso. Es un gap conocido y aceptado
+     * (no se corrige aquí); este test existe para que un cambio futuro en
+     * este comportamiento sea una decisión explícita, no un efecto colateral.
+     */
+    @Test
+    void rangoInvertidoNoGeneraCajasNiAviso() {
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            referencia.setCajas(List.of(rango(10, 5, 50)));
+        });
+
+        EnvioImportado importado = service.importar(envio);
+
+        assertTrue(importado.getDestinos().get(0).getDestino().getCajas().isEmpty());
+        assertTrue(importado.getAvisos().isEmpty());
+    }
+
+    private static EnvioInput envioConUnaReferencia(
+            java.util.function.Consumer<EnvioInput.ReferenciaInput> configurar) {
+        EnvioInput.ReferenciaInput referencia = new EnvioInput.ReferenciaInput();
+        referencia.setReferencia("USL728.AL217.001");
+        referencia.setColor("NOIR");
+        referencia.setMedidaCaja("60x40x40");
+        referencia.setPedido("07685");
+        configurar.accept(referencia);
+
+        EnvioInput.DestinoInput destino = new EnvioInput.DestinoInput();
+        destino.setDestino("PARIS");
+        destino.setReferencias(List.of(referencia));
+        destino.setPalets(List.of());
+
+        EnvioInput envio = new EnvioInput();
+        envio.setDestinos(List.of(destino));
+        return envio;
+    }
+
+    private static EnvioInput.CajaRangoInput cajaSuelta(int numero, int unidades) {
+        EnvioInput.CajaRangoInput entrada = new EnvioInput.CajaRangoInput();
+        entrada.setCaja(numero);
+        entrada.setUnidades(unidades);
+        return entrada;
+    }
+
+    private static EnvioInput.CajaRangoInput rango(int inicio, int fin, int unidadesPorCaja) {
+        EnvioInput.CajaRangoInput entrada = new EnvioInput.CajaRangoInput();
+        entrada.setCajaInicio(inicio);
+        entrada.setCajaFin(fin);
+        entrada.setUnidadesPorCaja(unidadesPorCaja);
+        return entrada;
+    }
 }

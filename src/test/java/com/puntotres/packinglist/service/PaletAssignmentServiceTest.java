@@ -13,6 +13,8 @@ import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
 
+import static com.puntotres.packinglist.testutil.TestDatos.palet;
+
 class PaletAssignmentServiceTest {
 
     private final PaletAssignmentService service = new PaletAssignmentService();
@@ -82,14 +84,5 @@ class PaletAssignmentServiceTest {
             destino.getCajas().add(caja);
         }
         return destino;
-    }
-
-    private static PaletData palet(String destino, int numero, int inicio, int fin) {
-        PaletData palet = new PaletData();
-        palet.setDestino(destino);
-        palet.setNumeroPalet(numero);
-        palet.setCajaInicio(inicio);
-        palet.setCajaFin(fin);
-        return palet;
     }
 }
