@@ -1,0 +1,24 @@
+# Maven
+target/
+
+# Compiled class files
+*.class
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+
+# Excel lock files (created while a workbook is open)
+.~lock.*#
+~$*.xlsx

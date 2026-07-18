@@ -1,0 +1,112 @@
+package com.puntotres.packinglist.model;
+
+import java.util.List;
+
+/**
+ * Estructura del JSON de entrada real: un envío completo con todas sus
+ * destinaciones. Refleja exactamente la jerarquía del JSON (por eso las
+ * clases anidadas), y es el {@code EnvioImportService} quien lo traduce
+ * al modelo de dominio (DestinoData/CajaData/PaletData).
+ */
+public class EnvioInput {
+
+    private String cliente;
+    private List<DestinoInput> destinos;
+
+    public String getCliente() { return cliente; }
+    public void setCliente(String cliente) { this.cliente = cliente; }
+
+    public List<DestinoInput> getDestinos() { return destinos; }
+    public void setDestinos(List<DestinoInput> destinos) { this.destinos = destinos; }
+
+    public static class DestinoInput {
+
+        private String destino;
+        private List<PaletInput> palets;
+        private List<ReferenciaInput> referencias;
+
+        public String getDestino() { return destino; }
+        public void setDestino(String destino) { this.destino = destino; }
+
+        public List<PaletInput> getPalets() { return palets; }
+        public void setPalets(List<PaletInput> palets) { this.palets = palets; }
+
+        public List<ReferenciaInput> getReferencias() { return referencias; }
+        public void setReferencias(List<ReferenciaInput> referencias) { this.referencias = referencias; }
+    }
+
+    public static class PaletInput {
+
+        private int palet;
+        private int cajaInicio;
+        private int cajaFin;
+
+        public int getPalet() { return palet; }
+        public void setPalet(int palet) { this.palet = palet; }
+
+        public int getCajaInicio() { return cajaInicio; }
+        public void setCajaInicio(int cajaInicio) { this.cajaInicio = cajaInicio; }
+
+        public int getCajaFin() { return cajaFin; }
+        public void setCajaFin(int cajaFin) { this.cajaFin = cajaFin; }
+    }
+
+    public static class ReferenciaInput {
+
+        private String referencia;
+        private String color;
+        private String medidaCaja;
+        private String pedido;
+        private Integer cantidadTotal;
+        private List<CajaRangoInput> cajas;
+
+        public String getReferencia() { return referencia; }
+        public void setReferencia(String referencia) { this.referencia = referencia; }
+
+        public String getColor() { return color; }
+        public void setColor(String color) { this.color = color; }
+
+        public String getMedidaCaja() { return medidaCaja; }
+        public void setMedidaCaja(String medidaCaja) { this.medidaCaja = medidaCaja; }
+
+        public String getPedido() { return pedido; }
+        public void setPedido(String pedido) { this.pedido = pedido; }
+
+        public Integer getCantidadTotal() { return cantidadTotal; }
+        public void setCantidadTotal(Integer cantidadTotal) { this.cantidadTotal = cantidadTotal; }
+
+        public List<CajaRangoInput> getCajas() { return cajas; }
+        public void setCajas(List<CajaRangoInput> cajas) { this.cajas = cajas; }
+    }
+
+    /**
+     * Una entrada de cajas de la imagen, en cualquiera de sus dos formas:
+     * caja suelta {"caja": 31, "unidades": 50} o rango
+     * {"cajaInicio": 1, "cajaFin": 30, "unidadesPorCaja": 50}.
+     */
+    public static class CajaRangoInput {
+
+        private Integer caja;
+        private Integer unidades;
+        private Integer cajaInicio;
+        private Integer cajaFin;
+        private Integer unidadesPorCaja;
+
+        public boolean esRango() { return caja == null; }
+
+        public Integer getCaja() { return caja; }
+        public void setCaja(Integer caja) { this.caja = caja; }
+
+        public Integer getUnidades() { return unidades; }
+        public void setUnidades(Integer unidades) { this.unidades = unidades; }
+
+        public Integer getCajaInicio() { return cajaInicio; }
+        public void setCajaInicio(Integer cajaInicio) { this.cajaInicio = cajaInicio; }
+
+        public Integer getCajaFin() { return cajaFin; }
+        public void setCajaFin(Integer cajaFin) { this.cajaFin = cajaFin; }
+
+        public Integer getUnidadesPorCaja() { return unidadesPorCaja; }
+        public void setUnidadesPorCaja(Integer unidadesPorCaja) { this.unidadesPorCaja = unidadesPorCaja; }
+    }
+}

@@ -1,0 +1,9 @@
+# Configuración del generador de packing lists.
+#
+# Taras conocidas (kg de embalaje vacío) por tamaño de caja "LxWxH" en cm.
+# Para soportar un tamaño nuevo basta con añadirlo aquí; las claves van
+# entre [] y comillas para que Spring las respete tal cual.
+packing-list:
+  taras:
+    "[60x40x40]": 1.6
+    "[60x40x30]": 1.2
