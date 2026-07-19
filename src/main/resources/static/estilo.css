@@ -101,6 +101,8 @@ textarea.json {
 
 .ayuda { color: #5a6673; font-size: 0.85rem; margin: 0.1rem 0 0.5rem; }
 
+.aviso-procesando { color: #5a6673; font-size: 1.45rem; font-weight: bold; margin: 0.5rem 0; }
+
 /* --- Selector del modo de entrada (JSON / CLAUDE / FORMULARIO) --- */
 
 .selector-modo {

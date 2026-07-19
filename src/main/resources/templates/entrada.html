@@ -16,7 +16,7 @@
                 disabled title="Próximamente">FORMULARIO</button>
     </div>
 
-    <form class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
+    <form id="formEntrada" class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
           method="post" enctype="multipart/form-data">
         <input type="hidden" id="modo" th:field="*{modo}">
         <div>
@@ -81,6 +81,9 @@
 
         <button type="submit" id="botonImportar">Importar y revisar</button>
     </form>
+    <p id="avisoProcesando" class="aviso-procesando" style="display: none">
+        Procesando... con Claude puede tardar 1-2 minutos, no cierres ni recargues la página.
+    </p>
 
     <script th:inline="javascript">
         /*<![CDATA[*/
@@ -130,6 +133,15 @@
 
         // Al volver con errores de validación se conserva el modo enviado.
         seleccionarModo(document.getElementById('modo').value || 'JSON');
+
+        // El envío en modo CLAUDE llama a la API y puede tardar 1-2 minutos;
+        // sin esto la página se queda igual y parece colgada.
+        document.getElementById('formEntrada').addEventListener('submit', function () {
+            const boton = document.getElementById('botonImportar');
+            boton.disabled = true;
+            boton.textContent = 'Procesando...';
+            document.getElementById('avisoProcesando').style.display = '';
+        });
     </script>
 </main>
 </body>
