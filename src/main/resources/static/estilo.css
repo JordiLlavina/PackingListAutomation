@@ -215,3 +215,76 @@ tr.pendiente td { background: var(--aviso-fondo); }
 }
 
 .sin-palet { color: var(--error-borde); font-weight: 700; }
+
+/* --- Pantalla de resultados: pila vertical de secciones de salida --- */
+
+.resumen-envio { margin: 1.2rem 0 0; }
+
+.seccion-salida .titulo-seccion { margin: 0 0 0.5rem; font-size: 1.05rem; }
+
+/* Celda de contenido en dos líneas: destino · referencia arriba y el
+   color debajo con sangría fija para que los colores queden alineados
+   en vertical entre filas. */
+.contenido-excel .color-excel {
+    padding-left: 1.6rem;
+    color: var(--acento);
+    font-weight: 600;
+}
+
+/* Sección todavía no disponible (etiquetas de caja). */
+.seccion-salida.deshabilitada {
+    opacity: 0.55;
+    background: var(--fondo-suave);
+}
+
+button:disabled {
+    background: var(--borde);
+    border-color: var(--borde);
+    color: #7a8591;
+    cursor: not-allowed;
+}
+
+/* --- Modal de vista previa del volcado ERP --- */
+
+.modal-fondo {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: rgba(28, 39, 51, 0.55);
+}
+
+.modal-fondo.visible {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-caja {
+    position: relative;
+    background: #fff;
+    border-radius: 6px;
+    padding: 1.25rem;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-contenido {
+    overflow: auto;
+    margin-top: 0.5rem;
+}
+
+.modal-cerrar {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    margin: 0;
+    padding: 0.1rem 0.55rem;
+    background: #fff;
+    border: none;
+    color: var(--tinta);
+    font-size: 1.4rem;
+    line-height: 1;
+}

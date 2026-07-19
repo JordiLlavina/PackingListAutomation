@@ -10,27 +10,50 @@ import com.puntotres.packinglist.model.CajaData;
  * peso vacías; cajasPendientes existe para que la pantalla de revisión
  * pueda remarcarlas.
  *
- * descripcion identifica el contenido del fichero en pantalla; su forma
- * depende del generador: AMI describe "destino · referencia color" (un
- * excel por referencia+color), APC/genérica describen solo el destino
- * (un excel por destino).
+ * El contenido se identifica en pantalla con destino y, si el generador
+ * trocea por referencia+color (AMI), también referencia y color; APC y la
+ * genérica (un excel por destino) los dejan a null. descripcion se deriva
+ * de esos campos para quien quiera el texto plano.
  */
 public class ExcelGenerado {
 
-    private final String descripcion;
+    private final String destino;
+    private final String referencia;
+    private final String color;
     private final String nombreFichero;
     private final byte[] contenido;
     private final List<CajaData> cajasPendientes;
 
-    public ExcelGenerado(String descripcion, String nombreFichero,
+    /** Excel por destino (APC, genérica): sin referencia ni color. */
+    public ExcelGenerado(String destino, String nombreFichero,
                          byte[] contenido, List<CajaData> cajasPendientes) {
-        this.descripcion = descripcion;
+        this(destino, null, null, nombreFichero, contenido, cajasPendientes);
+    }
+
+    /** Excel por referencia+color (AMI). */
+    public ExcelGenerado(String destino, String referencia, String color,
+                         String nombreFichero, byte[] contenido,
+                         List<CajaData> cajasPendientes) {
+        this.destino = destino;
+        this.referencia = referencia;
+        this.color = color;
         this.nombreFichero = nombreFichero;
         this.contenido = contenido;
         this.cajasPendientes = cajasPendientes;
     }
 
-    public String getDescripcion() { return descripcion; }
+    public String getDestino() { return destino; }
+    public String getReferencia() { return referencia; }
+    public String getColor() { return color; }
+
+    /** Texto plano equivalente: "destino" o "destino · referencia color". */
+    public String getDescripcion() {
+        if (referencia == null) {
+            return destino;
+        }
+        return destino + " · " + referencia + " " + color;
+    }
+
     public String getNombreFichero() { return nombreFichero; }
     public byte[] getContenido() { return contenido; }
     public List<CajaData> getCajasPendientes() { return cajasPendientes; }

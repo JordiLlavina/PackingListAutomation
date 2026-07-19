@@ -4,10 +4,15 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('· 3. Resultados')}"></header>
 <main>
-    <div class="tarjeta">
+    <p class="resumen-envio">
+        Factura <strong th:text="${cabecera.numeroFactura}"></strong> ·
+        temporada <strong th:text="${cabecera.temporada}"></strong>
+    </p>
+
+    <!-- Sección 1: los packing lists generados -->
+    <section class="tarjeta seccion-salida">
+        <h3 class="titulo-seccion">📦 Packing Lists</h3>
         <p>
-            Factura <strong th:text="${cabecera.numeroFactura}"></strong> ·
-            temporada <strong th:text="${cabecera.temporada}"></strong> ·
             <span th:text="${excels.size()}"></span> packing lists generados.
         </p>
         <table>
@@ -22,7 +27,15 @@
             <tbody>
             <tr th:each="excel : ${excels}">
                 <td th:text="${excel.nombreFichero}"></td>
-                <td th:text="${excel.descripcion}"></td>
+                <td class="contenido-excel">
+                    <div>
+                        <span th:text="${excel.destino}"></span>
+                        <span th:if="${excel.referencia != null}"
+                              th:text="|· ${excel.referencia}|"></span>
+                    </div>
+                    <div class="color-excel" th:if="${excel.color != null}"
+                         th:text="${excel.color}"></div>
+                </td>
                 <td>
                     <span th:if="${excel.tienePesosPendientes()}" class="badge pendiente"
                           th:text="|${excel.cajasPendientes.size()} cajas sin peso|"></span>
@@ -38,7 +51,81 @@
         <a class="boton" th:href="@{/descargar-todo}">Descargar todo (ZIP)</a>
         <a class="boton secundario" th:href="@{/revision}">Volver a revisión</a>
         <a class="boton secundario" th:href="@{/nuevo}">Nuevo envío</a>
+    </section>
+
+    <!-- Sección 2: el excel de volcado al ERP -->
+    <section class="tarjeta seccion-salida" th:with="hayVolcado=${volcadoErp != null && volcadoErp.tieneDatos()}">
+        <h3 class="titulo-seccion">📊 Volcado ERP</h3>
+        <p th:if="${hayVolcado}">
+            <strong th:text="${volcadoErp.nombreFichero}"></strong> ·
+            <span th:text="|${volcadoErp.totalLineas} líneas de artículos listos para importar|"></span>
+        </p>
+        <p th:unless="${hayVolcado}">0 líneas</p>
+
+        <a th:if="${hayVolcado}" class="boton" th:href="@{/descargar-volcado-erp}">Descargar</a>
+        <button th:if="${hayVolcado}" type="button" class="secundario"
+                onclick="abrirModalVolcado()">Vista previa</button>
+        <button th:unless="${hayVolcado}" type="button" disabled>Descargar</button>
+        <button th:unless="${hayVolcado}" type="button" class="secundario" disabled>Vista previa</button>
+    </section>
+
+    <!-- Sección 3: etiquetas de caja, todavía en desarrollo -->
+    <section class="tarjeta seccion-salida deshabilitada">
+        <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
+        <p>🔒 En desarrollo — Próximamente</p>
+        <button type="button" disabled>Descargar</button>
+    </section>
+
+    <!-- Modal de vista previa del volcado ERP -->
+    <div th:if="${volcadoErp != null && volcadoErp.tieneDatos()}"
+         id="modal-volcado" class="modal-fondo" onclick="cerrarModalVolcadoFuera(event)">
+        <div class="modal-caja">
+            <button type="button" class="modal-cerrar" onclick="cerrarModalVolcado()"
+                    aria-label="Cerrar">&times;</button>
+            <h3 class="titulo-seccion" th:text="${volcadoErp.nombreFichero}"></h3>
+            <div class="modal-contenido">
+                <table>
+                    <thead>
+                    <tr>
+                        <th>ARTICLE</th>
+                        <th>TALLA</th>
+                        <th>COLORCODI</th>
+                        <th>COLOR</th>
+                        <th>SISTALL</th>
+                        <th>SISGRUP</th>
+                        <th>QUANTITAT</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="linea : ${volcadoErp.lineas}">
+                        <td th:text="${linea.article}"></td>
+                        <td th:text="${linea.talla}"></td>
+                        <td th:text="${linea.colorCodi}"></td>
+                        <td th:text="${linea.color}"></td>
+                        <td th:text="${linea.sistall}"></td>
+                        <td th:text="${linea.sisgrup}"></td>
+                        <td th:text="${linea.quantitat}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </main>
+
+<script>
+    function abrirModalVolcado() {
+        document.getElementById('modal-volcado').classList.add('visible');
+    }
+    function cerrarModalVolcado() {
+        document.getElementById('modal-volcado').classList.remove('visible');
+    }
+    // Cerrar al pinchar fuera de la caja (el fondo oscuro).
+    function cerrarModalVolcadoFuera(evento) {
+        if (evento.target === document.getElementById('modal-volcado')) {
+            cerrarModalVolcado();
+        }
+    }
+</script>
 </body>
 </html>

@@ -77,8 +77,7 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             data.setCajas(esCinturon ? mapearCajasCinturon(cajas) : mapearCajasBolso(cajas));
 
             byte[] excel = excelBuilder.generar(data, layout);
-            String descripcion = destino.getNombreDestino() + " · " + referencia + " " + color;
-            resultado.add(new ExcelGenerado(descripcion,
+            resultado.add(new ExcelGenerado(destino.getNombreDestino(), referencia, color,
                     nombreFichero(destino.getNombreDestino(), referencia, color),
                     excel, pendientes));
         }
