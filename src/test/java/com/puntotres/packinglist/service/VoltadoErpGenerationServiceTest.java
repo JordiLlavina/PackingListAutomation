@@ -22,7 +22,10 @@ public class VoltadoErpGenerationServiceTest {
         VoltadoErpData resultado = service.generar(cajas, envio);
 
         assertNotNull(resultado);
-        assertEquals(2, resultado.getTotalLineas());  // 2 líneas únicas (REF001-80 y REF001-90)
+        // 2 líneas únicas: REF001-80-001 (50+30=80 uds sumadas) y REF001-90-002 (20 uds)
+        assertEquals(2, resultado.getTotalLineas());
+        assertEquals(80, resultado.getLineas().get(0).getQuantitat());
+        assertEquals(20, resultado.getLineas().get(1).getQuantitat());
         assertEquals("Volcado_ERP_FA-26-1189.xlsx", resultado.getNombreFichero());
     }
 
@@ -40,22 +43,22 @@ public class VoltadoErpGenerationServiceTest {
 
         VoltadoErpData resultado = service.generar(cajas, envio);
 
-        // Verify that colors in same reference+talla combine into single line:
-        // REF001-talla80 combines NOIR (50) + BLEU (30) = 1 line (takes first color NOIR)
-        // REF001-talla90 has NOIR (20) = 1 line
-        // Total: 2 lines (not 3), proving colors are aggregated by reference+talla
-        assertEquals(2, resultado.getTotalLineas(), "Should have 2 lines when combining NOIR+BLEU in talla 80");
+        // Una línea por combinación única referencia + talla + color:
+        // (REF001, 80, NOIR), (REF001, 80, BLEU), (REF001, 90, NOIR) = 3 líneas
+        assertEquals(3, resultado.getTotalLineas(), "Should have 3 lines, one per referencia+talla+color");
 
         VoltadoErpLinea linea1 = resultado.getLineas().get(0);
         VoltadoErpLinea linea2 = resultado.getLineas().get(1);
+        VoltadoErpLinea linea3 = resultado.getLineas().get(2);
 
-        // Both lines have NOIR (first color encountered for each reference+talla)
-        // Both get colorCodi 001 since NOIR was the first color encountered
+        // COLORCODI secuencial por orden de primera aparición: NOIR=001, BLEU=002
+        // El mismo color siempre recibe el mismo código
         assertEquals("001", linea1.getColorCodi());
-        assertEquals("001", linea2.getColorCodi());
+        assertEquals("002", linea2.getColorCodi());
+        assertEquals("001", linea3.getColorCodi());
 
-        // Verify quantities are summed: line 1 has 50+30=80 units
-        assertEquals(80, linea1.getQuantitat());
-        assertEquals(20, linea2.getQuantitat());
+        assertEquals(50, linea1.getQuantitat());
+        assertEquals(30, linea2.getQuantitat());
+        assertEquals(20, linea3.getQuantitat());
     }
 }

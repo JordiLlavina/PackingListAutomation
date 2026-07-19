@@ -8,13 +8,13 @@ import java.util.*;
 public class VoltadoErpGenerationService {
 
     public VoltadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
-        // Agrupar por referencia + talla (una línea por combinación única, agregando colores)
+        // Agrupar por referencia + talla + color (una línea por combinación única)
         Map<String, VoltadoErpLineaBuilder> grupos = new LinkedHashMap<>();
         Map<String, String> colorCodis = new LinkedHashMap<>();  // color → codigo (preserva orden inserción)
         int colorCodiCounter = 1;
 
         for (CajaData caja : cajas) {
-            String key = caja.getReferencia() + "|" + caja.getTalla();
+            String key = caja.getReferencia() + "|" + caja.getTalla() + "|" + caja.getCodigoColor();
 
             if (!grupos.containsKey(key)) {
                 grupos.put(key, new VoltadoErpLineaBuilder()
