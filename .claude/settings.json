@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(awk 'BEGIN{RS=\"</si>\"} NR==13 {gsub\\(/<[^>]*>/,\"\",$0\\); print \"12: \"$0}' xl/sharedStrings.xml)",
-      "Bash(grep -E 'Tests run: [0-9]+, Fail.*$|BUILD')"
+      "Bash(grep -E 'Tests run: [0-9]+, Fail.*$|BUILD')",
+      "Bash(scripts/start-server.sh --project-dir . --open)",
+      "Bash(find \"C:\\\\Users\\\\jordi\\\\.claude\\\\plugins\" -name \"start-server.sh\" -o -name \"brainstorming\" -type d 2>/dev/null | head -20)",
+      "Read(//c/Users/jordi/.claude/plugins/**)",
+      "Bash(\"C:\\\\Users\\\\jordi\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\6.1.1\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh\" --project-dir \"c:\\\\Users\\\\jordi\\\\Documents\\\\Workspace\\\\Packing List Automation\" --open)",
+      "Bash(\"C:\\\\Users\\\\jordi\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\6.1.1\\\\skills\\\\subagent-driven-development\\\\scripts\\\\task-brief\" \"c:\\\\Users\\\\jordi\\\\Documents\\\\Workspace\\\\Packing List Automation\\\\docs\\\\superpowers\\\\plans\\\\2026-07-19-outputs-framework-design.md\" 1)",
+      "Bash(tee .superpowers/sdd/base-commit.txt)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(\"C:\\\\Users\\\\jordi\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\6.1.1\\\\skills\\\\subagent-driven-development\\\\scripts\\\\task-brief\" \"c:\\\\Users\\\\jordi\\\\Documents\\\\Workspace\\\\Packing List Automation\\\\docs\\\\superpowers\\\\plans\\\\2026-07-19-outputs-framework-design.md\" 2)",
+      "Bash(tee .superpowers/sdd/base-commit-task2.txt)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
