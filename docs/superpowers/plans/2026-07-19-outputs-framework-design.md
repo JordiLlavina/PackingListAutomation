@@ -5,7 +5,7 @@
 **Goal:** Agregar soporte para 3 tipos de outputs (PackingLists, Volcado ERP, Etiquetas—stub) en la vista de resultados con layout stack vertical y modal de vista previa para ERP.
 
 **Architecture:** 
-- **Backend:** Dos nuevos servicios (VoltadoErpGenerationService, VoltadoErpExcelBuilder) siguiendo el patrón existente de PackingListGenerationService. Un servicio orquestador (GenerationOrchestrationService) que coordina los 3 tipos.
+- **Backend:** Dos nuevos servicios (VolcadoErpGenerationService, VolcadoErpExcelBuilder) siguiendo el patrón existente de PackingListGenerationService. Un servicio orquestador (GenerationOrchestrationService) que coordina los 3 tipos.
 - **Frontend:** Thymeleaf resultados.html reestructurado en 3 secciones con CSS para cards y JavaScript vanilla para modal.
 - **Testing:** Tests unitarios para servicios nuevos, test end-to-end.
 
@@ -25,11 +25,11 @@
 ## File Structure
 
 **Backend (crear):**
-- `src/main/java/com/puntotres/packinglist/model/VoltadoErpLinea.java` — una línea de artículo (ARTICLE, TALLA, COLORCODI, COLOR, etc.)
-- `src/main/java/com/puntotres/packinglist/model/VoltadoErpData.java` — DTO con lista de líneas + metadatos
-- `src/main/java/com/puntotres/packinglist/model/OutputsGenerados.java` — DTO orquestador (PackingLists + VoltadoErp + Etiquetas)
-- `src/main/java/com/puntotres/packinglist/service/VoltadoErpGenerationService.java` — orquesta generación del volcado
-- `src/main/java/com/puntotres/packinglist/service/VoltadoErpExcelBuilder.java` — escribe Excel de volcado
+- `src/main/java/com/puntotres/packinglist/model/VolcadoErpLinea.java` — una línea de artículo (ARTICLE, TALLA, COLORCODI, COLOR, etc.)
+- `src/main/java/com/puntotres/packinglist/model/VolcadoErpData.java` — DTO con lista de líneas + metadatos
+- `src/main/java/com/puntotres/packinglist/model/OutputsGenerados.java` — DTO orquestador (PackingLists + VolcadoErp + Etiquetas)
+- `src/main/java/com/puntotres/packinglist/service/VolcadoErpGenerationService.java` — orquesta generación del volcado
+- `src/main/java/com/puntotres/packinglist/service/VolcadoErpExcelBuilder.java` — escribe Excel de volcado
 - `src/main/java/com/puntotres/packinglist/service/GenerationOrchestrationService.java` — llama a los 3 tipos de outputs
 
 **Backend (modificar):**
@@ -42,32 +42,32 @@
 - `src/main/resources/static/js/resultados-modal.js` — lógica para abrir/cerrar modal
 
 **Tests (crear):**
-- `src/test/java/com/puntotres/packinglist/service/VoltadoErpGenerationServiceTest.java`
-- `src/test/java/com/puntotres/packinglist/service/VoltadoErpExcelBuilderTest.java`
+- `src/test/java/com/puntotres/packinglist/service/VolcadoErpGenerationServiceTest.java`
+- `src/test/java/com/puntotres/packinglist/service/VolcadoErpExcelBuilderTest.java`
 
 ---
 
 ## Tasks
 
-### Task 1: DTOs del modelo de dominio (VoltadoErpLinea, VoltadoErpData)
+### Task 1: DTOs del modelo de dominio (VolcadoErpLinea, VolcadoErpData)
 
 **Files:**
-- Create: `src/main/java/com/puntotres/packinglist/model/VoltadoErpLinea.java`
-- Create: `src/main/java/com/puntotres/packinglist/model/VoltadoErpData.java`
+- Create: `src/main/java/com/puntotres/packinglist/model/VolcadoErpLinea.java`
+- Create: `src/main/java/com/puntotres/packinglist/model/VolcadoErpData.java`
 - Create: `src/main/java/com/puntotres/packinglist/model/OutputsGenerados.java`
 
 **Interfaces:**
 - Produces: 
-  - `VoltadoErpLinea(String article, String talla, String colorCodi, String color, int sistall, int sisgrup, int quantitat)`
-  - `VoltadoErpData(List<VoltadoErpLinea> lineas, int totalLineas)`
-  - `OutputsGenerados(List<ExcelGenerado> packingLists, VoltadoErpData volcadoErp, Object etiquetas)`
+  - `VolcadoErpLinea(String article, String talla, String colorCodi, String color, int sistall, int sisgrup, int quantitat)`
+  - `VolcadoErpData(List<VolcadoErpLinea> lineas, int totalLineas)`
+  - `OutputsGenerados(List<ExcelGenerado> packingLists, VolcadoErpData volcadoErp, Object etiquetas)`
 
-- [ ] **Step 1: Crear VoltadoErpLinea.java**
+- [ ] **Step 1: Crear VolcadoErpLinea.java**
 
 ```java
 package com.puntotres.packinglist.model;
 
-public class VoltadoErpLinea {
+public class VolcadoErpLinea {
     private String article;           // referencia
     private String talla;             // talla
     private String colorCodi;         // 001, 002, 003...
@@ -76,7 +76,7 @@ public class VoltadoErpLinea {
     private int sisgrup;              // siempre 1
     private int quantitat;            // cantidad total
 
-    public VoltadoErpLinea(String article, String talla, String colorCodi, String color,
+    public VolcadoErpLinea(String article, String talla, String colorCodi, String color,
                            int sistall, int sisgrup, int quantitat) {
         this.article = article;
         this.talla = talla;
@@ -98,26 +98,26 @@ public class VoltadoErpLinea {
 }
 ```
 
-- [ ] **Step 2: Crear VoltadoErpData.java**
+- [ ] **Step 2: Crear VolcadoErpData.java**
 
 ```java
 package com.puntotres.packinglist.model;
 
 import java.util.List;
 
-public class VoltadoErpData {
-    private List<VoltadoErpLinea> lineas;
+public class VolcadoErpData {
+    private List<VolcadoErpLinea> lineas;
     private int totalLineas;
     private String nombreFichero;  // Volcado_ERP_<factura>.xlsx
 
-    public VoltadoErpData(List<VoltadoErpLinea> lineas, String nombreFichero) {
+    public VolcadoErpData(List<VolcadoErpLinea> lineas, String nombreFichero) {
         this.lineas = lineas;
         this.totalLineas = lineas.size();
         this.nombreFichero = nombreFichero;
     }
 
     // Getters
-    public List<VoltadoErpLinea> getLineas() { return lineas; }
+    public List<VolcadoErpLinea> getLineas() { return lineas; }
     public int getTotalLineas() { return totalLineas; }
     public String getNombreFichero() { return nombreFichero; }
     public boolean tieneDatos() { return totalLineas > 0; }
@@ -134,10 +134,10 @@ import com.puntotres.packinglist.service.ExcelGenerado;
 
 public class OutputsGenerados {
     private List<ExcelGenerado> packingLists;
-    private VoltadoErpData volcadoErp;
+    private VolcadoErpData volcadoErp;
     private Object etiquetas;  // null por ahora
 
-    public OutputsGenerados(List<ExcelGenerado> packingLists, VoltadoErpData volcadoErp) {
+    public OutputsGenerados(List<ExcelGenerado> packingLists, VolcadoErpData volcadoErp) {
         this.packingLists = packingLists;
         this.volcadoErp = volcadoErp;
         this.etiquetas = null;
@@ -145,7 +145,7 @@ public class OutputsGenerados {
 
     // Getters
     public List<ExcelGenerado> getPackingLists() { return packingLists; }
-    public VoltadoErpData getVolcadoErp() { return volcadoErp; }
+    public VolcadoErpData getVolcadoErp() { return volcadoErp; }
     public Object getEtiquetas() { return etiquetas; }
 }
 ```
@@ -153,22 +153,22 @@ public class OutputsGenerados {
 - [ ] **Step 4: Commit**
 
 ```bash
-git add src/main/java/com/puntotres/packinglist/model/VoltadoErpLinea.java \
-        src/main/java/com/puntotres/packinglist/model/VoltadoErpData.java \
+git add src/main/java/com/puntotres/packinglist/model/VolcadoErpLinea.java \
+        src/main/java/com/puntotres/packinglist/model/VolcadoErpData.java \
         src/main/java/com/puntotres/packinglist/model/OutputsGenerados.java
 git commit -m "feat: add DTOs for ERP volcado output"
 ```
 
 ---
 
-### Task 2: VoltadoErpGenerationService (lógica de generación)
+### Task 2: VolcadoErpGenerationService (lógica de generación)
 
 **Files:**
-- Create: `src/main/java/com/puntotres/packinglist/service/VoltadoErpGenerationService.java`
+- Create: `src/main/java/com/puntotres/packinglist/service/VolcadoErpGenerationService.java`
 
 **Interfaces:**
 - Consumes: `List<CajaData>`, `DatosEnvio` (para número factura)
-- Produces: `VoltadoErpData` con lista de VoltadoErpLinea generadas
+- Produces: `VolcadoErpData` con lista de VolcadoErpLinea generadas
 
 - [ ] **Step 1: Write failing test**
 
@@ -180,11 +180,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.puntotres.packinglist.model.*;
 import java.util.*;
 
-public class VoltadoErpGenerationServiceTest {
+public class VolcadoErpGenerationServiceTest {
     
     @Test
-    public void testGeneraVoltadoErpConArticulosAgrupados() {
-        VoltadoErpGenerationService service = new VoltadoErpGenerationService();
+    public void testGeneraVolcadoErpConArticulosAgrupados() {
+        VolcadoErpGenerationService service = new VolcadoErpGenerationService();
         
         List<CajaData> cajas = new ArrayList<>();
         cajas.add(new CajaData("REF001", "001", "80", 50, null, null));
@@ -194,7 +194,7 @@ public class VoltadoErpGenerationServiceTest {
         DatosEnvio envio = new DatosEnvio();
         envio.setNumeroFactura("FA-26-1189");
         
-        VoltadoErpData resultado = service.generar(cajas, envio);
+        VolcadoErpData resultado = service.generar(cajas, envio);
         
         assertNotNull(resultado);
         assertEquals(2, resultado.getTotalLineas());  // 2 líneas únicas (REF001-80 y REF001-90)
@@ -203,7 +203,7 @@ public class VoltadoErpGenerationServiceTest {
     
     @Test
     public void testGeneraColorCodiSecuencial() {
-        VoltadoErpGenerationService service = new VoltadoErpGenerationService();
+        VolcadoErpGenerationService service = new VolcadoErpGenerationService();
         
         List<CajaData> cajas = new ArrayList<>();
         cajas.add(new CajaData("REF001", "NOIR", "80", 50, null, null));
@@ -213,13 +213,13 @@ public class VoltadoErpGenerationServiceTest {
         DatosEnvio envio = new DatosEnvio();
         envio.setNumeroFactura("TEST");
         
-        VoltadoErpData resultado = service.generar(cajas, envio);
+        VolcadoErpData resultado = service.generar(cajas, envio);
         
         // NOIR aparece primero → 001
         // BLEU aparece segundo → 002
         // NOIR aparece de nuevo → 001
-        VoltadoErpLinea linea1 = resultado.getLineas().get(0);
-        VoltadoErpLinea linea2 = resultado.getLineas().get(1);
+        VolcadoErpLinea linea1 = resultado.getLineas().get(0);
+        VolcadoErpLinea linea2 = resultado.getLineas().get(1);
         
         assertEquals("001", linea1.getColorCodi());
         assertEquals("002", linea2.getColorCodi());
@@ -230,12 +230,12 @@ public class VoltadoErpGenerationServiceTest {
 - [ ] **Step 2: Run test to verify it fails**
 
 ```bash
-mvn test -Dtest=VoltadoErpGenerationServiceTest -v
+mvn test -Dtest=VolcadoErpGenerationServiceTest -v
 ```
 
 Expected: FAIL — clase no existe
 
-- [ ] **Step 3: Write VoltadoErpGenerationService**
+- [ ] **Step 3: Write VolcadoErpGenerationService**
 
 ```java
 package com.puntotres.packinglist.service;
@@ -245,11 +245,11 @@ import com.puntotres.packinglist.model.*;
 import java.util.*;
 
 @Service
-public class VoltadoErpGenerationService {
+public class VolcadoErpGenerationService {
     
-    public VoltadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
+    public VolcadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
         // Agrupar por referencia + talla + color (una línea por grupo único)
-        Map<String, VoltadoErpLineaBuilder> grupos = new LinkedHashMap<>();
+        Map<String, VolcadoErpLineaBuilder> grupos = new LinkedHashMap<>();
         Map<String, String> colorCodis = new LinkedHashMap<>();  // color → codigo (preserva orden inserción)
         int colorCodiCounter = 1;
         
@@ -257,7 +257,7 @@ public class VoltadoErpGenerationService {
             String key = caja.getReferencia() + "|" + caja.getTalla() + "|" + caja.getCodigoColor();
             
             if (!grupos.containsKey(key)) {
-                grupos.put(key, new VoltadoErpLineaBuilder()
+                grupos.put(key, new VolcadoErpLineaBuilder()
                     .article(caja.getReferencia())
                     .talla(caja.getTalla())
                     .color(caja.getCodigoColor())
@@ -274,8 +274,8 @@ public class VoltadoErpGenerationService {
         }
         
         // Construir líneas finales con COLORCODI
-        List<VoltadoErpLinea> lineas = new ArrayList<>();
-        for (VoltadoErpLineaBuilder builder : grupos.values()) {
+        List<VolcadoErpLinea> lineas = new ArrayList<>();
+        for (VolcadoErpLineaBuilder builder : grupos.values()) {
             String colorCodi = colorCodis.get(builder.getColor());
             lineas.add(builder
                 .colorCodi(colorCodi)
@@ -285,11 +285,11 @@ public class VoltadoErpGenerationService {
         }
         
         String nombreFichero = "Volcado_ERP_" + envio.getNumeroFactura() + ".xlsx";
-        return new VoltadoErpData(lineas, nombreFichero);
+        return new VolcadoErpData(lineas, nombreFichero);
     }
     
     // Inner builder class para facilitar construcción
-    private static class VoltadoErpLineaBuilder {
+    private static class VolcadoErpLineaBuilder {
         private String article;
         private String talla;
         private String color;
@@ -298,17 +298,17 @@ public class VoltadoErpGenerationService {
         private int sisgrup;
         private int quantitat = 0;
         
-        public VoltadoErpLineaBuilder article(String article) { this.article = article; return this; }
-        public VoltadoErpLineaBuilder talla(String talla) { this.talla = talla; return this; }
-        public VoltadoErpLineaBuilder color(String color) { this.color = color; return this; }
-        public VoltadoErpLineaBuilder colorCodi(String colorCodi) { this.colorCodi = colorCodi; return this; }
-        public VoltadoErpLineaBuilder sistall(int sistall) { this.sistall = sistall; return this; }
-        public VoltadoErpLineaBuilder sisgrup(int sisgrup) { this.sisgrup = sisgrup; return this; }
-        public VoltadoErpLineaBuilder addQuantitat(int qty) { this.quantitat += qty; return this; }
+        public VolcadoErpLineaBuilder article(String article) { this.article = article; return this; }
+        public VolcadoErpLineaBuilder talla(String talla) { this.talla = talla; return this; }
+        public VolcadoErpLineaBuilder color(String color) { this.color = color; return this; }
+        public VolcadoErpLineaBuilder colorCodi(String colorCodi) { this.colorCodi = colorCodi; return this; }
+        public VolcadoErpLineaBuilder sistall(int sistall) { this.sistall = sistall; return this; }
+        public VolcadoErpLineaBuilder sisgrup(int sisgrup) { this.sisgrup = sisgrup; return this; }
+        public VolcadoErpLineaBuilder addQuantitat(int qty) { this.quantitat += qty; return this; }
         public String getColor() { return color; }
         
-        public VoltadoErpLinea build() {
-            return new VoltadoErpLinea(article, talla, colorCodi, color, sistall, sisgrup, quantitat);
+        public VolcadoErpLinea build() {
+            return new VolcadoErpLinea(article, talla, colorCodi, color, sistall, sisgrup, quantitat);
         }
     }
 }
@@ -317,7 +317,7 @@ public class VoltadoErpGenerationService {
 - [ ] **Step 4: Run test to verify it passes**
 
 ```bash
-mvn test -Dtest=VoltadoErpGenerationServiceTest -v
+mvn test -Dtest=VolcadoErpGenerationServiceTest -v
 ```
 
 Expected: PASS (2 tests passing)
@@ -325,20 +325,20 @@ Expected: PASS (2 tests passing)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/puntotres/packinglist/service/VoltadoErpGenerationService.java \
-        src/test/java/com/puntotres/packinglist/service/VoltadoErpGenerationServiceTest.java
-git commit -m "feat: implement VoltadoErpGenerationService with color code sequencing"
+git add src/main/java/com/puntotres/packinglist/service/VolcadoErpGenerationService.java \
+        src/test/java/com/puntotres/packinglist/service/VolcadoErpGenerationServiceTest.java
+git commit -m "feat: implement VolcadoErpGenerationService with color code sequencing"
 ```
 
 ---
 
-### Task 3: VoltadoErpExcelBuilder (escribe Excel)
+### Task 3: VolcadoErpExcelBuilder (escribe Excel)
 
 **Files:**
-- Create: `src/main/java/com/puntotres/packinglist/service/VoltadoErpExcelBuilder.java`
+- Create: `src/main/java/com/puntotres/packinglist/service/VolcadoErpExcelBuilder.java`
 
 **Interfaces:**
-- Consumes: `VoltadoErpData`
+- Consumes: `VolcadoErpData`
 - Produces: archivo `.xlsx` escrito a disco, retorna `byte[]` con contenido
 
 - [ ] **Step 1: Write failing test**
@@ -353,18 +353,18 @@ import org.apache.poi.ss.usermodel.*;
 import java.io.*;
 import java.util.*;
 
-public class VoltadoErpExcelBuilderTest {
+public class VolcadoErpExcelBuilderTest {
     
     @Test
     public void testEscribeExcelConColumnasCorrectas() throws IOException {
-        VoltadoErpExcelBuilder builder = new VoltadoErpExcelBuilder();
+        VolcadoErpExcelBuilder builder = new VolcadoErpExcelBuilder();
         
-        List<VoltadoErpLinea> lineas = Arrays.asList(
-            new VoltadoErpLinea("USL728.AL217", "80", "001", "NOIR", 1, 1, 150),
-            new VoltadoErpLinea("UBL029.AL0216", "90", "002", "BLEU", 1, 1, 45)
+        List<VolcadoErpLinea> lineas = Arrays.asList(
+            new VolcadoErpLinea("USL728.AL217", "80", "001", "NOIR", 1, 1, 150),
+            new VolcadoErpLinea("UBL029.AL0216", "90", "002", "BLEU", 1, 1, 45)
         );
         
-        VoltadoErpData data = new VoltadoErpData(lineas, "test.xlsx");
+        VolcadoErpData data = new VolcadoErpData(lineas, "test.xlsx");
         byte[] excelContent = builder.generar(data);
         
         assertNotNull(excelContent);
@@ -400,12 +400,12 @@ public class VoltadoErpExcelBuilderTest {
 - [ ] **Step 2: Run test to verify it fails**
 
 ```bash
-mvn test -Dtest=VoltadoErpExcelBuilderTest -v
+mvn test -Dtest=VolcadoErpExcelBuilderTest -v
 ```
 
 Expected: FAIL — clase no existe
 
-- [ ] **Step 3: Write VoltadoErpExcelBuilder**
+- [ ] **Step 3: Write VolcadoErpExcelBuilder**
 
 ```java
 package com.puntotres.packinglist.service;
@@ -418,13 +418,13 @@ import java.io.*;
 import java.util.*;
 
 @Service
-public class VoltadoErpExcelBuilder {
+public class VolcadoErpExcelBuilder {
     
     private static final String[] HEADERS = {
         "ARTICLE", "TALLA", "COLORCODI", "COLOR", "SISTALL", "SISGRUP", "QUANTITAT"
     };
     
-    public byte[] generar(VoltadoErpData data) throws IOException {
+    public byte[] generar(VolcadoErpData data) throws IOException {
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Volcado");
         
@@ -444,7 +444,7 @@ public class VoltadoErpExcelBuilder {
         
         // Crear filas de datos
         int rowNum = 1;
-        for (VoltadoErpLinea linea : data.getLineas()) {
+        for (VolcadoErpLinea linea : data.getLineas()) {
             Row row = sheet.createRow(rowNum++);
             
             row.createCell(0).setCellValue(linea.getArticle());
@@ -469,7 +469,7 @@ public class VoltadoErpExcelBuilder {
 - [ ] **Step 4: Run test to verify it passes**
 
 ```bash
-mvn test -Dtest=VoltadoErpExcelBuilderTest -v
+mvn test -Dtest=VolcadoErpExcelBuilderTest -v
 ```
 
 Expected: PASS
@@ -477,9 +477,9 @@ Expected: PASS
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/java/com/puntotres/packinglist/service/VoltadoErpExcelBuilder.java \
-        src/test/java/com/puntotres/packinglist/service/VoltadoErpExcelBuilderTest.java
-git commit -m "feat: implement VoltadoErpExcelBuilder for writing ERP volcado Excel"
+git add src/main/java/com/puntotres/packinglist/service/VolcadoErpExcelBuilder.java \
+        src/test/java/com/puntotres/packinglist/service/VolcadoErpExcelBuilderTest.java
+git commit -m "feat: implement VolcadoErpExcelBuilder for writing ERP volcado Excel"
 ```
 
 ---
@@ -491,7 +491,7 @@ git commit -m "feat: implement VoltadoErpExcelBuilder for writing ERP volcado Ex
 
 **Interfaces:**
 - Consumes: `List<CajaData>`, `DatosEnvio`, `String clienteId`
-- Produces: `OutputsGenerados` (PackingLists + VoltadoErp + Etiquetas—null)
+- Produces: `OutputsGenerados` (PackingLists + VolcadoErp + Etiquetas—null)
 
 - [ ] **Step 1: Write minimal GenerationOrchestrationService**
 
@@ -510,14 +510,14 @@ public class GenerationOrchestrationService {
     private PackingListGenerationService packingListService;
     
     @Autowired
-    private VoltadoErpGenerationService volcadoErpService;
+    private VolcadoErpGenerationService volcadoErpService;
     
     public OutputsGenerados generar(List<CajaData> cajas, DatosEnvio envio, String cliente) {
         // Generar PackingLists
         List<ExcelGenerado> packingLists = packingListService.generarPorReferenciayColor(cajas, envio);
         
         // Generar Volcado ERP
-        VoltadoErpData volcadoErp = volcadoErpService.generar(cajas, envio);
+        VolcadoErpData volcadoErp = volcadoErpService.generar(cajas, envio);
         
         // Etiquetas: por ahora null
         
@@ -583,11 +583,11 @@ git commit -m "feat: add GenerationOrchestrationService to coordinate outputs"
 - Sección 2 (Volcado ERP): Task 2-3 (generación), Task 7 (presentación + modal) ✓
 - Sección 3 (Etiquetas): Task 7 (aspecto desactivado, stub) ✓
 - DTOs: Task 1 ✓
-- Generación COLORCODI: Task 2 (VoltadoErpGenerationService) ✓
+- Generación COLORCODI: Task 2 (VolcadoErpGenerationService) ✓
 - Modal con X: Task 7 (JS + CSS) ✓
 
 ✅ **No placeholders:** Todos los pasos tienen código completo, comandos exactos, tests concretos
 
-✅ **Type consistency:** VoltadoErpLinea, VoltadoErpData, OutputsGenerados usados consistentemente en Tasks 1-7
+✅ **Type consistency:** VolcadoErpLinea, VolcadoErpData, OutputsGenerados usados consistentemente en Tasks 1-7
 
 ✅ **Testing:** Tests en Task 2 (generation), Task 3 (builder), Task 8 (integration)

@@ -1,6 +1,6 @@
 package com.puntotres.packinglist.model;
 
-public class VoltadoErpLinea {
+public class VolcadoErpLinea {
     private String article;           // referencia
     private String talla;             // talla
     private String colorCodi;         // 001, 002, 003...
@@ -9,7 +9,7 @@ public class VoltadoErpLinea {
     private int sisgrup;              // siempre 1
     private int quantitat;            // cantidad total
 
-    public VoltadoErpLinea(String article, String talla, String colorCodi, String color,
+    public VolcadoErpLinea(String article, String talla, String colorCodi, String color,
                            int sistall, int sisgrup, int quantitat) {
         this.article = article;
         this.talla = talla;

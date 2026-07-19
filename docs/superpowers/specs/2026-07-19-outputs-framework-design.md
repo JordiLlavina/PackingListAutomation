@@ -65,7 +65,7 @@ La vista de resultados se estructura en **3 secciones ampliadas** apiladas verti
 **Datos de entrada:**
 - Nombre factura: obtenido de la sesión actual (`cabecera.numeroFactura`)
 - Número de líneas: contador de artículos generados (referencia+talla+color única por línea)
-- Tabla: datos generados por `VoltadoErpGenerationService` (a implementar en backend)
+- Tabla: datos generados por `VolcadoErpGenerationService` (a implementar en backend)
 
 ### 2.3 Sección 3: Etiquetas de Caja
 
@@ -86,30 +86,30 @@ La vista de resultados se estructura en **3 secciones ampliadas** apiladas verti
 
 **Nuevos servicios/métodos:**
 
-1. **`VoltadoErpGenerationService`** (nuevo)
+1. **`VolcadoErpGenerationService`** (nuevo)
    - Recibe: `List<CajaData>`, `cabecera`
-   - Genera: `VoltadoErpData` (DTO con tabla + metadatos)
+   - Genera: `VolcadoErpData` (DTO con tabla + metadatos)
    - Lógica:
      - Agrupa por `referencia + talla + color` (una línea por grupo único)
      - Para cada grupo: extrae ARTICLE (referencia), TALLA, COLOR, QUANTITAT (suma)
      - Genera códigos COLORCODI secuenciales (001, 002, 003...) por orden de aparición de color
-     - Genera archivo Excel con `VoltadoErpExcelBuilder`
+     - Genera archivo Excel con `VolcadoErpExcelBuilder`
 
-2. **`VoltadoErpExcelBuilder`** (nuevo)
+2. **`VolcadoErpExcelBuilder`** (nuevo)
    - Similar a `AmiExcelBuilder` pero para volcado ERP
    - Escribe tabla simple (sin estilos complejos, sin fórmulas)
    - Columnas: ARTICLE, TALLA, COLORCODI, COLOR, SISTALL (=1), SISGRUP (=1), QUANTITAT
 
 3. **`GenaricarGenerationService`** (renombrar `PackingListGenerationService` o crear wrapper)
    - Orquesta los 3 tipos de outputs
-   - Llama a: `PackingListGenerationService`, `VoltadoErpGenerationService`, `EtiquetasGenerationService` (stub por ahora)
+   - Llama a: `PackingListGenerationService`, `VolcadoErpGenerationService`, `EtiquetasGenerationService` (stub por ahora)
    - Devuelve: DTO con resultados de los 3 tipos
 
 **DTO nuevo:**
 ```java
 public class OutputsGenerados {
     List<ExcelGenerado> packingLists;      // Lo que devuelve PackingListGenerationService
-    VoltadoErpData volcadoErp;             // Lo que devuelve VoltadoErpGenerationService
+    VolcadoErpData volcadoErp;             // Lo que devuelve VolcadoErpGenerationService
     EtiquetasData etiquetas;               // Null por ahora
 }
 ```
@@ -146,8 +146,8 @@ public class OutputsGenerados {
 ### Tests
 
 **Nuevos tests:**
-- `VoltadoErpGenerationServiceTest` — agrupación por referencia+talla+color, generación de COLORCODI, cálculo de QUANTITAT
-- `VoltadoErpExcelBuilderTest` — escritura de columnas, formato Excel
+- `VolcadoErpGenerationServiceTest` — agrupación por referencia+talla+color, generación de COLORCODI, cálculo de QUANTITAT
+- `VolcadoErpExcelBuilderTest` — escritura de columnas, formato Excel
 - End-to-end test en `PackingListApplicationTest` que verifica los 3 outputs juntos
 
 ---
@@ -179,8 +179,8 @@ COLORCODI asignado:
 - Columnas: ARTICLE, TALLA, COLORCODI, COLOR, SISTALL, SISGRUP, QUANTITAT
 
 **¿Cómo se pasa al frontend?**
-- Backend genera `VoltadoErpData` con:
-  - `List<VoltadoErpLinea>` (filas de la tabla)
+- Backend genera `VolcadoErpData` con:
+  - `List<VolcadoErpLinea>` (filas de la tabla)
   - `int totalLineas` (para mostrar "N líneas")
 - Thymeleaf renderiza la tabla en JavaScript en el modal (o como atributo data oculto)
 
@@ -224,15 +224,15 @@ COLORCODI asignado:
 ## 8. Checklist de implementación
 
 Backend:
-- [ ] Crear `VoltadoErpData` (DTO)
-- [ ] Crear `VoltadoErpGenerationService`
-- [ ] Crear `VoltadoErpExcelBuilder`
+- [ ] Crear `VolcadoErpData` (DTO)
+- [ ] Crear `VolcadoErpGenerationService`
+- [ ] Crear `VolcadoErpExcelBuilder`
 - [ ] Crear `OutputsGenerados` (DTO orquestador)
 - [ ] Crear `GenerationOrchestrationService` (orquesta los 3)
 - [ ] Modificar endpoint `/generar` para retornar `OutputsGenerados`
 - [ ] Crear endpoints `/descargar-volcado-erp`, `/descargar-etiquetas`
-- [ ] Crear `VoltadoErpGenerationServiceTest`
-- [ ] Crear `VoltadoErpExcelBuilderTest`
+- [ ] Crear `VolcadoErpGenerationServiceTest`
+- [ ] Crear `VolcadoErpExcelBuilderTest`
 
 Frontend:
 - [ ] Modificar `resultados.html` (3 secciones)
@@ -244,7 +244,7 @@ Frontend:
 ## 9. Notas de diseño
 
 - **Separación de responsabilidades:** Cada tipo de output es independiente (service + builder)
-- **Reutilización:** `VoltadoErpExcelBuilder` sigue patrón de `AmiExcelBuilder`, facilitando futuros clientes
+- **Reutilización:** `VolcadoErpExcelBuilder` sigue patrón de `AmiExcelBuilder`, facilitando futuros clientes
 - **Desactivación graceful:** Etiquetas desactivada sin código complicado, fácil de activar luego
 - **Datos completos en tabla:** El volcado ERP en modal muestra todos los datos, permitiendo verificación pre-descarga
 

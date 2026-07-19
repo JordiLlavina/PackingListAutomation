@@ -5,10 +5,10 @@ import com.puntotres.packinglist.service.ExcelGenerado;
 
 public class OutputsGenerados {
     private List<ExcelGenerado> packingLists;
-    private VoltadoErpData volcadoErp;
+    private VolcadoErpData volcadoErp;
     private Object etiquetas;  // null por ahora
 
-    public OutputsGenerados(List<ExcelGenerado> packingLists, VoltadoErpData volcadoErp) {
+    public OutputsGenerados(List<ExcelGenerado> packingLists, VolcadoErpData volcadoErp) {
         this.packingLists = packingLists;
         this.volcadoErp = volcadoErp;
         this.etiquetas = null;
@@ -16,6 +16,6 @@ public class OutputsGenerados {
 
     // Getters
     public List<ExcelGenerado> getPackingLists() { return packingLists; }
-    public VoltadoErpData getVolcadoErp() { return volcadoErp; }
+    public VolcadoErpData getVolcadoErp() { return volcadoErp; }
     public Object getEtiquetas() { return etiquetas; }
 }

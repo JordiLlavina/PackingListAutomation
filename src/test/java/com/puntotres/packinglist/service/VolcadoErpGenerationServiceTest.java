@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import com.puntotres.packinglist.model.*;
 import java.util.*;
 
-public class VoltadoErpGenerationServiceTest {
+public class VolcadoErpGenerationServiceTest {
 
     @Test
-    public void testGeneraVoltadoErpConArticulosAgrupados() {
-        VoltadoErpGenerationService service = new VoltadoErpGenerationService();
+    public void testGeneraVolcadoErpConArticulosAgrupados() {
+        VolcadoErpGenerationService service = new VolcadoErpGenerationService();
 
         List<CajaData> cajas = new ArrayList<>();
         cajas.add(new CajaData("REF001", "001", "80", 50, null, null));
@@ -19,7 +19,7 @@ public class VoltadoErpGenerationServiceTest {
         DatosEnvio envio = new DatosEnvio();
         envio.setNumeroFactura("FA-26-1189");
 
-        VoltadoErpData resultado = service.generar(cajas, envio);
+        VolcadoErpData resultado = service.generar(cajas, envio);
 
         assertNotNull(resultado);
         // 2 líneas únicas: REF001-80-001 (50+30=80 uds sumadas) y REF001-90-002 (20 uds)
@@ -31,7 +31,7 @@ public class VoltadoErpGenerationServiceTest {
 
     @Test
     public void testGeneraColorCodiSecuencial() {
-        VoltadoErpGenerationService service = new VoltadoErpGenerationService();
+        VolcadoErpGenerationService service = new VolcadoErpGenerationService();
 
         List<CajaData> cajas = new ArrayList<>();
         cajas.add(new CajaData("REF001", "NOIR", "80", 50, null, null));
@@ -41,15 +41,15 @@ public class VoltadoErpGenerationServiceTest {
         DatosEnvio envio = new DatosEnvio();
         envio.setNumeroFactura("TEST");
 
-        VoltadoErpData resultado = service.generar(cajas, envio);
+        VolcadoErpData resultado = service.generar(cajas, envio);
 
         // Una línea por combinación única referencia + talla + color:
         // (REF001, 80, NOIR), (REF001, 80, BLEU), (REF001, 90, NOIR) = 3 líneas
         assertEquals(3, resultado.getTotalLineas(), "Should have 3 lines, one per referencia+talla+color");
 
-        VoltadoErpLinea linea1 = resultado.getLineas().get(0);
-        VoltadoErpLinea linea2 = resultado.getLineas().get(1);
-        VoltadoErpLinea linea3 = resultado.getLineas().get(2);
+        VolcadoErpLinea linea1 = resultado.getLineas().get(0);
+        VolcadoErpLinea linea2 = resultado.getLineas().get(1);
+        VolcadoErpLinea linea3 = resultado.getLineas().get(2);
 
         // COLORCODI secuencial por orden de primera aparición: NOIR=001, BLEU=002
         // El mismo color siempre recibe el mismo código

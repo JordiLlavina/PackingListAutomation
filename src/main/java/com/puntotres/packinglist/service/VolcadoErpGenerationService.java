@@ -5,11 +5,11 @@ import com.puntotres.packinglist.model.*;
 import java.util.*;
 
 @Service
-public class VoltadoErpGenerationService {
+public class VolcadoErpGenerationService {
 
-    public VoltadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
+    public VolcadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
         // Agrupar por referencia + talla + color (una línea por combinación única)
-        Map<String, VoltadoErpLineaBuilder> grupos = new LinkedHashMap<>();
+        Map<String, VolcadoErpLineaBuilder> grupos = new LinkedHashMap<>();
         Map<String, String> colorCodis = new LinkedHashMap<>();  // color → codigo (preserva orden inserción)
         int colorCodiCounter = 1;
 
@@ -17,7 +17,7 @@ public class VoltadoErpGenerationService {
             String key = caja.getReferencia() + "|" + caja.getTalla() + "|" + caja.getCodigoColor();
 
             if (!grupos.containsKey(key)) {
-                grupos.put(key, new VoltadoErpLineaBuilder()
+                grupos.put(key, new VolcadoErpLineaBuilder()
                     .article(caja.getReferencia())
                     .talla(caja.getTalla())
                     .color(caja.getCodigoColor())
@@ -34,8 +34,8 @@ public class VoltadoErpGenerationService {
         }
 
         // Construir líneas finales con COLORCODI
-        List<VoltadoErpLinea> lineas = new ArrayList<>();
-        for (VoltadoErpLineaBuilder builder : grupos.values()) {
+        List<VolcadoErpLinea> lineas = new ArrayList<>();
+        for (VolcadoErpLineaBuilder builder : grupos.values()) {
             String colorCodi = colorCodis.get(builder.getColor());
             lineas.add(builder
                 .colorCodi(colorCodi)
@@ -45,11 +45,11 @@ public class VoltadoErpGenerationService {
         }
 
         String nombreFichero = "Volcado_ERP_" + envio.getNumeroFactura() + ".xlsx";
-        return new VoltadoErpData(lineas, nombreFichero);
+        return new VolcadoErpData(lineas, nombreFichero);
     }
 
     // Inner builder class para facilitar construcción
-    private static class VoltadoErpLineaBuilder {
+    private static class VolcadoErpLineaBuilder {
         private String article;
         private String talla;
         private String color;
@@ -58,17 +58,17 @@ public class VoltadoErpGenerationService {
         private int sisgrup;
         private int quantitat = 0;
 
-        public VoltadoErpLineaBuilder article(String article) { this.article = article; return this; }
-        public VoltadoErpLineaBuilder talla(String talla) { this.talla = talla; return this; }
-        public VoltadoErpLineaBuilder color(String color) { this.color = color; return this; }
-        public VoltadoErpLineaBuilder colorCodi(String colorCodi) { this.colorCodi = colorCodi; return this; }
-        public VoltadoErpLineaBuilder sistall(int sistall) { this.sistall = sistall; return this; }
-        public VoltadoErpLineaBuilder sisgrup(int sisgrup) { this.sisgrup = sisgrup; return this; }
-        public VoltadoErpLineaBuilder addQuantitat(int qty) { this.quantitat += qty; return this; }
+        public VolcadoErpLineaBuilder article(String article) { this.article = article; return this; }
+        public VolcadoErpLineaBuilder talla(String talla) { this.talla = talla; return this; }
+        public VolcadoErpLineaBuilder color(String color) { this.color = color; return this; }
+        public VolcadoErpLineaBuilder colorCodi(String colorCodi) { this.colorCodi = colorCodi; return this; }
+        public VolcadoErpLineaBuilder sistall(int sistall) { this.sistall = sistall; return this; }
+        public VolcadoErpLineaBuilder sisgrup(int sisgrup) { this.sisgrup = sisgrup; return this; }
+        public VolcadoErpLineaBuilder addQuantitat(int qty) { this.quantitat += qty; return this; }
         public String getColor() { return color; }
 
-        public VoltadoErpLinea build() {
-            return new VoltadoErpLinea(article, talla, colorCodi, color, sistall, sisgrup, quantitat);
+        public VolcadoErpLinea build() {
+            return new VolcadoErpLinea(article, talla, colorCodi, color, sistall, sisgrup, quantitat);
         }
     }
 }
