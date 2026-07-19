@@ -27,6 +27,20 @@ public class CajaData {
     private String livraisonCode;
     private String canal;
 
+    // Constructor por defecto (para creación con setters)
+    public CajaData() {
+    }
+
+    // Constructor para pruebas y creación simplificada
+    public CajaData(String referencia, String codigoColor, String talla, int cantidad, Double pesoNetoKg, Double pesoBrutoKg) {
+        this.referencia = referencia;
+        this.codigoColor = codigoColor;
+        this.talla = talla;
+        this.cantidad = cantidad;
+        this.pesoNetoKg = pesoNetoKg;
+        this.pesoBrutoKg = pesoBrutoKg;
+    }
+
     public int getNumeroCaja() { return numeroCaja; }
     public void setNumeroCaja(int numeroCaja) { this.numeroCaja = numeroCaja; }
 
