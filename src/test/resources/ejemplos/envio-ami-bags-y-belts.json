@@ -1,0 +1,67 @@
+{
+  "cliente": "AMI",
+  "destinos": [
+    {
+      "destino": "PARIS",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 5 }
+      ],
+      "referencias": [
+        {
+          "referencia": "USL728.AL217",
+          "color": "NOIR",
+          "medidaCaja": "60x40x40",
+          "pedido": "07685",
+          "cantidadTotal": 150,
+          "cajas": [
+            { "cajaInicio": 1, "cajaFin": 3, "unidadesPorCaja": 50 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0216",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "07672",
+          "talla": "75",
+          "cantidadTotal": 45,
+          "cajas": [
+            { "caja": 4, "unidades": 45 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0216",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "07672",
+          "talla": "85",
+          "cantidadTotal": 3,
+          "cajas": [
+            { "caja": 5, "unidades": 3 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0216",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "07672",
+          "talla": "95",
+          "cantidadTotal": 31,
+          "cajas": [
+            { "caja": 5, "unidades": 31 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0216",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "07672",
+          "talla": "105",
+          "cantidadTotal": 3,
+          "cajas": [
+            { "caja": 5, "unidades": 3 }
+          ]
+        }
+      ]
+    }
+  ]
+}

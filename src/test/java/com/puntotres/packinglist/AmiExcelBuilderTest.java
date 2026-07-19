@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -115,6 +117,19 @@ class AmiExcelBuilderTest {
     }
 
     @Test
+    void ciudadYPaisDePackingListDataSobrescribenElValorPorDefecto() throws Exception {
+        PackingListData data = data(caja(1, "OF-1", "BOLSO", "NAT03", 10, "60x40x30", 8.0, 9.2));
+        data.setCiudadProveedor("HONG KONG");
+        data.setPaisProveedor("CHINA");
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(builder.generar(data)))) {
+            Sheet hoja = wb.getSheet(NOMBRE_HOJA);
+            assertEquals("HONG KONG", texto(hoja, 2, 4));  // E3
+            assertEquals("CHINA", texto(hoja, 3, 4));      // E4
+        }
+    }
+
+    @Test
     void listaDeCajasVaciaLanzaExcepcion() {
         PackingListData data = data();
 
@@ -126,6 +141,90 @@ class AmiExcelBuilderTest {
         PackingListData data = data(caja(1, "OF-1", "BOLSO", "NAT03", 10, "60x40", 8.0, 9.2));
 
         assertThrows(IllegalArgumentException.class, () -> builder.generar(data));
+    }
+
+    // --- Cinturones (AmiLayout.BELTS): matriz de tallas 70-110 ---
+
+    @Test
+    void cinturonesEscribenLaCantidadEnLaColumnaDeSuTalla() throws Exception {
+        PackingListData.Caja caja = cajaCinturon(14, "07672", "UBL029.AL0216", "001",
+                "60x40x40", 8.0, 10.0, Map.of("85", 45));
+        PackingListData data = data(caja);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(
+                new ByteArrayInputStream(builder.generar(data, AmiLayout.BELTS)))) {
+            Sheet hoja = wb.getSheet("STANDARD PKL E25");
+            Row fila = hoja.getRow(18); // fila modelo (única caja, sin desplazar)
+
+            assertEquals("85", fila.getCell(5).getStringCellValue());          // F: SIZE GRID
+            assertEquals(45, (int) fila.getCell(9).getNumericCellValue());     // J: talla 85
+            assertEquals("SUM(G19:Q19)", fila.getCell(17).getCellFormula());   // R: QNTY TOTAL
+            assertEquals("60x40x40", fila.getCell(18).getStringCellValue());   // S: SIZE OF BOX
+            assertEquals(8.0, fila.getCell(19).getNumericCellValue());         // T: NET
+            assertEquals(10.0, fila.getCell(20).getNumericCellValue());        // U: GROSS
+        }
+    }
+
+    @Test
+    void unaCajaMixtaDeVariasTallasEscribeTodasSusColumnasYElGridCompuesto() throws Exception {
+        Map<String, Integer> tallasMixtas = new LinkedHashMap<>();
+        tallasMixtas.put("85", 3);
+        tallasMixtas.put("95", 31);
+        tallasMixtas.put("105", 3);
+        PackingListData.Caja caja = cajaCinturon(14, "07672", "UBL029.AL0216", "001",
+                "60x40x40", 8.0, 10.0, tallasMixtas);
+        PackingListData data = data(caja);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(
+                new ByteArrayInputStream(builder.generar(data, AmiLayout.BELTS)))) {
+            Row fila = wb.getSheet("STANDARD PKL E25").getRow(18);
+
+            assertEquals("85-95-105", fila.getCell(5).getStringCellValue()); // F
+            assertEquals(3, (int) fila.getCell(9).getNumericCellValue());    // J: 85
+            assertEquals(31, (int) fila.getCell(11).getNumericCellValue());  // L: 95
+            assertEquals(3, (int) fila.getCell(13).getNumericCellValue());   // N: 105
+        }
+    }
+
+    @Test
+    void variasCajasDeCinturonesDesplazanTotalesYResumenIgualQueEnBolsos() throws Exception {
+        PackingListData data = data(
+                cajaCinturon(12, "07672", "UBL029.AL0216", "001", "60x40x40", 8.0, 10.0, Map.of("75", 45)),
+                cajaCinturon(13, "07672", "UBL029.AL0216", "001", "60x40x40", 8.0, 10.0, Map.of("85", 61)));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(
+                new ByteArrayInputStream(builder.generar(data, AmiLayout.BELTS)))) {
+            Sheet hoja = wb.getSheet("STANDARD PKL E25");
+
+            Row filaTotales = hoja.getRow(20); // desplazada 1 (2 cajas)
+            assertEquals("SUM(G19:G20)", filaTotales.getCell(6).getCellFormula());
+            assertEquals("SUM(T19:T20)", filaTotales.getCell(19).getCellFormula());
+
+            assertEquals("+R21", celda(hoja, 23, 20).getCellFormula());  // TOTAL QTY
+            assertEquals(2, celda(hoja, 24, 20).getNumericCellValue());  // TOTAL NUMBER OF BOXES
+        }
+    }
+
+    @Test
+    void unaTallaSinColumnaEnLaMatrizLanzaExcepcionClara() {
+        PackingListData data = data(cajaCinturon(1, "07672", "UBL029.AL0216", "001",
+                "60x40x40", 8.0, 10.0, Map.of("999", 10)));
+
+        assertThrows(IllegalArgumentException.class, () -> builder.generar(data, AmiLayout.BELTS));
+    }
+
+    private static PackingListData.Caja cajaCinturon(int numero, String pedido, String referencia,
+            String color, String tamano, Double neto, Double bruto, Map<String, Integer> cantidadesPorTalla) {
+        PackingListData.Caja caja = new PackingListData.Caja();
+        caja.setNumeroCaja(numero);
+        caja.setNumeroPedido(pedido);
+        caja.setReferencia(referencia);
+        caja.setCodigoColor(color);
+        caja.setTamanoCaja(tamano);
+        caja.setPesoNetoKg(neto);
+        caja.setPesoBrutoKg(bruto);
+        caja.setCantidadesPorTalla(cantidadesPorTalla);
+        return caja;
     }
 
     private static PackingListData data(PackingListData.Caja... cajas) {

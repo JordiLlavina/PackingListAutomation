@@ -80,6 +80,10 @@ public class EnvioImportService {
         caja.setCodigoColor(referencia.getColor());
         caja.setTamanoCaja(referencia.getMedidaCaja());
         caja.setCantidad(unidades != null ? unidades : 0);
+        caja.setTalla(referencia.getTalla());
+        caja.setModelo(referencia.getModelo());
+        caja.setLivraisonCode(referencia.getLivraisonCode());
+        caja.setCanal(referencia.getCanal());
         // Los pesos no vienen en el JSON: quedan a null hasta que los
         // complete el WeightInferenceService o la revisión manual.
         return caja;
@@ -97,18 +101,29 @@ public class EnvioImportService {
             palet.setNumeroPalet(entrada.getPalet());
             palet.setCajaInicio(entrada.getCajaInicio());
             palet.setCajaFin(entrada.getCajaFin());
+            palet.setMedidas(entrada.getMedidas());
+            palet.setTara(entrada.getTara());
             palets.add(palet);
         }
         return palets;
     }
 
+    /**
+     * Un mismo número de caja en varias entradas es legítimo cuando cambia
+     * el contenido (caja mixta de dos colores, cinturones con varias tallas,
+     * canales distintos de APC): solo se avisa si se repite la combinación
+     * completa, que sí huele a error de lectura de la imagen.
+     */
     private void detectarDuplicados(DestinoData destino, EnvioImportado resultado) {
-        Set<Integer> vistos = new HashSet<>();
+        Set<String> vistos = new HashSet<>();
         for (CajaData caja : destino.getCajas()) {
-            if (!vistos.add(caja.getNumeroCaja())) {
+            String clave = caja.getNumeroCaja() + "|" + caja.getReferencia() + "|"
+                    + caja.getCodigoColor() + "|" + caja.getTalla() + "|" + caja.getCanal();
+            if (!vistos.add(clave)) {
                 resultado.getAvisos().add(String.format(
-                        "%s: el número de caja %d aparece más de una vez",
-                        destino.getNombreDestino(), caja.getNumeroCaja()));
+                        "%s: la caja %d aparece más de una vez con la misma referencia, color, talla y canal (%s %s)",
+                        destino.getNombreDestino(), caja.getNumeroCaja(),
+                        caja.getReferencia(), caja.getCodigoColor()));
             }
         }
     }

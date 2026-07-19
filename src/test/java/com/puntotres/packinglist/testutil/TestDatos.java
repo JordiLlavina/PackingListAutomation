@@ -26,6 +26,14 @@ public final class TestDatos {
         return caja;
     }
 
+    /** Como {@link #caja}, pero con talla (referencias de cinturón, UBL). */
+    public static CajaData cajaConTalla(int numero, String pedido, String referencia, String color,
+                                        String talla, int cantidad, Double neto, Double bruto) {
+        CajaData caja = caja(numero, pedido, referencia, color, cantidad, neto, bruto);
+        caja.setTalla(talla);
+        return caja;
+    }
+
     public static PaletData palet(String destino, int numero, int inicio, int fin) {
         PaletData palet = new PaletData();
         palet.setDestino(destino);

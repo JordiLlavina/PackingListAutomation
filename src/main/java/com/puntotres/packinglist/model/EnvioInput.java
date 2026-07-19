@@ -40,6 +40,11 @@ public class EnvioInput {
         private int palet;
         private int cajaInicio;
         private int cajaFin;
+        // Opcionales: dimensiones del palet "LxWxH" en cm (p. ej. "80x120x130")
+        // y tara del palet en kg. Solo los usan las plantillas que imprimen
+        // datos de palet (APC/genérica); sin tara se asume 10 kg.
+        private String medidas;
+        private Double tara;
 
         public int getPalet() { return palet; }
         public void setPalet(int palet) { this.palet = palet; }
@@ -49,6 +54,12 @@ public class EnvioInput {
 
         public int getCajaFin() { return cajaFin; }
         public void setCajaFin(int cajaFin) { this.cajaFin = cajaFin; }
+
+        public String getMedidas() { return medidas; }
+        public void setMedidas(String medidas) { this.medidas = medidas; }
+
+        public Double getTara() { return tara; }
+        public void setTara(Double tara) { this.tara = tara; }
     }
 
     public static class ReferenciaInput {
@@ -59,6 +70,15 @@ public class EnvioInput {
         private String pedido;
         private Integer cantidadTotal;
         private List<CajaRangoInput> cajas;
+        // Opcionales según cliente: la talla (cinturones AMI, SIZE de APC),
+        // el nombre comercial del modelo, el código de livraison de APC y el
+        // canal de la línea (columna DESTINATION de APC: WHOLESALE, RETAIL,
+        // AUSTRALIA...). Una referencia con varias tallas o canales aparece
+        // como varias entradas, igual que ya ocurre con los colores.
+        private String talla;
+        private String modelo;
+        private String livraisonCode;
+        private String canal;
 
         public String getReferencia() { return referencia; }
         public void setReferencia(String referencia) { this.referencia = referencia; }
@@ -77,6 +97,18 @@ public class EnvioInput {
 
         public List<CajaRangoInput> getCajas() { return cajas; }
         public void setCajas(List<CajaRangoInput> cajas) { this.cajas = cajas; }
+
+        public String getTalla() { return talla; }
+        public void setTalla(String talla) { this.talla = talla; }
+
+        public String getModelo() { return modelo; }
+        public void setModelo(String modelo) { this.modelo = modelo; }
+
+        public String getLivraisonCode() { return livraisonCode; }
+        public void setLivraisonCode(String livraisonCode) { this.livraisonCode = livraisonCode; }
+
+        public String getCanal() { return canal; }
+        public void setCanal(String canal) { this.canal = canal; }
     }
 
     /**

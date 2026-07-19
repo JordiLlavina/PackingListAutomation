@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -17,72 +18,54 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
 /**
- * Genera el Excel de packing list AMI rellenando la plantilla
- * "STANDARD PKL H26" incluida en el classpath.
+ * Genera el Excel de packing list AMI rellenando la plantilla "STANDARD
+ * PKL" del {@link AmiLayout} indicado: bolsos/carteras ({@link
+ * AmiLayout#BAGS}, talla única "U") o cinturones ({@link AmiLayout#BELTS},
+ * matriz de tallas 70-110). Ambas comparten cabecera y mecánica de
+ * escritura; solo cambian plantilla, filas y columnas (ver AmiLayout).
  *
  * La plantilla trae la cabecera, la leyenda de tallas, los encabezados de
- * columna (fila 19), UNA fila modelo con los estilos correctos (fila 20),
- * la fila de totales (fila 21) y el bloque resumen (filas 23-28). Este
- * builder escribe la cabecera, clona la fila modelo tantas veces como cajas
- * haya (desplazando totales y resumen hacia abajo) y reescribe las fórmulas
- * de totales sobre el rango real de filas usadas.
+ * columna, UNA fila modelo con los estilos correctos, la fila de totales y
+ * el bloque resumen. Este builder escribe la cabecera, clona la fila
+ * modelo tantas veces como cajas haya (desplazando totales y resumen hacia
+ * abajo) y reescribe las fórmulas de totales sobre el rango real de filas
+ * usadas.
  */
 @Service
 public class AmiExcelBuilder {
 
-    private static final String RUTA_PLANTILLA = "/client-packinglist/ami-bags-packing-list-template.xlsx";
-    private static final String NOMBRE_HOJA = "STANDARD PKL H26";
-
-    // Datos fijos del proveedor: no vienen en el JSON.
+    // Nombre y código del proveedor: fijos, no vienen en el JSON. La ciudad
+    // y el país sí son datos (PackingListData, editables en la pantalla de
+    // entrada) porque AMI los pide como campo variable de la cabecera.
     private static final String PROVEEDOR_NOMBRE = "PUNTOTRES";
     private static final String PROVEEDOR_CODIGO = "PUN";
-    private static final String PROVEEDOR_CIUDAD = "BADALONA";
-    private static final String PROVEEDOR_PAIS = "SPAIN";
 
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    // Índices 0-based de POI (fila 20 de Excel = índice 19).
-    private static final int IDX_FILA_MODELO = 19;
-    private static final int IDX_FILA_TOTALES = 20;
-    private static final int IDX_RESUMEN_TOTAL_QTY = 23;   // V24
-    private static final int IDX_RESUMEN_NUM_CAJAS = 24;   // V25
-    private static final int IDX_RESUMEN_PESO_BRUTO = 25;  // V26
-    private static final int IDX_RESUMEN_PESO_NETO = 26;   // V27
-    private static final int IDX_RESUMEN_VOLUMEN = 27;     // V28
-
-    // Índices 0-based de columna (A=0 ... V=21).
-    private static final int COL_TEMPORADA = 0;      // A SEASON
-    private static final int COL_PEDIDO = 1;         // B ORDER FORM NUMBER
-    private static final int COL_REFERENCIA = 2;     // C REFERENCE
-    private static final int COL_COLOR = 3;          // D color CODE
-    private static final int COL_NUM_CAJA = 4;       // E CTN NO.
-    private static final int COL_SIZE_GRID = 5;      // F SIZE GRID
-    private static final int COL_PRIMERA_TALLA = 6;  // G (talla "U" del grid de talla única)
-    private static final int COL_ULTIMA_TALLA = 17;  // R
-    private static final int COL_QNTY_TOTAL = 18;    // S
-    private static final int COL_TAMANO_CAJA = 19;   // T SIZE OF BOX
-    private static final int COL_PESO_NETO = 20;     // U NET.W/KGS
-    private static final int COL_PESO_BRUTO = 21;    // V GROSS.W/KGS
-    private static final int ULTIMA_COLUMNA = COL_PESO_BRUTO;
+    /** Bolsos y carteras (comportamiento histórico, plantilla por defecto). */
+    public byte[] generar(PackingListData data) throws IOException {
+        return generar(data, AmiLayout.BAGS);
+    }
 
     /**
-     * Rellena la plantilla con los datos recibidos y devuelve el .xlsx
-     * resultante como bytes, listo para guardar en disco o servir por HTTP.
+     * Rellena la plantilla del layout indicado con los datos recibidos y
+     * devuelve el .xlsx resultante como bytes, listo para guardar en disco
+     * o servir por HTTP.
      */
-    public byte[] generar(PackingListData data) throws IOException {
-        try (InputStream plantilla = abrirPlantilla();
+    public byte[] generar(PackingListData data, AmiLayout layout) throws IOException {
+        try (InputStream plantilla = abrirPlantilla(layout);
              Workbook wb = new XSSFWorkbook(plantilla);
              ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
 
-            Sheet hoja = wb.getSheet(NOMBRE_HOJA);
+            Sheet hoja = wb.getSheet(layout.nombreHoja());
             if (hoja == null) {
-                throw new IllegalStateException("La plantilla no contiene la hoja '" + NOMBRE_HOJA + "'");
+                throw new IllegalStateException("La plantilla no contiene la hoja '" + layout.nombreHoja() + "'");
             }
 
-            escribirCabecera(hoja, data);
-            int idxFilaTotales = escribirFilasDeCajas(hoja, data);
-            escribirTotales(hoja, idxFilaTotales, data.getCajas().size());
-            escribirResumen(hoja, idxFilaTotales, data.getCajas());
+            escribirCabecera(hoja, data, layout);
+            int idxFilaTotales = escribirFilasDeCajas(hoja, data, layout);
+            escribirTotales(hoja, idxFilaTotales, data.getCajas().size(), layout);
+            escribirResumen(hoja, idxFilaTotales, data.getCajas(), layout);
 
             // Los valores cacheados de la plantilla son 0; con esto Excel
             // recalcula todas las fórmulas al abrir el fichero.
@@ -93,24 +76,25 @@ public class AmiExcelBuilder {
         }
     }
 
-    private InputStream abrirPlantilla() {
-        InputStream in = getClass().getResourceAsStream(RUTA_PLANTILLA);
+    private InputStream abrirPlantilla(AmiLayout layout) {
+        InputStream in = getClass().getResourceAsStream(layout.rutaPlantilla());
         if (in == null) {
-            throw new IllegalStateException("No se encuentra la plantilla en el classpath: " + RUTA_PLANTILLA);
+            throw new IllegalStateException(
+                    "No se encuentra la plantilla en el classpath: " + layout.rutaPlantilla());
         }
         return in;
     }
 
     /**
-     * Cabecera fija (filas 3-10). El proveedor se reescribe desde las
-     * constantes aunque la plantilla ya lo traiga, por robustez ante
-     * futuros cambios de plantilla.
+     * Cabecera fija (filas 3-10, idénticas en bolsos y cinturones). El
+     * nombre/código del proveedor se reescribe desde las constantes aunque
+     * la plantilla ya lo traiga, por robustez ante futuros cambios.
      */
-    private void escribirCabecera(Sheet hoja, PackingListData data) {
-        escribirTexto(hoja, 2, 1, PROVEEDOR_NOMBRE);   // B3
-        escribirTexto(hoja, 2, 4, PROVEEDOR_CIUDAD);   // E3
-        escribirTexto(hoja, 3, 1, PROVEEDOR_CODIGO);   // B4
-        escribirTexto(hoja, 3, 4, PROVEEDOR_PAIS);     // E4
+    private void escribirCabecera(Sheet hoja, PackingListData data, AmiLayout layout) {
+        escribirTexto(hoja, 2, 1, PROVEEDOR_NOMBRE);          // B3
+        escribirTexto(hoja, 2, 4, data.getCiudadProveedor()); // E3
+        escribirTexto(hoja, 3, 1, PROVEEDOR_CODIGO);          // B4
+        escribirTexto(hoja, 3, 4, data.getPaisProveedor());   // E4
 
         escribirTexto(hoja, 5, 1, data.getNumeroFactura());        // B6
         escribirFecha(hoja, 6, 1, data.getFechaFactura());         // B7
@@ -119,7 +103,7 @@ public class AmiExcelBuilder {
     }
 
     /**
-     * Escribe una fila por caja a partir de la fila modelo (20).
+     * Escribe una fila por caja a partir de la fila modelo del layout.
      *
      * Con N cajas: primero se desplazan N-1 posiciones hacia abajo todas las
      * filas desde la de totales (shiftRows mueve celdas, estilos y ajusta las
@@ -129,33 +113,33 @@ public class AmiExcelBuilder {
      *
      * @return índice 0-based de la fila de totales tras el desplazamiento
      */
-    private int escribirFilasDeCajas(Sheet hoja, PackingListData data) {
+    private int escribirFilasDeCajas(Sheet hoja, PackingListData data, AmiLayout layout) {
         List<PackingListData.Caja> cajas = data.getCajas();
         if (cajas == null || cajas.isEmpty()) {
             throw new IllegalArgumentException("El packing list no contiene cajas");
         }
         int numCajas = cajas.size();
 
-        Row filaModelo = hoja.getRow(IDX_FILA_MODELO);
+        Row filaModelo = hoja.getRow(layout.idxFilaModelo());
 
         // Los estilos del modelo se capturan ANTES de escribir nada en él.
-        CellStyle[] estilosModelo = new CellStyle[ULTIMA_COLUMNA + 1];
-        for (int col = 0; col <= ULTIMA_COLUMNA; col++) {
+        CellStyle[] estilosModelo = new CellStyle[layout.ultimaColumna() + 1];
+        for (int col = 0; col <= layout.ultimaColumna(); col++) {
             Cell celda = filaModelo.getCell(col);
             estilosModelo[col] = (celda != null) ? celda.getCellStyle() : null;
         }
         short alturaModelo = filaModelo.getHeight();
 
         if (numCajas > 1) {
-            hoja.shiftRows(IDX_FILA_TOTALES, hoja.getLastRowNum(), numCajas - 1);
+            hoja.shiftRows(layout.idxFilaTotales(), hoja.getLastRowNum(), numCajas - 1);
         }
 
         for (int i = 0; i < numCajas; i++) {
-            int idxFila = IDX_FILA_MODELO + i;
+            int idxFila = layout.idxFilaModelo() + i;
             Row fila = (i == 0) ? filaModelo : hoja.createRow(idxFila);
             if (i > 0) {
                 fila.setHeight(alturaModelo);
-                for (int col = 0; col <= ULTIMA_COLUMNA; col++) {
+                for (int col = 0; col <= layout.ultimaColumna(); col++) {
                     if (estilosModelo[col] != null) {
                         // Mismo workbook: se reutiliza la referencia al estilo,
                         // no hace falta clonarlo.
@@ -163,33 +147,63 @@ public class AmiExcelBuilder {
                     }
                 }
             }
-            escribirCaja(fila, data, cajas.get(i));
+            escribirCaja(fila, data, cajas.get(i), layout);
         }
 
-        return IDX_FILA_MODELO + numCajas;
+        return layout.idxFilaModelo() + numCajas;
     }
 
-    private void escribirCaja(Row fila, PackingListData data, PackingListData.Caja caja) {
-        fila.getCell(COL_TEMPORADA).setCellValue(data.getTemporada());
-        fila.getCell(COL_PEDIDO).setCellValue(caja.getNumeroPedido());
-        fila.getCell(COL_REFERENCIA).setCellValue(caja.getReferencia());
-        fila.getCell(COL_COLOR).setCellValue(caja.getCodigoColor());
-        fila.getCell(COL_NUM_CAJA).setCellValue(caja.getNumeroCaja());
-        fila.getCell(COL_SIZE_GRID).setCellValue("U");
-        fila.getCell(COL_PRIMERA_TALLA).setCellValue(caja.getCantidad());
+    private void escribirCaja(Row fila, PackingListData data, PackingListData.Caja caja, AmiLayout layout) {
+        fila.getCell(layout.colTemporada()).setCellValue(data.getTemporada());
+        fila.getCell(layout.colPedido()).setCellValue(caja.getNumeroPedido());
+        fila.getCell(layout.colReferencia()).setCellValue(caja.getReferencia());
+        fila.getCell(layout.colColor()).setCellValue(caja.getCodigoColor());
+        fila.getCell(layout.colNumCaja()).setCellValue(caja.getNumeroCaja());
+        escribirTallas(fila, caja, layout);
 
         // Fórmula de fila igual que en el original: =SUM(G20:R20), etc.
         // Las filas de fórmula son 1-based, de ahí el +1.
         int filaExcel = fila.getRowNum() + 1;
-        fila.getCell(COL_QNTY_TOTAL).setCellFormula("SUM(G" + filaExcel + ":R" + filaExcel + ")");
+        String colPrimeraTallaLetra = CellReference.convertNumToColString(layout.colPrimeraTalla());
+        String colUltimaTallaLetra = CellReference.convertNumToColString(layout.colUltimaTalla());
+        fila.getCell(layout.colQntyTotal()).setCellFormula(
+                "SUM(" + colPrimeraTallaLetra + filaExcel + ":" + colUltimaTallaLetra + filaExcel + ")");
 
-        fila.getCell(COL_TAMANO_CAJA).setCellValue(caja.getTamanoCaja());
+        fila.getCell(layout.colTamanoCaja()).setCellValue(caja.getTamanoCaja());
         // Pesos desconocidos (null): la celda se deja vacía, pendiente de revisión.
         if (caja.getPesoNetoKg() != null) {
-            fila.getCell(COL_PESO_NETO).setCellValue(caja.getPesoNetoKg());
+            fila.getCell(layout.colPesoNeto()).setCellValue(caja.getPesoNetoKg());
         }
         if (caja.getPesoBrutoKg() != null) {
-            fila.getCell(COL_PESO_BRUTO).setCellValue(caja.getPesoBrutoKg());
+            fila.getCell(layout.colPesoBruto()).setCellValue(caja.getPesoBrutoKg());
+        }
+    }
+
+    /**
+     * Talla única "U" (bolsos, {@code cantidadesPorTalla == null}): la
+     * cantidad de la caja va entera en la primera columna de talla.
+     *
+     * Matriz de tallas (cinturones): cada talla de la caja va en SU columna
+     * (una caja física puede mezclar tallas); el grid se etiqueta con las
+     * tallas presentes unidas por "-", en el mismo orden del mapa.
+     */
+    private void escribirTallas(Row fila, PackingListData.Caja caja, AmiLayout layout) {
+        Map<String, Integer> cantidadesPorTalla = caja.getCantidadesPorTalla();
+        if (cantidadesPorTalla == null) {
+            fila.getCell(layout.colSizeGrid()).setCellValue("U");
+            fila.getCell(layout.colPrimeraTalla()).setCellValue(caja.getCantidad());
+            return;
+        }
+
+        fila.getCell(layout.colSizeGrid()).setCellValue(String.join("-", cantidadesPorTalla.keySet()));
+        for (Map.Entry<String, Integer> entrada : cantidadesPorTalla.entrySet()) {
+            Integer columna = layout.columnaPorTalla().get(entrada.getKey());
+            if (columna == null) {
+                throw new IllegalArgumentException(
+                        "Talla '" + entrada.getKey() + "' no está en la matriz de la plantilla ("
+                        + layout.columnaPorTalla().keySet() + ")");
+            }
+            fila.getCell(columna).setCellValue(entrada.getValue());
         }
     }
 
@@ -197,16 +211,16 @@ public class AmiExcelBuilder {
      * Reescribe la fila de totales con fórmulas SUM sobre el rango real de
      * filas de datos (la plantilla solo sumaba su única fila de ejemplo).
      */
-    private void escribirTotales(Sheet hoja, int idxFilaTotales, int numCajas) {
+    private void escribirTotales(Sheet hoja, int idxFilaTotales, int numCajas, AmiLayout layout) {
         Row filaTotales = hoja.getRow(idxFilaTotales);
-        int primeraFilaExcel = IDX_FILA_MODELO + 1;              // 20
-        int ultimaFilaExcel = IDX_FILA_MODELO + numCajas;        // 19 + N
+        int primeraFilaExcel = layout.idxFilaModelo() + 1;
+        int ultimaFilaExcel = layout.idxFilaModelo() + numCajas;
 
-        for (int col = COL_PRIMERA_TALLA; col <= COL_QNTY_TOTAL; col++) {
+        for (int col = layout.colPrimeraTalla(); col <= layout.colQntyTotal(); col++) {
             escribirSuma(filaTotales, col, primeraFilaExcel, ultimaFilaExcel);
         }
-        escribirSuma(filaTotales, COL_PESO_NETO, primeraFilaExcel, ultimaFilaExcel);
-        escribirSuma(filaTotales, COL_PESO_BRUTO, primeraFilaExcel, ultimaFilaExcel);
+        escribirSuma(filaTotales, layout.colPesoNeto(), primeraFilaExcel, ultimaFilaExcel);
+        escribirSuma(filaTotales, layout.colPesoBruto(), primeraFilaExcel, ultimaFilaExcel);
     }
 
     private void escribirSuma(Row fila, int col, int primeraFilaExcel, int ultimaFilaExcel) {
@@ -216,23 +230,27 @@ public class AmiExcelBuilder {
     }
 
     /**
-     * Bloque SUM UP (columna V). Las fórmulas apuntan a la fila de totales ya
+     * Bloque SUM UP. Las fórmulas apuntan a la fila de totales ya
      * desplazada; el número de cajas y el volumen van como valor, igual que
      * en el original.
      */
-    private void escribirResumen(Sheet hoja, int idxFilaTotales, List<PackingListData.Caja> cajas) {
+    private void escribirResumen(Sheet hoja, int idxFilaTotales, List<PackingListData.Caja> cajas, AmiLayout layout) {
         int desplazamiento = cajas.size() - 1;
         int filaTotalesExcel = idxFilaTotales + 1;
+        String colQntyTotalLetra = CellReference.convertNumToColString(layout.colQntyTotal());
+        String colPesoBrutoLetra = CellReference.convertNumToColString(layout.colPesoBruto());
+        String colPesoNetoLetra = CellReference.convertNumToColString(layout.colPesoNeto());
+        int col = layout.colPesoBruto();
 
-        celda(hoja, IDX_RESUMEN_TOTAL_QTY + desplazamiento, COL_PESO_BRUTO)
-                .setCellFormula("+S" + filaTotalesExcel);
-        celda(hoja, IDX_RESUMEN_NUM_CAJAS + desplazamiento, COL_PESO_BRUTO)
+        celda(hoja, layout.idxResumenTotalQty() + desplazamiento, col)
+                .setCellFormula("+" + colQntyTotalLetra + filaTotalesExcel);
+        celda(hoja, layout.idxResumenNumCajas() + desplazamiento, col)
                 .setCellValue(cajas.size());
-        celda(hoja, IDX_RESUMEN_PESO_BRUTO + desplazamiento, COL_PESO_BRUTO)
-                .setCellFormula("V" + filaTotalesExcel);
-        celda(hoja, IDX_RESUMEN_PESO_NETO + desplazamiento, COL_PESO_BRUTO)
-                .setCellFormula("U" + filaTotalesExcel);
-        celda(hoja, IDX_RESUMEN_VOLUMEN + desplazamiento, COL_PESO_BRUTO)
+        celda(hoja, layout.idxResumenPesoBruto() + desplazamiento, col)
+                .setCellFormula(colPesoBrutoLetra + filaTotalesExcel);
+        celda(hoja, layout.idxResumenPesoNeto() + desplazamiento, col)
+                .setCellFormula(colPesoNetoLetra + filaTotalesExcel);
+        celda(hoja, layout.idxResumenVolumen() + desplazamiento, col)
                 .setCellValue(calcularVolumenTotalM3(cajas));
     }
 

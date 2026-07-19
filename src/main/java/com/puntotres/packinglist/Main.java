@@ -7,9 +7,12 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.TaraProperties;
+import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
+import com.puntotres.packinglist.service.AmiGenerador;
 import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
@@ -42,7 +45,7 @@ public class Main {
         PaletAssignmentService asignadorPalets = new PaletAssignmentService();
         WeightInferenceService inferidorPesos = new WeightInferenceService(taras);
         PackingListGenerationService generador =
-                new PackingListGenerationService(new AmiExcelBuilder());
+                new PackingListGenerationService(List.of(new AmiGenerador(new AmiExcelBuilder())));
 
         // Cabecera que no sale de las imágenes (la pondrá la pantalla de revisión).
         DatosEnvio cabecera = new DatosEnvio();
@@ -50,6 +53,9 @@ public class Main {
         cabecera.setNumeroFactura("FACTURA-PENDIENTE");
         cabecera.setFechaFactura("18/07/2026");
         cabecera.setFechaEnvio("31/07/2026");
+
+        ClienteConfig ami = new ClienteConfig();
+        ami.setPlantilla(TipoPlantilla.AMI);
 
         EnvioImportado importado = importador.importar(envio);
         // TODO(web-ui): sustituir estos prints por popups/alertas en la
@@ -70,7 +76,7 @@ public class Main {
             inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas());
 
             List<ExcelGenerado> excels =
-                    generador.generarPorModeloYColor(destino.getDestino(), cabecera);
+                    generador.generar(destino.getDestino(), destino.getPalets(), cabecera, ami);
             for (ExcelGenerado excel : excels) {
                 Path fichero = Path.of("target", excel.getNombreFichero());
                 Files.write(fichero, excel.getContenido());

@@ -14,8 +14,7 @@
             <thead>
             <tr>
                 <th>Fichero</th>
-                <th>Referencia</th>
-                <th>Color</th>
+                <th>Contenido</th>
                 <th>Pesos</th>
                 <th></th>
             </tr>
@@ -23,8 +22,7 @@
             <tbody>
             <tr th:each="excel : ${excels}">
                 <td th:text="${excel.nombreFichero}"></td>
-                <td th:text="${excel.referencia}"></td>
-                <td th:text="${excel.color}"></td>
+                <td th:text="${excel.descripcion}"></td>
                 <td>
                     <span th:if="${excel.tienePesosPendientes()}" class="badge pendiente"
                           th:text="|${excel.cajasPendientes.size()} cajas sin peso|"></span>

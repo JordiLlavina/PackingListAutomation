@@ -7,3 +7,77 @@ packing-list:
   taras:
     "[60x40x40]": 1.6
     "[60x40x30]": 1.2
+
+  # Catálogo de clientes. Añadir un cliente nuevo de plantilla GENERIC =
+  # añadir aquí su bloque (nombre-legal + direccion-entrega), sin tocar Java.
+  # El orden de este bloque es el orden del desplegable de la web.
+  clientes:
+    "[AMI]":
+      nombre: AMI
+      plantilla: AMI
+      placeholder-temporada: H26
+      # Destinos habituales (informativo, la plantilla los escribe tal cual
+      # llegan del JSON): PARIS, CHINA, JAPAN, HONG KONG. Pueden llegar más.
+
+    "[APC]":
+      nombre: A.P.C.
+      plantilla: APC
+      placeholder-temporada: E25
+      destinos:
+        "[D. USA]":
+          nombre-cliente: A.P.C.-USNY-TOUITOU
+          direccion: 43 BROOME STREET, 5TH FLOOR; 10013 NEW YORK; USA
+        "[IVRY]":
+          nombre-cliente: A.P.C.
+          direccion: 74 BIS AV MAURICE THOREZ 94200 IVRY SUR SEINE FRANCE
+        "[JAPAN]":
+          nombre-cliente: A.P.C. JAPAN LTD.
+          direccion: 4F AOYAMA 1-CHOME BUILDING; 8-5-30, AKASAKA,MINATO-KU; TOKYO
+        "[KOREA]":
+          nombre-cliente: I.D.LOOK. LTD.
+          direccion: 6TH FL. PUREUN BLDG. 581, GANGNAMDE-RO, SEOCHO-GU, 06530 SEOUL,SOUTH KOREA
+        "[C-LOG]":
+          nombre-cliente: A.P.C.
+          direccion: CROSSLOG, 104 RUE DENIS PAPIN, 77550 MOISSY CRAMAYEL, FRANCE
+
+    "[ACKERMANN]":
+      nombre: Ackermann
+      plantilla: GENERIC
+      nombre-legal: ACKERMANN HOHMANN UND SEDLACEK OHG
+      direccion-entrega: Goseburgstraße 27, 21339 Lüneburg, Germany
+
+    "[DROLE DU MONSIEUR]":
+      nombre: Drole du Monsieur
+      plantilla: GENERIC
+      nombre-legal: MSDS
+      direccion-entrega: ENTREPOT LOGISTIQUE NC; 17 Rue du noyer à la malice; 95380 LOUVRES, France
+
+    "[KAMI]":
+      nombre: Kami
+      plantilla: GENERIC
+      nombre-legal: KAMI SAS
+      direccion-entrega: Ploiesti West Park DN72 PLOIESTI Targoviste-Road; 107025 Aricestii Rahtivani communne; ROMANIA
+
+    "[LGN]":
+      nombre: LGN
+      plantilla: GENERIC
+      nombre-legal: LGN C/O - STELLAE INTERNATIONAL FRANCE
+      direccion-entrega: 47 BIS RUE ERNEST RENAN; 94200 IVRY SUR SEINE
+
+    "[PALOMA WOOL]":
+      nombre: Paloma Wool
+      plantilla: GENERIC
+      nombre-legal: PURO PASEO, S.L.
+      direccion-entrega: GRUPO SEVICA - C/ DEL PROGRES, 4-6, POL.IND. LA POST- NAVE 3, 08850 GAVÀ (BARCELONA)
+
+    "[PAUL & JOE]":
+      nombre: Paul & Joe
+      plantilla: GENERIC
+      nombre-legal: MANEKI SAS
+      direccion-entrega: PAUL&JOE; 14 RUE COMMINES, 75003 PARIS
+
+    "[SONIA RYKIEL]":
+      nombre: Sonia Rykiel
+      plantilla: GENERIC
+      nombre-legal: SONIA RYKIEL INTERNATIONAL
+      direccion-entrega: BLECKMANN - TRB INTERNATIONAL; INDUSTRIEWEG 38C; QUAI B12; 2280 GROBBENDONK, BELGIUM

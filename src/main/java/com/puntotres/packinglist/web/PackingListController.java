@@ -5,7 +5,9 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -24,6 +26,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.config.ClienteConfig;
+import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
@@ -54,6 +58,7 @@ public class PackingListController {
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
     private final PackingListGenerationService generador;
+    private final ClientesProperties clientesProperties;
     private final ObjectMapper mapper;
     private final EnvioEnCurso envioEnCurso;
 
@@ -61,12 +66,14 @@ public class PackingListController {
                                  PaletAssignmentService asignadorPalets,
                                  WeightInferenceService inferidorPesos,
                                  PackingListGenerationService generador,
+                                 ClientesProperties clientesProperties,
                                  ObjectMapper mapper,
                                  EnvioEnCurso envioEnCurso) {
         this.importador = importador;
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
         this.generador = generador;
+        this.clientesProperties = clientesProperties;
         this.mapper = mapper;
         this.envioEnCurso = envioEnCurso;
     }
@@ -82,6 +89,7 @@ public class PackingListController {
             form.setFechaEnvio(hoy);
             model.addAttribute("envioForm", form);
         }
+        anadirAtributosDeClientes(model);
         return "entrada";
     }
 
@@ -89,6 +97,14 @@ public class PackingListController {
     public String importar(@Valid @ModelAttribute EnvioForm envioForm,
                            BindingResult errores, Model model) {
         if (errores.hasErrors()) {
+            anadirAtributosDeClientes(model);
+            return "entrada";
+        }
+
+        ClienteConfig cliente = clientesProperties.clientePara(envioForm.getCliente()).orElse(null);
+        if (cliente == null) {
+            errores.rejectValue("cliente", "cliente.desconocido", "Cliente desconocido: " + envioForm.getCliente());
+            anadirAtributosDeClientes(model);
             return "entrada";
         }
 
@@ -97,10 +113,12 @@ public class PackingListController {
             envio = mapper.readValue(envioForm.getJson(), EnvioInput.class);
         } catch (JsonProcessingException e) {
             model.addAttribute("errorJson", "El JSON no es válido: " + e.getOriginalMessage());
+            anadirAtributosDeClientes(model);
             return "entrada";
         }
         if (envio.getDestinos() == null || envio.getDestinos().isEmpty()) {
             model.addAttribute("errorJson", "El JSON no contiene ninguna destinación ('destinos')");
+            anadirAtributosDeClientes(model);
             return "entrada";
         }
 
@@ -109,9 +127,25 @@ public class PackingListController {
         cabecera.setNumeroFactura(envioForm.getNumeroFactura());
         cabecera.setFechaFactura(envioForm.getFechaFactura());
         cabecera.setFechaEnvio(envioForm.getFechaEnvio());
+        cabecera.setClaveCliente(envioForm.getCliente());
+        // Ciudad/país del proveedor: solo tienen sentido para AMI; en blanco
+        // se aplica el valor por defecto (BADALONA/SPAIN) en el generador.
+        cabecera.setCiudadProveedor(envioForm.getCiudadProveedor());
+        cabecera.setPaisProveedor(envioForm.getPaisProveedor());
 
         // Mismo encadenado que Main.java: importar -> asignar -> inferir.
         EnvioImportado importado = importador.importar(envio);
+
+        // El "cliente" del JSON es informativo (viene de las imágenes); si no
+        // coincide con el seleccionado en el desplegable, se avisa mas no
+        // bloquea: el desplegable manda.
+        if (envio.getCliente() != null && !envio.getCliente().isBlank()
+                && clientesProperties.clientePara(envio.getCliente())
+                        .map(c -> c != cliente).orElse(true)) {
+            importado.getAvisos().add("El JSON indica cliente '" + envio.getCliente()
+                    + "' pero has seleccionado '" + cliente.getNombre() + "'");
+        }
+
         envioEnCurso.reiniciar();
         envioEnCurso.setCabecera(cabecera);
         envioEnCurso.setImportado(importado);
@@ -160,9 +194,13 @@ public class PackingListController {
 
         List<ExcelGenerado> excels = new ArrayList<>();
         try {
+            DatosEnvio cabecera = envioEnCurso.getCabecera();
+            ClienteConfig cliente = clientesProperties.clientePara(cabecera.getClaveCliente())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Cliente desconocido: " + cabecera.getClaveCliente()));
             for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
-                excels.addAll(generador.generarPorModeloYColor(
-                        destino.getDestino(), envioEnCurso.getCabecera()));
+                excels.addAll(generador.generar(
+                        destino.getDestino(), destino.getPalets(), cabecera, cliente));
             }
         } catch (IOException | RuntimeException e) {
             redirect.addFlashAttribute("error",
@@ -235,6 +273,24 @@ public class PackingListController {
     private String sinEnvio(RedirectAttributes redirect) {
         redirect.addFlashAttribute("mensaje", "No hay ningún envío en curso: empieza pegando el JSON.");
         return "redirect:/";
+    }
+
+    /**
+     * Catálogo de clientes para el desplegable y su configuración (tipo de
+     * plantilla, placeholder de temporada) para el JS de la pantalla de
+     * entrada, que ajusta los campos visibles al cambiar de cliente.
+     */
+    private void anadirAtributosDeClientes(Model model) {
+        model.addAttribute("clientes", clientesProperties.getClientes());
+        Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
+        clientesProperties.getClientes().forEach((clave, config) -> {
+            Map<String, String> datos = new LinkedHashMap<>();
+            datos.put("plantilla", config.getPlantilla().name());
+            datos.put("placeholderTemporada",
+                    config.getPlaceholderTemporada() != null ? config.getPlaceholderTemporada() : "");
+            clientesJs.put(clave, datos);
+        });
+        model.addAttribute("clientesJs", clientesJs);
     }
 
     /**

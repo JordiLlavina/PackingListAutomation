@@ -73,19 +73,31 @@ class EnvioImportServiceTest {
     void avisaCuandoLaSumaDeUnidadesNoCuadraConCantidadTotal() throws Exception {
         EnvioImportado importado = importarJsonDePrueba();
 
-        // El JSON de prueba contiene 4 avisos a propósito. Dos descuadres:
+        // El JSON de prueba contiene 2 descuadres a propósito:
         // USL728: 30x50+50+47 = 1597 vs cantidadTotal 1897
         // USL737 NOIR: 34+37 = 71 vs cantidadTotal 67
-        // Y dos duplicados: las cajas 33 y 35 aparecen en dos colores de
-        // USL737 (caja mixta), que hoy se reporta como número repetido.
-        assertEquals(4, importado.getAvisos().size());
+        // Las cajas mixtas 33 y 35 (dos colores de USL737 en la misma caja)
+        // ya NO se avisan: un número repetido con contenido distinto es
+        // legítimo (colores, tallas de cinturón, canales de APC).
+        assertEquals(2, importado.getAvisos().size());
         assertTrue(importado.getAvisos().get(0).contains("1597"));
         assertTrue(importado.getAvisos().get(0).contains("1897"));
         assertTrue(importado.getAvisos().get(1).contains("71"));
         assertTrue(importado.getAvisos().get(1).contains("67"));
-        assertTrue(importado.getAvisos().get(2).contains("33"));
-        assertTrue(importado.getAvisos().get(2).contains("más de una vez"));
-        assertTrue(importado.getAvisos().get(3).contains("35"));
+    }
+
+    @Test
+    void avisaSoloSiSeRepiteLaCombinacionCompletaDeCaja() {
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            // La misma caja 1 con la MISMA referencia+color+talla+canal.
+            referencia.setCajas(List.of(cajaSuelta(1, 50), cajaSuelta(1, 30)));
+        });
+
+        EnvioImportado importado = service.importar(envio);
+
+        assertEquals(1, importado.getAvisos().size());
+        assertTrue(importado.getAvisos().get(0).contains("más de una vez"));
     }
 
     @Test
@@ -119,6 +131,60 @@ class EnvioImportServiceTest {
 
         assertTrue(importado.getDestinos().get(0).getDestino().getCajas().isEmpty());
         assertTrue(importado.getAvisos().isEmpty());
+    }
+
+    @Test
+    void propagaTallaModeloLivraisonCodeYCanalALasCajas() {
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            referencia.setTalla("100");
+            referencia.setModelo("LE NEIGE CLOU");
+            referencia.setLivraisonCode("PUN20260717RT1");
+            referencia.setCanal("WHOLESALE");
+            referencia.setCajas(List.of(cajaSuelta(1, 50)));
+        });
+
+        EnvioImportado importado = service.importar(envio);
+
+        CajaData caja = importado.getDestinos().get(0).getDestino().getCajas().get(0);
+        assertEquals("100", caja.getTalla());
+        assertEquals("LE NEIGE CLOU", caja.getModelo());
+        assertEquals("PUN20260717RT1", caja.getLivraisonCode());
+        assertEquals("WHOLESALE", caja.getCanal());
+    }
+
+    @Test
+    void losCamposOpcionalesAusentesQuedanANull() throws Exception {
+        // El JSON real de ejemplo no trae talla/modelo/livraisonCode/medidas.
+        EnvioImportado importado = importarJsonDePrueba();
+
+        CajaData caja = importado.getDestinos().get(0).getDestino().getCajas().get(0);
+        assertEquals(null, caja.getTalla());
+        assertEquals(null, caja.getModelo());
+        assertEquals(null, caja.getLivraisonCode());
+        assertEquals(null, importado.getDestinos().get(0).getPalets().get(0).getMedidas());
+    }
+
+    @Test
+    void propagaLasMedidasYLaTaraDelPalet() {
+        EnvioInput.PaletInput palet = new EnvioInput.PaletInput();
+        palet.setPalet(1);
+        palet.setCajaInicio(1);
+        palet.setCajaFin(1);
+        palet.setMedidas("80x120x130");
+        palet.setTara(8.04);
+
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            referencia.setCajas(List.of(cajaSuelta(1, 50)));
+        });
+        envio.getDestinos().get(0).setPalets(List.of(palet));
+
+        EnvioImportado importado = service.importar(envio);
+
+        assertEquals("80x120x130",
+                importado.getDestinos().get(0).getPalets().get(0).getMedidas());
+        assertEquals(8.04, importado.getDestinos().get(0).getPalets().get(0).getTara());
     }
 
     private static EnvioInput envioConUnaReferencia(

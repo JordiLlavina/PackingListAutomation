@@ -1,0 +1,24 @@
+{
+  "cliente": "ACKERMANN",
+  "destinos": [
+    {
+      "destino": "LUNEBURG",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 16, "medidas": "80x120x170", "tara": 10 }
+      ],
+      "referencias": [
+        {
+          "referencia": "A204",
+          "modelo": "BRIEFCASE POST Q PO3",
+          "color": "BROWN",
+          "medidaCaja": "60x40x40",
+          "pedido": "250121",
+          "cantidadTotal": 80,
+          "cajas": [
+            { "cajaInicio": 1, "cajaFin": 16, "unidadesPorCaja": 5 }
+          ]
+        }
+      ]
+    }
+  ]
+}

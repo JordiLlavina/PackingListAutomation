@@ -14,9 +14,24 @@ public class DatosEnvio {
     private String numeroFactura;
     private String fechaFactura;
     private String fechaEnvio;
+    // Cliente seleccionado en la pantalla de entrada (clave del catálogo
+    // de ClientesProperties) y ciudad/país del proveedor, editables solo
+    // para clientes AMI (por defecto BADALONA/SPAIN).
+    private String claveCliente;
+    private String ciudadProveedor;
+    private String paisProveedor;
 
     public String getTemporada() { return temporada; }
     public void setTemporada(String temporada) { this.temporada = temporada; }
+
+    public String getClaveCliente() { return claveCliente; }
+    public void setClaveCliente(String claveCliente) { this.claveCliente = claveCliente; }
+
+    public String getCiudadProveedor() { return ciudadProveedor; }
+    public void setCiudadProveedor(String ciudadProveedor) { this.ciudadProveedor = ciudadProveedor; }
+
+    public String getPaisProveedor() { return paisProveedor; }
+    public void setPaisProveedor(String paisProveedor) { this.paisProveedor = paisProveedor; }
 
     public String getNumeroFactura() { return numeroFactura; }
     public void setNumeroFactura(String numeroFactura) { this.numeroFactura = numeroFactura; }

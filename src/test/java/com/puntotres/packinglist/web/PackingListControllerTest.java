@@ -49,6 +49,7 @@ class PackingListControllerTest {
     /** POST /importar con el JSON de fixture y cabecera válida. */
     private void importar(MockHttpSession sesion) throws Exception {
         mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI")
                         .param("json", jsonDePrueba())
                         .param("temporada", "H26")
                         .param("numeroFactura", "FA-26-1189")
@@ -59,11 +60,15 @@ class PackingListControllerTest {
     }
 
     @Test
-    void laPantallaDeEntradaRenderizaElFormulario() throws Exception {
+    void laPantallaDeEntradaRenderizaElFormularioConElDesplegableDeClientes() throws Exception {
         mvc.perform(get("/"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("entrada"))
-                .andExpect(content().string(containsString("JSON del envío")));
+                .andExpect(content().string(containsString("JSON del envío")))
+                // El desplegable lista el catálogo de application.yml.
+                .andExpect(content().string(containsString("selecciona un cliente")))
+                .andExpect(content().string(containsString("A.P.C.")))
+                .andExpect(content().string(containsString("Sonia Rykiel")));
     }
 
     @Test
@@ -74,10 +79,9 @@ class PackingListControllerTest {
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(view().name("revision"))
-                // Los avisos que el fixture contiene a propósito.
+                // Los avisos de descuadre que el fixture contiene a propósito.
                 .andExpect(content().string(containsString("1597")))
                 .andExpect(content().string(containsString("1897")))
-                .andExpect(content().string(containsString("más de una vez")))
                 // Las tres destinaciones con sus cajas.
                 .andExpect(content().string(containsString("PARIS")))
                 .andExpect(content().string(containsString("JAPAN")))
@@ -85,8 +89,40 @@ class PackingListControllerTest {
     }
 
     @Test
+    void unClienteDistintoAlDelJsonAvisaSinBloquear() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // El JSON dice "AMI" pero el desplegable selecciona ACKERMANN.
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "ACKERMANN")
+                        .param("json", jsonDePrueba())
+                        .param("temporada", "SPRING 25")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("has seleccionado")));
+    }
+
+    @Test
+    void importarSinClienteFallaLaValidacionDelCampo() throws Exception {
+        mvc.perform(post("/importar")
+                        .param("json", "{}")
+                        .param("temporada", "H26")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("entrada"))
+                .andExpect(model().attributeHasFieldErrors("envioForm", "cliente"));
+    }
+
+    @Test
     void importarConJsonInvalidoVuelveALaEntradaConElTextoPreservado() throws Exception {
         mvc.perform(post("/importar")
+                        .param("cliente", "AMI")
                         .param("json", "{esto no es json")
                         .param("temporada", "H26")
                         .param("numeroFactura", "FA-1")
@@ -101,6 +137,7 @@ class PackingListControllerTest {
     @Test
     void importarConFechaMalFormadaFallaLaValidacionDelCampo() throws Exception {
         mvc.perform(post("/importar")
+                        .param("cliente", "AMI")
                         .param("json", "{}")
                         .param("temporada", "H26")
                         .param("numeroFactura", "FA-1")
@@ -193,6 +230,7 @@ class PackingListControllerTest {
                     "cajas": [{"caja": 1, "unidades": 10}, {"caja": 2, "unidades": 10}]}]}]}
                 """;
         mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI")
                         .param("json", json)
                         .param("temporada", "H26")
                         .param("numeroFactura", "FA-1")

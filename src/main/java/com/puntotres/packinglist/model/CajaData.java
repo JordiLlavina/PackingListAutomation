@@ -19,6 +19,13 @@ public class CajaData {
     private Double pesoNetoKg;
     private Double pesoBrutoKg;
     private Integer numeroPalet;
+    // Opcionales según cliente (null si el JSON no los trae): talla del
+    // artículo (cinturones AMI, SIZE de APC), nombre comercial del modelo,
+    // código de livraison de APC y canal de la línea (DESTINATION de APC).
+    private String talla;
+    private String modelo;
+    private String livraisonCode;
+    private String canal;
 
     public int getNumeroCaja() { return numeroCaja; }
     public void setNumeroCaja(int numeroCaja) { this.numeroCaja = numeroCaja; }
@@ -46,6 +53,18 @@ public class CajaData {
 
     public Integer getNumeroPalet() { return numeroPalet; }
     public void setNumeroPalet(Integer numeroPalet) { this.numeroPalet = numeroPalet; }
+
+    public String getTalla() { return talla; }
+    public void setTalla(String talla) { this.talla = talla; }
+
+    public String getModelo() { return modelo; }
+    public void setModelo(String modelo) { this.modelo = modelo; }
+
+    public String getLivraisonCode() { return livraisonCode; }
+    public void setLivraisonCode(String livraisonCode) { this.livraisonCode = livraisonCode; }
+
+    public String getCanal() { return canal; }
+    public void setCanal(String canal) { this.canal = canal; }
 
     public boolean tienePesosCompletos() {
         return pesoNetoKg != null && pesoBrutoKg != null;

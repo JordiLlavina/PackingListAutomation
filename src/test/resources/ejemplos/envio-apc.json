@@ -1,0 +1,70 @@
+{
+  "cliente": "APC",
+  "destinos": [
+    {
+      "destino": "IVRY",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 2, "medidas": "80x120x130", "tara": 8.04 },
+        { "palet": 2, "cajaInicio": 3, "cajaFin": 3, "medidas": "80x120x130" }
+      ],
+      "referencias": [
+        {
+          "referencia": "PXCBC-F67008",
+          "modelo": "LE NEIGE",
+          "livraisonCode": "PUN20260428WH1",
+          "pedido": "4100126780",
+          "canal": "WHOLESALE",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 22,
+          "cajas": [
+            { "caja": 1, "unidades": 11 },
+            { "caja": 2, "unidades": 11 }
+          ]
+        },
+        {
+          "referencia": "PXBHZ-H65077",
+          "modelo": "CEINTURE PARIS",
+          "livraisonCode": "PUN20260428WH1",
+          "pedido": "4100126774",
+          "canal": "WHOLESALE",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "60x40x40",
+          "talla": "85",
+          "cantidadTotal": 7,
+          "cajas": [
+            { "caja": 3, "unidades": 7 }
+          ]
+        },
+        {
+          "referencia": "PXBHZ-H65077",
+          "modelo": "CEINTURE PARIS",
+          "livraisonCode": "PUN20260428WH1",
+          "pedido": "4100126774",
+          "canal": "WHOLESALE",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "60x40x40",
+          "talla": "90",
+          "cantidadTotal": 8,
+          "cajas": [
+            { "caja": 3, "unidades": 8 }
+          ]
+        },
+        {
+          "referencia": "PXBHZ-H65077",
+          "modelo": "CEINTURE PARIS",
+          "livraisonCode": "PUN20260428WH1",
+          "pedido": "4100126775",
+          "canal": "AUSTRALIA",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "60x40x40",
+          "talla": "85",
+          "cantidadTotal": 5,
+          "cajas": [
+            { "caja": 3, "unidades": 5 }
+          ]
+        }
+      ]
+    }
+  ]
+}
