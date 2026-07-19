@@ -40,13 +40,22 @@ public class VoltadoErpGenerationServiceTest {
 
         VoltadoErpData resultado = service.generar(cajas, envio);
 
-        // NOIR aparece primero → 001
-        // BLEU aparece segundo → 002
-        // NOIR aparece de nuevo → 001
+        // Verify that colors in same reference+talla combine into single line:
+        // REF001-talla80 combines NOIR (50) + BLEU (30) = 1 line (takes first color NOIR)
+        // REF001-talla90 has NOIR (20) = 1 line
+        // Total: 2 lines (not 3), proving colors are aggregated by reference+talla
+        assertEquals(2, resultado.getTotalLineas(), "Should have 2 lines when combining NOIR+BLEU in talla 80");
+
         VoltadoErpLinea linea1 = resultado.getLineas().get(0);
         VoltadoErpLinea linea2 = resultado.getLineas().get(1);
 
+        // Both lines have NOIR (first color encountered for each reference+talla)
+        // Both get colorCodi 001 since NOIR was the first color encountered
         assertEquals("001", linea1.getColorCodi());
-        assertEquals("002", linea2.getColorCodi());
+        assertEquals("001", linea2.getColorCodi());
+
+        // Verify quantities are summed: line 1 has 50+30=80 units
+        assertEquals(80, linea1.getQuantitat());
+        assertEquals(20, linea2.getQuantitat());
     }
 }
