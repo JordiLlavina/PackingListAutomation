@@ -119,20 +119,59 @@ button.secundario, a.boton.secundario {
     color: var(--acento);
 }
 
+/* Botón de propagar por fila, discreto para no ensuciar la tabla. */
+button.mini {
+    margin: 0;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8rem;
+    font-weight: 400;
+    background: #fff;
+    color: var(--acento);
+    white-space: nowrap;
+}
+
+/* border-collapse: separate (no collapse) para que los bordes viajen con
+   las celdas sticky; los bordes se reparten para no duplicarse. */
 table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     background: #fff;
     font-size: 0.9rem;
 }
 
 th, td {
-    border: 1px solid var(--borde);
+    border-right: 1px solid var(--borde);
+    border-bottom: 1px solid var(--borde);
     padding: 0.35rem 0.55rem;
     text-align: left;
 }
 
-th { background: var(--fondo-suave); }
+th:first-child, td:first-child { border-left: 1px solid var(--borde); }
+
+th {
+    background: var(--fondo-suave);
+    border-top: 1px solid var(--borde);
+}
+
+/* Cabeceras fijas al hacer scroll: primero el título de la destinación
+   (alto fijo de 3.2rem) y, pegada justo debajo, la fila de encabezados. */
+section.destino h2 {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin: 0;
+    padding: 0.9rem 0 0.4rem;
+    font-size: 1.25rem;
+    line-height: 1.9rem;
+    background: var(--fondo-suave);
+}
+
+section.destino thead th {
+    position: sticky;
+    top: 3.2rem;
+    z-index: 2;
+}
 
 td input[type="number"] {
     width: 6.5rem;

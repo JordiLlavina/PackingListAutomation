@@ -120,7 +120,9 @@ public class PackingListController {
                     asignadorPalets.asignar(destino.getDestino(), destino.getPalets());
             envioEnCurso.getAvisosPalets().addAll(asignacion.getAvisos());
             envioEnCurso.getCajasSinPalet().addAll(asignacion.getCajasSinPalet());
-            inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas());
+            envioEnCurso.getAvisosInferencia().addAll(
+                    inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas())
+                            .getAvisos());
         }
         return "redirect:/revision";
     }
@@ -135,6 +137,7 @@ public class PackingListController {
         model.addAttribute("destinos", montarVistaDestinos());
         model.addAttribute("avisosImportacion", envioEnCurso.getImportado().getAvisos());
         model.addAttribute("avisosPalets", envioEnCurso.getAvisosPalets());
+        model.addAttribute("avisosInferencia", envioEnCurso.getAvisosInferencia());
         model.addAttribute("cajasSinPalet", envioEnCurso.getCajasSinPalet());
         return "revision";
     }
@@ -236,9 +239,11 @@ public class PackingListController {
 
     /**
      * Aplica los pesos introducidos a mano sobre las CajaData de la sesión y
-     * re-ejecuta la inferencia: un bruto añadido a mano puede desbloquear el
-     * resto de su referencia (la inferencia solo rellena nulls, nunca pisa
-     * un valor manual).
+     * re-ejecuta la inferencia: un peso añadido a mano (neto o bruto) puede
+     * desbloquear el resto de su referencia (la inferencia solo rellena
+     * nulls, nunca pisa un valor manual). La caja se localiza por su
+     * POSICIÓN en la destinación, no por su número, que puede repetirse
+     * (caja mixta con dos colores).
      */
     private void aplicarPesosYReinferir(RevisionForm form) {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
@@ -247,20 +252,23 @@ public class PackingListController {
                     || peso.getIndiceDestino() >= destinos.size()) {
                 continue;
             }
-            destinos.get(peso.getIndiceDestino()).getDestino().getCajas().stream()
-                    .filter(caja -> caja.getNumeroCaja() == peso.getNumeroCaja())
-                    .findFirst()
-                    .ifPresent(caja -> {
-                        if (peso.getPesoNetoKg() != null) {
-                            caja.setPesoNetoKg(peso.getPesoNetoKg());
-                        }
-                        if (peso.getPesoBrutoKg() != null) {
-                            caja.setPesoBrutoKg(peso.getPesoBrutoKg());
-                        }
-                    });
+            List<CajaData> cajas = destinos.get(peso.getIndiceDestino()).getDestino().getCajas();
+            if (peso.getIndiceCaja() < 0 || peso.getIndiceCaja() >= cajas.size()) {
+                continue;
+            }
+            CajaData caja = cajas.get(peso.getIndiceCaja());
+            if (peso.getPesoNetoKg() != null) {
+                caja.setPesoNetoKg(peso.getPesoNetoKg());
+            }
+            if (peso.getPesoBrutoKg() != null) {
+                caja.setPesoBrutoKg(peso.getPesoBrutoKg());
+            }
         }
+        envioEnCurso.getAvisosInferencia().clear();
         for (EnvioImportado.DestinoImportado destino : destinos) {
-            inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas());
+            envioEnCurso.getAvisosInferencia().addAll(
+                    inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas())
+                            .getAvisos());
         }
     }
 
@@ -269,9 +277,10 @@ public class PackingListController {
         int indiceGlobal = 0;
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
         for (int i = 0; i < destinos.size(); i++) {
+            List<CajaData> cajas = destinos.get(i).getDestino().getCajas();
             List<FilaCaja> filas = new ArrayList<>();
-            for (CajaData caja : destinos.get(i).getDestino().getCajas()) {
-                filas.add(new FilaCaja(indiceGlobal++, caja));
+            for (int j = 0; j < cajas.size(); j++) {
+                filas.add(new FilaCaja(indiceGlobal++, j, cajas.get(j)));
             }
             vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(), filas));
         }
@@ -283,9 +292,10 @@ public class PackingListController {
     }
 
     /**
-     * Una fila de la tabla de revisión: la caja más su índice global en el
-     * formulario (los inputs de pesos se llaman pesos[indiceGlobal].*).
+     * Una fila de la tabla de revisión: la caja, su índice global en el
+     * formulario (los inputs se llaman pesos[indiceGlobal].*) y su posición
+     * dentro de la destinación (para localizarla al aplicar los pesos).
      */
-    public record FilaCaja(int indiceGlobal, CajaData caja) {
+    public record FilaCaja(int indiceGlobal, int indiceEnDestino, CajaData caja) {
     }
 }

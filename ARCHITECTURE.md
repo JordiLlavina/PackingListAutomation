@@ -68,24 +68,28 @@ La asignación se escribe directamente sobre los objetos `CajaData` de entrada (
 
 [service/WeightInferenceService.java](src/main/java/com/puntotres/packinglist/service/WeightInferenceService.java)
 
-La idea: dentro de una misma referencia, todas las cajas contienen el mismo producto, así que el **peso neto por unidad** debería ser el mismo en todas. Si algunas cajas ya tienen su peso bruto (a mano, o porque sí venía en la imagen), se puede usar ese dato para inferir el peso del resto:
+La idea: dentro de una misma referencia, todas las cajas contienen el mismo producto, así que el **peso neto por unidad** debería ser el mismo en todas. Si algunas cajas ya tienen algún peso (a mano desde la pantalla de revisión, o porque sí venía en la imagen), se usa ese dato para inferir el resto:
 
 ```
-peso_unitario = promedio( (pesoBruto - tara) / cantidad )   sobre las cajas con bruto conocido
+peso_unitario = promedio, sobre las cajas con algún peso conocido, de:
+    pesoNeto / cantidad                si el neto es conocido (directo)
+    (pesoBruto - tara) / cantidad      si solo se conoce el bruto
 ```
 
-y luego, para cada caja sin peso:
+y luego, para cada caja sin ningún peso:
 
 ```
 pesoNetoKg   = cantidad * peso_unitario
 pesoBrutoKg  = pesoNetoKg + tara
 ```
 
+Las cajas con un solo peso conocido se completan en ambos sentidos: `neto = bruto - tara` y `bruto = neto + tara`. Un único peso tecleado a mano (neto o bruto) desbloquea toda su referencia.
+
 La **tara** (peso del cartón vacío) depende del tamaño de caja y viene de `TaraProperties`, no está en el código Java — ver la sección de configuración más abajo.
 
 Casos que se quedan en `null` a propósito (nunca se inventa un número):
-- El tamaño de caja no tiene tara conocida en `application.yml`.
-- Ninguna caja de la referencia tiene peso bruto conocido (no hay de dónde partir).
+- El tamaño de caja no tiene tara conocida en `application.yml` — desde la web esto ya no es silencioso: `ResultadoInferencia.avisos` lo reporta y la pantalla de revisión lo muestra como alerta.
+- Ninguna caja de la referencia tiene peso conocido (no hay de dónde partir) — esto no genera aviso: es el estado normal de partida y ya se ve como filas pendientes en la revisión.
 
 `inferirPesosPorReferencia(List<CajaData>)` es el punto de entrada normal: agrupa internamente por `referencia` y llama a `inferirPesos` grupo a grupo, para no mezclar el peso unitario de un modelo con el de otro.
 

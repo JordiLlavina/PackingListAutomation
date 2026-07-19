@@ -124,12 +124,12 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        // Bruto de la caja 1 de PARIS (50 uds, 60x40x40, tara 1.6) puesto a
-        // mano: peso unitario (51.6-1.6)/50 = 1.0 -> la caja 32 (47 uds)
-        // debe quedar con neto 47.0 y bruto 48.6.
+        // Bruto de la caja 1 de PARIS (índice 0; 50 uds, 60x40x40, tara 1.6)
+        // puesto a mano: peso unitario (51.6-1.6)/50 = 1.0 -> la caja 32
+        // (47 uds) debe quedar con neto 47.0 y bruto 48.6.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].numeroCaja", "1")
+                        .param("pesos[0].indiceCaja", "0")
                         .param("pesos[0].pesoBrutoKg", "51.6"))
                 .andExpect(redirectedUrl("/revision"));
 
@@ -137,6 +137,81 @@ class PackingListControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"47.0\"")))
                 .andExpect(content().string(containsString("value=\"48.6\"")));
+    }
+
+    @Test
+    void recalcularConUnNetoManualTambienInfiereElResto() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        // Solo el NETO de la caja 1 de PARIS: unitario 50.0/50 = 1.0 ->
+        // la caja 32 (47 uds) queda igual que en el caso del bruto, y la
+        // propia caja 1 completa su bruto (50.0 + tara 1.6).
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("pesos[0].indiceDestino", "0")
+                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].pesoNetoKg", "50.0"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("value=\"51.6\"")))
+                .andExpect(content().string(containsString("value=\"47.0\"")));
+    }
+
+    @Test
+    void editarUnaCajaMixtaDuplicadaAplicaElPesoALaFilaCorrecta() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        // En PARIS las cajas 33 y 35 existen en DOS colores (caja mixta).
+        // Ordenadas: índice 32 = caja 33 ROJO (30 uds), índice 33 = caja 33
+        // NOIR (34 uds). Editamos la NOIR y comprobamos que el peso cae en
+        // ella y no en la ROJO (que recibirá otro valor por inferencia).
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("pesos[0].indiceDestino", "0")
+                        .param("pesos[0].indiceCaja", "33")
+                        .param("pesos[0].pesoNetoKg", "68.0"))
+                .andExpect(redirectedUrl("/revision"));
+
+        EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
+        var cajasParis = envio.getImportado().getDestinos().get(0).getDestino().getCajas();
+        assertEquals(34, cajasParis.get(33).getCantidad());          // la NOIR editada
+        assertEquals(68.0, cajasParis.get(33).getPesoNetoKg());      // el valor manual
+        // La ROJO (30 uds) recibe su neto por inferencia: 30 * (68/34) = 60.
+        assertEquals(60.0, cajasParis.get(32).getPesoNetoKg());
+    }
+
+    @Test
+    void unTamanoDeCajaSinTaraSeAvisaEnLaRevision() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        String json = """
+                {"cliente": "AMI", "destinos": [{"destino": "PARIS",
+                  "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 2}],
+                  "referencias": [{"referencia": "R1", "color": "NOIR",
+                    "medidaCaja": "99x99x99", "pedido": "P1",
+                    "cajas": [{"caja": 1, "unidades": 10}, {"caja": 2, "unidades": 10}]}]}]}
+                """;
+        mvc.perform(post("/importar").session(sesion)
+                        .param("json", json)
+                        .param("temporada", "H26")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        // Con un peso tecleado, el tamaño sin tara impide inferir: la
+        // revisión debe decirlo, no callar.
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("pesos[0].indiceDestino", "0")
+                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].pesoBrutoKg", "11.0"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("99x99x99")))
+                .andExpect(content().string(containsString("Sin tara configurada")));
     }
 
     @Test

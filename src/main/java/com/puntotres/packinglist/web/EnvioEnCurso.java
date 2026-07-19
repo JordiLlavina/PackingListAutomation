@@ -25,6 +25,7 @@ public class EnvioEnCurso {
     private DatosEnvio cabecera;
     private EnvioImportado importado;
     private final List<String> avisosPalets = new ArrayList<>();
+    private final List<String> avisosInferencia = new ArrayList<>();
     private final List<CajaData> cajasSinPalet = new ArrayList<>();
     private final List<ExcelGenerado> excels = new ArrayList<>();
 
@@ -37,6 +38,7 @@ public class EnvioEnCurso {
         cabecera = null;
         importado = null;
         avisosPalets.clear();
+        avisosInferencia.clear();
         cajasSinPalet.clear();
         excels.clear();
     }
@@ -48,6 +50,7 @@ public class EnvioEnCurso {
     public void setImportado(EnvioImportado importado) { this.importado = importado; }
 
     public List<String> getAvisosPalets() { return avisosPalets; }
+    public List<String> getAvisosInferencia() { return avisosInferencia; }
     public List<CajaData> getCajasSinPalet() { return cajasSinPalet; }
     public List<ExcelGenerado> getExcels() { return excels; }
 }

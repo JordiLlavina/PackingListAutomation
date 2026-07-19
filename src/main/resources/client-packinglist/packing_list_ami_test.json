@@ -1,97 +1,97 @@
-{
-  "cliente": "AMI",
-  "destinos": [
-    {
-      "destino": "PARIS",
-      "palets": [
-        { "palet": 1, "cajaInicio": 1, "cajaFin": 12 },
-        { "palet": 2, "cajaInicio": 13, "cajaFin": 24 },
-        { "palet": 3, "cajaInicio": 25, "cajaFin": 35 }
-      ],
-      "referencias": [
-        {
-          "referencia": "USL728.AL217",
-          "color": "NOIR",
-          "medidaCaja": "60x40x40",
-          "pedido": "07685",
-          "cantidadTotal": 1897,
-          "cajas": [
-            { "cajaInicio": 1, "cajaFin": 30, "unidadesPorCaja": 50 },
-            { "caja": 31, "unidades": 50 },
-            { "caja": 32, "unidades": 47 }
-          ]
-        },
-        {
-          "referencia": "USL737.ACO137",
-          "color": "ROJO PASION 69",
-          "medidaCaja": "60x40x30",
-          "pedido": "07685",
-          "cantidadTotal": 37,
-          "cajas": [
-            { "caja": 33, "unidades": 30 },
-            { "caja": 35, "unidades": 7 }
-          ]
-        },
-        {
-          "referencia": "USL737.ACO137",
-          "color": "NOIR",
-          "medidaCaja": "60x40x30",
-          "pedido": "07685",
-          "cantidadTotal": 67,
-          "cajas": [
-            { "caja": 33, "unidades": 34 },
-            { "caja": 35, "unidades": 37 }
-          ]
-        }
-      ]
-    },
-    {
-      "destino": "JAPAN",
-      "palets": [
-        { "palet": 1, "cajaInicio": 1, "cajaFin": 3 }
-      ],
-      "referencias": [
-        {
-          "referencia": "USL728.AL217.001",
-          "color": "NOIR",
-          "medidaCaja": "60x40x40",
-          "pedido": "07700",
-          "cantidadTotal": 100,
-          "cajas": [
-            { "caja": 1, "unidades": 50 },
-            { "caja": 2, "unidades": 50 }
-          ]
-        },
-        {
-          "referencia": "USL737.ACO137",
-          "color": "NOIR",
-          "medidaCaja": "60x40x30",
-          "pedido": "07701",
-          "cantidadTotal": 20,
-          "cajas": [
-            { "caja": 3, "unidades": 20 }
-          ]
-        }
-      ]
-    },
-    {
-      "destino": "CHINA",
-      "palets": [
-        { "palet": 1, "cajaInicio": 1, "cajaFin": 2 }
-      ],
-      "referencias": [
-        {
-          "referencia": "USL737.ACO137",
-          "color": "NOIR",
-          "medidaCaja": "60x40x30",
-          "pedido": "07713",
-          "cantidadTotal": 55,
-          "cajas": [
-            { "caja": 1, "unidades": 28 },
-            { "caja": 2, "unidades": 27 }
-          ]
-        }
-      ]
-    }
-  ]
-}
+  {
+    "cliente": "AMI",
+    "destinos": [
+      {
+        "destino": "PARIS",
+        "palets": [
+          { "palet": 1, "cajaInicio": 1, "cajaFin": 12 },
+          { "palet": 2, "cajaInicio": 13, "cajaFin": 24 },
+          { "palet": 3, "cajaInicio": 25, "cajaFin": 35 }
+        ],
+        "referencias": [
+          {
+            "referencia": "USL728.AL217",
+            "color": "NOIR",
+            "medidaCaja": "60x40x40",
+            "pedido": "07685",
+            "cantidadTotal": 1897,
+            "cajas": [
+              { "cajaInicio": 1, "cajaFin": 30, "unidadesPorCaja": 50 },
+              { "caja": 31, "unidades": 50 },
+              { "caja": 32, "unidades": 47 }
+            ]
+          },
+          {
+            "referencia": "USL737.ACO137",
+            "color": "ROJO PASION 69",
+            "medidaCaja": "60x40x30",
+            "pedido": "07685",
+            "cantidadTotal": 37,
+            "cajas": [
+              { "caja": 33, "unidades": 30 },
+              { "caja": 35, "unidades": 7 }
+            ]
+          },
+          {
+            "referencia": "USL737.ACO137",
+            "color": "NOIR",
+            "medidaCaja": "60x40x30",
+            "pedido": "07685",
+            "cantidadTotal": 67,
+            "cajas": [
+              { "caja": 33, "unidades": 34 },
+              { "caja": 35, "unidades": 37 }
+            ]
+          }
+        ]
+      },
+      {
+        "destino": "JAPAN",
+        "palets": [
+          { "palet": 1, "cajaInicio": 1, "cajaFin": 3 }
+        ],
+        "referencias": [
+          {
+            "referencia": "USL728.AL217.001",
+            "color": "NOIR",
+            "medidaCaja": "60x40x40",
+            "pedido": "07700",
+            "cantidadTotal": 100,
+            "cajas": [
+              { "caja": 1, "unidades": 50 },
+              { "caja": 2, "unidades": 50 }
+            ]
+          },
+          {
+            "referencia": "USL737.ACO137",
+            "color": "NOIR",
+            "medidaCaja": "60x40x30",
+            "pedido": "07701",
+            "cantidadTotal": 20,
+            "cajas": [
+              { "caja": 3, "unidades": 20 }
+            ]
+          }
+        ]
+      },
+      {
+        "destino": "CHINA",
+        "palets": [
+          { "palet": 1, "cajaInicio": 1, "cajaFin": 2 }
+        ],
+        "referencias": [
+          {
+            "referencia": "USL737.ACO137",
+            "color": "NOIR",
+            "medidaCaja": "60x40x30",
+            "pedido": "07713",
+            "cantidadTotal": 55,
+            "cajas": [
+              { "caja": 1, "unidades": 28 },
+              { "caja": 2, "unidades": 27 }
+            ]
+          }
+        ]
+      }
+    ]
+  }

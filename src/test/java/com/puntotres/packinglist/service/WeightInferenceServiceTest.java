@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
@@ -47,14 +48,45 @@ class WeightInferenceServiceTest {
     }
 
     @Test
-    void tamanoSinTaraQuedaPendienteAunqueHayaConocidas() {
+    void tamanoSinTaraQuedaPendienteYSeAvisa() {
         CajaData conocida = caja("60x40x40", 20, 21.6);
         CajaData sinTara = caja("50x30x20", 10, null);
 
-        service.inferirPesos(List.of(conocida, sinTara));
+        ResultadoInferencia resultado = service.inferirPesos(List.of(conocida, sinTara));
 
         assertNull(sinTara.getPesoNetoKg());
         assertNull(sinTara.getPesoBrutoKg());
+        // Ya no falla en silencio: el tamaño sin tara se reporta.
+        assertEquals(1, resultado.getAvisos().size());
+        assertTrue(resultado.getAvisos().get(0).contains("50x30x20"));
+    }
+
+    @Test
+    void netoManualCompletaSuBrutoYDesbloqueaSuReferencia() {
+        // Un neto tecleado a mano vale igual que un bruto: unitario = neto/cantidad.
+        CajaData conNeto = caja("60x40x40", 10, null);
+        conNeto.setPesoNetoKg(10.0);                    // unitario 1.0
+        CajaData sinPeso = caja("60x40x30", 5, null);
+
+        ResultadoInferencia resultado = service.inferirPesos(List.of(conNeto, sinPeso));
+
+        assertEquals(11.6, conNeto.getPesoBrutoKg());   // 10.0 + tara 1.6
+        assertEquals(5.0, sinPeso.getPesoNetoKg());     // 5 * 1.0
+        assertEquals(6.2, sinPeso.getPesoBrutoKg());    // 5.0 + tara 1.2
+        assertTrue(resultado.getAvisos().isEmpty());
+    }
+
+    @Test
+    void elMismoTamanoSinTaraEnVariasReferenciasSeAvisaUnaSolaVez() {
+        CajaData bolso = caja("50x30x20", 10, 9.0);
+        bolso.setReferencia("BOLSO");
+        CajaData cinturon = caja("50x30x20", 5, 4.0);
+        cinturon.setReferencia("CINTURON");
+
+        ResultadoInferencia resultado =
+                service.inferirPesosPorReferencia(List.of(bolso, cinturon));
+
+        assertEquals(1, resultado.getAvisos().size());
     }
 
     @Test
