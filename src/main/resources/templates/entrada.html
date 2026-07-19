@@ -7,7 +7,18 @@
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${errorJson}" th:text="${errorJson}"></div>
 
-    <form class="tarjeta" th:action="@{/importar}" th:object="${envioForm}" method="post">
+    <!-- Selector del modo de entrada: solo uno activo a la vez. FORMULARIO
+         está deshabilitado hasta que se implemente la entrada manual. -->
+    <div class="selector-modo" role="tablist">
+        <button type="button" id="botonModoJSON" data-modo="JSON">JSON</button>
+        <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CLAUDE</button>
+        <button type="button" id="botonModoFORMULARIO" data-modo="FORMULARIO"
+                disabled title="Próximamente">FORMULARIO</button>
+    </div>
+
+    <form class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
+          method="post" enctype="multipart/form-data">
+        <input type="hidden" id="modo" th:field="*{modo}">
         <div>
             <label for="cliente">Cliente</label>
             <select id="cliente" th:field="*{cliente}">
@@ -29,10 +40,21 @@
             </div>
         </div>
 
-        <label for="json">JSON del envío</label>
-        <textarea id="json" class="json" th:field="*{json}"
-                  placeholder='{"cliente": "AMI", "destinos": [ ... ]}'></textarea>
-        <p class="error-campo" th:errors="*{json}"></p>
+        <div id="bloqueJson">
+            <label for="json">JSON del envío</label>
+            <textarea id="json" class="json" th:field="*{json}"
+                      placeholder='{"cliente": "AMI", "destinos": [ ... ]}'></textarea>
+            <p class="error-campo" th:errors="*{json}"></p>
+        </div>
+
+        <div id="bloqueClaude" style="display: none">
+            <label for="imagenes">Imágenes del packing list</label>
+            <p class="ayuda">Sube las fotos o capturas del packing list (JPEG, PNG, WebP o GIF).
+                Claude las transcribirá al JSON del envío y pasarás a la revisión como siempre.</p>
+            <input type="file" id="imagenes" name="imagenes" multiple
+                   accept="image/jpeg,image/png,image/webp,image/gif">
+            <p class="error-campo" th:errors="*{imagenes}"></p>
+        </div>
 
         <div class="campos-cabecera">
             <div>
@@ -57,7 +79,7 @@
             </div>
         </div>
 
-        <button type="submit">Importar y revisar</button>
+        <button type="submit" id="botonImportar">Importar y revisar</button>
     </form>
 
     <script th:inline="javascript">
@@ -85,6 +107,29 @@
 
         document.getElementById('cliente').addEventListener('change', actualizarCamposCliente);
         actualizarCamposCliente();
+
+        // --- Selector de modo de entrada (JSON / CLAUDE / FORMULARIO) ---
+
+        function seleccionarModo(modo) {
+            document.getElementById('modo').value = modo;
+            document.getElementById('bloqueJson').style.display = modo === 'JSON' ? '' : 'none';
+            document.getElementById('bloqueClaude').style.display = modo === 'CLAUDE' ? '' : 'none';
+            document.querySelectorAll('.selector-modo button').forEach(function (boton) {
+                boton.classList.toggle('activo', boton.dataset.modo === modo);
+            });
+            document.getElementById('botonImportar').textContent =
+                modo === 'CLAUDE' ? 'Extraer con Claude y revisar' : 'Importar y revisar';
+        }
+
+        document.querySelectorAll('.selector-modo button:not([disabled])')
+            .forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    seleccionarModo(boton.dataset.modo);
+                });
+            });
+
+        // Al volver con errores de validación se conserva el modo enviado.
+        seleccionarModo(document.getElementById('modo').value || 'JSON');
     </script>
 </main>
 </body>

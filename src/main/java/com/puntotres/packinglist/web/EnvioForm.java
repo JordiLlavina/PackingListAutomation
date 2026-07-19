@@ -1,11 +1,20 @@
 package com.puntotres.packinglist.web;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.web.multipart.MultipartFile;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 /**
- * Formulario de la pantalla de entrada: el JSON del envío pegado a mano
- * más la cabecera que no sale de las imágenes ({@code DatosEnvio}).
+ * Formulario de la pantalla de entrada: los datos del envío (JSON pegado a
+ * mano o imágenes para el modo CLAUDE, según {@code modo}) más la cabecera
+ * que no sale de las imágenes ({@code DatosEnvio}).
+ *
+ * El JSON y las imágenes se validan en el controlador según el modo activo
+ * (solo uno de los dos es obligatorio); por eso no llevan @NotBlank aquí.
  *
  * Las fechas se validan aquí contra el formato dd/MM/yyyy que espera
  * {@code AmiExcelBuilder.escribirFecha}: es mejor un error de formulario
@@ -15,11 +24,16 @@ public class EnvioForm {
 
     private static final String FORMATO_FECHA = "\\d{2}/\\d{2}/\\d{4}";
 
+    /** Modo de entrada activo: JSON (por defecto), CLAUDE o FORMULARIO. */
+    private String modo = "JSON";
+
     @NotBlank(message = "Elige un cliente")
     private String cliente;
 
-    @NotBlank(message = "Pega el JSON del envío")
     private String json;
+
+    /** Fotos del packing list para el modo CLAUDE. */
+    private List<MultipartFile> imagenes = new ArrayList<>();
 
     @NotBlank(message = "La temporada es obligatoria")
     private String temporada;
@@ -40,8 +54,14 @@ public class EnvioForm {
     @Pattern(regexp = FORMATO_FECHA, message = "Formato de fecha: dd/MM/yyyy")
     private String fechaEnvio;
 
+    public String getModo() { return modo; }
+    public void setModo(String modo) { this.modo = modo; }
+
     public String getCliente() { return cliente; }
     public void setCliente(String cliente) { this.cliente = cliente; }
+
+    public List<MultipartFile> getImagenes() { return imagenes; }
+    public void setImagenes(List<MultipartFile> imagenes) { this.imagenes = imagenes; }
 
     public String getJson() { return json; }
     public void setJson(String json) { this.json = json; }

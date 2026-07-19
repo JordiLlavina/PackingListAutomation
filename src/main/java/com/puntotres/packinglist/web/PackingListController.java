@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,6 +33,7 @@ import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.model.VolcadoErpData;
+import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
 import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
@@ -58,6 +60,7 @@ public class PackingListController {
             MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
     private final EnvioImportService importador;
+    private final ClaudeEnvioExtractionService extractorClaude;
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
     private final PackingListGenerationService generador;
@@ -68,6 +71,7 @@ public class PackingListController {
     private final EnvioEnCurso envioEnCurso;
 
     public PackingListController(EnvioImportService importador,
+                                 ClaudeEnvioExtractionService extractorClaude,
                                  PaletAssignmentService asignadorPalets,
                                  WeightInferenceService inferidorPesos,
                                  PackingListGenerationService generador,
@@ -77,6 +81,7 @@ public class PackingListController {
                                  ObjectMapper mapper,
                                  EnvioEnCurso envioEnCurso) {
         this.importador = importador;
+        this.extractorClaude = extractorClaude;
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
         this.generador = generador;
@@ -105,6 +110,18 @@ public class PackingListController {
     @PostMapping("/importar")
     public String importar(@Valid @ModelAttribute EnvioForm envioForm,
                            BindingResult errores, Model model) {
+        boolean modoClaude = "CLAUDE".equals(envioForm.getModo());
+
+        // El JSON y las imágenes se validan aquí y no con @NotBlank porque
+        // solo es obligatorio el del modo activo.
+        if (modoClaude) {
+            if (imagenesDe(envioForm).isEmpty()) {
+                errores.rejectValue("imagenes", "imagenes.obligatorias",
+                        "Sube al menos una imagen del packing list");
+            }
+        } else if (envioForm.getJson() == null || envioForm.getJson().isBlank()) {
+            errores.rejectValue("json", "json.obligatorio", "Pega el JSON del envío");
+        }
         if (errores.hasErrors()) {
             anadirAtributosDeClientes(model);
             return "entrada";
@@ -118,15 +135,28 @@ public class PackingListController {
         }
 
         EnvioInput envio;
-        try {
-            envio = mapper.readValue(envioForm.getJson(), EnvioInput.class);
-        } catch (JsonProcessingException e) {
-            model.addAttribute("errorJson", "El JSON no es válido: " + e.getOriginalMessage());
-            anadirAtributosDeClientes(model);
-            return "entrada";
+        if (modoClaude) {
+            try {
+                envio = extractorClaude.extraer(aImagenesDeServicio(imagenesDe(envioForm)));
+            } catch (ClaudeEnvioExtractionService.ExtraccionException | IOException e) {
+                model.addAttribute("errorJson",
+                        "No se pudo extraer el packing list con Claude: " + e.getMessage());
+                anadirAtributosDeClientes(model);
+                return "entrada";
+            }
+        } else {
+            try {
+                envio = mapper.readValue(envioForm.getJson(), EnvioInput.class);
+            } catch (JsonProcessingException e) {
+                model.addAttribute("errorJson", "El JSON no es válido: " + e.getOriginalMessage());
+                anadirAtributosDeClientes(model);
+                return "entrada";
+            }
         }
         if (envio.getDestinos() == null || envio.getDestinos().isEmpty()) {
-            model.addAttribute("errorJson", "El JSON no contiene ninguna destinación ('destinos')");
+            model.addAttribute("errorJson", modoClaude
+                    ? "Claude no ha encontrado ninguna destinación en las imágenes"
+                    : "El JSON no contiene ninguna destinación ('destinos')");
             anadirAtributosDeClientes(model);
             return "entrada";
         }
@@ -144,6 +174,12 @@ public class PackingListController {
 
         // Mismo encadenado que Main.java: importar -> asignar -> inferir.
         EnvioImportado importado = importador.importar(envio);
+
+        if (modoClaude) {
+            importado.getAvisos().add(0, "Datos extraídos por Claude a partir de "
+                    + imagenesDe(envioForm).size()
+                    + " imagen(es): revisa referencias, tallas y cantidades antes de generar");
+        }
 
         // El "cliente" del JSON es informativo (viene de las imágenes); si no
         // coincide con el seleccionado en el desplegable, se avisa mas no
@@ -305,6 +341,26 @@ public class PackingListController {
     }
 
     // --- Internos ---
+
+    /** Imágenes realmente subidas: el input file manda una entrada vacía si no eliges nada. */
+    private static List<MultipartFile> imagenesDe(EnvioForm form) {
+        if (form.getImagenes() == null) {
+            return List.of();
+        }
+        return form.getImagenes().stream()
+                .filter(imagen -> imagen != null && !imagen.isEmpty())
+                .toList();
+    }
+
+    private static List<ClaudeEnvioExtractionService.Imagen> aImagenesDeServicio(
+            List<MultipartFile> ficheros) throws IOException {
+        List<ClaudeEnvioExtractionService.Imagen> imagenes = new ArrayList<>();
+        for (MultipartFile fichero : ficheros) {
+            imagenes.add(new ClaudeEnvioExtractionService.Imagen(
+                    fichero.getContentType(), fichero.getBytes()));
+        }
+        return imagenes;
+    }
 
     private String sinEnvio(RedirectAttributes redirect) {
         redirect.addFlashAttribute("mensaje", "No hay ningún envío en curso: empieza pegando el JSON.");

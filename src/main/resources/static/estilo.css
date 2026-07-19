@@ -99,6 +99,37 @@ textarea.json {
 
 .error-campo { color: var(--error-borde); font-size: 0.85rem; }
 
+.ayuda { color: #5a6673; font-size: 0.85rem; margin: 0.1rem 0 0.5rem; }
+
+/* --- Selector del modo de entrada (JSON / CLAUDE / FORMULARIO) --- */
+
+.selector-modo {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1.2rem;
+}
+
+.selector-modo button {
+    margin: 0;
+    background: #fff;
+    color: var(--acento);
+}
+
+.selector-modo button.activo {
+    background: var(--acento);
+    color: #fff;
+}
+
+input[type="file"] {
+    display: block;
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px dashed var(--borde);
+    border-radius: 4px;
+    background: var(--fondo-suave);
+    font: inherit;
+}
+
 button, a.boton {
     display: inline-block;
     margin-top: 1.2rem;

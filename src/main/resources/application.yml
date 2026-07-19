@@ -1,5 +1,14 @@
 # Configuración del generador de packing lists.
 #
+# Límites de subida de ficheros: las fotos de packing lists del móvil
+# superan de sobra el 1MB por defecto de Spring.
+spring:
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 60MB
+
+#
 # Taras conocidas (kg de embalaje vacío) por tamaño de caja "LxWxH" en cm.
 # Para soportar un tamaño nuevo basta con añadirlo aquí; las claves van
 # entre [] y comillas para que Spring las respete tal cual.
