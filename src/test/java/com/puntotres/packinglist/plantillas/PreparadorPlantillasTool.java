@@ -7,9 +7,13 @@ import java.util.List;
 
 import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.DataValidation;
+import org.apache.poi.ss.usermodel.DataValidationConstraint;
+import org.apache.poi.ss.usermodel.DataValidationHelper;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.CellRangeAddressList;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +70,11 @@ class PreparadorPlantillasTool {
             // El resumen queda con los contadores a cero como en bolsos.
             ponerCero(hoja, 23, 20);  // TOTAL NUMBER OF BOXES (U24 tras el desplazamiento)
             ponerCero(hoja, 26, 20);  // VOLUME (U27)
+
+            // El original de cinturones no traía la hoja oculta de destinos
+            // que alimenta el desplegable de B10 (la de bolsos sí, "Feuil1"):
+            // se recrea igual que en bolsos, con su validación de datos.
+            crearHojaDeDestinos(wb, hoja);
 
             guardar(wb, DIR + "ami-belts-packing-list-template.xlsx");
         }
@@ -147,6 +156,28 @@ class PreparadorPlantillasTool {
 
             guardar(wb, DIR + "generic-packing-list-template.xlsx");
         }
+    }
+
+    /**
+     * Crea la hoja oculta "Feuil1" con la lista de destinos AMI (idéntica a
+     * la de la plantilla de bolsos) y engancha la validación de lista de
+     * B10 de la hoja principal a Feuil1!$A$2:$A$5.
+     */
+    private void crearHojaDeDestinos(XSSFWorkbook wb, Sheet hojaPrincipal) {
+        Sheet destinos = wb.createSheet("Feuil1");
+        String[] valores = {"DESTINATION", "France", "China", "Hong Kong", "Japan"};
+        for (int i = 0; i < valores.length; i++) {
+            destinos.createRow(i).createCell(0).setCellValue(valores[i]);
+        }
+        wb.setSheetHidden(wb.getSheetIndex(destinos), true);
+
+        DataValidationHelper helper = hojaPrincipal.getDataValidationHelper();
+        DataValidationConstraint restriccion =
+                helper.createFormulaListConstraint("Feuil1!$A$2:$A$5");
+        CellRangeAddressList celdaDestino = new CellRangeAddressList(9, 9, 1, 1); // B10
+        DataValidation validacion = helper.createValidation(restriccion, celdaDestino);
+        validacion.setShowErrorBox(true);
+        hojaPrincipal.addValidationData(validacion);
     }
 
     // --- helpers ---

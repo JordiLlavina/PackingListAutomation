@@ -206,6 +206,28 @@ class AmiExcelBuilderTest {
     }
 
     @Test
+    void elExcelDeCinturonesConservaLaHojaYElDesplegableDeDestinos() throws Exception {
+        PackingListData data = data(cajaCinturon(1, "07672", "UBL029.AL0216", "001",
+                "60x40x40", 8.0, 10.0, Map.of("85", 45)));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(
+                new ByteArrayInputStream(builder.generar(data, AmiLayout.BELTS)))) {
+            // La hoja oculta de destinos y la validación de B10 (el desplegable)
+            // tienen que sobrevivir a la generación: el original del cliente no
+            // las traía y la plantilla las recrea.
+            Sheet destinos = wb.getSheet("Feuil1");
+            assertEquals("France", destinos.getRow(1).getCell(0).getStringCellValue());
+            assertEquals("Japan", destinos.getRow(4).getCell(0).getStringCellValue());
+
+            org.apache.poi.xssf.usermodel.XSSFSheet hoja =
+                    (org.apache.poi.xssf.usermodel.XSSFSheet) wb.getSheet("STANDARD PKL E25");
+            assertEquals(1, hoja.getDataValidations().size());
+            assertEquals("B10", hoja.getDataValidations().get(0)
+                    .getRegions().getCellRangeAddresses()[0].formatAsString());
+        }
+    }
+
+    @Test
     void unaTallaSinColumnaEnLaMatrizLanzaExcepcionClara() {
         PackingListData data = data(cajaCinturon(1, "07672", "UBL029.AL0216", "001",
                 "60x40x40", 8.0, 10.0, Map.of("999", 10)));

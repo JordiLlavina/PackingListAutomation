@@ -181,6 +181,19 @@ td input[type="number"] {
     font: inherit;
 }
 
+/* Filas de la tabla de revisión 4px más estrechas: se recortan 2px por
+   lado tanto en las celdas como en los inputs, que son los que marcan
+   la altura real de la fila. */
+section.destino th, section.destino td {
+    padding-top: calc(0.35rem - 2px);
+    padding-bottom: calc(0.35rem - 2px);
+}
+
+section.destino td input[type="number"] {
+    padding-top: calc(0.25rem - 2px);
+    padding-bottom: calc(0.25rem - 2px);
+}
+
 tr.pendiente td { background: var(--aviso-fondo); }
 
 .badge {

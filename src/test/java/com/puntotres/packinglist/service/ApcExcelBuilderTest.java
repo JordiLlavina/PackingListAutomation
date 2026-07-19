@@ -96,6 +96,9 @@ class ApcExcelBuilderTest {
             assertEquals("APC INV FA-1 IVRY", hoja.getSheetName());
             assertEquals("A.P.C.", hoja.getRow(7).getCell(5).getStringCellValue());   // F8
             assertTrue(hoja.getRow(9).getCell(5).getStringCellValue().contains("IVRY SUR SEINE")); // F10
+            // La fecha va como texto dd.MM.yyyy (como el original del cliente):
+            // la celda F12 tiene formato General y un LocalDate se vería "46213".
+            assertEquals("10.07.2026", hoja.getRow(11).getCell(5).getStringCellValue()); // F12
             assertEquals("FA-1", hoja.getRow(13).getCell(15).getStringCellValue());   // P14
         }
     }

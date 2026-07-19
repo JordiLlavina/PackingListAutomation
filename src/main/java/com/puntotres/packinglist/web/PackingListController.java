@@ -142,8 +142,8 @@ public class PackingListController {
         if (envio.getCliente() != null && !envio.getCliente().isBlank()
                 && clientesProperties.clientePara(envio.getCliente())
                         .map(c -> c != cliente).orElse(true)) {
-            importado.getAvisos().add("El JSON indica cliente '" + envio.getCliente()
-                    + "' pero has seleccionado '" + cliente.getNombre() + "'");
+            importado.getAvisos().add("Los datos de entrada indican que el cliente es '"
+                    + envio.getCliente() + "' pero has seleccionado '" + cliente.getNombre() + "'");
         }
 
         envioEnCurso.reiniciar();

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk 'BEGIN{RS=\"</si>\"} NR==13 {gsub\\(/<[^>]*>/,\"\",$0\\); print \"12: \"$0}' xl/sharedStrings.xml)",
+      "Bash(grep -E 'Tests run: [0-9]+, Fail.*$|BUILD')"
+    ]
+  }
+}

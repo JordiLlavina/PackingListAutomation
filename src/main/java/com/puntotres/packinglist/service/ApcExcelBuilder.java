@@ -54,6 +54,8 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
 
     private static final String RUTA_PLANTILLA = "/client-packinglist/apc-packing-list-template.xlsx";
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    /** Formato con el que APC escribe la fecha en F12 (texto, no fecha Excel). */
+    private static final DateTimeFormatter FORMATO_FECHA_APC = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final double TARA_PALET_KG_DEFECTO = 10.0;
     private static final double VOLUMEN_PALET_M3_DEFECTO = 0.168;
     private static final Locale LOCALE_ES = Locale.forLanguageTag("es-ES");
@@ -135,7 +137,12 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
     private void escribirCabecera(Sheet hoja, DestinoClienteConfig destinoConfig, DatosEnvio envio) {
         celda(hoja, 7, 5).setCellValue(destinoConfig.getNombreCliente());   // F8
         celda(hoja, 9, 5).setCellValue(destinoConfig.getDireccion());       // F10
-        celda(hoja, 11, 5).setCellValue(LocalDate.parse(envio.getFechaFactura(), FORMATO_FECHA)); // F12
+        // La fecha se escribe como texto dd.MM.yyyy, igual que el original del
+        // cliente: F12 tiene formato General y un LocalDate se vería como el
+        // número de serie de Excel (p. ej. "46222").
+        celda(hoja, 11, 5).setCellValue(
+                LocalDate.parse(envio.getFechaFactura(), FORMATO_FECHA)
+                        .format(FORMATO_FECHA_APC)); // F12
         celda(hoja, 13, 15).setCellValue(envio.getNumeroFactura());         // P14
     }
 
