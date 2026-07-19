@@ -8,6 +8,7 @@ import org.springframework.web.context.annotation.SessionScope;
 
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
+import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 
@@ -28,6 +29,7 @@ public class EnvioEnCurso {
     private final List<String> avisosInferencia = new ArrayList<>();
     private final List<CajaData> cajasSinPalet = new ArrayList<>();
     private final List<ExcelGenerado> excels = new ArrayList<>();
+    private VolcadoErpData volcadoErp;
 
     public boolean estaVacio() {
         return importado == null;
@@ -41,6 +43,7 @@ public class EnvioEnCurso {
         avisosInferencia.clear();
         cajasSinPalet.clear();
         excels.clear();
+        volcadoErp = null;
     }
 
     public DatosEnvio getCabecera() { return cabecera; }
@@ -53,4 +56,7 @@ public class EnvioEnCurso {
     public List<String> getAvisosInferencia() { return avisosInferencia; }
     public List<CajaData> getCajasSinPalet() { return cajasSinPalet; }
     public List<ExcelGenerado> getExcels() { return excels; }
+
+    public VolcadoErpData getVolcadoErp() { return volcadoErp; }
+    public void setVolcadoErp(VolcadoErpData volcadoErp) { this.volcadoErp = volcadoErp; }
 }

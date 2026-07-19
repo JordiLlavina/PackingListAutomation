@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -291,6 +292,48 @@ class PackingListControllerTest {
         }
         assertEquals(6, entradas.size());
         assertTrue(entradas.contains(FICHERO_PARIS_USL728));
+    }
+
+    @Test
+    void generarProduceElVolcadoErpDescargableDelEnvioCompleto() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+
+        // El volcado queda en sesión y expuesto a la vista de resultados.
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("volcadoErp"));
+
+        byte[] excel = mvc.perform(get("/descargar-volcado-erp").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andExpect(header().string("Content-Disposition",
+                        containsString("Volcado_ERP_FA-26-1189.xlsx")))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            Sheet hoja = wb.getSheet("Volcado");
+            assertEquals("ARTICLE", hoja.getRow(0).getCell(0).getStringCellValue());
+            // Al menos una línea de datos agregada de todas las destinaciones.
+            assertTrue(hoja.getLastRowNum() >= 1);
+        }
+    }
+
+    @Test
+    void descargarElVolcadoSinHaberGeneradoDevuelve404() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+        mvc.perform(get("/descargar-volcado-erp").session(sesion))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void descargarEtiquetasDevuelve404PorqueAunNoExiste() throws Exception {
+        mvc.perform(get("/descargar-etiquetas"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

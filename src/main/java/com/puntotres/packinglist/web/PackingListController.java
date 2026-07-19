@@ -31,12 +31,15 @@ import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
+import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.PackingListGenerationService;
 import com.puntotres.packinglist.service.PaletAssignmentService;
 import com.puntotres.packinglist.service.ResultadoAsignacion;
+import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
+import com.puntotres.packinglist.service.VolcadoErpGenerationService;
 import com.puntotres.packinglist.service.WeightInferenceService;
 
 import jakarta.validation.Valid;
@@ -58,6 +61,8 @@ public class PackingListController {
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
     private final PackingListGenerationService generador;
+    private final VolcadoErpGenerationService generadorVolcado;
+    private final VolcadoErpExcelBuilder constructorVolcado;
     private final ClientesProperties clientesProperties;
     private final ObjectMapper mapper;
     private final EnvioEnCurso envioEnCurso;
@@ -66,6 +71,8 @@ public class PackingListController {
                                  PaletAssignmentService asignadorPalets,
                                  WeightInferenceService inferidorPesos,
                                  PackingListGenerationService generador,
+                                 VolcadoErpGenerationService generadorVolcado,
+                                 VolcadoErpExcelBuilder constructorVolcado,
                                  ClientesProperties clientesProperties,
                                  ObjectMapper mapper,
                                  EnvioEnCurso envioEnCurso) {
@@ -73,6 +80,8 @@ public class PackingListController {
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
         this.generador = generador;
+        this.generadorVolcado = generadorVolcado;
+        this.constructorVolcado = constructorVolcado;
         this.clientesProperties = clientesProperties;
         this.mapper = mapper;
         this.envioEnCurso = envioEnCurso;
@@ -193,15 +202,21 @@ public class PackingListController {
         aplicarPesosYReinferir(revisionForm);
 
         List<ExcelGenerado> excels = new ArrayList<>();
+        VolcadoErpData volcado;
         try {
             DatosEnvio cabecera = envioEnCurso.getCabecera();
             ClienteConfig cliente = clientesProperties.clientePara(cabecera.getClaveCliente())
                     .orElseThrow(() -> new IllegalStateException(
                             "Cliente desconocido: " + cabecera.getClaveCliente()));
+            List<CajaData> todasLasCajas = new ArrayList<>();
             for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
                 excels.addAll(generador.generar(
                         destino.getDestino(), destino.getPalets(), cabecera, cliente));
+                todasLasCajas.addAll(destino.getDestino().getCajas());
             }
+            // El volcado ERP agrupa TODAS las cajas del envío (todas las
+            // destinaciones) por referencia+talla+color, un excel por envío.
+            volcado = generadorVolcado.generar(todasLasCajas, cabecera);
         } catch (IOException | RuntimeException e) {
             redirect.addFlashAttribute("error",
                     "No se pudieron generar los excels: " + e.getMessage());
@@ -209,6 +224,7 @@ public class PackingListController {
         }
         envioEnCurso.getExcels().clear();
         envioEnCurso.getExcels().addAll(excels);
+        envioEnCurso.setVolcadoErp(volcado);
         return "redirect:/resultados";
     }
 
@@ -224,6 +240,7 @@ public class PackingListController {
         }
         model.addAttribute("excels", envioEnCurso.getExcels());
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
+        model.addAttribute("volcadoErp", envioEnCurso.getVolcadoErp());
         return "resultados";
     }
 
@@ -260,6 +277,25 @@ public class PackingListController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
                         .attachment().filename(nombreZip).build().toString())
                 .body(salida.toByteArray());
+    }
+
+    @GetMapping("/descargar-volcado-erp")
+    public ResponseEntity<byte[]> descargarVolcadoErp() throws IOException {
+        VolcadoErpData volcado = envioEnCurso.getVolcadoErp();
+        if (envioEnCurso.estaVacio() || volcado == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .contentType(TIPO_XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
+                        .attachment().filename(volcado.getNombreFichero()).build().toString())
+                .body(constructorVolcado.generar(volcado));
+    }
+
+    /** Etiquetas: pendiente de implementar (stub que devuelve 404). */
+    @GetMapping("/descargar-etiquetas")
+    public ResponseEntity<byte[]> descargarEtiquetas() {
+        return ResponseEntity.notFound().build();
     }
 
     @GetMapping("/nuevo")
