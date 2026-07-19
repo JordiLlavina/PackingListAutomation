@@ -44,7 +44,9 @@ public class VolcadoErpGenerationService {
                 .build());
         }
 
-        String nombreFichero = "Volcado_ERP_" + envio.getNumeroFactura() + ".xlsx";
+        // Misma sanitización que el nombre del ZIP en /descargar-todo
+        String facturaSaneada = envio.getNumeroFactura().replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
+        String nombreFichero = "Volcado_ERP_" + facturaSaneada + ".xlsx";
         return new VolcadoErpData(lineas, nombreFichero);
     }
 
