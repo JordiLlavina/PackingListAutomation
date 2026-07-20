@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -105,6 +106,53 @@ class PackingListControllerTest {
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("has seleccionado")));
+    }
+
+    @Test
+    void importarEnModoFormularioUsaElJsonSerializadoEnElNavegador() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // Lo que formulario.js serializa: siempre rangos (una caja suelta es
+        // un rango de una sola caja) y solo los campos rellenados.
+        String json = """
+                {"cliente": "AMI", "destinos": [{"destino": "PARIS",
+                  "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 3}],
+                  "referencias": [{"referencia": "USL728.AL217", "color": "NOIR",
+                    "medidaCaja": "60x40x40", "cantidadTotal": 110,
+                    "cajas": [{"cajaInicio": 1, "cajaFin": 2, "unidadesPorCaja": 50},
+                              {"cajaInicio": 3, "cajaFin": 3, "unidadesPorCaja": 10}]}]}]}
+                """;
+        mvc.perform(post("/importar").session(sesion)
+                        .param("modo", "FORMULARIO")
+                        .param("cliente", "AMI")
+                        .param("json", json)
+                        .param("temporada", "H26")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        // Las 3 cajas expandidas (el rango de 1 incluido), sin avisos de
+        // descuadre porque cantidadTotal cuadra (2*50 + 10 = 110).
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("PARIS")))
+                .andExpect(content().string(containsString("USL728.AL217")))
+                .andExpect(content().string(not(containsString("no cuadra"))));
+    }
+
+    @Test
+    void importarEnModoFormularioVacioExplicaElErrorSinHablarDeJson() throws Exception {
+        mvc.perform(post("/importar")
+                        .param("modo", "FORMULARIO")
+                        .param("cliente", "AMI")
+                        .param("temporada", "H26")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("entrada"))
+                .andExpect(model().attributeHasFieldErrors("envioForm", "json"))
+                .andExpect(content().string(containsString("El formulario está vacío")));
     }
 
     @Test

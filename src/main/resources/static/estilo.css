@@ -277,6 +277,110 @@ button:disabled {
     cursor: not-allowed;
 }
 
+/* --- Modo FORMULARIO: entrada manual pensada para tablet ---
+   Campos y botones más altos que el resto de la app (dedo, no ratón),
+   teclado numérico vía inputmode en los inputs de las plantillas. */
+
+#bloqueFormulario input[type="text"],
+#bloqueFormulario input[type="number"] {
+    width: 100%;
+    padding: 0.5rem 0.6rem;
+    min-height: 2.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+}
+
+#bloqueFormulario button.mini {
+    padding: 0.45rem 0.8rem;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.f-destino {
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 0.4rem 0.9rem 0.9rem;
+    margin: 0.8rem 0;
+    background: var(--fondo-suave);
+}
+
+.f-cabecera-destino {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+}
+
+.f-cabecera-destino label { flex: 1; }
+
+.f-seccion h4 { margin: 1.1rem 0 0.1rem; }
+
+.f-nota { font-weight: 400; font-size: 0.85rem; color: #5a6673; }
+
+/* Una fila de campos cortos (palet o rango de cajas): los labels se
+   reparten el ancho y el botón de quitar queda pegado a la línea base. */
+.f-fila {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0 0.8rem;
+}
+
+.f-fila label {
+    flex: 1 1 7rem;
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+}
+
+.f-fila input { margin-top: 0.2rem; }
+
+.f-fila button.mini { flex: 0 0 auto; margin-bottom: 0.35rem; }
+
+.f-referencia {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 0.6rem 0.9rem 0.9rem;
+    margin: 0.6rem 0;
+}
+
+.f-opcionales summary {
+    cursor: pointer;
+    color: var(--acento);
+    font-size: 0.85rem;
+    margin-top: 0.6rem;
+}
+
+.f-cajas h5 { margin: 0.9rem 0 0; font-size: 0.95rem; }
+
+.f-pie-cajas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 1rem;
+}
+
+/* El contador en vivo de la referencia, para contrastar con el papel. */
+.f-total { font-weight: 600; margin-bottom: 0.7rem; }
+
+.f-total.descuadre { color: var(--error-borde); }
+
+.f-total.descuadre::after { content: " ≠ total declarado"; font-weight: 400; }
+
+.f-total-declarado {
+    flex: 0 1 16rem;
+    margin: 0.5rem 0 0;
+    font-size: 0.85rem;
+}
+
+.f-acciones-referencia {
+    margin-top: 0.6rem;
+    border-top: 1px solid var(--borde);
+}
+
+/* Los errores del formulario se listan uno por línea. */
+#errorFormulario { white-space: pre-line; font-weight: 600; }
+
 /* --- Modal de vista previa del volcado ERP --- */
 
 .modal-fondo {

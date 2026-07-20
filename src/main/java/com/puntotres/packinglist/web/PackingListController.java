@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -29,6 +30,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.TaraProperties;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
@@ -67,6 +69,7 @@ public class PackingListController {
     private final VolcadoErpGenerationService generadorVolcado;
     private final VolcadoErpExcelBuilder constructorVolcado;
     private final ClientesProperties clientesProperties;
+    private final TaraProperties taraProperties;
     private final ObjectMapper mapper;
     private final EnvioEnCurso envioEnCurso;
 
@@ -78,6 +81,7 @@ public class PackingListController {
                                  VolcadoErpGenerationService generadorVolcado,
                                  VolcadoErpExcelBuilder constructorVolcado,
                                  ClientesProperties clientesProperties,
+                                 TaraProperties taraProperties,
                                  ObjectMapper mapper,
                                  EnvioEnCurso envioEnCurso) {
         this.importador = importador;
@@ -88,6 +92,7 @@ public class PackingListController {
         this.generadorVolcado = generadorVolcado;
         this.constructorVolcado = constructorVolcado;
         this.clientesProperties = clientesProperties;
+        this.taraProperties = taraProperties;
         this.mapper = mapper;
         this.envioEnCurso = envioEnCurso;
     }
@@ -113,14 +118,19 @@ public class PackingListController {
         boolean modoClaude = "CLAUDE".equals(envioForm.getModo());
 
         // El JSON y las imágenes se validan aquí y no con @NotBlank porque
-        // solo es obligatorio el del modo activo.
+        // solo es obligatorio el del modo activo. El modo FORMULARIO
+        // serializa el formulario al mismo campo json antes de enviar, así
+        // que a partir de aquí es indistinguible del modo JSON.
         if (modoClaude) {
             if (imagenesDe(envioForm).isEmpty()) {
                 errores.rejectValue("imagenes", "imagenes.obligatorias",
                         "Sube al menos una imagen del packing list");
             }
         } else if (envioForm.getJson() == null || envioForm.getJson().isBlank()) {
-            errores.rejectValue("json", "json.obligatorio", "Pega el JSON del envío");
+            errores.rejectValue("json", "json.obligatorio",
+                    "FORMULARIO".equals(envioForm.getModo())
+                            ? "El formulario está vacío: añade al menos una destinación con sus cajas"
+                            : "Pega el JSON del envío");
         }
         if (errores.hasErrors()) {
             anadirAtributosDeClientes(model);
@@ -374,6 +384,9 @@ public class PackingListController {
      */
     private void anadirAtributosDeClientes(Model model) {
         model.addAttribute("clientes", clientesProperties.getClientes());
+        // Tamaños de caja con tara conocida, para el datalist del modo
+        // FORMULARIO (evita teclear un tamaño que luego no tendría tara).
+        model.addAttribute("tamanosCaja", new TreeSet<>(taraProperties.getTaras().keySet()));
         Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
         clientesProperties.getClientes().forEach((clave, config) -> {
             Map<String, String> datos = new LinkedHashMap<>();

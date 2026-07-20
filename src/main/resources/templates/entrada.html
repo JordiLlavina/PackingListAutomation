@@ -7,13 +7,11 @@
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${errorJson}" th:text="${errorJson}"></div>
 
-    <!-- Selector del modo de entrada: solo uno activo a la vez. FORMULARIO
-         está deshabilitado hasta que se implemente la entrada manual. -->
+    <!-- Selector del modo de entrada: solo uno activo a la vez. -->
     <div class="selector-modo" role="tablist">
         <button type="button" id="botonModoJSON" data-modo="JSON">JSON</button>
         <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CLAUDE</button>
-        <button type="button" id="botonModoFORMULARIO" data-modo="FORMULARIO"
-                disabled title="Próximamente">FORMULARIO</button>
+        <button type="button" id="botonModoFORMULARIO" data-modo="FORMULARIO">FORMULARIO</button>
     </div>
 
     <form id="formEntrada" class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
@@ -56,6 +54,17 @@
             <p class="error-campo" th:errors="*{imagenes}"></p>
         </div>
 
+        <div id="bloqueFormulario" style="display: none">
+            <label>Packing list</label>
+            <p class="ayuda">Rellena cada destinación con sus palets (opcionales) y sus
+                referencias. Cada fila de cajas es un rango consecutivo con las mismas
+                unidades; para una caja suelta deja el "hasta" vacío.</p>
+            <div id="listaDestinos"></div>
+            <button type="button" id="botonAnadirDestino" class="secundario">+ Añadir destinación</button>
+            <p class="error-campo" id="errorFormulario" style="display: none"></p>
+            <p class="error-campo" th:errors="*{json}"></p>
+        </div>
+
         <div class="campos-cabecera">
             <div>
                 <label for="temporada">Temporada</label>
@@ -85,6 +94,106 @@
         Procesando... con Claude puede tardar 1-2 minutos, no cierres ni recargues la página.
     </p>
 
+    <!-- Piezas del modo FORMULARIO: tamaños de caja con tara conocida y las
+         plantillas que formulario.js clona. Los inputs no llevan "name" a
+         propósito: no viajan en el POST, solo el JSON serializado. -->
+    <datalist id="listaTamanos">
+        <option th:each="tamano : ${tamanosCaja}" th:value="${tamano}"></option>
+    </datalist>
+
+    <template id="plantillaDestino">
+        <fieldset class="f-destino">
+            <div class="f-cabecera-destino">
+                <label>Destinación
+                    <input type="text" data-campo="destino" placeholder="PARIS"></label>
+                <button type="button" class="mini" data-eliminar="destino">✕ Quitar destinación</button>
+            </div>
+            <div class="f-seccion">
+                <h4>Palets <span class="f-nota">(opcional: rangos de cajas por palet)</span></h4>
+                <div data-lista="palets"></div>
+                <button type="button" class="mini" data-anadir="palet">+ Palet</button>
+            </div>
+            <div class="f-seccion">
+                <h4>Referencias</h4>
+                <div data-lista="referencias"></div>
+                <button type="button" class="secundario" data-anadir="referencia">+ Añadir referencia</button>
+            </div>
+        </fieldset>
+    </template>
+
+    <template id="plantillaPalet">
+        <div class="f-fila f-palet">
+            <label>Nº palet
+                <input type="number" inputmode="numeric" min="1" data-campo="palet"></label>
+            <label>Caja desde
+                <input type="number" inputmode="numeric" min="1" data-campo="cajaInicio"></label>
+            <label>Caja hasta
+                <input type="number" inputmode="numeric" min="1" data-campo="cajaFin"></label>
+            <label>Medidas cm (opcional)
+                <input type="text" data-campo="medidas" placeholder="80x120x130"></label>
+            <label>Tara kg (opcional)
+                <input type="number" inputmode="decimal" step="0.1" min="0" data-campo="tara"></label>
+            <button type="button" class="mini" data-eliminar="fila" title="Quitar palet">✕</button>
+        </div>
+    </template>
+
+    <template id="plantillaReferencia">
+        <div class="f-referencia">
+            <div class="f-fila">
+                <label>Referencia
+                    <input type="text" data-campo="referencia" placeholder="USL728.AL217"></label>
+                <label>Color
+                    <input type="text" data-campo="color" placeholder="NOIR"></label>
+                <label>Medida caja cm
+                    <input type="text" data-campo="medidaCaja" list="listaTamanos"
+                           placeholder="60x40x40"></label>
+            </div>
+            <details class="f-opcionales">
+                <summary>Más campos (talla, pedido, modelo, canal, livraison)</summary>
+                <div class="f-fila">
+                    <label>Talla
+                        <input type="text" data-campo="talla"></label>
+                    <label>Pedido
+                        <input type="text" data-campo="pedido"></label>
+                    <label>Modelo
+                        <input type="text" data-campo="modelo"></label>
+                    <label>Canal
+                        <input type="text" data-campo="canal" placeholder="WHOLESALE"></label>
+                    <label>Livraison
+                        <input type="text" data-campo="livraisonCode"></label>
+                </div>
+            </details>
+            <div class="f-cajas">
+                <h5>Cajas</h5>
+                <div data-lista="cajas"></div>
+                <div class="f-pie-cajas">
+                    <button type="button" class="mini" data-anadir="caja">+ Cajas</button>
+                    <span class="f-total" data-total>0 uds en 0 cajas</span>
+                    <label class="f-total-declarado">Total declarado en el papel (opcional)
+                        <input type="number" inputmode="numeric" min="0"
+                               data-campo="cantidadTotal"></label>
+                </div>
+            </div>
+            <div class="f-acciones-referencia">
+                <button type="button" class="mini" data-accion="duplicar">⧉ Duplicar (otro color)</button>
+                <button type="button" class="mini" data-eliminar="referencia">✕ Quitar referencia</button>
+            </div>
+        </div>
+    </template>
+
+    <template id="plantillaCaja">
+        <div class="f-fila f-caja">
+            <label>Caja desde
+                <input type="number" inputmode="numeric" min="1" data-campo="cajaInicio"></label>
+            <label>hasta (vacío = una caja)
+                <input type="number" inputmode="numeric" min="1" data-campo="cajaFin"></label>
+            <label>Uds por caja
+                <input type="number" inputmode="numeric" min="0" data-campo="unidadesPorCaja"></label>
+            <button type="button" class="mini" data-eliminar="fila" title="Quitar fila">✕</button>
+        </div>
+    </template>
+
+    <script th:src="@{/formulario.js}"></script>
     <script th:inline="javascript">
         /*<![CDATA[*/
         const CLIENTES = /*[[${clientesJs}]]*/ {};
@@ -117,6 +226,8 @@
             document.getElementById('modo').value = modo;
             document.getElementById('bloqueJson').style.display = modo === 'JSON' ? '' : 'none';
             document.getElementById('bloqueClaude').style.display = modo === 'CLAUDE' ? '' : 'none';
+            document.getElementById('bloqueFormulario').style.display =
+                modo === 'FORMULARIO' ? '' : 'none';
             document.querySelectorAll('.selector-modo button').forEach(function (boton) {
                 boton.classList.toggle('activo', boton.dataset.modo === modo);
             });
