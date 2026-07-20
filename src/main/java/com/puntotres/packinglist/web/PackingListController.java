@@ -439,13 +439,33 @@ public class PackingListController {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
         for (int i = 0; i < destinos.size(); i++) {
             List<CajaData> cajas = destinos.get(i).getDestino().getCajas();
+
+            // El peso es de la caja física entera y solo lo lleva su primera
+            // línea (la "líder"). Una caja física es la combinación
+            // referencia+color+nº de caja: las tallas de una misma caja mixta
+            // comparten líder (un solo peso, misma fila del excel), mientras
+            // que el mismo nº de caja en otro color/referencia va a otro excel
+            // y es líder de su propia caja física (edita su propio peso).
+            Map<String, CajaData> liderPorCaja = new LinkedHashMap<>();
+            for (CajaData caja : cajas) {
+                liderPorCaja.putIfAbsent(claveCajaFisica(caja), caja);
+            }
+
             List<FilaCaja> filas = new ArrayList<>();
             for (int j = 0; j < cajas.size(); j++) {
-                filas.add(new FilaCaja(indiceGlobal++, j, cajas.get(j)));
+                CajaData caja = cajas.get(j);
+                CajaData lider = liderPorCaja.get(claveCajaFisica(caja));
+                filas.add(new FilaCaja(indiceGlobal++, j, caja,
+                        lider == caja, !lider.tienePesosCompletos()));
             }
             vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(), filas));
         }
         return vista;
+    }
+
+    /** Identidad de la caja física dentro de su excel: referencia+color+nº. */
+    private static String claveCajaFisica(CajaData caja) {
+        return caja.getReferencia() + "|" + caja.getCodigoColor() + "|" + caja.getNumeroCaja();
     }
 
     /** Una destinación en la pantalla de revisión. */
@@ -456,7 +476,12 @@ public class PackingListController {
      * Una fila de la tabla de revisión: la caja, su índice global en el
      * formulario (los inputs se llaman pesos[indiceGlobal].*) y su posición
      * dentro de la destinación (para localizarla al aplicar los pesos).
+     *
+     * {@code esLider}: es la primera línea de su caja física, la única que
+     * muestra campos de peso editables. {@code cajaPendiente}: la caja física
+     * (su líder) aún no tiene los dos pesos, para resaltar la fila.
      */
-    public record FilaCaja(int indiceGlobal, int indiceEnDestino, CajaData caja) {
+    public record FilaCaja(int indiceGlobal, int indiceEnDestino, CajaData caja,
+                           boolean esLider, boolean cajaPendiente) {
     }
 }

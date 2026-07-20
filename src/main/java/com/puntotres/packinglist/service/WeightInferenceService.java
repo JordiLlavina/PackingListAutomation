@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -58,32 +59,41 @@ public class WeightInferenceService {
     /**
      * Infiere los pesos que falten en una lista de cajas de la MISMA
      * referencia (mismo producto, luego mismo peso por unidad).
+     *
+     * El peso pertenece a la CAJA FÍSICA, no a cada línea: una caja mixta
+     * (mismo color y nº de caja, varias tallas) se pesa una sola vez. Por eso
+     * las líneas se agrupan en cajas físicas y solo la líder (la primera de
+     * cada grupo) recibe el peso, calculado sobre las unidades de TODA la
+     * caja y con UNA sola tara; las demás líneas quedan a null a propósito.
      */
     public ResultadoInferencia inferirPesos(List<CajaData> cajasMismaReferencia) {
-        Double pesoUnitario = calcularPesoUnitarioMedio(cajasMismaReferencia);
+        List<List<CajaData>> cajasFisicas = agruparEnCajasFisicas(cajasMismaReferencia);
+        Double pesoUnitario = calcularPesoUnitarioMedio(cajasFisicas);
         Set<String> tamanosSinTara = new LinkedHashSet<>();
 
-        for (CajaData caja : cajasMismaReferencia) {
-            Optional<Double> tara = taras.taraPara(caja.getTamanoCaja());
+        for (List<CajaData> lineas : cajasFisicas) {
+            CajaData lider = lineas.get(0);
+            int unidades = unidadesTotales(lineas);
+            Optional<Double> tara = taras.taraPara(lider.getTamanoCaja());
 
-            if (caja.getPesoBrutoKg() != null) {
+            if (lider.getPesoBrutoKg() != null) {
                 // Bruto conocido: solo completar el neto si falta.
-                if (caja.getPesoNetoKg() == null) {
+                if (lider.getPesoNetoKg() == null) {
                     if (tara.isPresent()) {
-                        caja.setPesoNetoKg(redondear2(caja.getPesoBrutoKg() - tara.get()));
+                        lider.setPesoNetoKg(redondear2(lider.getPesoBrutoKg() - tara.get()));
                     } else {
-                        tamanosSinTara.add(nombreTamano(caja));
+                        tamanosSinTara.add(nombreTamano(lider));
                     }
                 }
                 continue;
             }
 
-            if (caja.getPesoNetoKg() != null) {
+            if (lider.getPesoNetoKg() != null) {
                 // Neto conocido (p. ej. introducido a mano): completar el bruto.
                 if (tara.isPresent()) {
-                    caja.setPesoBrutoKg(redondear2(caja.getPesoNetoKg() + tara.get()));
+                    lider.setPesoBrutoKg(redondear2(lider.getPesoNetoKg() + tara.get()));
                 } else {
-                    tamanosSinTara.add(nombreTamano(caja));
+                    tamanosSinTara.add(nombreTamano(lider));
                 }
                 continue;
             }
@@ -91,11 +101,11 @@ public class WeightInferenceService {
             // Sin ningún peso: solo se puede inferir con peso unitario y tara.
             if (pesoUnitario != null) {
                 if (tara.isPresent()) {
-                    double neto = redondear2(caja.getCantidad() * pesoUnitario);
-                    caja.setPesoNetoKg(neto);
-                    caja.setPesoBrutoKg(redondear2(neto + tara.get()));
+                    double neto = redondear2(unidades * pesoUnitario);
+                    lider.setPesoNetoKg(neto);
+                    lider.setPesoBrutoKg(redondear2(neto + tara.get()));
                 } else {
-                    tamanosSinTara.add(nombreTamano(caja));
+                    tamanosSinTara.add(nombreTamano(lider));
                 }
             }
             // Sin peso unitario la caja queda pendiente, pero eso ya se ve
@@ -111,30 +121,56 @@ public class WeightInferenceService {
     }
 
     /**
-     * Promedio del peso neto por unidad sobre las cajas con algún peso
-     * conocido y cantidad > 0. Se prefiere el neto (directo); si solo hay
-     * bruto se usa (bruto - tara) / cantidad. Null si no hay ninguna.
+     * Agrupa las líneas de una referencia en cajas físicas: misma caja física
+     * = mismo color y mismo nº de caja (las varias tallas de una caja mixta).
+     * Se conserva el orden de aparición, así la primera línea de cada grupo es
+     * la líder (la que porta el peso de la caja entera).
      */
-    private Double calcularPesoUnitarioMedio(List<CajaData> cajas) {
+    private static List<List<CajaData>> agruparEnCajasFisicas(List<CajaData> cajas) {
+        Map<String, List<CajaData>> porCaja = new LinkedHashMap<>();
+        for (CajaData caja : cajas) {
+            String clave = caja.getCodigoColor() + "|" + caja.getNumeroCaja();
+            porCaja.computeIfAbsent(clave, c -> new ArrayList<>()).add(caja);
+        }
+        return new ArrayList<>(porCaja.values());
+    }
+
+    /** Unidades de la caja física entera (suma de las de todas sus líneas). */
+    private static int unidadesTotales(List<CajaData> lineas) {
+        int total = 0;
+        for (CajaData linea : lineas) {
+            total += linea.getCantidad();
+        }
+        return total;
+    }
+
+    /**
+     * Promedio del peso neto por unidad sobre las CAJAS FÍSICAS con algún peso
+     * conocido (en su líder) y unidades > 0. Se prefiere el neto (directo); si
+     * solo hay bruto se usa (bruto - tara) / unidades. Null si no hay ninguna.
+     */
+    private Double calcularPesoUnitarioMedio(List<List<CajaData>> cajasFisicas) {
         double suma = 0;
         int conocidas = 0;
-        for (CajaData caja : cajas) {
-            if (caja.getCantidad() <= 0) {
+        for (List<CajaData> lineas : cajasFisicas) {
+            CajaData lider = lineas.get(0);
+            int unidades = unidadesTotales(lineas);
+            if (unidades <= 0) {
                 continue;
             }
-            if (caja.getPesoNetoKg() != null) {
-                suma += caja.getPesoNetoKg() / caja.getCantidad();
+            if (lider.getPesoNetoKg() != null) {
+                suma += lider.getPesoNetoKg() / unidades;
                 conocidas++;
                 continue;
             }
-            if (caja.getPesoBrutoKg() == null) {
+            if (lider.getPesoBrutoKg() == null) {
                 continue;
             }
-            Optional<Double> tara = taras.taraPara(caja.getTamanoCaja());
+            Optional<Double> tara = taras.taraPara(lider.getTamanoCaja());
             if (tara.isEmpty()) {
                 continue;
             }
-            suma += (caja.getPesoBrutoKg() - tara.get()) / caja.getCantidad();
+            suma += (lider.getPesoBrutoKg() - tara.get()) / unidades;
             conocidas++;
         }
         return (conocidas > 0) ? suma / conocidas : null;

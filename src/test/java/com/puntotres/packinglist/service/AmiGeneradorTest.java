@@ -152,17 +152,24 @@ class AmiGeneradorTest {
     }
 
     @Test
-    void referenciaUblUsaLaPlantillaDeCinturonesYAgregaPorCaja() throws Exception {
+    void referenciaUblAgregaLasTallasEnUnaFilaConElPesoDeLaCajaFisica() throws Exception {
         DestinoData destino = new DestinoData();
         destino.setNombreDestino("PARIS");
+        // Caja física 14 con tres tallas: el peso es de la caja entera y lo
+        // lleva la primera línea (talla 85); las demás van a null (una caja
+        // mixta se pesa una sola vez, no se suman las tallas).
         destino.setCajas(List.of(
                 cajaConTalla(14, "07672", "UBL029.AL0216", "001", "85", 3, 8.0, 10.0),
-                cajaConTalla(14, "07672", "UBL029.AL0216", "001", "95", 31, 0.0, 0.0),
-                cajaConTalla(14, "07672", "UBL029.AL0216", "001", "105", 3, 0.0, 0.0)));
+                cajaConTalla(14, "07672", "UBL029.AL0216", "001", "95", 31, null, null),
+                cajaConTalla(14, "07672", "UBL029.AL0216", "001", "105", 3, null, null)));
 
         List<ExcelGenerado> excels = generador.generar(destino, List.of(), envio(), ami);
 
         assertEquals(1, excels.size());
+        // La caja tiene su peso (en la líder): no debe quedar pendiente aunque
+        // las otras tallas estén a null.
+        assertFalse(excels.get(0).tienePesosPendientes(),
+                "Pendiente inesperado: " + excels.get(0).getCajasPendientes());
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
             Sheet hoja = wb.getSheet("STANDARD PKL E25");
             Row fila = hoja.getRow(18);
@@ -170,8 +177,8 @@ class AmiGeneradorTest {
             assertEquals(3, (int) fila.getCell(9).getNumericCellValue());     // J: talla 85
             assertEquals(31, (int) fila.getCell(11).getNumericCellValue());   // L: talla 95
             assertEquals(3, (int) fila.getCell(13).getNumericCellValue());    // N: talla 105
-            assertEquals(8.0, fila.getCell(19).getNumericCellValue());        // T: NET sumado
-            assertEquals(10.0, fila.getCell(20).getNumericCellValue());       // U: GROSS sumado
+            assertEquals(8.0, fila.getCell(19).getNumericCellValue());        // T: NET de la caja
+            assertEquals(10.0, fila.getCell(20).getNumericCellValue());       // U: GROSS de la caja
         }
     }
 

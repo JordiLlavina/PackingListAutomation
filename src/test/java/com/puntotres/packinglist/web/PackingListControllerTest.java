@@ -269,6 +269,48 @@ class PackingListControllerTest {
     }
 
     @Test
+    void enCajaMixtaPorTallaSoloLaPrimeraLineaMuestraCamposDePeso() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // Cinturón con la caja 4 (una talla) y la caja 5 mixta (tres tallas):
+        // 4 líneas pero solo 2 cajas físicas, luego 2 campos de peso.
+        String json = """
+                {"cliente": "AMI", "destinos": [{"destino": "PARIS",
+                  "palets": [{"palet": 1, "cajaInicio": 4, "cajaFin": 5}],
+                  "referencias": [
+                    {"referencia": "UBL029.AL0216", "color": "001", "medidaCaja": "60x40x40",
+                     "pedido": "07672", "talla": "75", "cajas": [{"caja": 4, "unidades": 45}]},
+                    {"referencia": "UBL029.AL0216", "color": "001", "medidaCaja": "60x40x40",
+                     "pedido": "07672", "talla": "85", "cajas": [{"caja": 5, "unidades": 3}]},
+                    {"referencia": "UBL029.AL0216", "color": "001", "medidaCaja": "60x40x40",
+                     "pedido": "07672", "talla": "95", "cajas": [{"caja": 5, "unidades": 31}]},
+                    {"referencia": "UBL029.AL0216", "color": "001", "medidaCaja": "60x40x40",
+                     "pedido": "07672", "talla": "105", "cajas": [{"caja": 5, "unidades": 3}]}
+                  ]}]}
+                """;
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", json)
+                        .param("temporada", "H26").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        String html = mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Un input "pesoNetoKg" por caja física líder (caja 4 y caja 5), no por línea.
+        assertEquals(2, contarOcurrencias(html, "pesoNetoKg"));
+        assertEquals(2, contarOcurrencias(html, "pesoBrutoKg"));
+    }
+
+    private static int contarOcurrencias(String texto, String fragmento) {
+        int total = 0;
+        for (int i = texto.indexOf(fragmento); i >= 0; i = texto.indexOf(fragmento, i + fragmento.length())) {
+            total++;
+        }
+        return total;
+    }
+
+    @Test
     void unTamanoDeCajaSinTaraSeAvisaEnLaRevision() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         String json = """

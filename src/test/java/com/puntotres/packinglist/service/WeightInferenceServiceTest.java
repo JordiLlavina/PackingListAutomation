@@ -90,6 +90,27 @@ class WeightInferenceServiceTest {
     }
 
     @Test
+    void enCajaMixtaElPesoEsDeLaCajaEnteraYSoloLoLlevaLaLinea() {
+        // Una caja conocida fija el peso unitario (1.0 kg/ud). La caja física
+        // 5 es mixta: 3 tallas (3 + 31 + 3 = 37 uds) con el mismo nº de caja.
+        // Su peso se infiere sobre las 37 uds y con UNA tara, y recae en la
+        // línea líder; las demás tallas de la caja quedan a null.
+        CajaData conocida = caja("60x40x40", 10, 11.6);   // (11.6-1.6)/10 = 1.0
+        CajaData lider = lineaMixta(5, "001", "85", 3);
+        CajaData talla95 = lineaMixta(5, "001", "95", 31);
+        CajaData talla105 = lineaMixta(5, "001", "105", 3);
+
+        service.inferirPesos(List.of(conocida, lider, talla95, talla105));
+
+        assertEquals(37.0, lider.getPesoNetoKg());    // 37 uds * 1.0
+        assertEquals(38.6, lider.getPesoBrutoKg());   // 37.0 + tara 1.6 (una sola)
+        assertNull(talla95.getPesoNetoKg());
+        assertNull(talla95.getPesoBrutoKg());
+        assertNull(talla105.getPesoNetoKg());
+        assertNull(talla105.getPesoBrutoKg());
+    }
+
+    @Test
     void sinNingunaCajaConocidaTodoQuedaPendiente() {
         CajaData caja1 = caja("60x40x40", 20, null);
         CajaData caja2 = caja("60x40x30", 10, null);
@@ -131,11 +152,30 @@ class WeightInferenceServiceTest {
         assertNull(cinturonSinPeso.getPesoBrutoKg());
     }
 
+    /**
+     * Cada caja del helper es una caja física distinta: le damos un nº de caja
+     * único para que la inferencia (que agrupa por color+nº) no las mezcle.
+     * El color queda a null, que basta al ser el número siempre distinto.
+     */
+    private static int siguienteNumeroCaja = 1;
+
     private static CajaData caja(String tamano, int cantidad, Double pesoBruto) {
         CajaData caja = new CajaData();
+        caja.setNumeroCaja(siguienteNumeroCaja++);
         caja.setTamanoCaja(tamano);
         caja.setCantidad(cantidad);
         caja.setPesoBrutoKg(pesoBruto);
+        return caja;
+    }
+
+    /** Una línea (talla) de una caja física mixta, identificada por su color+nº. */
+    private static CajaData lineaMixta(int numeroCaja, String color, String talla, int cantidad) {
+        CajaData caja = new CajaData();
+        caja.setNumeroCaja(numeroCaja);
+        caja.setCodigoColor(color);
+        caja.setTalla(talla);
+        caja.setTamanoCaja("60x40x40");
+        caja.setCantidad(cantidad);
         return caja;
     }
 }

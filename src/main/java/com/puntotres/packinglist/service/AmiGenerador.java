@@ -6,7 +6,6 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 import org.springframework.stereotype.Service;
 
@@ -67,7 +66,14 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             String referencia = cajas.get(0).getReferencia();
             String color = cajas.get(0).getCodigoColor();
 
-            List<CajaData> pendientes = cajas.stream()
+            // Una caja física está pendiente si su línea líder (la primera de
+            // su nº de caja) no tiene los dos pesos; las demás líneas de una
+            // caja mixta comparten ese peso y no cuentan por separado.
+            Map<Integer, CajaData> liderPorNumeroCaja = new LinkedHashMap<>();
+            for (CajaData c : cajas) {
+                liderPorNumeroCaja.putIfAbsent(c.getNumeroCaja(), c);
+            }
+            List<CajaData> pendientes = liderPorNumeroCaja.values().stream()
                     .filter(c -> !c.tienePesosCompletos())
                     .toList();
 
@@ -124,8 +130,9 @@ public class AmiGenerador implements GeneradorPackingListCliente {
      * Cinturones (matriz de tallas): una caja física puede mezclar tallas,
      * así que las entradas del JSON con el mismo número de caja (una por
      * talla, igual que ya ocurre con los colores) se agregan en UNA fila de
-     * plantilla. El peso de la fila es la suma de los pesos de sus tallas
-     * (cada entrada aporta el peso de su porción de la caja).
+     * plantilla. El peso es el de la caja física entera y lo lleva su primera
+     * línea (la líder); las demás tallas de esa caja no aportan peso (se
+     * pesan juntas una sola vez), así que sus celdas de peso quedan a null.
      */
     private List<PackingListData.Caja> mapearCajasCinturon(List<CajaData> cajas) {
         Map<Integer, List<CajaData>> porNumeroCaja = new LinkedHashMap<>();
@@ -142,8 +149,8 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             fila.setReferencia(primera.getReferencia());
             fila.setCodigoColor(primera.getCodigoColor());
             fila.setTamanoCaja(primera.getTamanoCaja());
-            fila.setPesoNetoKg(sumarPesos(entradas, CajaData::getPesoNetoKg));
-            fila.setPesoBrutoKg(sumarPesos(entradas, CajaData::getPesoBrutoKg));
+            fila.setPesoNetoKg(primera.getPesoNetoKg());
+            fila.setPesoBrutoKg(primera.getPesoBrutoKg());
 
             Map<String, Integer> cantidadesPorTalla = new LinkedHashMap<>();
             for (CajaData entrada : entradas) {
@@ -158,19 +165,6 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             filas.add(fila);
         }
         return filas;
-    }
-
-    /** Suma los pesos de las entradas; null si a alguna le falta (no se inventa). */
-    private static Double sumarPesos(List<CajaData> entradas, Function<CajaData, Double> extractor) {
-        double total = 0;
-        for (CajaData entrada : entradas) {
-            Double valor = extractor.apply(entrada);
-            if (valor == null) {
-                return null;
-            }
-            total += valor;
-        }
-        return Math.round(total * 100.0) / 100.0;
     }
 
     private static String nombreFichero(String destino, String referencia, String color) {
