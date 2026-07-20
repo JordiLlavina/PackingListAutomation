@@ -1,0 +1,11 @@
+# TODO — pendientes del proyecto
+
+(Archivo mantenido por Jordi. Formato libre: una línea por pendiente, tachar o borrar al completar.)
+
+## Pendientes
+
+- [ ] Actualizar README.md y ARCHITECTURE.md: siguen diciendo que no hay capa web ni builders APC/genérico, y ya existen (web/, ClaudeEnvioExtractionService, volcado ERP).
+- [ ]
+
+## Hecho
+
