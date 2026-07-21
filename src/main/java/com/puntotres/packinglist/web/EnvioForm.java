@@ -46,6 +46,10 @@ public class EnvioForm {
     @NotBlank(message = "El número de factura es obligatorio")
     private String numeroFactura;
 
+    // Nº de comanda de ICSuite para el volcado ERP. Opcional a propósito:
+    // un envío se puede generar sin él y rellenar la columna a mano después.
+    private String numeroComanda;
+
     @NotBlank(message = "La fecha de factura es obligatoria")
     @Pattern(regexp = FORMATO_FECHA, message = "Formato de fecha: dd/MM/yyyy")
     private String fechaFactura;
@@ -77,6 +81,9 @@ public class EnvioForm {
 
     public String getNumeroFactura() { return numeroFactura; }
     public void setNumeroFactura(String numeroFactura) { this.numeroFactura = numeroFactura; }
+
+    public String getNumeroComanda() { return numeroComanda; }
+    public void setNumeroComanda(String numeroComanda) { this.numeroComanda = numeroComanda; }
 
     public String getFechaFactura() { return fechaFactura; }
     public void setFechaFactura(String fechaFactura) { this.fechaFactura = fechaFactura; }

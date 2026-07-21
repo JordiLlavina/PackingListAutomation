@@ -177,6 +177,8 @@ public class PackingListController {
         cabecera.setFechaFactura(envioForm.getFechaFactura());
         cabecera.setFechaEnvio(envioForm.getFechaEnvio());
         cabecera.setClaveCliente(envioForm.getCliente());
+        // Solo lo usa el volcado ERP; vacío significa columna "Comanda" en blanco.
+        cabecera.setNumeroComanda(envioForm.getNumeroComanda());
         // Ciudad/país del proveedor: solo tienen sentido para AMI; en blanco
         // se aplica el valor por defecto (BADALONA/SPAIN) en el generador.
         cabecera.setCiudadProveedor(envioForm.getCiudadProveedor());

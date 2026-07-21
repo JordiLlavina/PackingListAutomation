@@ -88,6 +88,15 @@
             </div>
         </div>
 
+        <!-- Dato que no sale del JSON ni de las imágenes: lo teclea el
+             usuario y solo viaja hasta la columna "Comanda" del volcado. -->
+        <section class="tarjeta seccion-salida">
+            <h3 class="titulo-seccion">📊 Volcado Albarán ICSUITE</h3>
+            <label for="numeroComanda">Numero Comanda ICSUITE</label>
+            <input type="text" id="numeroComanda" th:field="*{numeroComanda}"
+                   placeholder="Opcional: si lo dejas vacío, la columna sale en blanco">
+        </section>
+
         <button type="submit" id="botonImportar">Importar y revisar</button>
     </form>
     <p id="avisoProcesando" class="aviso-procesando" style="display: none">

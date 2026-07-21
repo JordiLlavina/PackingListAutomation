@@ -10,6 +10,13 @@ package com.puntotres.packinglist.model;
  */
 public class CajaData {
 
+    /**
+     * Prefijo de referencia de los cinturones: llevan talla (75-100) y su
+     * propia plantilla de matriz de tallas. "ULL" (bolso) y "USL" (cartera)
+     * son de talla única.
+     */
+    public static final String PREFIJO_CINTURON = "UBL";
+
     private int numeroCaja;
     private String numeroPedido;
     private String referencia;
@@ -79,6 +86,10 @@ public class CajaData {
 
     public String getCanal() { return canal; }
     public void setCanal(String canal) { this.canal = canal; }
+
+    public boolean esCinturon() {
+        return referencia != null && referencia.startsWith(PREFIJO_CINTURON);
+    }
 
     public boolean tienePesosCompletos() {
         return pesoNetoKg != null && pesoBrutoKg != null;

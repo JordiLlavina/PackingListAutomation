@@ -36,8 +36,6 @@ import com.puntotres.packinglist.model.PaletData;
 @Service
 public class AmiGenerador implements GeneradorPackingListCliente {
 
-    private static final String PREFIJO_CINTURON = "UBL";
-
     private final AmiExcelBuilder excelBuilder;
 
     public AmiGenerador(AmiExcelBuilder excelBuilder) {
@@ -77,7 +75,7 @@ public class AmiGenerador implements GeneradorPackingListCliente {
                     .filter(c -> !c.tienePesosCompletos())
                     .toList();
 
-            boolean esCinturon = referencia.startsWith(PREFIJO_CINTURON);
+            boolean esCinturon = referencia.startsWith(CajaData.PREFIJO_CINTURON);
             AmiLayout layout = esCinturon ? AmiLayout.BELTS : AmiLayout.BAGS;
             PackingListData data = mapearCabecera(destino, envio);
             data.setCajas(esCinturon ? mapearCajasCinturon(cajas) : mapearCajasBolso(cajas));

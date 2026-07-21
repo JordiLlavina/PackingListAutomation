@@ -55,7 +55,7 @@
 
     <!-- Sección 2: el excel de volcado al ERP -->
     <section class="tarjeta seccion-salida" th:with="hayVolcado=${volcadoErp != null && volcadoErp.tieneDatos()}">
-        <h3 class="titulo-seccion">📊 Volcado ERP</h3>
+        <h3 class="titulo-seccion">📊 Volcado Albarán ICSUITE</h3>
         <p th:if="${hayVolcado}">
             <strong th:text="${volcadoErp.nombreFichero}"></strong> ·
             <span th:text="|${volcadoErp.totalLineas} líneas de artículos listos para importar|"></span>
@@ -87,24 +87,30 @@
                 <table>
                     <thead>
                     <tr>
-                        <th>ARTICLE</th>
-                        <th>TALLA</th>
-                        <th>COLORCODI</th>
+                        <th>Lin.</th>
+                        <th>Article</th>
+                        <th>Comanda</th>
+                        <th>Quantitat</th>
+                        <th>Uni</th>
+                        <th>% Dte 1</th>
+                        <th>% Dte 2</th>
+                        <th>Import Div.</th>
                         <th>COLOR</th>
-                        <th>SISTALL</th>
-                        <th>SISGRUP</th>
-                        <th>QUANTITAT</th>
+                        <th>TALLA</th>
                     </tr>
                     </thead>
                     <tbody>
                     <tr th:each="linea : ${volcadoErp.lineas}">
+                        <td th:text="${linea.numeroLinea}"></td>
                         <td th:text="${linea.article}"></td>
-                        <td th:text="${linea.talla}"></td>
-                        <td th:text="${linea.colorCodi}"></td>
-                        <td th:text="${linea.color}"></td>
-                        <td th:text="${linea.sistall}"></td>
-                        <td th:text="${linea.sisgrup}"></td>
+                        <td th:text="${linea.comanda}"></td>
                         <td th:text="${linea.quantitat}"></td>
+                        <td th:text="${linea.uni}"></td>
+                        <td>0</td>
+                        <td>0</td>
+                        <td>0.00</td>
+                        <td th:text="${linea.color}"></td>
+                        <td th:text="${linea.talla}"></td>
                     </tr>
                     </tbody>
                 </table>

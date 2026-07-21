@@ -4,73 +4,58 @@ import org.springframework.stereotype.Service;
 import com.puntotres.packinglist.model.*;
 import java.util.*;
 
+/**
+ * Volcado de albarán para ICSuite: una línea por artículo con su cantidad
+ * total en el envío (todas las destinaciones juntas).
+ *
+ * El nº de comanda no sale del JSON: viene de la pantalla de entrada en
+ * {@link DatosEnvio} y se repite en todas las líneas. Si no se rellenó,
+ * las líneas van sin comanda y el excel se genera igual.
+ */
 @Service
 public class VolcadoErpGenerationService {
 
+    /** Unidad por defecto: los cinturones la sustituyen por su talla. */
+    private static final String UNIDAD_UNICA = "U";
+
     public VolcadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
         // Agrupar por referencia + talla + color (una línea por combinación única)
-        Map<String, VolcadoErpLineaBuilder> grupos = new LinkedHashMap<>();
-        Map<String, String> colorCodis = new LinkedHashMap<>();  // color → codigo (preserva orden inserción)
-        int colorCodiCounter = 1;
+        Map<String, Grupo> grupos = new LinkedHashMap<>();
 
         for (CajaData caja : cajas) {
             String key = caja.getReferencia() + "|" + caja.getTalla() + "|" + caja.getCodigoColor();
-
-            if (!grupos.containsKey(key)) {
-                grupos.put(key, new VolcadoErpLineaBuilder()
-                    .article(caja.getReferencia())
-                    .talla(caja.getTalla())
-                    .color(caja.getCodigoColor())
-                );
-            }
-
-            // Registrar color si es nuevo
-            if (!colorCodis.containsKey(caja.getCodigoColor())) {
-                colorCodis.put(caja.getCodigoColor(), String.format("%03d", colorCodiCounter++));
-            }
-
-            // Sumar cantidad a esta línea
-            grupos.get(key).addQuantitat(caja.getCantidad());
+            grupos.computeIfAbsent(key, k -> new Grupo(caja)).cantidad += caja.getCantidad();
         }
 
-        // Construir líneas finales con COLORCODI
+        // Construir las líneas finales, numeradas de 1 en 1 en el orden en
+        // que aparecieron los grupos.
         List<VolcadoErpLinea> lineas = new ArrayList<>();
-        for (VolcadoErpLineaBuilder builder : grupos.values()) {
-            String colorCodi = colorCodis.get(builder.getColor());
-            lineas.add(builder
-                .colorCodi(colorCodi)
-                .sistall(1)
-                .sisgrup(1)
-                .build());
+        int numeroLinea = 1;
+        for (Grupo grupo : grupos.values()) {
+            CajaData caja = grupo.caja;
+            // Los cinturones se venden por talla (75-100) y esa es su unidad;
+            // el resto de artículos son de talla única.
+            String uni = caja.esCinturon() && caja.getTalla() != null
+                    ? caja.getTalla()
+                    : UNIDAD_UNICA;
+            lineas.add(new VolcadoErpLinea(numeroLinea++, caja.getReferencia(),
+                    envio.getNumeroComanda(), grupo.cantidad, uni,
+                    caja.getCodigoColor(), caja.getTalla()));
         }
 
         // Misma sanitización que el nombre del ZIP en /descargar-todo
         String facturaSaneada = envio.getNumeroFactura().replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
-        String nombreFichero = "Volcado_ERP_" + facturaSaneada + ".xlsx";
+        String nombreFichero = "Volcado_ICSUITE_" + facturaSaneada + ".xlsx";
         return new VolcadoErpData(lineas, nombreFichero);
     }
 
-    // Inner builder class para facilitar construcción
-    private static class VolcadoErpLineaBuilder {
-        private String article;
-        private String talla;
-        private String color;
-        private String colorCodi;
-        private int sistall;
-        private int sisgrup;
-        private int quantitat = 0;
+    /** Cajas agrupadas: la primera caja aporta los datos, el resto solo cantidad. */
+    private static class Grupo {
+        private final CajaData caja;
+        private int cantidad;
 
-        public VolcadoErpLineaBuilder article(String article) { this.article = article; return this; }
-        public VolcadoErpLineaBuilder talla(String talla) { this.talla = talla; return this; }
-        public VolcadoErpLineaBuilder color(String color) { this.color = color; return this; }
-        public VolcadoErpLineaBuilder colorCodi(String colorCodi) { this.colorCodi = colorCodi; return this; }
-        public VolcadoErpLineaBuilder sistall(int sistall) { this.sistall = sistall; return this; }
-        public VolcadoErpLineaBuilder sisgrup(int sisgrup) { this.sisgrup = sisgrup; return this; }
-        public VolcadoErpLineaBuilder addQuantitat(int qty) { this.quantitat += qty; return this; }
-        public String getColor() { return color; }
-
-        public VolcadoErpLinea build() {
-            return new VolcadoErpLinea(article, talla, colorCodi, color, sistall, sisgrup, quantitat);
+        Grupo(CajaData caja) {
+            this.caja = caja;
         }
     }
 }

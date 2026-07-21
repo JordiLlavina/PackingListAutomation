@@ -20,6 +20,10 @@ public class DatosEnvio {
     private String claveCliente;
     private String ciudadProveedor;
     private String paisProveedor;
+    // Nº de comanda de ICSuite: no sale de las imágenes ni del JSON, lo
+    // teclea el usuario y solo lo usa el volcado ERP. Opcional: si viene
+    // vacío, la columna "Comanda" del volcado sale en blanco.
+    private String numeroComanda;
 
     public String getTemporada() { return temporada; }
     public void setTemporada(String temporada) { this.temporada = temporada; }
@@ -41,4 +45,7 @@ public class DatosEnvio {
 
     public String getFechaEnvio() { return fechaEnvio; }
     public void setFechaEnvio(String fechaEnvio) { this.fechaEnvio = fechaEnvio; }
+
+    public String getNumeroComanda() { return numeroComanda; }
+    public void setNumeroComanda(String numeroComanda) { this.numeroComanda = numeroComanda; }
 }

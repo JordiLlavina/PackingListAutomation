@@ -55,6 +55,7 @@ class PackingListControllerTest {
                         .param("json", jsonDePrueba())
                         .param("temporada", "H26")
                         .param("numeroFactura", "FA-26-1189")
+                        .param("numeroComanda", "12345")
                         .param("fechaFactura", "10/07/2026")
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(status().is3xxRedirection())
@@ -402,13 +403,17 @@ class PackingListControllerTest {
                 .andExpect(content().contentType(
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .andExpect(header().string("Content-Disposition",
-                        containsString("Volcado_ERP_FA-26-1189.xlsx")))
+                        containsString("Volcado_ICSUITE_FA-26-1189.xlsx")))
                 .andReturn().getResponse().getContentAsByteArray();
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
             Sheet hoja = wb.getSheet("Volcado");
-            assertEquals("ARTICLE", hoja.getRow(0).getCell(0).getStringCellValue());
+            assertEquals("Lin.", hoja.getRow(0).getCell(0).getStringCellValue());
             // Al menos una línea de datos agregada de todas las destinaciones.
             assertTrue(hoja.getLastRowNum() >= 1);
+            // La comanda tecleada en la pantalla de entrada llega a todas las líneas.
+            for (int fila = 1; fila <= hoja.getLastRowNum(); fila++) {
+                assertEquals(12345, hoja.getRow(fila).getCell(2).getNumericCellValue());
+            }
         }
     }
 
