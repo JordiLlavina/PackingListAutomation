@@ -16,7 +16,10 @@
       "Bash(git commit -m ' *)",
       "Bash(mkdir -p __TRACKED_VAR__/x)",
       "Bash(unzip -o -q volcado-ERP-ejemplo-completo.xlsx -d \"C:/Users/jordi/AppData/Local/Temp/claude/c--Users-jordi-Documents-Workspace-Packing-List-Automation/b96409b8-ea8c-4ca2-9086-5c80ac5cb86f/scratchpad/xlsx\")",
-      "Bash(unzip -o -q volcado-albaran-erp-ejemplo-completo.xlsx -d \"C:/Users/jordi/AppData/Local/Temp/claude/c--Users-jordi-Documents-Workspace-Packing-List-Automation/b96409b8-ea8c-4ca2-9086-5c80ac5cb86f/scratchpad/new\")"
+      "Bash(unzip -o -q volcado-albaran-erp-ejemplo-completo.xlsx -d \"C:/Users/jordi/AppData/Local/Temp/claude/c--Users-jordi-Documents-Workspace-Packing-List-Automation/b96409b8-ea8c-4ca2-9086-5c80ac5cb86f/scratchpad/new\")",
+      "Bash(py --version)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -c \"import openpyxl; print\\(openpyxl.__version__\\)\")"
     ]
   }
 }

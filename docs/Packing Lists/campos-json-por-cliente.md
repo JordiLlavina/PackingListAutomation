@@ -106,8 +106,11 @@ La temporada del formulario va a la columna SEASON.
 Los tres JSON de `src/test/resources/ejemplos/` son ejemplos completos y
 válidos que los tests importan y generan de verdad:
 
-- `envio-ami-bags-y-belts.json`: AMI con carteras (USL) y cinturones (UBL),
-  incluida una caja con tres tallas (85-95-105).
+- `envio-ami-bags-y-belts.json`: AMI con las tres destinaciones
+  (China/Japan/France), bolsos y carteras (ULL/USL) y cinturones (UBL),
+  incluida una caja con tres tallas (85-95-105 en France). Referencias,
+  colores, POs y tallas reales del pedido `AMI EAN H26.xlsx` (el sufijo del
+  PO marca la destinación: CH China, JP Japan, sin sufijo France).
 - `envio-apc.json`: APC destino IVRY con bolsos y cinturones, caja de tres
   líneas y taras de palet mixtas (8.04 del JSON + 10 por defecto).
 - `envio-generico.json`: ACKERMANN con un palet de 16 cajas.

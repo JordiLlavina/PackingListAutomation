@@ -70,14 +70,21 @@ class EjemplosJsonTest {
     void elEnvioAmiGeneraBolsosYCinturones() throws Exception {
         List<ExcelGenerado> excels = importarYGenerar("envio-ami-bags-y-belts.json");
 
-        // Un excel por referencia+color: carteras USL728 y cinturones UBL029.
-        assertEquals(2, excels.size());
-        assertEquals("PKL_PARIS_USL728.AL217_NOIR.xlsx", excels.get(0).getNombreFichero());
-        assertEquals("PKL_PARIS_UBL029.AL0216_001.xlsx", excels.get(1).getNombreFichero());
+        // Tres destinaciones (China/Japan/France) y un excel por referencia+color:
+        // CHINA: ULL027, USL737, UBL029.AL0104, UBL214 (4)
+        // JAPAN: ULL163, UBL214 (2)
+        // FRANCE: ULL163, USL728, UBL029.AL0216 (3)
+        assertEquals(9, excels.size());
 
-        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(1).getContenido()))) {
+        // El cinturón de France (UBL029.AL0216) reúne las cajas 8 y 9: la 8 es
+        // talla única (75) y la 9 mezcla tres tallas (85-95-105).
+        ExcelGenerado belt = excels.stream()
+                .filter(e -> e.getNombreFichero().equals("PKL_FRANCE_UBL029.AL0216_001.xlsx"))
+                .findFirst().orElseThrow();
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(belt.getContenido()))) {
             Sheet hoja = wb.getSheet("STANDARD PKL E25");
-            // Caja 4 (idx 18): talla única 75. Caja 5 (idx 19): tres tallas.
+            // Las filas de cinturón arrancan en idx 18 y van por posición: 1ª caja
+            // (talla única 75) y 2ª caja (tres tallas).
             assertEquals("75", hoja.getRow(18).getCell(5).getStringCellValue());
             assertEquals("85-95-105", hoja.getRow(19).getCell(5).getStringCellValue());
             assertEquals(31, (int) hoja.getRow(19).getCell(11).getNumericCellValue()); // L: talla 95
