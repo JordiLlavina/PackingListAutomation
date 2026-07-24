@@ -101,9 +101,9 @@ class AmiEtiquetasExcelBuilderTest {
     }
 
     @Test
-    void laTemporadaSeEscribeConFuenteNegraAunqueLaPlantillaLaTengaRoja() throws IOException {
-        // En la plantilla, la celda de temporada de AMI FRANCE lleva el
-        // texto de ejemplo en rojo (marca de "campo a rellenar").
+    void laTemporadaConservaElEstiloRojoDeLaPlantilla() throws IOException {
+        // En la plantilla de AMI FRANCE la celda de temporada va en rojo y
+        // así la quiere el cliente: el builder no debe alterar su estilo.
         byte[] excel = builder.generar(AmiEtiquetaLayout.FRANCE, List.of(
                 new EtiquetaCaja("H26", "UBL029.AL0216", "001 BLACK", "85",
                         "4", "9,93 KGS", "1 / 1", "07672")));
@@ -113,7 +113,7 @@ class AmiEtiquetasExcelBuilderTest {
                 var fuente = hoja.getRow(fila).getCell(1).getCellStyle().getFont();
                 boolean roja = fuente.getXSSFColor() != null
                         && "FFFF0000".equals(fuente.getXSSFColor().getARGBHex());
-                assertTrue(!roja, "La temporada de la fila " + fila + " sigue en rojo");
+                assertTrue(roja, "La temporada de la fila " + fila + " ya no está en rojo");
             }
         }
     }
