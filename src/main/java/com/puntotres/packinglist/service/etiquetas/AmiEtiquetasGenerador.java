@@ -176,28 +176,33 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             cajasPendientes.add(lider);
         }
 
+        // El ORDER NUMBER (celda y código de barras) sale SIEMPRE del campo
+        // 'pedido' del JSON: es el dato por referencia del packing list. El
+        // excel de pedido aporta el color code y sirve de contraste del PO.
+        String pedidoJson = soloDigitos(lider.getNumeroPedido());
+        String orderNumber = pedidoJson.isBlank()
+                ? null : String.format("%05d", Long.parseLong(pedidoJson));
+        if (orderNumber == null) {
+            avisos.add("Caja " + lider.getNumeroCaja() + " de " + nombreDestino
+                    + " sin campo 'pedido' en el JSON: etiqueta sin order number "
+                    + "ni código de barras");
+        }
+
         Optional<AmiPedidoExcel.FilaPedido> fila =
                 pedido.buscar(lider.getReferencia(), lider.getCodigoColor(), layout.sufijoPo());
-        String orderNumber;
         String colorCode;
         if (fila.isPresent()) {
-            orderNumber = fila.get().orderNumber();
             colorCode = fila.get().colorCode();
-            String pedidoJson = soloDigitos(lider.getNumeroPedido());
-            if (!pedidoJson.isBlank()
-                    && Long.parseLong(pedidoJson) != Long.parseLong(orderNumber)) {
+            if (orderNumber != null
+                    && Long.parseLong(fila.get().orderNumber()) != Long.parseLong(orderNumber)) {
                 avisos.add("Caja " + lider.getNumeroCaja() + " de " + nombreDestino
-                        + ": el pedido del JSON (" + lider.getNumeroPedido()
-                        + ") no coincide con el PO del excel de pedido (" + orderNumber
-                        + "); la etiqueta lleva el del excel");
+                        + ": el pedido del JSON (" + orderNumber
+                        + ") no coincide con el PO del excel de pedido ("
+                        + fila.get().orderNumber() + "); la etiqueta lleva el del JSON");
             }
         } else {
             avisos.add("Referencia '" + lider.getReferencia() + "' (" + nombreDestino
-                    + ") no encontrada en el excel de pedido: order number y color "
-                    + "salen del JSON");
-            String pedidoJson = soloDigitos(lider.getNumeroPedido());
-            orderNumber = pedidoJson.isBlank()
-                    ? null : String.format("%05d", Long.parseLong(pedidoJson));
+                    + ") no encontrada en el excel de pedido: el color code sale del JSON");
             colorCode = lider.getCodigoColor();
         }
 

@@ -80,6 +80,8 @@ class AmiEtiquetasGeneradorTest {
         assertEquals("Etiquetas_AMI_PARIS_F-123.xlsx", paris.getNombreFichero());
         try (XSSFWorkbook libro = abrir(paris)) {
             assertEquals("AMI FRANCE", libro.getSheetName(0));
+            // El order number sale del campo 'pedido' del JSON.
+            assertEquals("07665", texto(libro.getSheetAt(0), 8, 2));
         }
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(1))) {
             assertEquals("AMI CHINA", libro.getSheetName(0));
@@ -161,13 +163,29 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
-    void poDelExcelDiscrepanteDelJsonAvisa() throws IOException {
+    void poDelExcelDiscrepanteDelJsonAvisaYLaEtiquetaLlevaElDelJson() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07777"))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(aviso -> aviso.contains("07777") && aviso.contains("07665")));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals("07777", texto(libro.getSheetAt(0), 8, 2));
+        }
+    }
+
+    @Test
+    void cajaSinPedidoEnElJsonAvisaYVaSinOrderNumber() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, null))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("sin campo 'pedido'")));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals("", texto(libro.getSheetAt(0), 8, 2));
+        }
     }
 
     @Test

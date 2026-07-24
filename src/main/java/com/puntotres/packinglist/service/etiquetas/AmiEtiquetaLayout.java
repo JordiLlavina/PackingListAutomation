@@ -17,8 +17,8 @@ package com.puntotres.packinglist.service.etiquetas;
  */
 public record AmiEtiquetaLayout(
         String nombreHoja, String sufijoPo, int alturaBloque, int offsetSegundaEtiqueta,
-        int filaTemporada, int filaReferencia, int filaColor, int filaTalla,
-        int filaCantidad, int filaPeso, int filaParcel,
+        int filaOrderNumber, int filaTemporada, int filaReferencia, int filaColor,
+        int filaTalla, int filaCantidad, int filaPeso, int filaParcel,
         int filaBarcode, long dxBarcode, long dyBarcode, long cxBarcode, long cyBarcode) {
 
     public static final int COL_TEMPORADA = 1;
@@ -27,17 +27,17 @@ public record AmiEtiquetaLayout(
 
     public static final AmiEtiquetaLayout CHINA = new AmiEtiquetaLayout(
             "AMI CHINA", "CH", 34, 17,
-            11, 11, 12, 13, 14, 15, 16,
+            9, 11, 11, 12, 13, 14, 15, 16,
             8, 2971800, 19050, 1047750, 666750);
 
     public static final AmiEtiquetaLayout JAPAN = new AmiEtiquetaLayout(
             "AMI JAPAN", "JP", 32, 16,
-            10, 10, 11, 12, 13, 14, 15,
+            8, 10, 10, 11, 12, 13, 14, 15,
             7, 2857500, 19050, 990600, 628650);
 
     public static final AmiEtiquetaLayout FRANCE = new AmiEtiquetaLayout(
             "AMI FRANCE", null, 32, 16,
-            10, 10, 11, 12, 13, 14, 15,
+            8, 10, 10, 11, 12, 13, 14, 15,
             7, 3457575, 9525, 1209675, 762000);
 
     /** Anclaje de la imagen-dirección de JAPAN (único PNG de la plantilla). */

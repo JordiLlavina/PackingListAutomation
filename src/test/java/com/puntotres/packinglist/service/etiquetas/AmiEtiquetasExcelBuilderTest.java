@@ -40,7 +40,9 @@ class AmiEtiquetasExcelBuilderTest {
         byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA, List.of(etiquetaBolso("1 / 1")));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            // Etiqueta 1 (bloque 0)
+            // Etiqueta 1 (bloque 0). El order number pisa el valor de
+            // ejemplo que trae la plantilla (7703 numérico en C10).
+            assertEquals("07703", texto(hoja, 9, 2));
             assertEquals("H26", texto(hoja, 11, 1));
             assertEquals("ULL163.AL0052", texto(hoja, 11, 2));
             assertEquals("221 BLACK", texto(hoja, 12, 2));
@@ -49,6 +51,7 @@ class AmiEtiquetasExcelBuilderTest {
             assertEquals("5,28 KGS", texto(hoja, 15, 2));
             assertEquals("1 / 1", texto(hoja, 16, 2));
             // Etiqueta 2 = mismas celdas + offset 17
+            assertEquals("07703", texto(hoja, 9 + 17, 2));
             assertEquals("ULL163.AL0052", texto(hoja, 11 + 17, 2));
             assertEquals("1 / 1", texto(hoja, 16 + 17, 2));
         }
@@ -67,6 +70,8 @@ class AmiEtiquetasExcelBuilderTest {
             assertEquals("85-95", texto(hoja, 12, 2));
             assertEquals("4-85,33-95", texto(hoja, 13, 2));
             // Caja 2 = bloque desplazado 32 filas; peso null = celda en blanco.
+            // El order number también se escribe en los bloques copiados.
+            assertEquals("07672", texto(hoja, 8 + 32, 2));
             assertEquals("UBL029.AL0216", texto(hoja, 10 + 32, 2));
             assertEquals("3-105", texto(hoja, 13 + 32, 2));
             assertEquals("", texto(hoja, 14 + 32, 2));
@@ -96,6 +101,24 @@ class AmiEtiquetasExcelBuilderTest {
     }
 
     @Test
+    void laTemporadaSeEscribeConFuenteNegraAunqueLaPlantillaLaTengaRoja() throws IOException {
+        // En la plantilla, la celda de temporada de AMI FRANCE lleva el
+        // texto de ejemplo en rojo (marca de "campo a rellenar").
+        byte[] excel = builder.generar(AmiEtiquetaLayout.FRANCE, List.of(
+                new EtiquetaCaja("H26", "UBL029.AL0216", "001 BLACK", "85",
+                        "4", "9,93 KGS", "1 / 1", "07672")));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            for (int fila : new int[] {10, 10 + 16}) {
+                var fuente = hoja.getRow(fila).getCell(1).getCellStyle().getFont();
+                boolean roja = fuente.getXSSFColor() != null
+                        && "FFFF0000".equals(fuente.getXSSFColor().getARGBHex());
+                assertTrue(!roja, "La temporada de la fila " + fila + " sigue en rojo");
+            }
+        }
+    }
+
+    @Test
     void enJapanCadaParLlevaAdemasLaDireccionComoImagen() throws IOException {
         byte[] excel = builder.generar(AmiEtiquetaLayout.JAPAN, List.of(
                 etiquetaBolso("1 / 2"), etiquetaBolso("2 / 2")));
@@ -114,6 +137,9 @@ class AmiEtiquetasExcelBuilderTest {
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
             assertEquals("ULL163.AL0052", texto(hoja, 11, 2));
+            // Sin order number la celda queda en blanco (el 7703 de ejemplo
+            // de la plantilla no debe sobrevivir).
+            assertEquals("", texto(hoja, 9, 2));
             XSSFDrawing dibujo = hoja.getDrawingPatriarch();
             assertTrue(dibujo == null || dibujo.getShapes().isEmpty());
         }

@@ -14,8 +14,10 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.Units;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFPictureData;
 import org.apache.poi.xssf.usermodel.XSSFRow;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -62,11 +64,12 @@ public class AmiEtiquetasExcelBuilder {
             for (int i = 1; i < etiquetas.size(); i++) {
                 modelo.copiarEn(hoja, i * layout.alturaBloque());
             }
+            CellStyle estiloTemporada = estiloTemporadaEnNegro(libro, hoja, layout);
             for (int i = 0; i < etiquetas.size(); i++) {
                 int base = i * layout.alturaBloque();
-                escribirEtiqueta(hoja, layout, base, etiquetas.get(i));
+                escribirEtiqueta(hoja, layout, base, etiquetas.get(i), estiloTemporada);
                 escribirEtiqueta(hoja, layout, base + layout.offsetSegundaEtiqueta(),
-                        etiquetas.get(i));
+                        etiquetas.get(i), estiloTemporada);
                 insertarImagenes(libro, hoja, layout, base, etiquetas.get(i), direccionJapan);
                 if (i < etiquetas.size() - 1) {
                     hoja.setRowBreak(base + layout.alturaBloque() - 1);
@@ -120,9 +123,17 @@ public class AmiEtiquetasExcelBuilder {
     }
 
     private static void escribirEtiqueta(XSSFSheet hoja, AmiEtiquetaLayout layout,
-                                         int base, EtiquetaCaja etiqueta) {
-        escribir(hoja, base + layout.filaTemporada(), AmiEtiquetaLayout.COL_TEMPORADA,
-                etiqueta.temporada());
+                                         int base, EtiquetaCaja etiqueta,
+                                         CellStyle estiloTemporada) {
+        // El order number va también como texto bajo su encabezado (la
+        // plantilla trae un valor de ejemplo que hay que pisar siempre).
+        escribir(hoja, base + layout.filaOrderNumber(), AmiEtiquetaLayout.COL_VALOR,
+                etiqueta.orderNumber());
+        Cell temporada = escribir(hoja, base + layout.filaTemporada(),
+                AmiEtiquetaLayout.COL_TEMPORADA, etiqueta.temporada());
+        if (estiloTemporada != null) {
+            temporada.setCellStyle(estiloTemporada);
+        }
         escribir(hoja, base + layout.filaReferencia(), AmiEtiquetaLayout.COL_VALOR,
                 etiqueta.referencia());
         escribir(hoja, base + layout.filaColor(), AmiEtiquetaLayout.COL_VALOR,
@@ -137,7 +148,7 @@ public class AmiEtiquetasExcelBuilder {
                 etiqueta.parcel());
     }
 
-    private static void escribir(XSSFSheet hoja, int fila, int col, String valor) {
+    private static Cell escribir(XSSFSheet hoja, int fila, int col, String valor) {
         XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
         Cell celda = f.getCell(col) != null ? f.getCell(col) : f.createCell(col);
         if (valor == null || valor.isBlank()) {
@@ -145,6 +156,33 @@ public class AmiEtiquetasExcelBuilder {
         } else {
             celda.setCellValue(valor);
         }
+        return celda;
+    }
+
+    /**
+     * Clon del estilo de la celda de temporada con la fuente en negro: en
+     * la plantilla el texto de ejemplo viene en rojo (marca de "campo a
+     * rellenar") y la etiqueta final debe ir en negro.
+     */
+    private static CellStyle estiloTemporadaEnNegro(XSSFWorkbook libro, XSSFSheet hoja,
+                                                    AmiEtiquetaLayout layout) {
+        XSSFRow fila = hoja.getRow(layout.filaTemporada());
+        if (fila == null || fila.getCell(AmiEtiquetaLayout.COL_TEMPORADA) == null) {
+            return null;
+        }
+        XSSFCellStyle original =
+                fila.getCell(AmiEtiquetaLayout.COL_TEMPORADA).getCellStyle();
+        XSSFFont fuenteOriginal = original.getFont();
+        XSSFFont negra = libro.createFont();
+        negra.setBold(fuenteOriginal.getBold());
+        negra.setItalic(fuenteOriginal.getItalic());
+        negra.setFontHeightInPoints(fuenteOriginal.getFontHeightInPoints());
+        negra.setFontName(fuenteOriginal.getFontName());
+        // Sin setColor: la fuente nueva queda con el negro por defecto.
+        XSSFCellStyle enNegro = libro.createCellStyle();
+        enNegro.cloneStyleFrom(original);
+        enNegro.setFont(negra);
+        return enNegro;
     }
 
     private void insertarImagenes(XSSFWorkbook libro, XSSFSheet hoja, AmiEtiquetaLayout layout,
