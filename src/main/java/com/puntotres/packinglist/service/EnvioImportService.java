@@ -53,10 +53,12 @@ public class EnvioImportService {
         for (EnvioInput.CajaRangoInput entrada : referencia.getCajas()) {
             if (entrada.esRango()) {
                 for (int numero = entrada.getCajaInicio(); numero <= entrada.getCajaFin(); numero++) {
-                    cajas.add(crearCaja(referencia, numero, entrada.getUnidadesPorCaja()));
+                    cajas.add(crearCaja(referencia, numero, entrada.getUnidadesPorCaja(),
+                            entrada.getPesoBruto()));
                 }
             } else {
-                cajas.add(crearCaja(referencia, entrada.getCaja(), entrada.getUnidades()));
+                cajas.add(crearCaja(referencia, entrada.getCaja(), entrada.getUnidades(),
+                        entrada.getPesoBruto()));
             }
         }
 
@@ -72,7 +74,8 @@ public class EnvioImportService {
         return cajas;
     }
 
-    private CajaData crearCaja(EnvioInput.ReferenciaInput referencia, int numero, Integer unidades) {
+    private CajaData crearCaja(EnvioInput.ReferenciaInput referencia, int numero, Integer unidades,
+                               Double pesoBruto) {
         CajaData caja = new CajaData();
         caja.setNumeroCaja(numero);
         caja.setNumeroPedido(referencia.getPedido());
@@ -84,8 +87,11 @@ public class EnvioImportService {
         caja.setModelo(referencia.getModelo());
         caja.setLivraisonCode(referencia.getLivraisonCode());
         caja.setCanal(referencia.getCanal());
-        // Los pesos no vienen en el JSON: quedan a null hasta que los
-        // complete el WeightInferenceService o la revisión manual.
+        // El peso bruto solo viene en el JSON cuando la imagen lo indica; si
+        // falta (null) queda pendiente para el WeightInferenceService o la
+        // revisión manual. El neto no viene nunca: lo deriva la inferencia
+        // (bruto - tara) o el peso tecleado a mano.
+        caja.setPesoBrutoKg(pesoBruto);
         return caja;
     }
 

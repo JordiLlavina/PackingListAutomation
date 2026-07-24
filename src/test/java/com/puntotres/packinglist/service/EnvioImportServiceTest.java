@@ -154,6 +154,32 @@ class EnvioImportServiceTest {
     }
 
     @Test
+    void propagaElPesoBrutoDelJsonYLoDejaANullCuandoFalta() {
+        EnvioInput.CajaRangoInput sueltaConPeso = cajaSuelta(1, 50);
+        sueltaConPeso.setPesoBruto(12.5);
+        EnvioInput.CajaRangoInput rangoConPeso = rango(2, 3, 40);
+        rangoConPeso.setPesoBruto(10.0);
+        EnvioInput.CajaRangoInput sinPeso = cajaSuelta(4, 20); // pesoBruto omitido
+
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            referencia.setCajas(List.of(sueltaConPeso, rangoConPeso, sinPeso));
+        });
+
+        List<CajaData> cajas = service.importar(envio)
+                .getDestinos().get(0).getDestino().getCajas();
+
+        // Caja suelta: el bruto va tal cual; el neto nunca viene en el JSON.
+        assertEquals(12.5, cajas.get(0).getPesoBrutoKg());
+        assertEquals(null, cajas.get(0).getPesoNetoKg());
+        // Rango: cada una de sus cajas hereda el mismo peso bruto.
+        assertEquals(10.0, cajas.get(1).getPesoBrutoKg());
+        assertEquals(10.0, cajas.get(2).getPesoBrutoKg());
+        // Sin pesoBruto: queda a null (pendiente de inferencia/revisión).
+        assertEquals(null, cajas.get(3).getPesoBrutoKg());
+    }
+
+    @Test
     void losCamposOpcionalesAusentesQuedanANull() throws Exception {
         // El JSON real de ejemplo no trae talla/modelo/livraisonCode/medidas.
         EnvioImportado importado = importarJsonDePrueba();

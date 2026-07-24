@@ -31,8 +31,8 @@ bloquear).
           "canal": "...",            // opcional (APC)
           "talla": "85",             // opcional (cinturones AMI y APC)
           "cajas": [
-            { "caja": 31, "unidades": 50 },
-            { "cajaInicio": 1, "cajaFin": 30, "unidadesPorCaja": 50 }
+            { "caja": 31, "unidades": 50, "pesoBruto": 16.2 },  // pesoBruto opcional, kg
+            { "cajaInicio": 1, "cajaFin": 30, "unidadesPorCaja": 50, "pesoBruto": 18.5 }
           ]
         }
       ]
@@ -41,8 +41,14 @@ bloquear).
 }
 ```
 
-Los pesos NUNCA vienen en el JSON: los infiere la aplicación (tabla de
-taras de `application.yml` + pesos tecleados en la pantalla de revisión).
+Los pesos son opcionales. `pesoBruto` (kg) es el peso de la caja física y
+solo se pone cuando la imagen del packing list lo indica; si falta, el peso
+queda pendiente y lo completa la aplicación (tabla de taras de
+`application.yml` + pesos tecleados en la pantalla de revisión). El peso neto
+NUNCA viene en el JSON: se deriva del bruto menos la tara. En un rango el
+`pesoBruto` aplica a cada una de sus cajas; en una caja mixta (mismo nº de
+caja en varias entradas de talla/color) se pone una sola vez, en la primera
+entrada, porque la caja se pesa entera una vez.
 
 Una misma caja física puede aparecer en VARIAS entradas de `referencias`
 (mismo número de caja): caja mixta de dos colores, cinturones con varias
@@ -108,7 +114,8 @@ válidos que los tests importan y generan de verdad:
 
 - `envio-ami-bags-y-belts.json`: AMI con las tres destinaciones
   (China/Japan/France), bolsos y carteras (ULL/USL) y cinturones (UBL),
-  incluida una caja con tres tallas (85-95-105 en France). Referencias,
+  incluida una caja con tres tallas (85-95-105 en France) y `pesoBruto` por
+  caja (en las cajas mixtas de cinturón, en la primera talla). Referencias,
   colores, POs y tallas reales del pedido `AMI EAN H26.xlsx` (el sufijo del
   PO marca la destinación: CH China, JP Japan, sin sufijo France).
 - `envio-apc.json`: APC destino IVRY con bolsos y cinturones, caja de tres

@@ -115,6 +115,14 @@ public class EnvioInput {
      * Una entrada de cajas de la imagen, en cualquiera de sus dos formas:
      * caja suelta {"caja": 31, "unidades": 50} o rango
      * {"cajaInicio": 1, "cajaFin": 30, "unidadesPorCaja": 50}.
+     *
+     * {@code pesoBruto} (kg) es opcional: el peso bruto de la caja física
+     * cuando la imagen del packing list lo indica. Si falta (null) el peso
+     * queda pendiente y lo infiere el {@code WeightInferenceService} o lo
+     * teclea el humano en la revisión. En un rango el peso aplica a cada una
+     * de sus cajas (mismo producto y mismas unidades por caja). El peso es de
+     * la caja física entera: en una caja mixta (mismo nº de caja en varias
+     * entradas de talla/color) se pone una sola vez, en la primera entrada.
      */
     public static class CajaRangoInput {
 
@@ -123,6 +131,7 @@ public class EnvioInput {
         private Integer cajaInicio;
         private Integer cajaFin;
         private Integer unidadesPorCaja;
+        private Double pesoBruto;
 
         public boolean esRango() { return caja == null; }
 
@@ -140,5 +149,8 @@ public class EnvioInput {
 
         public Integer getUnidadesPorCaja() { return unidadesPorCaja; }
         public void setUnidadesPorCaja(Integer unidadesPorCaja) { this.unidadesPorCaja = unidadesPorCaja; }
+
+        public Double getPesoBruto() { return pesoBruto; }
+        public void setPesoBruto(Double pesoBruto) { this.pesoBruto = pesoBruto; }
     }
 }

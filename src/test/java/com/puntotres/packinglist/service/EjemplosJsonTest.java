@@ -88,6 +88,12 @@ class EjemplosJsonTest {
             assertEquals("75", hoja.getRow(18).getCell(5).getStringCellValue());
             assertEquals("85-95-105", hoja.getRow(19).getCell(5).getStringCellValue());
             assertEquals(31, (int) hoja.getRow(19).getCell(11).getNumericCellValue()); // L: talla 95
+
+            // El pesoBruto del JSON llega a la celda de peso bruto (col 20) de cada
+            // caja física; el neto (col 19) queda vacío porque este test no corre la
+            // inferencia (sin ella no hay tara aplicada).
+            assertEquals(10.2, hoja.getRow(18).getCell(20).getNumericCellValue());
+            assertEquals(20.8, hoja.getRow(19).getCell(20).getNumericCellValue());
         }
     }
 

@@ -70,8 +70,8 @@ public class ClaudeEnvioExtractionService {
                       "talla": "<solo si el artículo tiene talla, p. ej. cinturones>",
                       "cantidadTotal": 150,
                       "cajas": [
-                        { "cajaInicio": 1, "cajaFin": 3, "unidadesPorCaja": 50 },
-                        { "caja": 4, "unidades": 45 }
+                        { "cajaInicio": 1, "cajaFin": 3, "unidadesPorCaja": 50, "pesoBruto": 18.5 },
+                        { "caja": 4, "unidades": 45, "pesoBruto": 16.2 }
                       ]
                     }
                   ]
@@ -87,6 +87,12 @@ public class ClaudeEnvioExtractionService {
             - Una referencia con varias tallas o colores aparece como varias entradas \
             de "referencias", una por combinación, cada una con su cantidadTotal.
             - Una caja puede aparecer en varias referencias (caja mixta).
+            - "pesoBruto" (kg) es OPCIONAL: ponlo solo si la imagen indica el peso \
+            bruto de la caja. Es el peso de la caja física, así que va una sola vez \
+            por caja: en un rango, el peso de cada una de sus cajas; en una caja \
+            mixta (mismo nº de caja en varias entradas), solo en la primera entrada. \
+            Si la imagen no da pesos, omite "pesoBruto" (no lo inventes: el peso se \
+            calcula después). Transcribe el número tal cual, sin la unidad.
             - "palets" solo si las imágenes indican el reparto de cajas por palet; \
             si no aparece, deja la lista vacía.
             - Los campos opcionales ("talla", "modelo", "canal", "livraisonCode", \
