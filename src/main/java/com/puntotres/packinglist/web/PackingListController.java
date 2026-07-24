@@ -221,10 +221,8 @@ public class PackingListController {
                     asignadorPalets.asignar(destino.getDestino(), destino.getPalets());
             envioEnCurso.getAvisosPalets().addAll(asignacion.getAvisos());
             envioEnCurso.getCajasSinPalet().addAll(asignacion.getCajasSinPalet());
-            envioEnCurso.getAvisosInferencia().addAll(
-                    inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas())
-                            .getAvisos());
         }
+        reinferirTodoElEnvio();
         return "redirect:/revision";
     }
 
@@ -526,12 +524,24 @@ public class PackingListController {
                 caja.setPesoBrutoKg(peso.getPesoBrutoKg());
             }
         }
-        envioEnCurso.getAvisosInferencia().clear();
-        for (EnvioImportado.DestinoImportado destino : destinos) {
-            envioEnCurso.getAvisosInferencia().addAll(
-                    inferidorPesos.inferirPesosPorReferencia(destino.getDestino().getCajas())
-                            .getAvisos());
+        reinferirTodoElEnvio();
+    }
+
+    /**
+     * Re-ejecuta la inferencia de pesos sobre TODAS las cajas del envío a la
+     * vez (todas las destinaciones juntas), no destinación por destinación: el
+     * peso neto por unidad es propiedad de la referencia (el producto), así que
+     * un peso tecleado en una caja de un modelo debe completar ese mismo modelo
+     * esté en el palet o la destinación que esté, no solo en la suya.
+     */
+    private void reinferirTodoElEnvio() {
+        List<List<CajaData>> cajasPorDestino = new ArrayList<>();
+        for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
+            cajasPorDestino.add(destino.getDestino().getCajas());
         }
+        envioEnCurso.getAvisosInferencia().clear();
+        envioEnCurso.getAvisosInferencia().addAll(
+                inferidorPesos.inferirPesosDelEnvio(cajasPorDestino).getAvisos());
     }
 
     private List<DestinoVista> montarVistaDestinos() {

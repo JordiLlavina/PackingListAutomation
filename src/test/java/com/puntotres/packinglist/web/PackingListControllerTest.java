@@ -275,6 +275,78 @@ class PackingListControllerTest {
     }
 
     @Test
+    void recalcularPropagaElPesoAOtrasDestinacionesConElMismoModelo() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // El mismo modelo (R1/NOIR) en DOS destinaciones distintas. Se pesa
+        // una caja en PARIS; como el peso por unidad es del producto (la
+        // referencia), la caja de CHINA del mismo modelo también debe quedar
+        // inferida. Antes la inferencia era por destinación y CHINA se
+        // quedaba sin recalcular.
+        String json = """
+                {"cliente": "AMI", "destinos": [
+                  {"destino": "PARIS",
+                   "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
+                   "referencias": [{"referencia": "R1", "color": "NOIR",
+                     "medidaCaja": "60x40x40", "pedido": "P1",
+                     "cajas": [{"caja": 1, "unidades": 50}]}]},
+                  {"destino": "CHINA",
+                   "palets": [{"palet": 2, "cajaInicio": 10, "cajaFin": 10}],
+                   "referencias": [{"referencia": "R1", "color": "NOIR",
+                     "medidaCaja": "60x40x40", "pedido": "P1",
+                     "cajas": [{"caja": 10, "unidades": 50}]}]}
+                ]}
+                """;
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", json)
+                        .param("temporada", "H26").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        // Neto a mano de la caja de PARIS (destino 0, índice 0): unitario
+        // 50.0 / 50 = 1.0 kg.
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("pesos[0].indiceDestino", "0")
+                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].pesoNetoKg", "50.0"))
+                .andExpect(redirectedUrl("/revision"));
+
+        EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
+        var cajaChina = envio.getImportado().getDestinos().get(1).getDestino().getCajas().get(0);
+        assertEquals(50.0, cajaChina.getPesoNetoKg());   // inferida desde PARIS (50 uds * 1.0)
+        assertEquals(51.6, cajaChina.getPesoBrutoKg());  // neto + tara 1.6 del 60x40x40
+    }
+
+    @Test
+    void elEnvioConNumerosDeCajaRepetidosEntreDestinacionesInfiereCadaUna() throws Exception {
+        // Regresión: el ejemplo real repite números de caja entre
+        // destinaciones (caja 5 en CHINA y en JAPAN, cajas 1-4 en JAPAN y
+        // FRANCE...). La inferencia debe tratar cada destinación por separado
+        // y completar los netos de todas, no fusionarlas por nº de caja.
+        MockHttpSession sesion = new MockHttpSession();
+        String json;
+        try (var in = getClass().getResourceAsStream("/ejemplos/envio-ami-bags-y-belts.json")) {
+            json = new String(in.readAllBytes());
+        }
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", json)
+                        .param("temporada", "H26").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
+        var cajasJapan = envio.getImportado().getDestinos().get(1).getDestino().getCajas();
+        // JAPAN caja 5 (UBL214.AL0223 talla 75, bruto 5.2, tara 60x40x30 = 1.2):
+        // su neto debe salir aunque CHINA también tenga una caja 5 del mismo
+        // modelo (antes se perdía por la colisión de nº de caja).
+        var japanCaja5 = cajasJapan.get(4);
+        assertEquals(5, japanCaja5.getNumeroCaja());
+        assertEquals(4.0, japanCaja5.getPesoNetoKg());   // 5.2 - 1.2
+        // JAPAN caja 1 (ULL163, bruto 16.6) también, pese a que FRANCE tiene
+        // sus propias cajas 1-5 del mismo modelo.
+        assertEquals(15.0, cajasJapan.get(0).getPesoNetoKg());   // 16.6 - 1.6
+    }
+
+    @Test
     void enCajaMixtaPorTallaSoloLaPrimeraLineaMuestraCamposDePeso() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         // Cinturón con la caja 4 (una talla) y la caja 5 mixta (tres tallas):

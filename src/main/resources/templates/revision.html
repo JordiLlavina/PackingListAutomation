@@ -86,5 +86,28 @@
         <a class="boton secundario" th:href="@{/nuevo}">Empezar de nuevo</a>
     </form>
 </main>
+
+<script>
+    // Recalcular usa POST-redirect-GET: la página se recarga entera y el
+    // navegador salta arriba. Thymeleaf no puede evitarlo (el scroll es
+    // estado del navegador), así que guardamos la posición antes de recalcular
+    // y la restauramos al recargar. "Generar excels" lleva a otra pantalla, por
+    // eso no se toca: ahí el scroll arriba es el comportamiento correcto.
+    (function () {
+        var CLAVE = 'revisionScroll';
+        document.addEventListener('DOMContentLoaded', function () {
+            var guardado = sessionStorage.getItem(CLAVE);
+            sessionStorage.removeItem(CLAVE);
+            if (guardado !== null) {
+                window.scrollTo(0, parseInt(guardado, 10));
+            }
+            document.querySelectorAll('button[formaction$="/recalcular"]').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    sessionStorage.setItem(CLAVE, String(window.scrollY));
+                });
+            });
+        });
+    })();
+</script>
 </body>
 </html>

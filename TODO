@@ -5,9 +5,6 @@
 ## Pendientes
 
 - [ ] Actualizar README.md y ARCHITECTURE.md: siguen diciendo que no hay capa web ni builders APC/genérico, y ya existen (web/, ClaudeEnvioExtractionService, volcado ERP).
-- [ ]EL PESO SOLO SE RECALCULA EN UN PALET, HAZ QUE SI HAY LOS MISMOS MODELOS EN OTROS PALES, TAMBIEN SE RECALCULEN.
-- Cuando se clica al botón de las filas de "recalcular precio", la pantalla se va hacia arriba. Esto es muy difícil de hacer que se quede en el mismo sitio? Si se puede hacer con Thymeleaf, hazlo.
-- En la vista de resultados (/Resultados), en la tabla de packing lists, en la columna de contenido, pon el color en la misma línea que la destinación y la referencia, y cambia su texto a color negro 
 
 ## Hecho
 

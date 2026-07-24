@@ -28,13 +28,11 @@
             <tr th:each="excel : ${excels}">
                 <td th:text="${excel.nombreFichero}"></td>
                 <td class="contenido-excel">
-                    <div>
-                        <span th:text="${excel.destino}"></span>
-                        <span th:if="${excel.referencia != null}"
-                              th:text="|· ${excel.referencia}|"></span>
-                    </div>
-                    <div class="color-excel" th:if="${excel.color != null}"
-                         th:text="${excel.color}"></div>
+                    <span th:text="${excel.destino}"></span>
+                    <span th:if="${excel.referencia != null}"
+                          th:text="|· ${excel.referencia}|"></span>
+                    <span class="color-excel" th:if="${excel.color != null}"
+                          th:text="|· ${excel.color}|"></span>
                 </td>
                 <td>
                     <span th:if="${excel.tienePesosPendientes()}" class="badge pendiente"

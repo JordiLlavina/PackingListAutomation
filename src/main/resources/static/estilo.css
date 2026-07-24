@@ -255,12 +255,10 @@ tr.pendiente td { background: var(--aviso-fondo); }
 
 .seccion-salida .titulo-seccion { margin: 0 0 0.5rem; font-size: 1.05rem; }
 
-/* Celda de contenido en dos líneas: destino · referencia arriba y el
-   color debajo con sangría fija para que los colores queden alineados
-   en vertical entre filas. */
+/* Celda de contenido en una sola línea: destino · referencia · color. El
+   color va en negro (color de texto normal) pero en negrita para destacarlo. */
 .contenido-excel .color-excel {
-    padding-left: 1.6rem;
-    color: var(--acento);
+    color: inherit;
     font-weight: 600;
 }
 

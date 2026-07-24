@@ -152,6 +152,45 @@ class WeightInferenceServiceTest {
         assertNull(cinturonSinPeso.getPesoBrutoKg());
     }
 
+    @Test
+    void enElEnvioLasCajasConMismoNumeroEnDistintasDestinacionesNoSeMezclan() {
+        // El mismo modelo y el mismo nº de caja (5, color 001) en DOS
+        // destinaciones son cajas físicas DISTINTAS (los nº de caja se
+        // reinician por destinación). Cada una con su propio bruto debe
+        // recibir su neto; no debe fusionarse una dentro de la otra.
+        CajaData chinaCaja5 = caja("60x40x30", 50, 11.2);   // (11.2-1.2)/50
+        chinaCaja5.setReferencia("REF");
+        chinaCaja5.setCodigoColor("001");
+        chinaCaja5.setNumeroCaja(5);
+        CajaData japanCaja5 = caja("60x40x30", 20, 5.2);
+        japanCaja5.setReferencia("REF");
+        japanCaja5.setCodigoColor("001");
+        japanCaja5.setNumeroCaja(5);
+
+        service.inferirPesosDelEnvio(List.of(List.of(chinaCaja5), List.of(japanCaja5)));
+
+        assertEquals(10.0, chinaCaja5.getPesoNetoKg());  // 11.2 - tara 1.2
+        assertEquals(4.0, japanCaja5.getPesoNetoKg());   // 5.2 - tara 1.2 (no se pierde)
+    }
+
+    @Test
+    void enElEnvioElPesoUnitarioSeComparteEntreDestinaciones() {
+        // REF pesada solo en la destinación A; una caja de REF sin peso en la
+        // destinación B (con el mismo nº de caja) debe inferirse con el
+        // unitario de A: el peso por unidad es del producto, no del palet.
+        CajaData a = caja("60x40x40", 10, 11.6);   // (11.6-1.6)/10 = 1.0
+        a.setReferencia("REF");
+        a.setNumeroCaja(1);
+        CajaData b = caja("60x40x40", 5, null);
+        b.setReferencia("REF");
+        b.setNumeroCaja(1);
+
+        service.inferirPesosDelEnvio(List.of(List.of(a), List.of(b)));
+
+        assertEquals(5.0, b.getPesoNetoKg());   // 5 * 1.0
+        assertEquals(6.6, b.getPesoBrutoKg());  // 5.0 + tara 1.6
+    }
+
     /**
      * Cada caja del helper es una caja física distinta: le damos un nº de caja
      * único para que la inferencia (que agrupa por color+nº) no las mezcle.

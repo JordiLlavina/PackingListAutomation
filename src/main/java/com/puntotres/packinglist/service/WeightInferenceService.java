@@ -40,20 +40,78 @@ public class WeightInferenceService {
 
     /** Agrupa por referencia y aplica {@link #inferirPesos} a cada grupo. */
     public ResultadoInferencia inferirPesosPorReferencia(List<CajaData> cajas) {
-        Map<String, List<CajaData>> porReferencia = new LinkedHashMap<>();
-        for (CajaData caja : cajas) {
-            porReferencia.computeIfAbsent(caja.getReferencia(), r -> new java.util.ArrayList<>())
-                    .add(caja);
-        }
         // Un mismo tamaño sin tara puede aparecer en varias referencias:
         // el aviso se emite una sola vez.
         Set<String> avisos = new LinkedHashSet<>();
-        for (List<CajaData> grupo : porReferencia.values()) {
+        for (List<CajaData> grupo : agruparPorReferencia(cajas).values()) {
             avisos.addAll(inferirPesos(grupo).getAvisos());
         }
         ResultadoInferencia resultado = new ResultadoInferencia();
         resultado.getAvisos().addAll(avisos);
         return resultado;
+    }
+
+    /**
+     * Infiere los pesos de un envío completo: una lista de cajas por
+     * destinación. El peso neto por unidad se promedia por referencia sobre
+     * TODAS las destinaciones (mismo producto = mismo peso por unidad, así un
+     * peso tecleado en una caja informa al mismo modelo en cualquier palet o
+     * destinación), pero la identidad de la CAJA FÍSICA (qué líneas comparten
+     * un único peso) es POR DESTINACIÓN: los números de caja se reinician en
+     * cada una y no se pueden mezclar (la caja 5 de CHINA y la 5 de JAPAN son
+     * cajas distintas).
+     */
+    public ResultadoInferencia inferirPesosDelEnvio(List<List<CajaData>> cajasPorDestino) {
+        Map<String, Double> unitarioPorReferencia = pesoUnitarioPorReferencia(cajasPorDestino);
+        Set<String> avisos = new LinkedHashSet<>();
+        for (List<CajaData> cajasDestino : cajasPorDestino) {
+            for (Map.Entry<String, List<CajaData>> grupo
+                    : agruparPorReferencia(cajasDestino).entrySet()) {
+                avisos.addAll(inferirPesos(grupo.getValue(),
+                        unitarioPorReferencia.get(grupo.getKey())).getAvisos());
+            }
+        }
+        ResultadoInferencia resultado = new ResultadoInferencia();
+        resultado.getAvisos().addAll(avisos);
+        return resultado;
+    }
+
+    /** Agrupa una lista de cajas por su referencia, conservando el orden. */
+    private static Map<String, List<CajaData>> agruparPorReferencia(List<CajaData> cajas) {
+        Map<String, List<CajaData>> porReferencia = new LinkedHashMap<>();
+        for (CajaData caja : cajas) {
+            porReferencia.computeIfAbsent(caja.getReferencia(), r -> new ArrayList<>()).add(caja);
+        }
+        return porReferencia;
+    }
+
+    /**
+     * Peso neto medio por unidad de cada referencia, calculado sobre TODAS las
+     * destinaciones a la vez. Las cajas físicas se agrupan DENTRO de cada
+     * destinación (los nº de caja se repiten entre ellas) y cada una con algún
+     * peso conocido aporta su (peso / unidades) al promedio de su referencia.
+     * Una referencia sin ninguna caja conocida en todo el envío no aparece en
+     * el mapa (no se puede inferir su unitario).
+     */
+    private Map<String, Double> pesoUnitarioPorReferencia(List<List<CajaData>> cajasPorDestino) {
+        Map<String, double[]> acumulado = new LinkedHashMap<>(); // [suma, nº conocidas]
+        for (List<CajaData> cajasDestino : cajasPorDestino) {
+            for (Map.Entry<String, List<CajaData>> grupo
+                    : agruparPorReferencia(cajasDestino).entrySet()) {
+                for (List<CajaData> lineas : agruparEnCajasFisicas(grupo.getValue())) {
+                    Double contribucion = contribucionUnitaria(lineas);
+                    if (contribucion == null) {
+                        continue;
+                    }
+                    double[] acc = acumulado.computeIfAbsent(grupo.getKey(), r -> new double[2]);
+                    acc[0] += contribucion;
+                    acc[1]++;
+                }
+            }
+        }
+        Map<String, Double> unitario = new LinkedHashMap<>();
+        acumulado.forEach((referencia, acc) -> unitario.put(referencia, acc[0] / acc[1]));
+        return unitario;
     }
 
     /**
@@ -67,8 +125,19 @@ public class WeightInferenceService {
      * caja y con UNA sola tara; las demás líneas quedan a null a propósito.
      */
     public ResultadoInferencia inferirPesos(List<CajaData> cajasMismaReferencia) {
+        return inferirPesos(cajasMismaReferencia, null);
+    }
+
+    /**
+     * Como {@link #inferirPesos(List)}, pero con un peso unitario ya calculado
+     * fuera (el del envío entero, compartido entre destinaciones). Si es
+     * {@code null} se calcula localmente sobre las cajas recibidas.
+     */
+    private ResultadoInferencia inferirPesos(List<CajaData> cajasMismaReferencia,
+                                             Double unitarioGlobal) {
         List<List<CajaData>> cajasFisicas = agruparEnCajasFisicas(cajasMismaReferencia);
-        Double pesoUnitario = calcularPesoUnitarioMedio(cajasFisicas);
+        Double pesoUnitario = (unitarioGlobal != null)
+                ? unitarioGlobal : calcularPesoUnitarioMedio(cajasFisicas);
         Set<String> tamanosSinTara = new LinkedHashSet<>();
 
         for (List<CajaData> lineas : cajasFisicas) {
@@ -153,27 +222,36 @@ public class WeightInferenceService {
         double suma = 0;
         int conocidas = 0;
         for (List<CajaData> lineas : cajasFisicas) {
-            CajaData lider = lineas.get(0);
-            int unidades = unidadesTotales(lineas);
-            if (unidades <= 0) {
-                continue;
-            }
-            if (lider.getPesoNetoKg() != null) {
-                suma += lider.getPesoNetoKg() / unidades;
+            Double contribucion = contribucionUnitaria(lineas);
+            if (contribucion != null) {
+                suma += contribucion;
                 conocidas++;
-                continue;
             }
-            if (lider.getPesoBrutoKg() == null) {
-                continue;
-            }
-            Optional<Double> tara = taras.taraPara(lider.getTamanoCaja());
-            if (tara.isEmpty()) {
-                continue;
-            }
-            suma += (lider.getPesoBrutoKg() - tara.get()) / unidades;
-            conocidas++;
         }
         return (conocidas > 0) ? suma / conocidas : null;
+    }
+
+    /**
+     * Aporte al peso neto por unidad de una sola caja física (leído de su
+     * líder): neto directo (neto / unidades) o, si solo hay bruto,
+     * (bruto - tara) / unidades. Null si la caja no tiene ningún peso conocido,
+     * no tiene unidades, o su tamaño no tiene tara (no se puede pasar de bruto
+     * a neto).
+     */
+    private Double contribucionUnitaria(List<CajaData> lineasCajaFisica) {
+        CajaData lider = lineasCajaFisica.get(0);
+        int unidades = unidadesTotales(lineasCajaFisica);
+        if (unidades <= 0) {
+            return null;
+        }
+        if (lider.getPesoNetoKg() != null) {
+            return lider.getPesoNetoKg() / unidades;
+        }
+        if (lider.getPesoBrutoKg() == null) {
+            return null;
+        }
+        Optional<Double> tara = taras.taraPara(lider.getTamanoCaja());
+        return tara.map(t -> (lider.getPesoBrutoKg() - t) / unidades).orElse(null);
     }
 
     private static String nombreTamano(CajaData caja) {
