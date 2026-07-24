@@ -41,6 +41,8 @@ EnvioInput (calco del JSON)
   → WeightInferenceService  infiere pesos que faltan (taras de application.yml)
   → PackingListGenerationService  despacha al builder del cliente → excels
   → VolcadoErpGenerationService / VolcadoErpExcelBuilder  albarán para el ERP
+  → EtiquetasGenerationService → GeneradorEtiquetasCliente (AmiEtiquetasGenerador)
+      → excels de etiquetas de caja (opcional: Paso 2 web con archivos extra)
 ```
 
 Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
@@ -49,6 +51,8 @@ Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
 3. `PackingListData` — vocabulario de la plantilla Excel de un cliente concreto.
 
 **Multi-cliente**: `GeneradorPackingListCliente` es la interfaz; `AmiGenerador`/`AmiExcelBuilder`, `ApcExcelBuilder` y `GenericoExcelBuilder` la implementan, y `PackingListGenerationService` despacha según `ClienteConfig.getPlantilla()` (`TipoPlantilla`: AMI, APC, GENERIC). El catálogo de clientes vive en `application.yml` (bloque `packing-list.clientes`): **añadir un cliente de plantilla GENERIC es solo configuración** (nombre-legal + direccion-entrega), sin tocar Java. Igual con las taras: un tamaño de caja nuevo es una línea en `packing-list.taras`.
+
+**Etiquetas de caja** (`service/etiquetas/`): estrategia propia `GeneradorEtiquetasCliente` despachada por **clave de cliente** (no por TipoPlantilla); cada implementación declara qué destinaciones soporta y qué archivos extra pide al usuario en la vista `/etiquetas` (Paso 2). Implementado: AMI (China/Japan/France; hoja por destinación, par de etiquetas A4 por caja, barcode Code 128 del PO del excel de pedido EAN). Plantillas en `src/main/resources/client-labels/` — misma regla que las de packing list: **no editarlas sin revisar su builder** (`AmiEtiquetasExcelBuilder`/`AmiEtiquetaLayout`).
 
 **Web** (`web/`): asistente de 3 pantallas — `entrada` (pegar JSON o subir fotos) → `revision` (avisos, pesos editables, "↻ modelo" propaga un peso a toda su referencia) → `resultados` (descarga individual, ZIP y volcado ERP). Estado del envío en sesión HTTP (`EnvioEnCurso`). Las cajas en la revisión se localizan por **posición** (`indiceCaja`), no por número de caja, porque los números pueden repetirse (cajas mixtas).
 

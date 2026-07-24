@@ -145,8 +145,12 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     .toList();
             talla = String.join("-", ordenadas.stream()
                     .map(CajaData::getTalla).toList());
-            cantidad = String.join(",", ordenadas.stream()
-                    .map(linea -> linea.getCantidad() + "-" + linea.getTalla()).toList());
+            // Los pares cantidad-talla solo tienen sentido con varias tallas;
+            // con una sola, QUANTITY es la cantidad a secas (regla general).
+            cantidad = ordenadas.size() == 1
+                    ? String.valueOf(ordenadas.get(0).getCantidad())
+                    : String.join(",", ordenadas.stream()
+                            .map(linea -> linea.getCantidad() + "-" + linea.getTalla()).toList());
         } else {
             talla = "U";
             cantidad = String.valueOf(lineas.stream().mapToInt(CajaData::getCantidad).sum());

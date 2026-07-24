@@ -120,6 +120,21 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
+    void cinturonDeTallaUnicaLlevaCantidadSimple() throws IOException {
+        // Una sola talla en la caja: SIZE la talla y QUANTITY a secas (los
+        // pares cantidad-talla son solo del caso especial multi-talla).
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("PARIS", caja(1, "UBL029.AL0216", "001", "75", 45, 8.5, "07672"))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertEquals("75", texto(hoja, 12, 2));
+            assertEquals("45", texto(hoja, 13, 2));
+        }
+    }
+
+    @Test
     void destinacionNoReconocidaSeOmiteConAviso() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         destino("HONG KONG", caja(1, "ULL163.AL0052", "221", null, 10, 1.0, null))),
