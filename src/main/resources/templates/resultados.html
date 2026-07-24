@@ -69,8 +69,49 @@
         <button th:unless="${hayVolcado}" type="button" class="secundario" disabled>Vista previa</button>
     </section>
 
-    <!-- Sección 3: etiquetas de caja, todavía en desarrollo -->
-    <section class="tarjeta seccion-salida deshabilitada">
+    <!-- Sección 3: etiquetas de caja (Paso 2 aparte: /etiquetas pide los
+         archivos extra que declare el generador del cliente). -->
+    <section class="tarjeta seccion-salida" th:if="${hayGeneradorEtiquetas}">
+        <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
+
+        <div th:if="${!avisosEtiquetas.isEmpty()}">
+            <div class="alerta" th:each="aviso : ${avisosEtiquetas}"
+                 th:text="|Etiquetas: ${aviso}|"></div>
+        </div>
+
+        <p th:if="${etiquetas.isEmpty()}">
+            Requieren datos adicionales según las destinaciones del envío.
+        </p>
+        <table th:if="${!etiquetas.isEmpty()}">
+            <thead>
+            <tr>
+                <th>Fichero</th>
+                <th>Destinación</th>
+                <th>Pesos</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="excel : ${etiquetas}">
+                <td th:text="${excel.nombreFichero}"></td>
+                <td th:text="${excel.destino}"></td>
+                <td>
+                    <span th:if="${excel.tienePesosPendientes()}" class="badge pendiente"
+                          th:text="|${excel.cajasPendientes.size()} cajas sin peso|"></span>
+                    <span th:if="${!excel.tienePesosPendientes()}" class="badge ok">completos</span>
+                </td>
+                <td>
+                    <a th:href="@{/descargar-etiquetas/{fichero}(fichero=${excel.nombreFichero})}">Descargar</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <a class="boton" th:href="@{/etiquetas}"
+           th:text="${etiquetas.isEmpty()} ? 'Preparar etiquetas' : 'Regenerar etiquetas'"></a>
+    </section>
+    <!-- Cliente sin generador de etiquetas: sigue en desarrollo. -->
+    <section class="tarjeta seccion-salida deshabilitada" th:unless="${hayGeneradorEtiquetas}">
         <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
         <p>🔒 En desarrollo — Próximamente</p>
         <button type="button" disabled>Descargar</button>

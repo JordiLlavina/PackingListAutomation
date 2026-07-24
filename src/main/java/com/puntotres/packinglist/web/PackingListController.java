@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -33,6 +35,7 @@ import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.TaraProperties;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
+import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
@@ -45,6 +48,10 @@ import com.puntotres.packinglist.service.ResultadoAsignacion;
 import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
 import com.puntotres.packinglist.service.VolcadoErpGenerationService;
 import com.puntotres.packinglist.service.WeightInferenceService;
+import com.puntotres.packinglist.service.etiquetas.CampoEtiquetas;
+import com.puntotres.packinglist.service.etiquetas.EtiquetasGenerationService;
+import com.puntotres.packinglist.service.etiquetas.GeneradorEtiquetasCliente;
+import com.puntotres.packinglist.service.etiquetas.ResultadoEtiquetas;
 
 import jakarta.validation.Valid;
 
@@ -68,6 +75,7 @@ public class PackingListController {
     private final PackingListGenerationService generador;
     private final VolcadoErpGenerationService generadorVolcado;
     private final VolcadoErpExcelBuilder constructorVolcado;
+    private final EtiquetasGenerationService etiquetasService;
     private final ClientesProperties clientesProperties;
     private final TaraProperties taraProperties;
     private final ObjectMapper mapper;
@@ -80,6 +88,7 @@ public class PackingListController {
                                  PackingListGenerationService generador,
                                  VolcadoErpGenerationService generadorVolcado,
                                  VolcadoErpExcelBuilder constructorVolcado,
+                                 EtiquetasGenerationService etiquetasService,
                                  ClientesProperties clientesProperties,
                                  TaraProperties taraProperties,
                                  ObjectMapper mapper,
@@ -91,6 +100,7 @@ public class PackingListController {
         this.generador = generador;
         this.generadorVolcado = generadorVolcado;
         this.constructorVolcado = constructorVolcado;
+        this.etiquetasService = etiquetasService;
         this.clientesProperties = clientesProperties;
         this.taraProperties = taraProperties;
         this.mapper = mapper;
@@ -273,6 +283,9 @@ public class PackingListController {
         envioEnCurso.getExcels().clear();
         envioEnCurso.getExcels().addAll(excels);
         envioEnCurso.setVolcadoErp(volcado);
+        // Regenerar invalida las etiquetas ya hechas (pesos/cajas cambiados).
+        envioEnCurso.getEtiquetas().clear();
+        envioEnCurso.getAvisosEtiquetas().clear();
         return "redirect:/resultados";
     }
 
@@ -289,6 +302,9 @@ public class PackingListController {
         model.addAttribute("excels", envioEnCurso.getExcels());
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
         model.addAttribute("volcadoErp", envioEnCurso.getVolcadoErp());
+        model.addAttribute("etiquetas", envioEnCurso.getEtiquetas());
+        model.addAttribute("avisosEtiquetas", envioEnCurso.getAvisosEtiquetas());
+        model.addAttribute("hayGeneradorEtiquetas", generadorEtiquetasDelEnvio().isPresent());
         return "resultados";
     }
 
@@ -340,10 +356,83 @@ public class PackingListController {
                 .body(constructorVolcado.generar(volcado));
     }
 
-    /** Etiquetas: pendiente de implementar (stub que devuelve 404). */
-    @GetMapping("/descargar-etiquetas")
-    public ResponseEntity<byte[]> descargarEtiquetas() {
-        return ResponseEntity.notFound().build();
+    // --- Paso extra: etiquetas de caja ---
+
+    /**
+     * Paso 2 de etiquetas: según las destinaciones del envío, el generador
+     * del cliente declara qué archivos extra necesita (ej. el excel del
+     * pedido de la temporada de AMI) antes de poder generar.
+     */
+    @GetMapping("/etiquetas")
+    public String etiquetas(Model model, RedirectAttributes redirect) {
+        if (envioEnCurso.estaVacio()) {
+            return sinEnvio(redirect);
+        }
+        if (envioEnCurso.getExcels().isEmpty()) {
+            return "redirect:/revision";
+        }
+        GeneradorEtiquetasCliente generador = generadorEtiquetasDelEnvio().orElse(null);
+        if (generador == null) {
+            return "redirect:/resultados";
+        }
+        List<DestinoData> destinos = destinosDelEnvio();
+        model.addAttribute("campos", generador.camposRequeridos(destinos));
+        model.addAttribute("destinos", destinos.stream()
+                .map(destino -> Map.of(
+                        "nombre", destino.getNombreDestino(),
+                        "soportado", generador.soportaDestino(destino.getNombreDestino())))
+                .toList());
+        model.addAttribute("cabecera", envioEnCurso.getCabecera());
+        return "etiquetas";
+    }
+
+    @PostMapping("/etiquetas/generar")
+    public String generarEtiquetas(MultipartHttpServletRequest peticion,
+                                   RedirectAttributes redirect) {
+        if (envioEnCurso.estaVacio()) {
+            return sinEnvio(redirect);
+        }
+        GeneradorEtiquetasCliente generador = generadorEtiquetasDelEnvio().orElse(null);
+        if (generador == null) {
+            return "redirect:/resultados";
+        }
+        List<DestinoData> destinos = destinosDelEnvio();
+        Map<String, byte[]> archivos = new LinkedHashMap<>();
+        try {
+            for (CampoEtiquetas campo : generador.camposRequeridos(destinos)) {
+                MultipartFile archivo = peticion.getFile(campo.nombre());
+                if (archivo == null || archivo.isEmpty()) {
+                    redirect.addFlashAttribute("error",
+                            "Falta el archivo: " + campo.titulo());
+                    return "redirect:/etiquetas";
+                }
+                archivos.put(campo.nombre(), archivo.getBytes());
+            }
+            ResultadoEtiquetas resultado =
+                    generador.generar(destinos, envioEnCurso.getCabecera(), archivos);
+            envioEnCurso.getEtiquetas().clear();
+            envioEnCurso.getEtiquetas().addAll(resultado.getExcels());
+            envioEnCurso.getAvisosEtiquetas().clear();
+            envioEnCurso.getAvisosEtiquetas().addAll(resultado.getAvisos());
+        } catch (IOException | RuntimeException e) {
+            redirect.addFlashAttribute("error",
+                    "No se pudieron generar las etiquetas: " + e.getMessage());
+            return "redirect:/etiquetas";
+        }
+        return "redirect:/resultados";
+    }
+
+    @GetMapping("/descargar-etiquetas/{nombreFichero}")
+    public ResponseEntity<byte[]> descargarEtiquetas(@PathVariable String nombreFichero) {
+        return envioEnCurso.getEtiquetas().stream()
+                .filter(excel -> excel.getNombreFichero().equals(nombreFichero))
+                .findFirst()
+                .map(excel -> ResponseEntity.ok()
+                        .contentType(TIPO_XLSX)
+                        .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
+                                .attachment().filename(excel.getNombreFichero()).build().toString())
+                        .body(excel.getContenido()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @GetMapping("/nuevo")
@@ -372,6 +461,16 @@ public class PackingListController {
                     fichero.getContentType(), fichero.getBytes()));
         }
         return imagenes;
+    }
+
+    private Optional<GeneradorEtiquetasCliente> generadorEtiquetasDelEnvio() {
+        return etiquetasService.generadorPara(envioEnCurso.getCabecera().getClaveCliente());
+    }
+
+    private List<DestinoData> destinosDelEnvio() {
+        return envioEnCurso.getImportado().getDestinos().stream()
+                .map(EnvioImportado.DestinoImportado::getDestino)
+                .toList();
     }
 
     private String sinEnvio(RedirectAttributes redirect) {

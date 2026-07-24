@@ -5,8 +5,10 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -26,7 +28,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 
 /**
  * Tests del asistente web con los beans reales (los servicios de dominio no
@@ -425,10 +430,94 @@ class PackingListControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // --- etiquetas de caja ---
+
+    /** Llega hasta resultados con el fixture AMI (importar + generar). */
+    private MockHttpSession sesionConEnvioGenerado() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+        return sesion;
+    }
+
+    /** Excel de pedido coherente con el fixture (PARIS/JAPAN/CHINA). */
+    private static byte[] pedidoAmiDelFixture() {
+        return PedidoAmiExcel.crear("EAN H26",
+                new PedidoAmiExcel.Fila("SPAIN", "USL728.AL217", "NOIR", "BLACK", "U", 7685),
+                new PedidoAmiExcel.Fila("SPAIN", "USL737.ACO137", "ROJO PASION 69", "RED", "U", 7685),
+                new PedidoAmiExcel.Fila("SPAIN", "USL737.ACO137", "NOIR", "BLACK", "U", "07700 JP"),
+                new PedidoAmiExcel.Fila("SPAIN", "USL737.ACO137", "NOIR", "BLACK", "U", "07713 CH"));
+    }
+
     @Test
-    void descargarEtiquetasDevuelve404PorqueAunNoExiste() throws Exception {
-        mvc.perform(get("/descargar-etiquetas"))
-                .andExpect(status().isNotFound());
+    void elPasoDeEtiquetasPideElExcelDePedidoDeAmi() throws Exception {
+        MockHttpSession sesion = sesionConEnvioGenerado();
+        mvc.perform(get("/etiquetas").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(view().name("etiquetas"))
+                .andExpect(content().string(containsString("Introducir excel del pedido de AMI")))
+                .andExpect(content().string(containsString("PARIS")));
+    }
+
+    @Test
+    void generarEtiquetasDejaLosExcelsDescargables() throws Exception {
+        MockHttpSession sesion = sesionConEnvioGenerado();
+
+        mvc.perform(multipart("/etiquetas/generar")
+                        .file(new MockMultipartFile("pedido", "AMI EAN H26.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                pedidoAmiDelFixture()))
+                        .session(sesion))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/resultados"));
+
+        // La tarjeta de resultados lista los excels de etiquetas.
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Etiquetas_AMI_PARIS_FA-26-1189.xlsx")));
+
+        byte[] excel = mvc.perform(
+                        get("/descargar-etiquetas/Etiquetas_AMI_PARIS_FA-26-1189.xlsx")
+                                .session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            assertEquals("AMI FRANCE", wb.getSheetName(0));
+        }
+    }
+
+    @Test
+    void generarEtiquetasSinArchivoVuelveAlPasoConError() throws Exception {
+        MockHttpSession sesion = sesionConEnvioGenerado();
+        mvc.perform(multipart("/etiquetas/generar").session(sesion))
+                .andExpect(redirectedUrl("/etiquetas"))
+                .andExpect(flash().attributeExists("error"));
+    }
+
+    @Test
+    void clienteSinGeneradorDeEtiquetasSigueEnDesarrollo() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // El fixture es de AMI, pero generamos como ACKERMANN (genérico):
+        // avisa sin bloquear y no tiene etiquetas implementadas.
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "ACKERMANN")
+                        .param("json", jsonDePrueba())
+                        .param("temporada", "SPRING 25")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("En desarrollo")));
+        mvc.perform(get("/etiquetas").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
     }
 
     @Test

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Etiquetas de caja')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· Etiquetas de caja')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <p class="resumen-envio">
+        Factura <strong th:text="${cabecera.numeroFactura}"></strong> ·
+        temporada <strong th:text="${cabecera.temporada}"></strong>
+    </p>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">🏷️ Etiquetas de caja — datos adicionales</h3>
+        <p>Destinaciones del envío:</p>
+        <ul>
+            <li th:each="destino : ${destinos}">
+                <span th:text="${destino['nombre']}"></span>
+                <span th:if="${destino['soportado']}" class="badge ok">etiquetas disponibles</span>
+                <span th:unless="${destino['soportado']}" class="badge pendiente">
+                    sin etiquetas implementadas: se omitirá</span>
+            </li>
+        </ul>
+
+        <form th:action="@{/etiquetas/generar}" method="post" enctype="multipart/form-data">
+            <div class="campo" th:each="campo : ${campos}">
+                <label th:for="${campo.nombre}" th:text="${campo.titulo}"></label>
+                <input type="file" th:id="${campo.nombre}" th:name="${campo.nombre}"
+                       accept=".xlsx" required>
+            </div>
+            <p th:if="${campos.isEmpty()}">
+                Ninguna destinación de este envío tiene etiquetas implementadas.
+            </p>
+            <button type="submit" th:disabled="${campos.isEmpty()}">Generar etiquetas</button>
+            <a class="boton secundario" th:href="@{/resultados}">Volver a resultados</a>
+        </form>
+    </section>
+</main>
+</body>
+</html>
