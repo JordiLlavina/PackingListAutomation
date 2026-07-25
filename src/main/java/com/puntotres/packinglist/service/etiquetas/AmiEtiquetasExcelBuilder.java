@@ -3,16 +3,11 @@ package com.puntotres.packinglist.service.etiquetas;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellStyle;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.ClientAnchor;
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.util.Units;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
@@ -58,7 +53,7 @@ public class AmiEtiquetasExcelBuilder {
             XSSFSheet hoja = libro.getSheetAt(0);
             limpiarImagenesDeEjemplo(hoja);
 
-            BloqueModelo modelo = BloqueModelo.capturar(hoja, layout.alturaBloque());
+            BloqueEtiquetaModelo modelo = BloqueEtiquetaModelo.capturar(hoja, layout.alturaBloque());
             for (int i = 1; i < etiquetas.size(); i++) {
                 modelo.copiarEn(hoja, i * layout.alturaBloque());
             }
@@ -214,69 +209,5 @@ public class AmiEtiquetasExcelBuilder {
                 ? hoja.getRow(fila).getHeightInPoints()
                 : hoja.getDefaultRowHeightInPoints();
         return Units.toEMU(puntos);
-    }
-
-    /**
-     * El par de etiquetas modelo de la plantilla: valores, estilos, altos
-     * de fila y celdas combinadas de las primeras alturaBloque filas,
-     * capturados antes de escribir nada para poder replicarlos por caja.
-     */
-    private record BloqueModelo(List<FilaModelo> filas, List<CellRangeAddress> merges,
-                                int altura) {
-
-        private record CeldaModelo(int col, CellStyle estilo, CellType tipo, String texto) {
-        }
-
-        private record FilaModelo(int fila, float altoPuntos, boolean altoPersonalizado,
-                                  List<CeldaModelo> celdas) {
-        }
-
-        static BloqueModelo capturar(XSSFSheet hoja, int altura) {
-            List<FilaModelo> filas = new ArrayList<>();
-            for (int i = 0; i < altura; i++) {
-                Row fila = hoja.getRow(i);
-                if (fila == null) {
-                    continue;
-                }
-                List<CeldaModelo> celdas = new ArrayList<>();
-                for (Cell celda : fila) {
-                    celdas.add(new CeldaModelo(celda.getColumnIndex(), celda.getCellStyle(),
-                            celda.getCellType(),
-                            celda.getCellType() == CellType.STRING
-                                    ? celda.getStringCellValue() : null));
-                }
-                filas.add(new FilaModelo(i, fila.getHeightInPoints(),
-                        ((XSSFRow) fila).getCTRow().getCustomHeight(), celdas));
-            }
-            List<CellRangeAddress> merges = new ArrayList<>();
-            for (CellRangeAddress merge : hoja.getMergedRegions()) {
-                if (merge.getLastRow() < altura) {
-                    merges.add(merge);
-                }
-            }
-            return new BloqueModelo(filas, merges, altura);
-        }
-
-        void copiarEn(XSSFSheet hoja, int filaDestino) {
-            for (FilaModelo modelo : filas) {
-                XSSFRow fila = hoja.createRow(filaDestino + modelo.fila());
-                if (modelo.altoPersonalizado()) {
-                    fila.setHeightInPoints(modelo.altoPuntos());
-                }
-                for (CeldaModelo celdaModelo : modelo.celdas()) {
-                    Cell celda = fila.createCell(celdaModelo.col());
-                    // Mismo libro: la referencia de estilo se comparte, sin clonar.
-                    celda.setCellStyle(celdaModelo.estilo());
-                    if (celdaModelo.texto() != null) {
-                        celda.setCellValue(celdaModelo.texto());
-                    }
-                }
-            }
-            for (CellRangeAddress merge : merges) {
-                hoja.addMergedRegion(new CellRangeAddress(
-                        merge.getFirstRow() + filaDestino, merge.getLastRow() + filaDestino,
-                        merge.getFirstColumn(), merge.getLastColumn()));
-            }
-        }
     }
 }
