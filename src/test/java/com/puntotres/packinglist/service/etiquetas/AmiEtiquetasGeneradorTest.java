@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel.Fila;
@@ -56,6 +57,10 @@ class AmiEtiquetasGeneradorTest {
         return destino;
     }
 
+    private static EnvioImportado.DestinoImportado importado(DestinoData destino) {
+        return new EnvioImportado.DestinoImportado(destino, List.of());
+    }
+
     private static byte[] pedido() {
         return PedidoAmiExcel.crear("EAN H26",
                 new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665),
@@ -70,8 +75,8 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void generaUnExcelPorDestinacionSoportada() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665")),
-                        destino("CHINA", caja(1, "ULL163.AL0052", "221", null, 40, 4.10, "07703"))),
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665"))),
+                        importado(destino("CHINA", caja(1, "ULL163.AL0052", "221", null, 40, 4.10, "07703")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertEquals(2, resultado.getExcels().size());
@@ -94,11 +99,11 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void cinturonesMultiTallaVanEnUnaEtiquetaConTallasYCantidades() throws IOException {
         // Caja 2 con tres tallas (mismo numeroCaja); solo la líder lleva peso.
-        ResultadoEtiquetas resultado = generador.generar(List.of(destino("PARIS",
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
                         caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665"),
                         caja(2, "UBL029.AL0216", "001", "95", 33, 9.93, "07672"),
                         caja(2, "UBL029.AL0216", "001", "85", 4, null, "07672"),
-                        caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672"))),
+                        caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
@@ -126,7 +131,7 @@ class AmiEtiquetasGeneradorTest {
         // Una sola talla en la caja: SIZE la talla y QUANTITY a secas (los
         // pares cantidad-talla son solo del caso especial multi-talla).
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("PARIS", caja(1, "UBL029.AL0216", "001", "75", 45, 8.5, "07672"))),
+                        importado(destino("PARIS", caja(1, "UBL029.AL0216", "001", "75", 45, 8.5, "07672")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
@@ -139,7 +144,7 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void destinacionNoReconocidaSeOmiteConAviso() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("HONG KONG", caja(1, "ULL163.AL0052", "221", null, 10, 1.0, null))),
+                        importado(destino("HONG KONG", caja(1, "ULL163.AL0052", "221", null, 10, 1.0, null)))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertTrue(resultado.getExcels().isEmpty());
@@ -150,7 +155,7 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void referenciaAusenteDelPedidoAvisaYGeneraConFallback() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("PARIS", caja(1, "USL999.XX0000", "007", null, 10, 2.0, "07699"))),
+                        importado(destino("PARIS", caja(1, "USL999.XX0000", "007", null, 10, 2.0, "07699")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertEquals(1, resultado.getExcels().size());
@@ -165,7 +170,7 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void poDelExcelDiscrepanteDelJsonAvisaYLaEtiquetaLlevaElDelJson() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07777"))),
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07777")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertTrue(resultado.getAvisos().stream()
@@ -178,7 +183,7 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void cajaSinPedidoEnElJsonAvisaYVaSinOrderNumber() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, null))),
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, null)))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertTrue(resultado.getAvisos().stream()
@@ -191,7 +196,7 @@ class AmiEtiquetasGeneradorTest {
     @Test
     void pesoPendienteDejaLaCajaEnCajasPendientes() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
-                        destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, null, "07665"))),
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, null, "07665")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         assertEquals(1, resultado.getExcels().get(0).getCajasPendientes().size());

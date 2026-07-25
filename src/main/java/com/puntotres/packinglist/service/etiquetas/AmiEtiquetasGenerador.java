@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.etiquetas.AmiEtiquetasExcelBuilder.EtiquetaCaja;
 
@@ -67,8 +68,9 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
     }
 
     @Override
-    public ResultadoEtiquetas generar(List<DestinoData> destinos, DatosEnvio envio,
-                                      Map<String, byte[]> archivos) throws IOException {
+    public ResultadoEtiquetas generar(List<EnvioImportado.DestinoImportado> destinos,
+                                      DatosEnvio envio, Map<String, byte[]> archivos)
+            throws IOException {
         byte[] contenidoPedido = archivos.get(CAMPO_PEDIDO.nombre());
         if (contenidoPedido == null) {
             throw new IllegalArgumentException("Falta el excel del pedido de AMI");
@@ -76,7 +78,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(contenidoPedido);
 
         ResultadoEtiquetas resultado = new ResultadoEtiquetas();
-        for (DestinoData destino : destinos) {
+        for (EnvioImportado.DestinoImportado importado : destinos) {
+            DestinoData destino = importado.getDestino();
             AmiEtiquetaLayout layout =
                     LAYOUT_POR_DESTINO.get(normalizar(destino.getNombreDestino()));
             if (layout == null) {

@@ -406,8 +406,8 @@ public class PackingListController {
                 }
                 archivos.put(campo.nombre(), archivo.getBytes());
             }
-            ResultadoEtiquetas resultado =
-                    generador.generar(destinos, envioEnCurso.getCabecera(), archivos);
+            ResultadoEtiquetas resultado = generador.generar(
+                    envioEnCurso.getImportado().getDestinos(), envioEnCurso.getCabecera(), archivos);
             envioEnCurso.getEtiquetas().clear();
             envioEnCurso.getEtiquetas().addAll(resultado.getExcels());
             envioEnCurso.getAvisosEtiquetas().clear();

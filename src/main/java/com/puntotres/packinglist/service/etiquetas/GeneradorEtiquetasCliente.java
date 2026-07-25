@@ -6,6 +6,7 @@ import java.util.Map;
 
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.service.EnvioImportado;
 
 /**
  * Estrategia de generación de etiquetas de caja de un cliente concreto
@@ -31,9 +32,11 @@ public interface GeneradorEtiquetasCliente {
     List<CampoEtiquetas> camposRequeridos(List<DestinoData> destinos);
 
     /**
-     * Genera un excel de etiquetas por destinación soportada. archivos:
-     * contenido de cada CampoEtiquetas subido, indexado por su nombre.
+     * Genera un excel de etiquetas por destinación soportada. Cada destino
+     * llega con sus palets (los necesitan las etiquetas de palet; los
+     * generadores sin ellas los ignoran). archivos: contenido de cada
+     * CampoEtiquetas subido, indexado por su nombre.
      */
-    ResultadoEtiquetas generar(List<DestinoData> destinos, DatosEnvio envio,
+    ResultadoEtiquetas generar(List<EnvioImportado.DestinoImportado> destinos, DatosEnvio envio,
                                Map<String, byte[]> archivos) throws IOException;
 }

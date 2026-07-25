@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.service.EnvioImportado;
 
 class EtiquetasGenerationServiceTest {
 
@@ -21,7 +22,7 @@ class EtiquetasGenerationServiceTest {
             @Override public List<CampoEtiquetas> camposRequeridos(List<DestinoData> destinos) {
                 return List.of();
             }
-            @Override public ResultadoEtiquetas generar(List<DestinoData> destinos,
+            @Override public ResultadoEtiquetas generar(List<EnvioImportado.DestinoImportado> destinos,
                     DatosEnvio envio, Map<String, byte[]> archivos) {
                 return new ResultadoEtiquetas();
             }
