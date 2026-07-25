@@ -56,9 +56,10 @@ record BloqueEtiquetaModelo(List<FilaModelo> filas, List<CellRangeAddress> merge
     void copiarEn(XSSFSheet hoja, int filaDestino) {
         for (FilaModelo modelo : filas) {
             XSSFRow fila = hoja.createRow(filaDestino + modelo.fila());
-            if (modelo.altoPersonalizado()) {
-                fila.setHeightInPoints(modelo.altoPuntos());
-            }
+            // Se aplica siempre (no solo si customHeight="1" en el XML
+            // original): algunas plantillas (APC) traen ht explícito sin
+            // marcar ese flag y aun así hay que preservar el alto real.
+            fila.setHeightInPoints(modelo.altoPuntos());
             for (CeldaModelo celdaModelo : modelo.celdas()) {
                 Cell celda = fila.createCell(celdaModelo.col());
                 // Mismo libro: la referencia de estilo se comparte, sin clonar.
