@@ -14,8 +14,10 @@ import com.puntotres.packinglist.service.EnvioImportado;
  *
  * Cada implementación sabe qué destinaciones soporta, qué datos estáticos
  * usar por destinación y qué archivos extra pedir al usuario en el Paso 2
- * del asistente. Las etiquetas de palet y la "etiqueta de etiqueta" son
- * funcionalidades futuras y NO forman parte de este contrato.
+ * del asistente. Genera etiquetas de caja y, cuando el cliente las tiene,
+ * de palet (los destinos llegan con sus palets para este fin; los generadores
+ * sin etiquetas de palet los ignoran). La "etiqueta de etiqueta" es
+ * funcionalidad futura y NO forma parte de este contrato.
  */
 public interface GeneradorEtiquetasCliente {
 
