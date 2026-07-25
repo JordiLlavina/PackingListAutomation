@@ -592,6 +592,57 @@ class PackingListControllerTest {
                 .andExpect(redirectedUrl("/resultados"));
     }
 
+    /** JSON de fixture de APC con la destinación sustituida (IVRY no tiene etiquetas, JAPAN sí). */
+    private String jsonApcConDestino(String destino) throws Exception {
+        try (var in = getClass().getResourceAsStream("/ejemplos/envio-apc.json")) {
+            String json = new String(in.readAllBytes());
+            return json.replace("\"IVRY\"", "\"" + destino + "\"");
+        }
+    }
+
+    private void importarApc(MockHttpSession sesion, String destino) throws Exception {
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "APC")
+                        .param("json", jsonApcConDestino(destino))
+                        .param("temporada", "E25")
+                        .param("numeroFactura", "FA-26-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/revision"));
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+    }
+
+    @Test
+    void elPasoDeEtiquetasHabilitaElBotonSinCamposCuandoLaDestinacionEstaSoportada() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApc(sesion, "JAPAN");
+
+        mvc.perform(get("/etiquetas").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(view().name("etiquetas"))
+                .andExpect(model().attribute("haySoportadas", true))
+                // APC no pide ningún archivo extra: sin campos que rellenar.
+                .andExpect(content().string(not(containsString("required"))))
+                .andExpect(content().string(not(containsString("disabled"))));
+    }
+
+    @Test
+    void elPasoDeEtiquetasDeshabilitaElBotonCuandoNingunaDestinacionEstaSoportada() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // IVRY es una destinación válida de APC para el packing list, pero
+        // sin etiquetas implementadas.
+        importarApc(sesion, "IVRY");
+
+        mvc.perform(get("/etiquetas").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(view().name("etiquetas"))
+                .andExpect(model().attribute("haySoportadas", false))
+                .andExpect(content().string(containsString("Ninguna destinación de este envío tiene etiquetas implementadas.")))
+                .andExpect(content().string(containsString("disabled")));
+    }
+
     @Test
     void descargarUnFicheroQueNoExisteDevuelve404() throws Exception {
         MockHttpSession sesion = new MockHttpSession();

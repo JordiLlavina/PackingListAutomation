@@ -380,6 +380,9 @@ public class PackingListController {
                         "nombre", destino.getNombreDestino(),
                         "soportado", generador.soportaDestino(destino.getNombreDestino())))
                 .toList());
+        boolean haySoportadas = destinos.stream()
+                .anyMatch(destino -> generador.soportaDestino(destino.getNombreDestino()));
+        model.addAttribute("haySoportadas", haySoportadas);
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
         return "etiquetas";
     }

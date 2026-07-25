@@ -29,10 +29,10 @@
                 <input type="file" th:id="${campo.nombre}" th:name="${campo.nombre}"
                        accept=".xlsx" required>
             </div>
-            <p th:if="${campos.isEmpty()}">
+            <p th:unless="${haySoportadas}">
                 Ninguna destinación de este envío tiene etiquetas implementadas.
             </p>
-            <button type="submit" th:disabled="${campos.isEmpty()}">Generar etiquetas</button>
+            <button type="submit" th:disabled="${!haySoportadas}">Generar etiquetas</button>
             <a class="boton secundario" th:href="@{/resultados}">Volver a resultados</a>
         </form>
     </section>
