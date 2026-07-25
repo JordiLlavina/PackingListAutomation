@@ -43,7 +43,7 @@ public class ApcEtiquetasExcelBuilder {
         try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
              XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
             escribirHojaCajas(hoja(libro, layout.hojaCajas(), layout), layout, cajas);
-            // Hoja de palet: Task 5.
+            escribirHojaPalets(hoja(libro, layout.hojaPalet(), layout), palets);
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             libro.write(salida);
             return salida.toByteArray();
@@ -132,5 +132,50 @@ public class ApcEtiquetasExcelBuilder {
                 dibujo.createPicture(ancla, indice);
             }
         }
+    }
+
+    private static void escribirHojaPalets(XSSFSheet hoja, List<EtiquetaPaletApc> palets) {
+        limpiarContadorManual(hoja);
+        if (palets.isEmpty()) {
+            // Sin palets no se sabe qué imprimir: la etiqueta modelo queda
+            // con los valores en blanco (el generador avisa).
+            escribir(hoja, ApcEtiquetaLayout.FILA_PALET_NUM_CAJAS, null);
+            escribir(hoja, ApcEtiquetaLayout.FILA_PALET_PESO, null);
+            return;
+        }
+        BloqueEtiquetaModelo modelo =
+                BloqueEtiquetaModelo.capturar(hoja, ApcEtiquetaLayout.ALTURA_BLOQUE_PALET);
+        for (int i = 1; i < palets.size(); i++) {
+            modelo.copiarEn(hoja, i * ApcEtiquetaLayout.ALTURA_BLOQUE_PALET);
+        }
+        replicarImagenes(hoja, ApcEtiquetaLayout.ALTURA_BLOQUE_PALET, palets.size());
+        for (int i = 0; i < palets.size(); i++) {
+            int base = i * ApcEtiquetaLayout.ALTURA_BLOQUE_PALET;
+            escribirNumero(hoja, base + ApcEtiquetaLayout.FILA_PALET_NUM_CAJAS,
+                    palets.get(i).numeroCajas());
+            escribir(hoja, base + ApcEtiquetaLayout.FILA_PALET_PESO,
+                    palets.get(i).poidsBrut());
+            if (i < palets.size() - 1) {
+                hoja.setRowBreak(base + ApcEtiquetaLayout.ALTURA_BLOQUE_PALET - 1);
+            }
+        }
+    }
+
+    /**
+     * La fila 1 de la hoja de palet trae una celda suelta con un contador
+     * apuntado a mano (E1/C1/D1 según plantilla) que no debe replicarse.
+     */
+    private static void limpiarContadorManual(XSSFSheet hoja) {
+        if (hoja.getRow(0) != null) {
+            hoja.getRow(0).forEach(Cell::setBlank);
+        }
+    }
+
+    private static void escribirNumero(XSSFSheet hoja, int fila, int valor) {
+        XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
+        Cell celda = f.getCell(ApcEtiquetaLayout.COL_VALOR) != null
+                ? f.getCell(ApcEtiquetaLayout.COL_VALOR)
+                : f.createCell(ApcEtiquetaLayout.COL_VALOR);
+        celda.setCellValue(valor);
     }
 }

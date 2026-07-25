@@ -83,6 +83,44 @@ class ApcEtiquetasExcelBuilderTest {
         }
     }
 
+    @Test
+    void generaUnaEtiquetaDePaletPorPaletConSaltoDePagina() throws IOException {
+        byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
+                List.of(etiqueta("1 / 1", "7,60 Kg")),
+                List.of(new EtiquetaPaletApc(9, "64,58 Kg"), new EtiquetaPaletApc(3, null)));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet palet = libro.getSheet("Etiquette Palette Bolloré");
+            // Palet 1: nº de cajas numérico en C13 y peso en C14.
+            assertEquals(9, palet.getRow(12).getCell(2).getNumericCellValue(), 0.001);
+            assertEquals("64,58 Kg", texto(palet, 13, 2));
+            // Palet 2 = bloque desplazado 14 filas; peso null en blanco.
+            assertEquals(3, palet.getRow(12 + 14).getCell(2).getNumericCellValue(), 0.001);
+            assertEquals("", texto(palet, 13 + 14, 2));
+            // Estáticos copiados y salto de página entre palets.
+            assertEquals("TOKYO", texto(palet, 9 + 14, 2));
+            assertTrue(palet.getRowBreaks().length >= 1);
+            assertEquals(13, palet.getRowBreaks()[0]);
+            // La celda suelta del contador manual de la fila 1 se limpia
+            // (en la plantilla de JAPAN es E1).
+            assertEquals("", texto(palet, 0, 4));
+        }
+    }
+
+    @Test
+    void sinPaletsLaHojaDePaletQuedaConLosValoresEnBlanco() throws IOException {
+        byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
+                List.of(etiqueta("1 / 1", "7,60 Kg")), List.of());
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet palet = libro.getSheet("Etiquette Palette Bolloré");
+            assertEquals("", texto(palet, 12, 2));
+            assertEquals("", texto(palet, 13, 2));
+        }
+        // Copia para inspección manual, como hace el e2e de packing lists.
+        java.nio.file.Files.createDirectories(java.nio.file.Path.of("target"));
+        java.nio.file.Files.write(
+                java.nio.file.Path.of("target", "etiquetas-apc-japan.xlsx"), excel);
+    }
+
     static XSSFWorkbook abrir(byte[] contenido) throws IOException {
         return new XSSFWorkbook(new ByteArrayInputStream(contenido));
     }
