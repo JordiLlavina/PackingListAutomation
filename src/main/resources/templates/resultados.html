@@ -12,6 +12,13 @@
     <!-- Sección 1: los packing lists generados -->
     <section class="tarjeta seccion-salida">
         <h3 class="titulo-seccion">📦 Packing Lists</h3>
+
+        <!-- Destinaciones sin datos configurados: se avisan, no bloquean. -->
+        <div th:if="${!avisosGeneracion.isEmpty()}">
+            <div class="alerta" th:each="aviso : ${avisosGeneracion}"
+                 th:text="${aviso}"></div>
+        </div>
+
         <p>
             <span th:text="${excels.size()}"></span> packing lists generados.
         </p>

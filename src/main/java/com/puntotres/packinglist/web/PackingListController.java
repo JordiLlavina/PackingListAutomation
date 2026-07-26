@@ -258,6 +258,7 @@ public class PackingListController {
         aplicarPesosYReinferir(revisionForm);
 
         List<ExcelGenerado> excels = new ArrayList<>();
+        List<String> avisosGeneracion = new ArrayList<>();
         VolcadoErpData volcado;
         try {
             DatosEnvio cabecera = envioEnCurso.getCabecera();
@@ -266,9 +267,21 @@ public class PackingListController {
                             "Cliente desconocido: " + cabecera.getClaveCliente()));
             List<CajaData> todasLasCajas = new ArrayList<>();
             for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
-                excels.addAll(generador.generar(
-                        destino.getDestino(), destino.getPalets(), cabecera, cliente));
-                todasLasCajas.addAll(destino.getDestino().getCajas());
+                DestinoData datos = destino.getDestino();
+                // Cliente con catálogo de destinos (APC): una destinación
+                // fuera del catálogo no tiene datos con que rellenar su
+                // plantilla; se avisa y se salta en vez de abortar el envío.
+                if (!cliente.getDestinos().isEmpty()
+                        && cliente.destinoPara(datos.getNombreDestino()).isEmpty()) {
+                    avisosGeneracion.add("Destinación '" + datos.getNombreDestino()
+                            + "' sin datos configurados para " + cliente.getNombre()
+                            + ": packing no generado");
+                    // El volcado ERP es del envío completo: sus cajas cuentan igual.
+                    todasLasCajas.addAll(datos.getCajas());
+                    continue;
+                }
+                excels.addAll(generador.generar(datos, destino.getPalets(), cabecera, cliente));
+                todasLasCajas.addAll(datos.getCajas());
             }
             // El volcado ERP agrupa TODAS las cajas del envío (todas las
             // destinaciones) por referencia+talla+color, un excel por envío.
@@ -278,8 +291,15 @@ public class PackingListController {
                     "No se pudieron generar los excels: " + e.getMessage());
             return "redirect:/revision";
         }
+        if (excels.isEmpty() && !avisosGeneracion.isEmpty()) {
+            redirect.addFlashAttribute("error", "No se pudo generar ningún packing list. "
+                    + String.join(" · ", avisosGeneracion));
+            return "redirect:/revision";
+        }
         envioEnCurso.getExcels().clear();
         envioEnCurso.getExcels().addAll(excels);
+        envioEnCurso.getAvisosGeneracion().clear();
+        envioEnCurso.getAvisosGeneracion().addAll(avisosGeneracion);
         envioEnCurso.setVolcadoErp(volcado);
         // Regenerar invalida las etiquetas ya hechas (pesos/cajas cambiados).
         envioEnCurso.getEtiquetas().clear();
@@ -298,6 +318,7 @@ public class PackingListController {
             return "redirect:/revision";
         }
         model.addAttribute("excels", envioEnCurso.getExcels());
+        model.addAttribute("avisosGeneracion", envioEnCurso.getAvisosGeneracion());
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
         model.addAttribute("volcadoErp", envioEnCurso.getVolcadoErp());
         model.addAttribute("etiquetas", envioEnCurso.getEtiquetas());

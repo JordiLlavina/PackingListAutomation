@@ -29,6 +29,7 @@ public class EnvioEnCurso {
     private final List<String> avisosInferencia = new ArrayList<>();
     private final List<CajaData> cajasSinPalet = new ArrayList<>();
     private final List<ExcelGenerado> excels = new ArrayList<>();
+    private final List<String> avisosGeneracion = new ArrayList<>();
     private VolcadoErpData volcadoErp;
     private final List<ExcelGenerado> etiquetas = new ArrayList<>();
     private final List<String> avisosEtiquetas = new ArrayList<>();
@@ -45,6 +46,7 @@ public class EnvioEnCurso {
         avisosInferencia.clear();
         cajasSinPalet.clear();
         excels.clear();
+        avisosGeneracion.clear();
         volcadoErp = null;
         etiquetas.clear();
         avisosEtiquetas.clear();
@@ -60,6 +62,7 @@ public class EnvioEnCurso {
     public List<String> getAvisosInferencia() { return avisosInferencia; }
     public List<CajaData> getCajasSinPalet() { return cajasSinPalet; }
     public List<ExcelGenerado> getExcels() { return excels; }
+    public List<String> getAvisosGeneracion() { return avisosGeneracion; }
 
     public VolcadoErpData getVolcadoErp() { return volcadoErp; }
     public void setVolcadoErp(VolcadoErpData volcadoErp) { this.volcadoErp = volcadoErp; }

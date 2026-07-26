@@ -643,6 +643,66 @@ class PackingListControllerTest {
                 .andExpect(content().string(containsString("disabled")));
     }
 
+    // --- destinaciones sin configurar (clientes con catálogo de destinos) ---
+
+    /** Dos destinaciones APC: JAPAN (configurada) y AUSTRALIA (desconocida). */
+    private static final String JSON_APC_JAPAN_Y_AUSTRALIA = """
+            {"cliente": "APC", "destinos": [
+              {"destino": "JAPAN",
+               "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
+               "referencias": [{"referencia": "PXCBC-F67008", "modelo": "LE NEIGE",
+                 "pedido": "4100128683", "canal": "JAPAN", "color": "LZZ-NOIR",
+                 "medidaCaja": "60x40x40", "cantidadTotal": 10,
+                 "cajas": [{"caja": 1, "unidades": 10, "pesoBruto": 3.5}]}]},
+              {"destino": "AUSTRALIA",
+               "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
+               "referencias": [{"referencia": "PXBHZ-H65077", "modelo": "CEINTURE PARIS",
+                 "pedido": "4100128721", "canal": "AUSTRALIA", "color": "LZZ-NOIR",
+                 "medidaCaja": "60x40x40", "talla": "95", "cantidadTotal": 3,
+                 "cajas": [{"caja": 1, "unidades": 3, "pesoBruto": 1.4}]}]}
+            ]}
+            """;
+
+    private void importarJsonApc(MockHttpSession sesion, String json) throws Exception {
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "APC")
+                        .param("json", json)
+                        .param("temporada", "E25")
+                        .param("numeroFactura", "FA-26-2")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+    }
+
+    @Test
+    void unaDestinacionSinConfigurarAvisaYGeneraLasDemas() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarJsonApc(sesion, JSON_APC_JAPAN_Y_AUSTRALIA);
+
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+
+        // JAPAN se genera; AUSTRALIA sale como aviso, no como error.
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("PKL_APC_JAPAN_FA-26-2.xlsx")))
+                .andExpect(content().string(containsString("AUSTRALIA")))
+                .andExpect(content().string(containsString("packing no generado")));
+    }
+
+    @Test
+    void sinNingunaDestinacionConfiguradaVuelveARevisionConElError() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // Solo AUSTRALIA: no hay nada que generar.
+        importarJsonApc(sesion, JSON_APC_JAPAN_Y_AUSTRALIA
+                .replace("\"JAPAN\"", "\"RETAIL\""));
+
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/revision"))
+                .andExpect(flash().attribute("error", containsString("packing no generado")))
+                .andExpect(flash().attribute("error", containsString("AUSTRALIA")));
+    }
+
     @Test
     void descargarUnFicheroQueNoExisteDevuelve404() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
