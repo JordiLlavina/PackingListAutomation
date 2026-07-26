@@ -18,6 +18,7 @@ import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
 
 import static com.puntotres.packinglist.testutil.TestDatos.caja;
+import static com.puntotres.packinglist.testutil.TestDatos.cajaConTalla;
 import static com.puntotres.packinglist.testutil.TestDatos.palet;
 
 /**
@@ -130,5 +131,33 @@ class GenericoExcelBuilderTest {
             assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());    // TOTAL CARTONS
             assertEquals("3 (60x40x40cm)", hoja.getRow(16).getCell(8).getStringCellValue()); // DIMENTIONS
         }
+    }
+
+    /** Caja 3 partida en dos tallas: el peso de la caja vive en su líder. */
+    private static DestinoData destinoConCajaMixta(Double brutoLider) {
+        DestinoData destino = destino();
+        CajaData lider = cajaConTalla(3, "250121", "A204", "BROWN", "85", 2, null, brutoLider);
+        lider.setNumeroPalet(2);
+        CajaData segunda = cajaConTalla(3, "250121", "A204", "BROWN", "90", 2, null, null);
+        segunda.setNumeroPalet(2);
+        destino.setCajas(List.of(destino.getCajas().get(0), destino.getCajas().get(1), lider, segunda));
+        return destino;
+    }
+
+    @Test
+    void lasLineasExtraDeUnaCajaMixtaNoCuentanComoPendientes() throws Exception {
+        List<ExcelGenerado> excels = builder.generar(destinoConCajaMixta(9.0), palets(), envio(), ackermann());
+
+        assertTrue(excels.get(0).getCajasPendientes().isEmpty(),
+                "el peso de la caja 3 está en su línea líder: no hay nada pendiente");
+    }
+
+    @Test
+    void unaCajaMixtaSinPesoCuentaUnaSolaVez() throws Exception {
+        List<ExcelGenerado> excels = builder.generar(destinoConCajaMixta(null), palets(), envio(), ackermann());
+
+        List<CajaData> pendientes = excels.get(0).getCajasPendientes();
+        assertEquals(1, pendientes.size(), "una entrada por caja física, no por línea");
+        assertEquals(3, pendientes.get(0).getNumeroCaja());
     }
 }

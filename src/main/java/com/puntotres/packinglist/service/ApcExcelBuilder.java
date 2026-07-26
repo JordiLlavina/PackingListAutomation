@@ -110,8 +110,13 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
             wb.setForceFormulaRecalculation(true);
             wb.write(salida);
 
-            List<CajaData> pendientes = destino.getCajas().stream()
-                    .filter(c -> !c.tienePesosCompletos())
+            // Pendiente = caja FÍSICA cuyo peso queda en blanco en el excel:
+            // una entrada por nº de caja (no por línea) y solo el bruto, que
+            // es lo único que escribe esta plantilla (no hay columna de neto).
+            List<CajaData> pendientes = bloques.stream()
+                    .flatMap(bloque -> bloque.cajas().stream())
+                    .filter(caja -> caja.pesoBrutoTotal() == null)
+                    .map(caja -> caja.lineas().get(0))
                     .toList();
             String nombreFichero = ("PKL_APC_" + destino.getNombreDestino() + "_"
                     + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");

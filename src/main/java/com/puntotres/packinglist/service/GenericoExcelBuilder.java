@@ -108,14 +108,29 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
             wb.setForceFormulaRecalculation(true);
             wb.write(salida);
 
-            List<CajaData> pendientes = destino.getCajas().stream()
-                    .filter(c -> !c.tienePesosCompletos())
-                    .toList();
             String nombreFichero = ("PKL_" + destino.getNombreDestino() + "_"
                     + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
             return List.of(new ExcelGenerado(destino.getNombreDestino(), nombreFichero,
-                    salida.toByteArray(), pendientes));
+                    salida.toByteArray(), cajasPendientes(destino)));
         }
+    }
+
+    /**
+     * Cajas que salen sin peso en el excel. El peso es de la caja FÍSICA y
+     * vive en su línea líder (referencia+color+nº de caja, la misma identidad
+     * que usan la inferencia y la pantalla de revisión): las líneas extra de
+     * una caja mixta van sin peso a propósito y no cuentan aparte. Solo se
+     * mira el bruto, que es lo único que escribe esta plantilla.
+     */
+    private static List<CajaData> cajasPendientes(DestinoData destino) {
+        Map<String, CajaData> liderPorCajaFisica = new LinkedHashMap<>();
+        for (CajaData caja : destino.getCajas()) {
+            liderPorCajaFisica.putIfAbsent(caja.getReferencia() + "|" + caja.getCodigoColor()
+                    + "|" + caja.getNumeroCaja(), caja);
+        }
+        return liderPorCajaFisica.values().stream()
+                .filter(caja -> caja.getPesoBrutoKg() == null)
+                .toList();
     }
 
     private InputStream abrirPlantilla() {
