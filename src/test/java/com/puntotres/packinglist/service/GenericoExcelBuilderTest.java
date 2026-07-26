@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayInputStream;
 import java.util.List;
 
+import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -150,6 +151,14 @@ class GenericoExcelBuilderTest {
 
         assertTrue(excels.get(0).getCajasPendientes().isEmpty(),
                 "el peso de la caja 3 está en su línea líder: no hay nada pendiente");
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            // La caja 3 ocupa dos filas (idx 24 y 25) pero pesa una sola vez.
+            assertEquals(9.0, hoja.getRow(24).getCell(7).getNumericCellValue());
+            assertEquals(CellType.BLANK, hoja.getRow(25).getCell(7).getCellType());
+            // Y cuenta como UN cartón, no como dos.
+            assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());
+        }
     }
 
     @Test

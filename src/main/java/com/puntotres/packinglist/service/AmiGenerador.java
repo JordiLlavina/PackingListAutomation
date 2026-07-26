@@ -15,6 +15,7 @@ import com.puntotres.packinglist.PackingListData;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
@@ -64,15 +65,12 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             String referencia = cajas.get(0).getReferencia();
             String color = cajas.get(0).getCodigoColor();
 
-            // Una caja física está pendiente si su línea líder (la primera de
-            // su nº de caja) no tiene los dos pesos; las demás líneas de una
-            // caja mixta comparten ese peso y no cuentan por separado.
-            Map<Integer, CajaData> liderPorNumeroCaja = new LinkedHashMap<>();
-            for (CajaData c : cajas) {
-                liderPorNumeroCaja.putIfAbsent(c.getNumeroCaja(), c);
-            }
-            List<CajaData> pendientes = liderPorNumeroCaja.values().stream()
-                    .filter(c -> !c.tienePesosCompletos())
+            // Una caja física está pendiente si su línea líder no tiene los
+            // dos pesos; las demás líneas de una caja mixta comparten ese
+            // peso y no cuentan por separado.
+            List<CajaData> pendientes = CajaFisica.agrupar(cajas).stream()
+                    .filter(caja -> !caja.tienePesosCompletos())
+                    .map(CajaFisica::lider)
                     .toList();
 
             boolean esCinturon = referencia.startsWith(CajaData.PREFIJO_CINTURON);
@@ -133,22 +131,18 @@ public class AmiGenerador implements GeneradorPackingListCliente {
      * pesan juntas una sola vez), así que sus celdas de peso quedan a null.
      */
     private List<PackingListData.Caja> mapearCajasCinturon(List<CajaData> cajas) {
-        Map<Integer, List<CajaData>> porNumeroCaja = new LinkedHashMap<>();
-        for (CajaData caja : cajas) {
-            porNumeroCaja.computeIfAbsent(caja.getNumeroCaja(), n -> new ArrayList<>()).add(caja);
-        }
-
         List<PackingListData.Caja> filas = new ArrayList<>();
-        for (List<CajaData> entradas : porNumeroCaja.values()) {
-            CajaData primera = entradas.get(0);
+        for (CajaFisica cajaFisica : CajaFisica.agrupar(cajas)) {
+            List<CajaData> entradas = cajaFisica.lineas();
+            CajaData primera = cajaFisica.lider();
             PackingListData.Caja fila = new PackingListData.Caja();
             fila.setNumeroCaja(primera.getNumeroCaja());
             fila.setNumeroPedido(primera.getNumeroPedido());
             fila.setReferencia(primera.getReferencia());
             fila.setCodigoColor(primera.getCodigoColor());
             fila.setTamanoCaja(primera.getTamanoCaja());
-            fila.setPesoNetoKg(primera.getPesoNetoKg());
-            fila.setPesoBrutoKg(primera.getPesoBrutoKg());
+            fila.setPesoNetoKg(cajaFisica.pesoNetoKg());
+            fila.setPesoBrutoKg(cajaFisica.pesoBrutoKg());
 
             Map<String, Integer> cantidadesPorTalla = new LinkedHashMap<>();
             for (CajaData entrada : entradas) {

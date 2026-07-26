@@ -24,6 +24,7 @@ import com.puntotres.packinglist.VolumenUtil;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
@@ -116,20 +117,14 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
     }
 
     /**
-     * Cajas que salen sin peso en el excel. El peso es de la caja FÍSICA y
-     * vive en su línea líder (referencia+color+nº de caja, la misma identidad
-     * que usan la inferencia y la pantalla de revisión): las líneas extra de
-     * una caja mixta van sin peso a propósito y no cuentan aparte. Solo se
-     * mira el bruto, que es lo único que escribe esta plantilla.
+     * Cajas que salen sin peso en el excel: una entrada por caja FÍSICA (no
+     * por línea) cuya líder no trae peso. Solo se mira el bruto, que es lo
+     * único que escribe esta plantilla.
      */
     private static List<CajaData> cajasPendientes(DestinoData destino) {
-        Map<String, CajaData> liderPorCajaFisica = new LinkedHashMap<>();
-        for (CajaData caja : destino.getCajas()) {
-            liderPorCajaFisica.putIfAbsent(caja.getReferencia() + "|" + caja.getCodigoColor()
-                    + "|" + caja.getNumeroCaja(), caja);
-        }
-        return liderPorCajaFisica.values().stream()
-                .filter(caja -> caja.getPesoBrutoKg() == null)
+        return CajaFisica.agrupar(destino.getCajas()).stream()
+                .filter(caja -> caja.pesoBrutoKg() == null)
+                .map(CajaFisica::lider)
                 .toList();
     }
 
@@ -208,24 +203,30 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
         }
         idx++;
 
-        for (CajaData caja : cajas) {
-            Row filaDato = (idx == IDX_FILA_DATO_MODELO) ? filaDatoModelo
-                    : crearFilaConEstilo(hoja, idx, estiloDato, alturaDato);
-            filaDato.getCell(COL_BOX_NUM).setCellValue(caja.getNumeroCaja());
-            filaDato.getCell(COL_REFERENCIA).setCellValue(caja.getReferencia());
-            if (caja.getModelo() != null) {
-                filaDato.getCell(COL_MODELO).setCellValue(caja.getModelo());
+        for (CajaFisica cajaFisica : CajaFisica.agrupar(cajas)) {
+            // El peso de la caja va solo en su primera fila: las demás
+            // líneas de una caja mixta comparten ese peso, no suman.
+            boolean primeraLinea = true;
+            for (CajaData caja : cajaFisica.lineas()) {
+                Row filaDato = (idx == IDX_FILA_DATO_MODELO) ? filaDatoModelo
+                        : crearFilaConEstilo(hoja, idx, estiloDato, alturaDato);
+                filaDato.getCell(COL_BOX_NUM).setCellValue(caja.getNumeroCaja());
+                filaDato.getCell(COL_REFERENCIA).setCellValue(caja.getReferencia());
+                if (caja.getModelo() != null) {
+                    filaDato.getCell(COL_MODELO).setCellValue(caja.getModelo());
+                }
+                if (envio.getTemporada() != null) {
+                    filaDato.getCell(COL_TEMPORADA).setCellValue(envio.getTemporada());
+                }
+                filaDato.getCell(COL_COLOR).setCellValue(caja.getCodigoColor());
+                filaDato.getCell(COL_UNIDADES).setCellValue(caja.getCantidad());
+                if (primeraLinea && cajaFisica.pesoBrutoKg() != null) {
+                    filaDato.getCell(COL_PESO).setCellValue(cajaFisica.pesoBrutoKg());
+                }
+                filaDato.getCell(COL_TAMANO).setCellValue(caja.getTamanoCaja());
+                primeraLinea = false;
+                idx++;
             }
-            if (envio.getTemporada() != null) {
-                filaDato.getCell(COL_TEMPORADA).setCellValue(envio.getTemporada());
-            }
-            filaDato.getCell(COL_COLOR).setCellValue(caja.getCodigoColor());
-            filaDato.getCell(COL_UNIDADES).setCellValue(caja.getCantidad());
-            if (caja.getPesoBrutoKg() != null) {
-                filaDato.getCell(COL_PESO).setCellValue(caja.getPesoBrutoKg());
-            }
-            filaDato.getCell(COL_TAMANO).setCellValue(caja.getTamanoCaja());
-            idx++;
         }
         return idx;
     }
@@ -268,10 +269,14 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
         filaTotal.getCell(COL_PESO).setCellFormula(
                 "SUM(" + letraPeso + primeraFilaExcel + ":" + letraPeso + ultimaFilaExcel + ")");
 
-        List<CajaData> cajas = destino.getCajas();
-        double pesoCartones = cajas.stream().filter(c -> c.getPesoBrutoKg() != null)
-                .mapToDouble(CajaData::getPesoBrutoKg).sum();
-        double volumenCartones = VolumenUtil.volumenTotalM3(cajas.stream().map(CajaData::getTamanoCaja).toList());
+        // Todo el resumen va por caja FÍSICA, no por línea: una caja mixta
+        // (varias líneas con el mismo nº de caja) es un solo cartón, pesa
+        // una sola vez (el peso de su línea líder) y ocupa un volumen.
+        List<CajaFisica> cajas = CajaFisica.agrupar(destino.getCajas());
+        double pesoCartones = cajas.stream().filter(c -> c.pesoBrutoKg() != null)
+                .mapToDouble(CajaFisica::pesoBrutoKg).sum();
+        List<String> medidas = cajas.stream().map(c -> c.lider().getTamanoCaja()).toList();
+        double volumenCartones = VolumenUtil.volumenTotalM3(medidas);
         double pesoTotal = pesoCartones + sumaTaras;
 
         // Bloque SHIPMENT DETAILS (I12-I17): mismas filas para cualquier
@@ -280,8 +285,7 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
         celda(hoja, 12, 8).setCellValue(redondear2(pesoTotal) + " Kg");      // TOTAL GROSS WEIGHT
         celda(hoja, 13, 8).setCellValue(redondear2(volumenCartones) + " m3"); // TOTAL VOLUME
         celda(hoja, 15, 8).setCellValue(cajas.size());                       // TOTAL CARTONS
-        celda(hoja, 16, 8).setCellValue(
-                ResumenUtil.resumenConteo(cajas.stream().map(CajaData::getTamanoCaja).toList())); // CARTON DIMENTIONS
+        celda(hoja, 16, 8).setCellValue(ResumenUtil.resumenConteo(medidas)); // CARTON DIMENTIONS
     }
 
     private static double redondear2(double valor) {

@@ -47,8 +47,14 @@ queda pendiente y lo completa la aplicación (tabla de taras de
 `application.yml` + pesos tecleados en la pantalla de revisión). El peso neto
 NUNCA viene en el JSON: se deriva del bruto menos la tara. En un rango el
 `pesoBruto` aplica a cada una de sus cajas; en una caja mixta (mismo nº de
-caja en varias entradas de talla/color) se pone una sola vez, en la primera
-entrada, porque la caja se pesa entera una vez.
+caja en varias entradas de talla/color/referencia) se pone una sola vez, en
+la primera entrada, y es el peso del bulto ENTERO, porque la caja se pesa
+entera una vez.
+
+Esta regla vale para **todos los clientes** y para ambas salidas (packing
+list y etiquetas): las líneas de una caja nunca se suman entre sí y las que
+no son la primera no aportan peso. Si la primera línea no trae peso, la caja
+queda pendiente aunque otra línea sí lo traiga.
 
 Una misma caja física puede aparecer en VARIAS entradas de `referencias`
 (mismo número de caja): caja mixta de dos colores, cinturones con varias

@@ -65,16 +65,20 @@ class ApcExcelBuilderTest {
         return linea;
     }
 
-    /** 2 cajas de bolsos en el palet 1 y una caja de cinturones de 3 líneas en el 2. */
+    /**
+     * 2 cajas de bolsos en el palet 1 y una caja de cinturones de 3 líneas
+     * en el 2. El peso de la caja 3 (15.26 kg del bulto entero) va una sola
+     * vez, en su primera línea: es la convención de entrada del JSON.
+     */
     private static DestinoData destinoIvry() {
         DestinoData destino = new DestinoData();
         destino.setNombreDestino("IVRY");
         destino.setCajas(List.of(
                 linea(1, 1, "LE NEIGE", "PXCBC-F67008", "WHOLESALE", null, 11, 8.18),
                 linea(2, 1, "LE NEIGE", "PXCBC-F67008", "WHOLESALE", null, 11, 8.18),
-                linea(3, 2, "CEINTURE PARIS", "PXBHZ-H65077", "WHOLESALE", "85", 7, 5.0),
-                linea(3, 2, "CEINTURE PARIS", "PXBHZ-H65077", "WHOLESALE", "90", 8, 6.0),
-                linea(3, 2, "CEINTURE PARIS", "PXBHZ-H65077", "AUSTRALIA", "85", 5, 4.26)));
+                linea(3, 2, "CEINTURE PARIS", "PXBHZ-H65077", "WHOLESALE", "85", 7, 15.26),
+                linea(3, 2, "CEINTURE PARIS", "PXBHZ-H65077", "WHOLESALE", "90", 8, null),
+                linea(3, 2, "CEINTURE PARIS", "PXBHZ-H65077", "AUSTRALIA", "85", 5, null)));
         return destino;
     }
 
@@ -173,29 +177,23 @@ class ApcExcelBuilderTest {
     }
 
     /**
-     * Las cajas pendientes son las que salen SIN peso en el excel, y el peso
-     * es de la caja física entera: las líneas extra de una caja mixta no
-     * cuentan por separado (tras la inferencia solo la línea líder lleva el
-     * neto, y APC ni siquiera escribe el neto).
+     * El peso es de la caja física y viene UNA sola vez, en su primera
+     * línea: las demás líneas de una caja mixta no aportan peso ni cuentan
+     * como pendientes.
      */
     @Test
-    void unaCajaMixtaConElBrutoEnTodasSusLineasNoQuedaPendiente() throws Exception {
-        DestinoData destino = destinoIvry();
-        destino.getCajas().get(3).setPesoNetoKg(null); // 2ª línea de la caja 3
-        destino.getCajas().get(4).setPesoNetoKg(null); // 3ª línea de la caja 3
-
-        List<ExcelGenerado> excels = builder.generar(destino, palets(), envio(), apc());
+    void unaCajaMixtaConSuPesoEnLaPrimeraLineaNoQuedaPendiente() throws Exception {
+        List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());
 
         assertTrue(excels.get(0).getCajasPendientes().isEmpty(),
-                "la caja 3 tiene el bruto de todas sus líneas: su peso sale en el excel");
+                "la caja 3 lleva su peso en la primera línea: no está pendiente");
     }
 
     @Test
-    void unaCajaSinPesoCuentaUnaSolaVezAunqueTengaVariasLineas() throws Exception {
+    void unaCajaSinPesoEnSuLiderCuentaUnaSolaVez() throws Exception {
         DestinoData destino = destinoIvry();
-        destino.getCajas().get(3).setPesoNetoKg(null);  // 2ª línea: solo bruto
-        destino.getCajas().get(4).setPesoNetoKg(null);  // 3ª línea: sin ningún
-        destino.getCajas().get(4).setPesoBrutoKg(null); // peso -> caja 3 en blanco
+        destino.getCajas().get(2).setPesoBrutoKg(null); // líder de la caja 3
+        destino.getCajas().get(2).setPesoNetoKg(null);
 
         List<ExcelGenerado> excels = builder.generar(destino, palets(), envio(), apc());
 

@@ -1,6 +1,6 @@
 # Peso único por caja física, unificado para todos los clientes — diseño
 
-Fecha: 2026-07-26 · Estado: aprobado
+Fecha: 2026-07-26 · Estado: implementado (2026-07-26)
 
 ## Objetivo
 

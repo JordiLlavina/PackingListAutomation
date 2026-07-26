@@ -575,32 +575,26 @@ public class PackingListController {
         for (int i = 0; i < destinos.size(); i++) {
             List<CajaData> cajas = destinos.get(i).getDestino().getCajas();
 
-            // El peso es de la caja física entera y solo lo lleva su primera
-            // línea (la "líder"). Una caja física es la combinación
-            // referencia+color+nº de caja: las tallas de una misma caja mixta
-            // comparten líder (un solo peso, misma fila del excel), mientras
-            // que el mismo nº de caja en otro color/referencia va a otro excel
-            // y es líder de su propia caja física (edita su propio peso).
-            Map<String, CajaData> liderPorCaja = new LinkedHashMap<>();
+            // El peso es de la caja física entera (un bulto = un numeroCaja)
+            // y solo lo lleva su primera línea, la "líder": es la única con
+            // campos de peso editables. Las demás líneas de la caja —otras
+            // tallas, colores o referencias del mismo bulto— comparten ese
+            // peso y no se editan por separado.
+            Map<Integer, CajaData> liderPorCaja = new LinkedHashMap<>();
             for (CajaData caja : cajas) {
-                liderPorCaja.putIfAbsent(claveCajaFisica(caja), caja);
+                liderPorCaja.putIfAbsent(caja.getNumeroCaja(), caja);
             }
 
             List<FilaCaja> filas = new ArrayList<>();
             for (int j = 0; j < cajas.size(); j++) {
                 CajaData caja = cajas.get(j);
-                CajaData lider = liderPorCaja.get(claveCajaFisica(caja));
+                CajaData lider = liderPorCaja.get(caja.getNumeroCaja());
                 filas.add(new FilaCaja(indiceGlobal++, j, caja,
                         lider == caja, !lider.tienePesosCompletos()));
             }
             vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(), filas));
         }
         return vista;
-    }
-
-    /** Identidad de la caja física dentro de su excel: referencia+color+nº. */
-    private static String claveCajaFisica(CajaData caja) {
-        return caja.getReferencia() + "|" + caja.getCodigoColor() + "|" + caja.getNumeroCaja();
     }
 
     /** Una destinación en la pantalla de revisión. */

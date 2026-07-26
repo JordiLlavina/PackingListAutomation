@@ -14,6 +14,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.service.EnvioImportado;
@@ -97,20 +98,17 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                                          AmiPedidoExcel pedido, DatosEnvio envio,
                                          List<String> avisos) throws IOException {
         // Una caja física por numeroCaja, en orden ascendente.
-        Map<Integer, List<CajaData>> porNumero = new LinkedHashMap<>();
-        destino.getCajas().stream()
+        List<CajaFisica> cajasFisicas = CajaFisica.agrupar(destino.getCajas().stream()
                 .sorted(Comparator.comparingInt(CajaData::getNumeroCaja))
-                .forEach(caja -> porNumero
-                        .computeIfAbsent(caja.getNumeroCaja(), n -> new ArrayList<>())
-                        .add(caja));
+                .toList());
 
         List<EtiquetaCaja> etiquetas = new ArrayList<>();
         List<CajaData> cajasPendientes = new ArrayList<>();
         int posicion = 0;
-        int total = porNumero.size();
-        for (List<CajaData> lineas : porNumero.values()) {
+        int total = cajasFisicas.size();
+        for (CajaFisica caja : cajasFisicas) {
             posicion++;
-            etiquetas.add(etiquetaDe(lineas, posicion, total, layout, pedido, envio,
+            etiquetas.add(etiquetaDe(caja, posicion, total, layout, pedido, envio,
                     destino.getNombreDestino(), avisos, cajasPendientes));
         }
 
@@ -121,11 +119,12 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 contenido, cajasPendientes);
     }
 
-    private EtiquetaCaja etiquetaDe(List<CajaData> lineas, int posicion, int total,
+    private EtiquetaCaja etiquetaDe(CajaFisica caja, int posicion, int total,
                                     AmiEtiquetaLayout layout, AmiPedidoExcel pedido,
                                     DatosEnvio envio, String nombreDestino,
                                     List<String> avisos, List<CajaData> cajasPendientes) {
-        CajaData lider = lineas.get(0);
+        List<CajaData> lineas = caja.lineas();
+        CajaData lider = caja.lider();
 
         // Caja mixta de verdad (varias referencias o colores): el spec no la
         // contempla para etiquetas; se etiqueta con la primera y se avisa.
@@ -159,23 +158,10 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             cantidad = String.valueOf(lineas.stream().mapToInt(CajaData::getCantidad).sum());
         }
 
-        // El peso es de la caja física y lo lleva la línea líder de cada
-        // referencia+color (las demás tallas van a null).
-        Double peso = null;
-        boolean pesoCompleto = true;
-        Set<String> vistos = new LinkedHashSet<>();
-        for (CajaData linea : lineas) {
-            if (!vistos.add(claveRefColor(linea))) {
-                continue;
-            }
-            if (linea.getPesoBrutoKg() == null) {
-                pesoCompleto = false;
-            } else {
-                peso = (peso == null ? 0 : peso) + linea.getPesoBrutoKg();
-            }
-        }
-        if (!pesoCompleto) {
-            peso = null;
+        // El peso es de la caja física ENTERA y viene una sola vez, en su
+        // línea líder; las demás líneas no aportan peso.
+        Double peso = caja.pesoBrutoKg();
+        if (peso == null) {
             cajasPendientes.add(lider);
         }
 

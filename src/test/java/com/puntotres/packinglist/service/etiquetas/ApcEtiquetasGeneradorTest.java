@@ -114,16 +114,32 @@ class ApcEtiquetasGeneradorTest {
         // 85 (5u de otro pedido/canal) de la misma referencia y color.
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         destino("JAPAN", List.of(palet(1, 3, 3, null)),
-                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 2.0, 1),
-                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "90", 8, 2.5, 1),
-                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 5, 1.5, 1))),
+                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 6.0, 1),
+                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "90", 8, null, 1),
+                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 5, null, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
         assertEquals("85-90", texto(hoja, 13, 2));
         assertEquals("12-85,8-90", texto(hoja, 14, 2));
-        // El peso es de la caja física entera: 2.0 + 2.5 + 1.5.
+        // El peso de la caja entera viene una sola vez, en su primera línea.
         assertEquals("6,00 Kg", texto(hoja, 18, 2));
         assertEquals("1 / 1", texto(hoja, 17, 2));
+    }
+
+    @Test
+    void elPaletSumaUnPesoPorCajaFisicaNoPorLinea() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("JAPAN", List.of(palet(1, 1, 1, 8.04)),
+                                caja(1, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 6.0, 1),
+                                caja(1, "PXBHZ-H65077", "LZZ-NOIR", "90", 8, null, 1))),
+                envio(), Map.of());
+
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
+            assertEquals("14,04 Kg", texto(palet, 13, 2)); // 6.0 + 8.04 de tara
+        }
+        assertTrue(resultado.getAvisos().stream().noneMatch(a -> a.contains("sin peso")));
     }
 
     @Test

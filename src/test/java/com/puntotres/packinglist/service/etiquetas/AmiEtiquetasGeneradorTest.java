@@ -127,6 +127,21 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
+    void unaCajaConVariasReferenciasPesaLoQueDigaSuLineaLider() throws IOException {
+        // Un solo peso por caja física, en su primera línea, aunque la caja
+        // mezcle referencias: las demás líneas no aportan peso.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665"),
+                        caja(1, "USL728.AL0217", "001", null, 10, null, "07685")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals("5,28 KGS", texto(libro.getSheetAt(0), 14, 2));
+        }
+        assertTrue(resultado.getExcels().get(0).getCajasPendientes().isEmpty());
+    }
+
+    @Test
     void cinturonDeTallaUnicaLlevaCantidadSimple() throws IOException {
         // Una sola talla en la caja: SIZE la talla y QUANTITY a secas (los
         // pares cantidad-talla son solo del caso especial multi-talla).

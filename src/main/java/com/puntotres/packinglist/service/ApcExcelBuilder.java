@@ -27,6 +27,7 @@ import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.DestinoClienteConfig;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
@@ -115,8 +116,8 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
             // es lo único que escribe esta plantilla (no hay columna de neto).
             List<CajaData> pendientes = bloques.stream()
                     .flatMap(bloque -> bloque.cajas().stream())
-                    .filter(caja -> caja.pesoBrutoTotal() == null)
-                    .map(caja -> caja.lineas().get(0))
+                    .filter(caja -> caja.pesoBrutoKg() == null)
+                    .map(CajaFisica::lider)
                     .toList();
             String nombreFichero = ("PKL_APC_" + destino.getNombreDestino() + "_"
                     + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
@@ -151,25 +152,7 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
         celda(hoja, 13, 15).setCellValue(envio.getNumeroFactura());         // P14
     }
 
-    /**
-     * Un palet y sus cajas físicas: cada caja física agrupa las entradas
-     * del JSON que comparten número de caja (varias filas de excel).
-     */
-    private record CajaFisica(int numeroCaja, List<CajaData> lineas) {
-
-        /** Peso de la caja entera: suma de sus líneas; null si falta alguno. */
-        Double pesoBrutoTotal() {
-            double total = 0;
-            for (CajaData linea : lineas) {
-                if (linea.getPesoBrutoKg() == null) {
-                    return null;
-                }
-                total += linea.getPesoBrutoKg();
-            }
-            return Math.round(total * 100.0) / 100.0;
-        }
-    }
-
+    /** Un palet y las cajas físicas que lleva encima. */
     private record Bloque(String etiqueta, double taraKg, List<CajaFisica> cajas) {
         int numeroDeFilas() {
             return 1 + cajas.stream().mapToInt(c -> c.lineas().size()).sum();
@@ -307,13 +290,14 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
     }
 
     /**
-     * El Nº COLIS y el peso bruto (de la caja ENTERA) van solo en la
-     * primera línea de cada caja física, como en el ejemplo del cliente.
+     * El Nº COLIS y el peso bruto (de la caja ENTERA, el de su línea
+     * líder) van solo en la primera línea de cada caja física, como en el
+     * ejemplo del cliente.
      */
     private void escribirLinea(Row fila, CajaFisica caja, CajaData linea, boolean primeraLinea) {
         if (primeraLinea) {
             fila.getCell(COL_NUM_CAJA).setCellValue(caja.numeroCaja());
-            Double peso = caja.pesoBrutoTotal();
+            Double peso = caja.pesoBrutoKg();
             if (peso != null) {
                 fila.getCell(COL_PESO_BRUTO).setCellValue(peso);
             }
@@ -365,10 +349,12 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
         int desplazamiento = resultado.idxFilaTotal() - IDX_FILA_TOTAL;
         int idx = IDX_RESUMEN_PRIMERA + desplazamiento;
 
-        List<CajaData> cajas = destino.getCajas();
-        double pesoCartones = cajas.stream()
-                .filter(c -> c.getPesoBrutoKg() != null)
-                .mapToDouble(CajaData::getPesoBrutoKg).sum();
+        // El peso se cuenta UNA vez por caja física (el de su línea líder),
+        // no por línea: una caja mixta no pesa más por tener varias tallas.
+        double pesoCartones = bloques.stream()
+                .flatMap(bloque -> bloque.cajas().stream())
+                .filter(caja -> caja.pesoBrutoKg() != null)
+                .mapToDouble(CajaFisica::pesoBrutoKg).sum();
         double taras = bloques.stream().mapToDouble(Bloque::taraKg).sum();
         List<String> medidasCajasFisicas = medidasPorCajaFisica(destino);
         double volumenCartones = VolumenUtil.volumenTotalM3(medidasCajasFisicas);
@@ -385,11 +371,9 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
 
     /** Una medida por caja FÍSICA (no por línea), para contar y sumar volumen. */
     private List<String> medidasPorCajaFisica(DestinoData destino) {
-        Map<Integer, String> porNumero = new LinkedHashMap<>();
-        for (CajaData caja : destino.getCajas()) {
-            porNumero.putIfAbsent(caja.getNumeroCaja(), caja.getTamanoCaja());
-        }
-        return new ArrayList<>(porNumero.values());
+        return CajaFisica.agrupar(destino.getCajas()).stream()
+                .map(caja -> caja.lider().getTamanoCaja())
+                .toList();
     }
 
     /** "60 x 40 x 40 cm" si todas iguales; "2*60x40x30cm+22*60x40x40cm" si no. */

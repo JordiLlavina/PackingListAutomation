@@ -14,6 +14,7 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.PaletData;
@@ -30,9 +31,9 @@ import com.puntotres.packinglist.service.etiquetas.ApcEtiquetasExcelBuilder.Etiq
  * implemente su búsqueda (iteración futura).
  *
  * Una caja física = un numeroCaja; los cinturones (línea con talla, APC no
- * usa el prefijo UBL) agrupan unidades por talla en SIZE/PIECES. El peso de
- * palet reutiliza la convención del packing list de APC: suma de los pesos
- * de sus cajas más la tara del palet (10 kg si el JSON no la trae).
+ * usa el prefijo UBL) agrupan unidades por talla en SIZE/PIECES. El peso es
+ * el de la línea líder de cada caja ({@link CajaFisica}) y el del palet, la
+ * suma de los de sus cajas más la tara (10 kg si el JSON no la trae).
  */
 @Service
 public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
@@ -86,25 +87,22 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                                          ApcEtiquetaLayout layout, DatosEnvio envio,
                                          List<String> avisos) throws IOException {
         // Una caja física por numeroCaja, en orden ascendente.
-        Map<Integer, List<CajaData>> porNumero = new LinkedHashMap<>();
-        destino.getCajas().stream()
+        List<CajaFisica> cajasFisicas = CajaFisica.agrupar(destino.getCajas().stream()
                 .sorted(Comparator.comparingInt(CajaData::getNumeroCaja))
-                .forEach(caja -> porNumero
-                        .computeIfAbsent(caja.getNumeroCaja(), n -> new ArrayList<>())
-                        .add(caja));
+                .toList());
 
         List<EtiquetaCajaApc> etiquetas = new ArrayList<>();
         List<CajaData> cajasPendientes = new ArrayList<>();
         int posicion = 0;
-        int total = porNumero.size();
-        for (List<CajaData> lineas : porNumero.values()) {
+        int total = cajasFisicas.size();
+        for (CajaFisica caja : cajasFisicas) {
             posicion++;
-            etiquetas.add(etiquetaDe(lineas, posicion, total,
+            etiquetas.add(etiquetaDe(caja, posicion, total,
                     destino.getNombreDestino(), avisos, cajasPendientes));
         }
 
         List<EtiquetaPaletApc> etiquetasPalet =
-                etiquetasDePalet(destino, palets, avisos);
+                etiquetasDePalet(cajasFisicas, destino.getNombreDestino(), palets, avisos);
 
         if (destino.getCajas().stream().anyMatch(caja -> caja.getNumeroPalet() == null)) {
             avisos.add("Destinación " + destino.getNombreDestino()
@@ -118,10 +116,11 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 contenido, cajasPendientes);
     }
 
-    private EtiquetaCajaApc etiquetaDe(List<CajaData> lineas, int posicion, int total,
+    private EtiquetaCajaApc etiquetaDe(CajaFisica caja, int posicion, int total,
                                        String nombreDestino, List<String> avisos,
                                        List<CajaData> cajasPendientes) {
-        CajaData lider = lineas.get(0);
+        List<CajaData> lineas = caja.lineas();
+        CajaData lider = caja.lider();
 
         // Caja mixta de verdad (varias referencias o colores): se etiqueta
         // con la primera y se avisa, igual que en AMI.
@@ -162,9 +161,9 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     .map(e -> e.getValue() + "-" + e.getKey()).toList());
         }
 
-        // El peso es de la caja física ENTERA: suma de todas sus líneas
-        // (convención APC: cada línea lleva su peso, ver ApcExcelBuilder).
-        Double peso = pesoDeLaCaja(lineas);
+        // El peso es de la caja física ENTERA y viene una sola vez, en su
+        // línea líder; las demás líneas no aportan peso.
+        Double peso = caja.pesoBrutoKg();
         if (peso == null) {
             cajasPendientes.add(lider);
         }
@@ -172,11 +171,17 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 lider.getCodigoColor(), size, piezas, posicion + " / " + total, kg(peso));
     }
 
-    private List<EtiquetaPaletApc> etiquetasDePalet(DestinoData destino,
+    /**
+     * Peso del palet: la suma de los pesos de sus cajas FÍSICAS (uno por
+     * caja, el de su línea líder) más la tara. En blanco, con aviso, si
+     * alguna de esas cajas no trae peso.
+     */
+    private List<EtiquetaPaletApc> etiquetasDePalet(List<CajaFisica> cajasFisicas,
+                                                    String nombreDestino,
                                                     List<PaletData> palets,
                                                     List<String> avisos) {
         if (palets.isEmpty()) {
-            avisos.add("Destinación " + destino.getNombreDestino()
+            avisos.add("Destinación " + nombreDestino
                     + " sin palets: la hoja de etiquetas de palet sale en blanco");
             return List.of();
         }
@@ -186,19 +191,18 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             int numeroCajas = palet.getCajaFin() - palet.getCajaInicio() + 1;
             Double peso = null;
             boolean completo = true;
-            for (CajaData caja : destino.getCajas()) {
-                if (!Integer.valueOf(palet.getNumeroPalet()).equals(caja.getNumeroPalet())) {
+            for (CajaFisica caja : cajasFisicas) {
+                if (!Integer.valueOf(palet.getNumeroPalet()).equals(caja.numeroPalet())) {
                     continue;
                 }
-                if (caja.getPesoBrutoKg() == null) {
+                if (caja.pesoBrutoKg() == null) {
                     completo = false;
                 } else {
-                    peso = (peso == null ? 0 : peso) + caja.getPesoBrutoKg();
+                    peso = (peso == null ? 0 : peso) + caja.pesoBrutoKg();
                 }
             }
             if (!completo || peso == null) {
-                avisos.add("Palet " + palet.getNumeroPalet() + " de "
-                        + destino.getNombreDestino()
+                avisos.add("Palet " + palet.getNumeroPalet() + " de " + nombreDestino
                         + " con cajas sin peso: etiqueta de palet sin peso");
                 peso = null;
             } else {
@@ -207,17 +211,6 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             etiquetas.add(new EtiquetaPaletApc(numeroCajas, kg(peso)));
         }
         return etiquetas;
-    }
-
-    private static Double pesoDeLaCaja(List<CajaData> lineas) {
-        double total = 0;
-        for (CajaData linea : lineas) {
-            if (linea.getPesoBrutoKg() == null) {
-                return null;
-            }
-            total += linea.getPesoBrutoKg();
-        }
-        return total;
     }
 
     private static String kg(Double peso) {

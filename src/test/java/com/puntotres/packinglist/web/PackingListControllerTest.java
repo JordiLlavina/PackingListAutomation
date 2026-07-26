@@ -3,6 +3,7 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -256,22 +257,22 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        // En PARIS las cajas 33 y 35 existen en DOS colores (caja mixta).
-        // Ordenadas: índice 32 = caja 33 ROJO (30 uds), índice 33 = caja 33
-        // NOIR (34 uds). Editamos la NOIR y comprobamos que el peso cae en
-        // ella y no en la ROJO (que recibirá otro valor por inferencia).
+        // En PARIS la caja 33 tiene DOS líneas (colores ROJO y NOIR): es UN
+        // bulto con un solo peso, el de su primera línea (índice 32). El
+        // formulario localiza la fila por posición, no por nº de caja.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].indiceCaja", "33")
+                        .param("pesos[0].indiceCaja", "32")
                         .param("pesos[0].pesoNetoKg", "68.0"))
                 .andExpect(redirectedUrl("/revision"));
 
         EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
         var cajasParis = envio.getImportado().getDestinos().get(0).getDestino().getCajas();
-        assertEquals(34, cajasParis.get(33).getCantidad());          // la NOIR editada
-        assertEquals(68.0, cajasParis.get(33).getPesoNetoKg());      // el valor manual
-        // La ROJO (30 uds) recibe su neto por inferencia: 30 * (68/34) = 60.
-        assertEquals(60.0, cajasParis.get(32).getPesoNetoKg());
+        assertEquals(30, cajasParis.get(32).getCantidad());       // la líder de la caja 33
+        assertEquals(68.0, cajasParis.get(32).getPesoNetoKg());   // el valor manual
+        // La segunda línea del mismo bulto no lleva peso propio.
+        assertEquals(34, cajasParis.get(33).getCantidad());
+        assertNull(cajasParis.get(33).getPesoNetoKg());
     }
 
     @Test

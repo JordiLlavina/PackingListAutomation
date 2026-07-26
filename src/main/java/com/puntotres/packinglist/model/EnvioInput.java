@@ -122,7 +122,8 @@ public class EnvioInput {
      * teclea el humano en la revisión. En un rango el peso aplica a cada una
      * de sus cajas (mismo producto y mismas unidades por caja). El peso es de
      * la caja física entera: en una caja mixta (mismo nº de caja en varias
-     * entradas de talla/color) se pone una sola vez, en la primera entrada.
+     * entradas de talla/color/referencia) se pone una sola vez, en la primera
+     * entrada, y las demás no aportan peso (ver {@code CajaFisica}).
      */
     public static class CajaRangoInput {
 

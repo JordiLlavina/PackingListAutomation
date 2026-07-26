@@ -191,10 +191,53 @@ class WeightInferenceServiceTest {
         assertEquals(6.6, b.getPesoBrutoKg());  // 5.0 + tara 1.6
     }
 
+    @Test
+    void unaCajaConVariosColoresSinPesoSeInfiereEnteraEnSuLider() {
+        // La caja 500 es un solo bulto con dos colores (20 + 30 uds): se
+        // infiere UNA vez, sobre las 50 unidades y con UNA sola tara.
+        CajaData conocida = caja("60x40x40", 10, 11.6);   // (11.6-1.6)/10 = 1.0
+        conocida.setReferencia("REF");
+        CajaData lider = linea(500, "REF", "001", 20);
+        CajaData otroColor = linea(500, "REF", "002", 30);
+
+        service.inferirPesosDelEnvio(List.of(List.of(conocida, lider, otroColor)));
+
+        assertEquals(50.0, lider.getPesoNetoKg());
+        assertEquals(51.6, lider.getPesoBrutoKg());
+        assertNull(otroColor.getPesoNetoKg());
+        assertNull(otroColor.getPesoBrutoKg());
+    }
+
+    @Test
+    void unaCajaQueMezclaReferenciasSumaElUnitarioDeCadaLinea() {
+        CajaData bolsos = caja("60x40x40", 10, 11.6);    // REF-A: unitario 1.0
+        bolsos.setReferencia("REF-A");
+        CajaData carteras = caja("60x40x40", 10, 6.6);   // REF-B: unitario 0.5
+        carteras.setReferencia("REF-B");
+        CajaData lider = linea(501, "REF-A", "001", 4);
+        CajaData segunda = linea(501, "REF-B", "001", 6);
+
+        service.inferirPesosDelEnvio(List.of(List.of(bolsos, carteras, lider, segunda)));
+
+        assertEquals(7.0, lider.getPesoNetoKg());    // 4*1.0 + 6*0.5
+        assertEquals(8.6, lider.getPesoBrutoKg());   // + una sola tara
+        assertNull(segunda.getPesoNetoKg());
+    }
+
+    /** Una línea de una caja física concreta (referencia y color propios). */
+    private static CajaData linea(int numeroCaja, String referencia, String color, int cantidad) {
+        CajaData caja = new CajaData();
+        caja.setNumeroCaja(numeroCaja);
+        caja.setReferencia(referencia);
+        caja.setCodigoColor(color);
+        caja.setTamanoCaja("60x40x40");
+        caja.setCantidad(cantidad);
+        return caja;
+    }
+
     /**
      * Cada caja del helper es una caja física distinta: le damos un nº de caja
-     * único para que la inferencia (que agrupa por color+nº) no las mezcle.
-     * El color queda a null, que basta al ser el número siempre distinto.
+     * único para que la inferencia (que agrupa por nº de caja) no las mezcle.
      */
     private static int siguienteNumeroCaja = 1;
 
