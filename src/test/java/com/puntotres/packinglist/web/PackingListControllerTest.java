@@ -216,19 +216,19 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        // Bruto de la caja 1 de PARIS (índice 0; 50 uds, 60x40x40, tara 1.6)
-        // puesto a mano: peso unitario (51.6-1.6)/50 = 1.0 -> la caja 32
-        // (47 uds) debe quedar con neto 47.0 y bruto 48.6.
+        // Bruto de la caja 1 de PARIS (índice 0; 50 uds, 60x40x40, tara 0.6)
+        // puesto a mano: peso unitario (50.6-0.6)/50 = 1.0 -> la caja 32
+        // (47 uds) debe quedar con neto 47.0 y bruto 47.6.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
                         .param("pesos[0].indiceCaja", "0")
-                        .param("pesos[0].pesoBrutoKg", "51.6"))
+                        .param("pesos[0].pesoBrutoKg", "50.6"))
                 .andExpect(redirectedUrl("/revision"));
 
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"47.0\"")))
-                .andExpect(content().string(containsString("value=\"48.6\"")));
+                .andExpect(content().string(containsString("value=\"47.6\"")));
     }
 
     @Test
@@ -238,7 +238,7 @@ class PackingListControllerTest {
 
         // Solo el NETO de la caja 1 de PARIS: unitario 50.0/50 = 1.0 ->
         // la caja 32 (47 uds) queda igual que en el caso del bruto, y la
-        // propia caja 1 completa su bruto (50.0 + tara 1.6).
+        // propia caja 1 completa su bruto (50.0 + tara 0.6).
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
                         .param("pesos[0].indiceCaja", "0")
@@ -247,7 +247,7 @@ class PackingListControllerTest {
 
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("value=\"51.6\"")))
+                .andExpect(content().string(containsString("value=\"50.6\"")))
                 .andExpect(content().string(containsString("value=\"47.0\"")));
     }
 
@@ -313,7 +313,7 @@ class PackingListControllerTest {
         EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
         var cajaChina = envio.getImportado().getDestinos().get(1).getDestino().getCajas().get(0);
         assertEquals(50.0, cajaChina.getPesoNetoKg());   // inferida desde PARIS (50 uds * 1.0)
-        assertEquals(51.6, cajaChina.getPesoBrutoKg());  // neto + tara 1.6 del 60x40x40
+        assertEquals(50.6, cajaChina.getPesoBrutoKg());  // neto + tara 0.6 del 60x40x40
     }
 
     @Test
@@ -335,15 +335,15 @@ class PackingListControllerTest {
 
         EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
         var cajasJapan = envio.getImportado().getDestinos().get(1).getDestino().getCajas();
-        // JAPAN caja 5 (UBL214.AL0223 talla 75, bruto 5.2, tara 60x40x30 = 1.2):
+        // JAPAN caja 5 (UBL214.AL0223 talla 75, bruto 5.2, tara 60x40x30 = 0.2):
         // su neto debe salir aunque CHINA también tenga una caja 5 del mismo
         // modelo (antes se perdía por la colisión de nº de caja).
         var japanCaja5 = cajasJapan.get(4);
         assertEquals(5, japanCaja5.getNumeroCaja());
-        assertEquals(4.0, japanCaja5.getPesoNetoKg());   // 5.2 - 1.2
+        assertEquals(5.0, japanCaja5.getPesoNetoKg());   // 5.2 - 0.2
         // JAPAN caja 1 (ULL163, bruto 16.6) también, pese a que FRANCE tiene
         // sus propias cajas 1-5 del mismo modelo.
-        assertEquals(15.0, cajasJapan.get(0).getPesoNetoKg());   // 16.6 - 1.6
+        assertEquals(16.0, cajasJapan.get(0).getPesoNetoKg());   // 16.6 - 0.6
     }
 
     @Test

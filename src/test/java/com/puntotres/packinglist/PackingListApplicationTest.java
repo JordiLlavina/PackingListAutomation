@@ -30,8 +30,9 @@ class PackingListApplicationTest {
 
     @Test
     void cargaLasTarasDesdeApplicationYml() {
-        assertEquals(Optional.of(1.6), taras.taraPara("60X40X40"));
-        assertEquals(Optional.of(1.2), taras.taraPara(" 60x40x30 "));
+        assertEquals(Optional.of(0.6), taras.taraPara("60X40X40"));
+        assertEquals(Optional.of(0.2), taras.taraPara(" 60x40x30 "));
+        assertEquals(Optional.of(0.2), taras.taraPara("40x30x20"));
         assertTrue(taras.taraPara("99x99x99").isEmpty());
     }
 
