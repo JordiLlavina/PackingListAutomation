@@ -111,6 +111,8 @@ class EtiquetasArticuloExcelBuilderTest {
         assertEquals(210, EtiquetasArticuloExcelBuilder.cuerpoPara("2221 CHOCOLATE"));
         assertEquals(180, EtiquetasArticuloExcelBuilder.cuerpoPara("221 DARK COFFEE"));
         assertEquals(180, EtiquetasArticuloExcelBuilder.cuerpoPara("A184 MASTIC BEIGE"));
+        // Borde exacto de la regla: 18 caracteres ya caen en el tramo de 160.
+        assertEquals(160, EtiquetasArticuloExcelBuilder.cuerpoPara("A328 SAND-CHOCOLAT"));
         assertEquals(160, EtiquetasArticuloExcelBuilder.cuerpoPara("A328 SAND-CHOCOLATE"));
 
         EtiquetaArticulo corta = new EtiquetaArticulo("REF", "Size: U", "001 BLACK", "Cde: 1", null);

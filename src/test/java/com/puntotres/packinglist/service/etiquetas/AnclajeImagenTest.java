@@ -1,26 +1,28 @@
 package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 class AnclajeImagenTest {
 
     @Test
+    @Timeout(5)
     void unaColumnaDeAnchoCeroNoCuelgaElCalculo() throws Exception {
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             XSSFSheet hoja = libro.createSheet("H");
             hoja.createRow(0).setHeightInPoints(15f);
             hoja.setColumnWidth(0, 0);   // columna oculta
 
-            // Sin la guarda, este cálculo no termina nunca.
+            // Sin la guarda este cálculo no termina nunca; con ella se para
+            // en la columna donde arrancó.
             XSSFClientAnchor ancla = AnclajeImagen.fijo(hoja, 0, 0, 0, 0, 1463802, 647700);
 
-            assertTrue(ancla.getCol2() >= ancla.getCol1());
+            assertEquals(0, ancla.getCol2());
         }
     }
 

@@ -15,7 +15,6 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.PageMargin;
 import org.apache.poi.ss.usermodel.PrintSetup;
-import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPrintSetup;
@@ -68,6 +67,8 @@ public class EtiquetasArticuloExcelBuilder {
     static final double MARGEN_IZQUIERDO = 0.0;
     /** 1 mm en pulgadas, que es lo que guarda el fichero del cliente. */
     static final double MARGEN = 0.03937007874015748;
+    /** Margen de cabecera/pie del fichero del cliente, en pulgadas. */
+    static final double MARGEN_CABECERA_PIE = 0.31496062992125984;
 
     /** Longitud máxima de un nombre de hoja en Excel. */
     private static final int MAX_NOMBRE_HOJA = 31;
@@ -159,11 +160,17 @@ public class EtiquetasArticuloExcelBuilder {
         hoja.createRow(0).setHeightInPoints(ALTO_MARGEN_SUPERIOR);
         for (int bloque = 0; bloque < BLOQUES; bloque++) {
             int base = filaBase(bloque);
-            for (int desplazamiento = 0; desplazamiento < FILAS_POR_BLOQUE; desplazamiento++) {
-                Row fila = hoja.createRow(base + desplazamiento);
-                if (desplazamiento == FILAS_POR_BLOQUE - 1) {
-                    fila.setHeightInPoints(ALTO_SEPARADORA);
-                }
+            hoja.createRow(base);        // referencia + talla
+            hoja.createRow(base + 1);    // color + pedido
+            // Las filas del código de barras (base+2 a base+6) no se crean:
+            // la imagen flota sobre ellas y AnclajeImagen.altoFilaEmu ya cae
+            // al alto por defecto cuando la fila no existe. Y el último
+            // bloque no lleva separadora, igual que el fichero del cliente:
+            // crearla haría la hoja 9,95pt más alta y sacaría una segunda
+            // página al imprimir (el fichero real termina en la fila 74).
+            if (bloque < BLOQUES - 1) {
+                hoja.createRow(base + FILAS_POR_BLOQUE - 1)
+                        .setHeightInPoints(ALTO_SEPARADORA);
             }
         }
         XSSFPrintSetup impresion = hoja.getPrintSetup();
@@ -174,6 +181,8 @@ public class EtiquetasArticuloExcelBuilder {
         hoja.setMargin(PageMargin.RIGHT, MARGEN);
         hoja.setMargin(PageMargin.TOP, MARGEN);
         hoja.setMargin(PageMargin.BOTTOM, MARGEN);
+        hoja.setMargin(PageMargin.HEADER, MARGEN_CABECERA_PIE);
+        hoja.setMargin(PageMargin.FOOTER, MARGEN_CABECERA_PIE);
         return hoja;
     }
 
@@ -210,10 +219,14 @@ public class EtiquetasArticuloExcelBuilder {
         return png.map(bytes -> libro.addPicture(bytes, Workbook.PICTURE_TYPE_PNG)).orElse(-1);
     }
 
+    /**
+     * Escribe en una celda de una fila que crearHojaMaquetada ya ha creado
+     * (siempre base o base+1): no hay rama defensiva de "por si no existe",
+     * porque con la maquetación fija esas filas siempre existen.
+     */
     private static void escribir(XSSFSheet hoja, int fila, int columna, String valor,
                                  CellStyle estilo) {
-        Row f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
-        Cell celda = f.getCell(columna) != null ? f.getCell(columna) : f.createCell(columna);
+        Cell celda = hoja.getRow(fila).createCell(columna);
         if (valor == null || valor.isBlank()) {
             celda.setBlank();
         } else {
