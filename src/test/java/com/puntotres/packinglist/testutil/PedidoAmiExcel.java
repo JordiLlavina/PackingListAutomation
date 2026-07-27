@@ -15,9 +15,18 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  */
 public final class PedidoAmiExcel {
 
-    /** po: String ("07704 CH") o Number (7672 = PO de France sin sufijo). */
+    /**
+     * po: String ("07704 CH") o Number (7672 = PO de France sin sufijo).
+     * ean13: null para los tests que no lo necesitan (etiquetas de caja).
+     */
     public record Fila(String madeIn, String article, String coloris,
-                       String libelle, String taille, Object po) {
+                       String libelle, String taille, Object po, String ean13) {
+
+        /** Sin EAN13: firma que ya usaban los tests de etiquetas de caja. */
+        public Fila(String madeIn, String article, String coloris,
+                    String libelle, String taille, Object po) {
+            this(madeIn, article, coloris, libelle, taille, po, null);
+        }
     }
 
     private PedidoAmiExcel() {
@@ -45,6 +54,9 @@ public final class PedidoAmiExcel {
                     f.createCell(6).setCellValue(n.doubleValue());
                 } else {
                     f.createCell(6).setCellValue((String) fila.po());
+                }
+                if (fila.ean13() != null) {
+                    f.createCell(8).setCellValue(fila.ean13());
                 }
             }
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
