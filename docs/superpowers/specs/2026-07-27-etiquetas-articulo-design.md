@@ -109,8 +109,9 @@ UBL029.AL0104 0014 07704CH 75      cinturón, "NOIR/ARGENT…" no cabe (29)
 ## 4. Maquetación de la hoja
 
 Medidas extraídas del XML de `docs/Etiquetas para etiquetas/AMI CODE BARRE
-H26 MOROCCO.xlsx`. Bolsos y cinturones son estructuralmente **idénticos**:
-una sola plantilla sirve para los tres ficheros.
+H26 MOROCCO.xlsx` y verificadas con POI en un spike. Bolsos y cinturones son
+estructuralmente **idénticos**: la misma maquetación sirve para los tres
+ficheros.
 
 - **Rejilla**: 4 columnas × 10 filas = **40 etiquetas**.
 - **Columnas de etiqueta** (índice POI, 0-based): pares `(0,1)`, `(3,4)`,
@@ -176,7 +177,7 @@ que la etiqueta de artículo no forma parte de su contrato.
 excel de pedido (bytes)
   → AmiCatalogoEan.desdeBytes()        List<FilaEan>
   → AmiEtiquetasArticuloGenerador      clasifica, agrupa, ordena, nombra
-  → EtiquetasArticuloExcelBuilder      plantilla + cloneSheet + celdas + imágenes
+  → EtiquetasArticuloExcelBuilder      maqueta la hoja con POI + celdas + imágenes
   → ResultadoEtiquetasArticulo         List<ExcelEtiquetasArticulo> + avisos
 ```
 
@@ -190,7 +191,7 @@ excel de pedido (bytes)
 | `EtiquetaArticulo` | `etiquetasarticulo` | `record(referencia, talla, color, pedido, ean13)`, las 5 partes **ya formateadas** (`"Size: U"`, `"Cde: 07714"`, `"A236 TRUFFLE"`). `ean13 == null` → hoja sin código de barras. |
 | `GeneradorEtiquetasArticuloCliente` | `etiquetasarticulo` | Interfaz: `claveCliente()`, `tituloCampoPedido()`, `generar(byte[] pedido, String temporada)`. **Un cliente nuevo = una implementación.** |
 | `AmiEtiquetasArticuloGenerador` | `etiquetasarticulo` | Única implementación por ahora. `esCinturon = ARTICLE.startsWith("UBL")`. |
-| `HojaEtiquetas` | `etiquetasarticulo` | `record(nombreHoja, List<EtiquetaArticulo>)`: lo que el builder necesita, sin vocabulario de AMI. |
+| `HojaEtiquetas` | `etiquetasarticulo` | `record(nombreHoja, EtiquetaArticulo etiqueta)`: lo que el builder necesita, sin vocabulario de AMI. **Una** etiqueta, no una lista: las 40 de la hoja son idénticas y el builder las repite. |
 | `EtiquetasArticuloExcelBuilder` | `etiquetasarticulo` | Compartido entre clientes: la rejilla 4×10 no es de AMI. Un cliente con otra etiqueta traería su propio builder. |
 | `ExcelEtiquetasArticulo` | `etiquetasarticulo` | `record(descripcion, nombreFichero, byte[] contenido)`. **No** se reutiliza `ExcelGenerado`: su vocabulario es de packing list (destino, referencia, color, cajasPendientes) y aquí no aplica ninguno. |
 | `ResultadoEtiquetasArticulo` | `etiquetasarticulo` | Excels + avisos, como `ResultadoEtiquetas`. |
@@ -201,40 +202,79 @@ en vez de en un paquete nuevo: son primitivas de dibujo/lectura, dos de las
 tres ya tienen ahí su hermana, e inventar un tercer paquete para tres clases
 de métodos estáticos sería peor. `etiquetasarticulo` las importa.
 
-### Plantilla
+### Cómo maqueta el builder: POI, sin plantilla
 
-`src/main/resources/client-labels/etiquetas-articulo-template.xlsx`: **una
-sola hoja**, extraída del `AMI CODE BARRE H26 MOROCCO.xlsx` real, con
+**Decisión revisada.** El diseño original usaba una plantilla `.xlsx`
+extraída del fichero real y la clonaba con `XSSFWorkbook.cloneSheet`. Un
+spike lo descartó con evidencia:
 
-- las 40 etiquetas ya maquetadas (anchos, altos, estilos, celdas),
-- los textos de ejemplo borrados (celdas presentes pero en blanco, para
-  conservar el estilo de cada una),
-- **sin imágenes** ni anclajes,
-- **sin `printerSettings`** (evita que `cloneSheet` duplique la relación
-  binaria 46 veces),
-- `pageSetup` y `pageMargins` intactos.
+```
+WARN org.apache.poi.xssf.usermodel.XSSFWorkbook -- Cloning sheets with page setup is not yet supported.
 
-Aplica la regla del proyecto: **no editar esta plantilla sin revisar su
-builder**.
-
-### Cómo genera el builder
-
-```java
-try (XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
-    // 1. una hoja por variante: clonar la plantilla y renombrar
-    for (HojaEtiquetas h : hojas) { libro.cloneSheet(0); ... setSheetName ... }
-    // 2. borrar la hoja plantilla original
-    // 3. por hoja: 40 × 4 celdas + addPicture(1) + createPicture(40)
-}
+plantilla   scale=74  paperSize=9 (A4)
+clon        scale=100 paperSize=1 (Letter)
 ```
 
-`cloneSheet` copia anchos, altos, estilos, `pageSetup` y márgenes, que es
-exactamente lo que se quiere heredar del fichero real. Riesgo conocido:
-`cloneSheet` arrastra el `r:id` del `pageSetup`; se neutraliza quitando
-`printerSettings` de la plantilla. El test que reabre el `.xlsx` con POI y
-comprueba `scale=74` cubre esto. **Fallback si diera problemas**: construir
-cada hoja desde cero con las constantes de §4, sin cambiar nada más del
-diseño.
+`cloneSheet` copia el XML de la hoja pero **excluye a propósito** los
+elementos con relaciones propias: `pageSetup` (apunta a
+`printerSettings.bin`) y `drawing` (apunta a `media/`). O sea que lo único
+que se quería heredar del fichero real —el ajuste al A4— es lo único que no
+se hereda. Además, quitar los 40 anclajes de la plantilla deja sus 23
+`xl/media/*.gif` huérfanos dentro del paquete (90 KB) y
+`POIXMLDocumentPart.removeRelation` es `protected`.
+
+Sí se heredaban correctamente: anchos de columna, altos de fila, estilos de
+celda y márgenes. Pero eso son ~30 líneas de constantes ya medidas y
+verificadas en §4, así que la plantilla dejaba de pagar su coste.
+
+**Cada hoja se construye con POI** a partir de las constantes de §4, sin
+recurso binario:
+
+```java
+XSSFSheet hoja = libro.createSheet(nombreUnico);
+for (int c = 0; c < ANCHOS_COLUMNA.length; c++) {
+    hoja.setColumnWidth(c, ANCHOS_COLUMNA[c]);      // 3766, 4425, 621, ...
+}
+hoja.createRow(0).setHeightInPoints(6f);            // margen superior
+// 10 bloques × 8 filas: 2 de texto, 5 de barcode (alto por defecto), 1 separadora
+XSSFPrintSetup impresion = hoja.getPrintSetup();
+impresion.setPaperSize(PrintSetup.A4_PAPERSIZE);    // 9
+impresion.setScale((short) 74);
+impresion.setLandscape(false);
+hoja.setMargin(PageMargin.LEFT, 0.0);
+hoja.setMargin(PageMargin.RIGHT, 0.03937007874015748);
+hoja.setMargin(PageMargin.TOP, 0.03937007874015748);
+hoja.setMargin(PageMargin.BOTTOM, 0.03937007874015748);
+```
+
+Los tres estilos de la celda de color (10,5 / 9 / 8pt) se crean **una vez por
+libro** y se cachean: POI tiene un límite de estilos por libro y un fichero
+llega a 79 hojas.
+
+**Consecuencia**: no hay ningún `.xlsx` nuevo en `src/main/resources/`, y la
+regla del proyecto sobre no editar plantillas no aplica aquí. El test de
+maquetación de §8 es lo que ancla estas constantes al fichero real.
+
+### Bucle del builder
+
+```java
+try (XSSFWorkbook libro = new XSSFWorkbook()) {
+    Map<Integer, CellStyle> estilosColor = new HashMap<>();   // cache por libro
+    for (HojaEtiquetas h : hojas) {
+        XSSFSheet hoja = crearHojaMaquetada(libro, nombreUnico(libro, h.nombreHoja()));
+        int imagen = indiceDeImagen(libro, h.etiqueta());     // addPicture, 1 vez o -1
+        for (int bloque = 0; bloque < BLOQUES; bloque++) {
+            for (int colIzq : COLUMNAS_IZQUIERDA) {
+                escribirEtiqueta(hoja, bloque, colIzq, h.etiqueta(), estilosColor);
+                if (imagen >= 0) {
+                    anclarImagen(hoja, bloque, colIzq, imagen);   // createPicture
+                }
+            }
+        }
+    }
+    // ...write
+}
+```
 
 ## 6. Avisos y errores
 
@@ -328,9 +368,22 @@ tocarlos.
 - **`EtiquetasArticuloExcelBuilderTest`** — reabre el generado y comprueba:
   `A2/B2/A3/B3` del primer bloque y del último (fila base 73); las 4
   columnas de etiqueta del mismo bloque; 40 imágenes en el `drawing` y
-  **una sola** `PictureData` por hoja; anchos de columna de §4; `pageSetup`
-  (A4, `scale=74`, portrait) y `pageMargins`; que una etiqueta sin EAN13 no
-  añade imagen; que el cuerpo de la celda de color cambia con la longitud.
+  **una sola** `PictureData` por hoja; que una etiqueta sin EAN13 no añade
+  imagen; que el cuerpo de la celda de color cambia con la longitud; que dos
+  hojas con el mismo nombre no rompen la generación (sufijo `-2`).
+- **`EtiquetasArticuloMaquetacionTest`** — el test que **ancla las
+  constantes de §4 al fichero real del cliente**, ahora que no hay plantilla
+  de la que heredarlas. Abre
+  `docs/Etiquetas para etiquetas/AMI CODE BARRE H26 MOROCCO.xlsx` y el
+  `.xlsx` generado, y compara hoja contra hoja: los 11 anchos de columna, el
+  alto de la fila 0, el alto de las 10 filas separadoras, el alto por
+  defecto, `getPrintSetup()` (`scale`, `paperSize`, `landscape`) y los
+  cuatro márgenes. Si alguien toca una constante de maquetación, este test
+  cae. Valores esperados verificados en el spike: anchos
+  `3766, 4425, 621, 3766, 4534, 512, 3766, 4534, 621, 3766, 4534`;
+  `row0 = 6.0pt`; `separadora = 9.95pt`; `defecto = 15.0pt`; `scale = 74`;
+  `paperSize = 9`; `landscape = false`; márgenes `0.0` /
+  `0.03937007874015748` ×3.
 - **`CodigoBarrasEan13Test`** — un EAN13 válido produce PNG; uno con
   checksum malo, longitud distinta o no numérico se rechaza de forma
   controlada (sin excepción de barcode4j sin envolver).
