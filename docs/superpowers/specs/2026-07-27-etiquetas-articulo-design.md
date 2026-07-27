@@ -56,11 +56,19 @@ un fichero; un grupo vacío simplemente no genera fichero (sin error).
 |---|---|
 | `AMI CODE BARRE H26 MOROCCO.xlsx` | 46 |
 | `AMI CODE BARRE H26 SPAIN.xlsx` | 26 |
-| `AMI CODE BARRE ITEMS H26 SPAIN.xlsx` | 79 |
+| `AMI CODE BARRE ITEMS H26 SPAIN CINTURONES.xlsx` | 79 |
 
-`ITEMS` marca el fichero de cinturones, como en los ejemplos del cliente.
-El país va **siempre** en el nombre, por regla uniforme (los ejemplos
-actuales omiten el país en cinturones porque hoy solo hay uno).
+Patrones, con `{temporada}` y `{país}` como únicas partes variables:
+
+```
+bolsos      AMI CODE BARRE {temporada} {país}.xlsx
+cinturones  AMI CODE BARRE ITEMS {temporada} {país} CINTURONES.xlsx
+```
+
+`ITEMS` y `CINTURONES` marcan los dos el fichero de cinturones, como en los
+ficheros del cliente; **`CINTURONES` va siempre al final del nombre**. El
+país va **siempre**, por regla uniforme (los ficheros actuales del cliente lo
+omiten en cinturones porque hoy solo hay uno).
 
 La temporada (`H26`) se lee del nombre de la hoja (`EAN H26` → `H26`). Si no
 se puede extraer, la pantalla ofrece un campo de texto prellenado con el
