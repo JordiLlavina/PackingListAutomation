@@ -47,7 +47,18 @@ public final class AmiCatalogoEan {
             for (int i = hoja.primeraFilaDatos(); i <= hoja.ultimaFila(); i++) {
                 String article = hoja.texto(i, colArticle).trim().toUpperCase(Locale.ROOT);
                 String po = hoja.texto(i, colPo).trim();
-                if (article.isBlank() && po.isBlank()) {
+                // Del todo vacía = ninguna columna trae nada: los excels del
+                // cliente arrastran filas sueltas al final y esas se ignoran
+                // sin ruido. Si trae CUALQUIER dato pero le falta ARTICLE o
+                // PO, se avisa: es un error del fichero que alguien puede
+                // arreglar.
+                boolean vacia = article.isBlank() && po.isBlank()
+                        && hoja.texto(i, colMadeIn).isBlank()
+                        && hoja.texto(i, colColoris).isBlank()
+                        && hoja.texto(i, colLibelle).isBlank()
+                        && hoja.texto(i, colTaille).isBlank()
+                        && hoja.texto(i, colEan13).isBlank();
+                if (vacia) {
                     continue;
                 }
                 String numerico = po.replaceAll("[^0-9]", "");

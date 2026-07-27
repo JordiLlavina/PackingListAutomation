@@ -72,6 +72,28 @@ class AmiCatalogoEanTest {
     }
 
     @Test
+    void unaFilaConDatosPeroSinArticuloNiPoAvisaEnVezDeDesaparecer() throws Exception {
+        // Trae Made in, color, talla y un EAN13: no está "del todo vacía",
+        // así que perderla en silencio ocultaría un error del fichero.
+        AmiCatalogoEan catalogo = AmiCatalogoEan.desdeBytes(PedidoAmiExcel.crear("EAN H26",
+                new Fila("SPAIN", "", "221", "BLACK", "U", "", "3666598543892")));
+
+        assertTrue(catalogo.filas().isEmpty());
+        assertEquals(1, catalogo.avisos().size());
+        assertTrue(catalogo.avisos().get(0).contains("ARTICLE"), catalogo.avisos().get(0));
+    }
+
+    @Test
+    void unaFilaDelTodoVaciaSeIgnoraSinAviso() throws Exception {
+        AmiCatalogoEan catalogo = AmiCatalogoEan.desdeBytes(PedidoAmiExcel.crear("EAN H26",
+                new Fila("", "", "", "", "", ""),
+                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7672, "3666598543892")));
+
+        assertEquals(1, catalogo.filas().size());
+        assertTrue(catalogo.avisos().isEmpty(), catalogo.avisos().toString());
+    }
+
+    @Test
     void unaFilaSinPoSeOmiteConAviso() throws Exception {
         AmiCatalogoEan catalogo = AmiCatalogoEan.desdeBytes(PedidoAmiExcel.crear("EAN H26",
                 new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", "", "3666598543892")));
