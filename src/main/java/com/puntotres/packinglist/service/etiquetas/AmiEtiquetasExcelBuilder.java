@@ -6,10 +6,7 @@ import java.io.InputStream;
 import java.util.List;
 
 import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.ClientAnchor;
 import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.util.Units;
-import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPictureData;
 import org.apache.poi.xssf.usermodel.XSSFRow;
@@ -159,13 +156,13 @@ public class AmiEtiquetasExcelBuilder {
         for (int offset : offsets) {
             if (barcode != null) {
                 int indice = libro.addPicture(barcode, Workbook.PICTURE_TYPE_PNG);
-                dibujo.createPicture(anclaje(hoja, AmiEtiquetaLayout.COL_BARCODE,
+                dibujo.createPicture(AnclajeImagen.fijo(hoja, AmiEtiquetaLayout.COL_BARCODE,
                         layout.dxBarcode(), base + offset + layout.filaBarcode(),
                         layout.dyBarcode(), layout.cxBarcode(), layout.cyBarcode()), indice);
             }
             if (direccionJapan != null && "AMI JAPAN".equals(layout.nombreHoja())) {
                 int indice = libro.addPicture(direccionJapan, Workbook.PICTURE_TYPE_PNG);
-                dibujo.createPicture(anclaje(hoja, AmiEtiquetaLayout.COL_BARCODE,
+                dibujo.createPicture(AnclajeImagen.fijo(hoja, AmiEtiquetaLayout.COL_BARCODE,
                         AmiEtiquetaLayout.JAPAN_DIRECCION_DX,
                         base + offset + AmiEtiquetaLayout.JAPAN_DIRECCION_FILA,
                         AmiEtiquetaLayout.JAPAN_DIRECCION_DY,
@@ -173,41 +170,5 @@ public class AmiEtiquetasExcelBuilder {
                         AmiEtiquetaLayout.JAPAN_DIRECCION_CY), indice);
             }
         }
-    }
-
-    /**
-     * Anclaje de dos celdas equivalente al oneCellAnchor de la plantilla:
-     * desde (col,fila)+offset EMU, con tamaño fijo (cx,cy) EMU repartido
-     * sobre las columnas/filas siguientes según sus anchos reales.
-     */
-    private static XSSFClientAnchor anclaje(XSSFSheet hoja, int col, long dx,
-                                            int fila, long dy, long cx, long cy) {
-        int col2 = col;
-        long xRestante = dx + cx;
-        while (xRestante > anchoColumnaEmu(hoja, col2)) {
-            xRestante -= anchoColumnaEmu(hoja, col2);
-            col2++;
-        }
-        int fila2 = fila;
-        long yRestante = dy + cy;
-        while (yRestante > altoFilaEmu(hoja, fila2)) {
-            yRestante -= altoFilaEmu(hoja, fila2);
-            fila2++;
-        }
-        XSSFClientAnchor ancla = new XSSFClientAnchor((int) dx, (int) dy,
-                (int) xRestante, (int) yRestante, col, fila, col2, fila2);
-        ancla.setAnchorType(ClientAnchor.AnchorType.MOVE_DONT_RESIZE);
-        return ancla;
-    }
-
-    private static long anchoColumnaEmu(XSSFSheet hoja, int col) {
-        return Units.columnWidthToEMU(hoja.getColumnWidth(col));
-    }
-
-    private static long altoFilaEmu(XSSFSheet hoja, int fila) {
-        float puntos = hoja.getRow(fila) != null
-                ? hoja.getRow(fila).getHeightInPoints()
-                : hoja.getDefaultRowHeightInPoints();
-        return Units.toEMU(puntos);
     }
 }
