@@ -5,7 +5,7 @@
 <header th:replace="~{fragmentos :: cabecera('')}"></header>
 <main>
     <p class="menu-intro">
-        Dos cosas distintas que salen de dos documentos distintos. Elige por dónde empezar.
+        Tres cosas distintas que salen de tres documentos distintos. Elige por dónde empezar.
     </p>
 
     <div class="menu-tarjetas">
@@ -39,6 +39,22 @@
                 <li>40 etiquetas por hoja, ajustadas a un A4</li>
             </ul>
             <a class="boton" th:href="@{/etiquetas-articulo}">Empezar →</a>
+        </section>
+
+        <section class="tarjeta menu-tarjeta">
+            <h2 class="menu-titulo"><span class="menu-icono">📋</span> Procesado de Escandallos ICSUITE</h2>
+            <p class="menu-descripcion">
+                De los escandallos que imprime el ERP —uno por artículo y color— a un
+                único excel limpio, listo para volcar a otro sistema. Se queda solo con
+                el modelo, la descripción, el color y la tabla de materiales.
+            </p>
+            <p class="menu-entrada">Necesitas: los excels de escandallo del ERP.</p>
+            <ul class="menu-lista">
+                <li>Un solo excel con una hoja por escandallo</li>
+                <li>Cada hoja se llama como su modelo y su color</li>
+                <li>Sin precios, sin importes y sin fases</li>
+            </ul>
+            <a class="boton" th:href="@{/escandallos}">Empezar →</a>
         </section>
     </div>
 </main>

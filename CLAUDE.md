@@ -21,6 +21,7 @@ mvn spring-boot:run                           # asistente web en http://localhos
 - El modo CLAUDE de la pantalla de entrada (fotos → JSON) necesita la variable de entorno `ANTHROPIC_API_KEY`. Sin ella la app arranca igual y el resto de modos funciona (cliente HTTP perezoso).
 - **Windows**: matar `mvn spring-boot:run` no mata el proceso `java` hijo y el 8080 queda ocupado. Liberarlo: `netstat -ano | findstr :8080` + `taskkill /F /PID <pid>`.
 - La portada es `/menu`; el asistente de packing list vive en `/packing-list` y `/` redirige al menú.
+- `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx` con los dos escandallos reales, para compararlo a mano con el ejemplo de `docs/Procesado Escandallos ICSUITE/`.
 
 ## Documentación que ya existe (y su estado)
 
@@ -28,6 +29,8 @@ mvn spring-boot:run                           # asistente web en http://localhos
 - [ARCHITECTURE.md](ARCHITECTURE.md) — recorrido interno del pipeline y decisiones de diseño. **Lectura recomendada antes de tocar los servicios.**
 - ⚠️ Ambos están **parcialmente desactualizados**: dicen que no hay capa web ni endpoint y que solo existe el builder AMI. En realidad ya existen la web completa (`web/`), la extracción por imágenes (`ClaudeEnvioExtractionService`), los builders APC y genérico, y el volcado ERP. Lo que cuentan del pipeline de dominio sigue siendo válido.
 - [docs/Packing Lists/campos-json-por-cliente.md](docs/Packing%20Lists/campos-json-por-cliente.md) — campos del JSON por cliente; en `docs/Packing Lists/` hay ejemplos `.xlsx` completos de cada plantilla.
+- [docs/Procesado Escandallos ICSUITE/](docs/Procesado%20Escandallos%20ICSUITE/) — dos escandallos reales del ERP (`ULL*.xlsx`) y el excel de salida de ejemplo; los dos escandallos están copiados en `src/test/resources/ejemplos/escandallos/`.
+- [docs/superpowers/specs/2026-07-29-procesado-escandallos-icsuite-design.md](docs/superpowers/specs/2026-07-29-procesado-escandallos-icsuite-design.md) — diseño de la feature de escandallos.
 - [TODO](TODO) — lista de pendientes que mantiene **el usuario**; consultarla al empezar, no reescribirla por tu cuenta.
 - [SESSION_HANDOFF.md](SESSION_HANDOFF.md) — traspaso de la última sesión ("stop the session" lo regenera, no es un log).
 
@@ -65,6 +68,21 @@ fichero por (tipo, Made in): bolsos MOROCCO, bolsos SPAIN, cinturones
 `EtiquetasArticuloExcelBuilder`, ancladas al fichero real del cliente por
 `EtiquetasArticuloMaquetacionTest` — POI no copia el `pageSetup` al clonar
 hojas, así que heredarla de una plantilla no servía.
+
+**Procesado de escandallos ICSUITE** (`service/escandallos/`): flujo
+**totalmente independiente** del resto (`/escandallos`) — no hay envío, ni
+cliente, ni catálogo. Entran N excels de escandallo del ERP y sale **un solo
+`.xlsx` con una hoja por escandallo** (`Escandallos ICSUITE.xlsx`). Los
+escandallos son PDFs convertidos a excel: **los valores no caen en la columna de
+su encabezado** (`Article` en B9 pero los códigos en A10, `Quantitat` en X9 pero
+las cantidades en W10) y el número de materiales varía, así que `EscandalloReader`
+**no usa coordenadas**: localiza la fila `Article…Quantitat`, anota *todas* sus
+columnas con encabezado —también `Preu Ult.` e `Imp. Material`, que son las que
+impiden que el precio se lea como cantidad— y asigna cada celda al encabezado más
+cercano. Ojo: esos ficheros traen celdas `inlineStr` vacías y POI devuelve `null`
+en `getStringCellValue()`. Nombre de hoja = modelo + color (`NombresHoja`), porque
+hay un escandallo por color y todos comparten `MODEL`. Sin plantilla `.xlsx`: la
+maquetación son constantes de `EscandallosExcelBuilder`.
 
 **Web** (`web/`): asistente de 3 pantallas — `entrada` (pegar JSON o subir fotos) → `revision` (avisos, pesos editables, "↻ modelo" propaga un peso a toda su referencia) → `resultados` (descarga individual, ZIP y volcado ERP). Estado del envío en sesión HTTP (`EnvioEnCurso`). Las cajas en la revisión se localizan por **posición** (`indiceCaja`), no por número de caja, porque los números pueden repetirse (cajas mixtas).
 

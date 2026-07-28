@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Escandallos ICSUITE')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· Escandallos ICSUITE')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <!-- Solo se llega aquí con hojas cuando el procesado dejó algún aviso:
+         sin avisos el excel se descarga directamente desde el POST. -->
+    <section class="tarjeta seccion-salida" th:if="${hojas}">
+        <h3 class="titulo-seccion">✅ Escandallos procesados</h3>
+        <p class="resumen-envio">
+            <span th:text="${#lists.size(hojas)}"></span> hoja(s) en el excel:
+            <span th:text="${#strings.listJoin(hojas, ' · ')}"></span>
+        </p>
+        <a class="boton" th:href="@{/escandallos/descargar}">Descargar igualmente</a>
+        <a class="boton secundario" th:href="@{/escandallos}">Empezar de nuevo</a>
+    </section>
+
+    <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+
+    <form class="tarjeta" th:action="@{/escandallos/procesar}" method="post"
+          enctype="multipart/form-data">
+        <h3 class="titulo-seccion">📋 Procesado de Escandallos ICSUITE</h3>
+        <p class="ayuda">
+            Sube los excels de escandallo que imprime el ERP —uno por artículo y color— y
+            sale un único excel con una hoja por escandallo: modelo, descripción, color y
+            su tabla de materiales. Se ignoran precios, importes y las fases.
+        </p>
+
+        <label for="escandallos">Excels de escandallo (puedes elegir varios)</label>
+        <input type="file" id="escandallos" name="escandallos" accept=".xlsx" multiple required>
+        <p class="ayuda">
+            Cada hoja se llama como el modelo y su color («ULL770.AL245 NOIR»), porque el
+            mismo modelo viene repetido en un escandallo por cada color.
+        </p>
+
+        <button type="submit">Procesar escandallos</button>
+        <a class="boton secundario" th:href="@{/menu}">Volver al menú</a>
+    </form>
+</main>
+</body>
+</html>
