@@ -1,18 +1,10 @@
 package com.puntotres.packinglist.service.etiquetas;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 /**
  * Índice en memoria del excel de pedido de la temporada de AMI (el que sube
@@ -26,6 +18,9 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  * La columna PO codifica la destinación: "NNNNN CH" (China), "NNNNN JP"
  * (Japan) o un número sin sufijo (France). El order number de la etiqueta
  * es siempre la parte numérica con padding a 5 dígitos.
+ *
+ * La lectura de bajo nivel (localizar la hoja, resolver columnas, leer
+ * celdas) está en HojaEan, compartida con las etiquetas de artículo.
  */
 public class AmiPedidoExcel {
 
@@ -44,22 +39,16 @@ public class AmiPedidoExcel {
     }
 
     public static AmiPedidoExcel desdeBytes(byte[] contenido) throws IOException {
-        try (Workbook libro = new XSSFWorkbook(new ByteArrayInputStream(contenido))) {
-            Sheet hoja = hojaEan(libro);
-            Row cabecera = hoja.getRow(hoja.getFirstRowNum());
-            int colArticle = columna(cabecera, "ARTICLE");
-            int colColoris = columna(cabecera, "COLORIS");
-            int colLibelle = columna(cabecera, "LIBELL");
-            int colPo = columna(cabecera, "PO");
+        try (HojaEan hoja = HojaEan.abrir(contenido)) {
+            int colArticle = hoja.columna("ARTICLE");
+            int colColoris = hoja.columna("COLORIS");
+            int colLibelle = hoja.columna("LIBELL");
+            int colPo = hoja.columna("PO");
 
             List<FilaCruda> filas = new ArrayList<>();
-            for (int i = hoja.getFirstRowNum() + 1; i <= hoja.getLastRowNum(); i++) {
-                Row fila = hoja.getRow(i);
-                if (fila == null) {
-                    continue;
-                }
-                String article = texto(fila.getCell(colArticle));
-                String po = textoPo(fila.getCell(colPo));
+            for (int i = hoja.primeraFilaDatos(); i <= hoja.ultimaFila(); i++) {
+                String article = hoja.texto(i, colArticle);
+                String po = hoja.texto(i, colPo);
                 if (article.isBlank() || po.isBlank()) {
                     continue;
                 }
@@ -70,8 +59,8 @@ public class AmiPedidoExcel {
                 String sufijo = po.replaceAll("[0-9\\s]", "").toUpperCase(Locale.ROOT);
                 filas.add(new FilaCruda(
                         article.trim().toUpperCase(Locale.ROOT),
-                        texto(fila.getCell(colColoris)).trim(),
-                        texto(fila.getCell(colLibelle)).trim(),
+                        hoja.texto(i, colColoris).trim(),
+                        hoja.texto(i, colLibelle).trim(),
                         String.format("%05d", Long.parseLong(numerico)),
                         sufijo.isBlank() ? null : sufijo));
             }
@@ -103,49 +92,5 @@ public class AmiPedidoExcel {
                 ? elegida.coloris()
                 : elegida.coloris() + " " + elegida.libelle();
         return Optional.of(new FilaPedido(elegida.poNumerico(), colorCode));
-    }
-
-    private static Sheet hojaEan(Workbook libro) {
-        for (int i = 0; i < libro.getNumberOfSheets(); i++) {
-            if (libro.getSheetName(i).trim().toUpperCase(Locale.ROOT).startsWith("EAN")) {
-                return libro.getSheetAt(i);
-            }
-        }
-        throw new IllegalArgumentException(
-                "El excel de pedido no tiene ninguna hoja 'EAN ...': ¿es el archivo correcto?");
-    }
-
-    private static int columna(Row cabecera, String titulo) {
-        for (Cell celda : cabecera) {
-            if (texto(celda).trim().toUpperCase(Locale.ROOT).startsWith(titulo)) {
-                return celda.getColumnIndex();
-            }
-        }
-        throw new IllegalArgumentException(
-                "La hoja EAN del pedido no tiene la columna '" + titulo + "'");
-    }
-
-    private static String texto(Cell celda) {
-        if (celda == null) {
-            return "";
-        }
-        return switch (celda.getCellType()) {
-            case STRING -> celda.getStringCellValue();
-            case NUMERIC -> String.valueOf((long) celda.getNumericCellValue());
-            case FORMULA -> celda.getCachedFormulaResultType() == CellType.STRING
-                    ? celda.getStringCellValue() : "";
-            default -> "";
-        };
-    }
-
-    /** El PO puede ser texto ("07704 CH") o numérico (7672.0). */
-    private static String textoPo(Cell celda) {
-        if (celda == null) {
-            return "";
-        }
-        if (celda.getCellType() == CellType.NUMERIC) {
-            return String.valueOf((long) celda.getNumericCellValue());
-        }
-        return texto(celda);
     }
 }

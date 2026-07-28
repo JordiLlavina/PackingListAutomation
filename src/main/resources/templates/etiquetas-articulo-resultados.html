@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Etiquetas de artículo generadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· Etiquetas de artículo')}"></header>
+<main>
+    <p class="resumen-envio">
+        Cliente <strong th:text="${cliente}"></strong> ·
+        <span th:text="${#lists.size(excels)}"></span> excel(s) generado(s)
+    </p>
+
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
+        <summary th:text="|${#lists.size(avisos)} aviso(s)|"></summary>
+        <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+    </details>
+
+    <section class="tarjeta seccion-salida">
+        <h3 class="titulo-seccion">🏷️ Excels de etiquetas</h3>
+        <table>
+            <thead>
+            <tr>
+                <th>Contenido</th>
+                <th>Fichero</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="excel : ${excels}">
+                <td th:text="${excel.descripcion}"></td>
+                <td th:text="${excel.nombreFichero}"></td>
+                <td>
+                    <a th:href="@{/etiquetas-articulo/descargar/{nombre}(nombre=${excel.nombreFichero})}">
+                        Descargar</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <a class="boton" th:href="@{/etiquetas-articulo/descargar-todo}">Descargar todo (ZIP)</a>
+        <a class="boton secundario" th:href="@{/etiquetas-articulo/nuevo}">Otro pedido</a>
+        <a class="boton secundario" th:href="@{/menu}">Volver al menú</a>
+    </section>
+</main>
+</body>
+</html>

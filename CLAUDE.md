@@ -20,6 +20,7 @@ mvn spring-boot:run                           # asistente web en http://localhos
 - El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual.
 - El modo CLAUDE de la pantalla de entrada (fotos → JSON) necesita la variable de entorno `ANTHROPIC_API_KEY`. Sin ella la app arranca igual y el resto de modos funciona (cliente HTTP perezoso).
 - **Windows**: matar `mvn spring-boot:run` no mata el proceso `java` hijo y el 8080 queda ocupado. Liberarlo: `netstat -ano | findstr :8080` + `taskkill /F /PID <pid>`.
+- La portada es `/menu`; el asistente de packing list vive en `/packing-list` y `/` redirige al menú.
 
 ## Documentación que ya existe (y su estado)
 
@@ -54,6 +55,17 @@ Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
 
 **Etiquetas de caja** (`service/etiquetas/`): estrategia propia `GeneradorEtiquetasCliente` despachada por **clave de cliente** (no por TipoPlantilla); cada implementación declara qué destinaciones soporta y qué archivos extra pide al usuario en la vista `/etiquetas` (Paso 2). Implementado: AMI (China/Japan/France; hoja por destinación, par de etiquetas A4 por caja, barcode Code 128 del PO del excel de pedido EAN). Plantillas en `src/main/resources/client-labels/` — misma regla que las de packing list: **no editarlas sin revisar su builder** (`AmiEtiquetasExcelBuilder`/`AmiEtiquetaLayout`).
 
+**Etiquetas de artículo** (`service/etiquetasarticulo/`): flujo **independiente
+del envío** (`/etiquetas-articulo`), su única entrada es el excel de pedido del
+cliente. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
+clave de cliente; implementado AMI. Una hoja por fila del pedido (= por EAN13),
+40 etiquetas idénticas por hoja en una rejilla 4×10 que cabe en un A4, y un
+fichero por (tipo, Made in): bolsos MOROCCO, bolsos SPAIN, cinturones
+(`UBL*`). **No hay plantilla `.xlsx`**: la maquetación son constantes en
+`EtiquetasArticuloExcelBuilder`, ancladas al fichero real del cliente por
+`EtiquetasArticuloMaquetacionTest` — POI no copia el `pageSetup` al clonar
+hojas, así que heredarla de una plantilla no servía.
+
 **Web** (`web/`): asistente de 3 pantallas — `entrada` (pegar JSON o subir fotos) → `revision` (avisos, pesos editables, "↻ modelo" propaga un peso a toda su referencia) → `resultados` (descarga individual, ZIP y volcado ERP). Estado del envío en sesión HTTP (`EnvioEnCurso`). Las cajas en la revisión se localizan por **posición** (`indiceCaja`), no por número de caja, porque los números pueden repetirse (cajas mixtas).
 
 ## Reglas del proyecto
@@ -64,4 +76,4 @@ Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
 - **Un peso por caja física, en su primera línea** (`model/CajaFisica`): una caja puede ocupar varias líneas del JSON (tallas, colores, referencias) pero se pesa una sola vez y ese peso es el de su **línea líder**; las demás no aportan peso y una caja está pendiente si su líder no lo trae. Vale para todos los clientes y para packing lists y etiquetas: **nunca sumar las líneas de una caja**.
 - Las plantillas de `src/main/resources/client-packinglist/` tienen filas modelo y coordenadas de las que dependen los builders: **no editar la fila modelo ni los encabezados** de una plantilla sin revisar su builder.
 - `Main.java` se mantiene como prueba manual por petición explícita del usuario; no eliminarlo aunque la web cubra el mismo flujo.
-- Los tests instancian los servicios con `new` (JUnit 5 puro); solo `PackingListApplicationTest` levanta contexto Spring. Los tests de builders reabren el `.xlsx` generado con POI y comprueban celdas reales — seguir ese patrón.
+- Los tests instancian los servicios con `new` (JUnit 5 puro) por defecto; solo levantan contexto Spring con `@SpringBootTest` los que necesitan cableado real que no se puede replicar a mano: los de la capa web (mapeo de rutas, redirecciones, MockMvc) y los que verifican los JSON de ejemplo contra el catálogo real de `application.yml` (`EjemplosJsonTest`). Los tests de builders reabren el `.xlsx` generado con POI y comprueban celdas reales — seguir ese patrón.
