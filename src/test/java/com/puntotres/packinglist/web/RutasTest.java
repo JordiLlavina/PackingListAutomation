@@ -51,4 +51,21 @@ class RutasTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
+
+    @Test
+    void laPantallaDeEtiquetasDeArticuloOfreceElFormulario() throws Exception {
+        mvc.perform(get("/etiquetas-articulo"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("etiquetas-articulo"))
+                // El desplegable y el input del excel de pedido.
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("cliente")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("pedido")));
+    }
+
+    @Test
+    void sinNadaGeneradoLosResultadosVuelvenAlFormulario() throws Exception {
+        mvc.perform(get("/etiquetas-articulo/resultados"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/etiquetas-articulo"));
+    }
 }
