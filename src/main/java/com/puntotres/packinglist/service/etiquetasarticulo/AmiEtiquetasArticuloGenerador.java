@@ -2,7 +2,6 @@ package com.puntotres.packinglist.service.etiquetasarticulo;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -132,9 +131,15 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
         for (int i = 0; i < filas.size(); i++) {
             String candidato = conLibelle.get(i);
             boolean cabe = candidato.length() <= MAX_NOMBRE_HOJA;
+            // Comparación insensible a mayúsculas, como hace POI al crear la
+            // hoja: dos colores con el mismo libellé salvo mayúsculas ("NOIR"
+            // / "Noir") tienen que caer al mismo fallback que un libellé
+            // repetido tal cual, o la segunda hoja tumbaría la generación.
             // O(n²) sobre 79 filas como máximo: irrelevante y más claro que
             // montar un mapa de frecuencias.
-            boolean unico = Collections.frequency(conLibelle, candidato) == 1;
+            boolean unico = conLibelle.stream()
+                    .filter(candidato::equalsIgnoreCase)
+                    .count() == 1;
             nombres.add(recortar(cabe && unico
                     ? candidato
                     : nombre(filas.get(i), cinturon, sanear(filas.get(i).coloris()))));

@@ -3,7 +3,7 @@ package com.puntotres.packinglist.service.etiquetasarticulo;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.TreeSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,7 +100,10 @@ public class EtiquetasArticuloExcelBuilder {
         }
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             Estilos estilos = new Estilos(libro);
-            Set<String> nombresUsados = new HashSet<>();
+            // Insensible a mayúsculas, como compara POI al crear la hoja: si
+            // no, dos nombres que solo difieran en mayúsculas se cuelan por
+            // esta red y POI lanza al crear la segunda.
+            Set<String> nombresUsados = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (HojaEtiquetas hoja : hojas) {
                 XSSFSheet destino =
                         crearHojaMaquetada(libro, nombreUnico(nombresUsados, hoja.nombreHoja()));

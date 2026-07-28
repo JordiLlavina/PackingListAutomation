@@ -161,6 +161,20 @@ class EtiquetasArticuloExcelBuilderTest {
     }
 
     @Test
+    void dosHojasQueSoloDifierenEnMayusculasTampocoRompenLaGeneracion() throws Exception {
+        // POI compara los nombres de hoja con equalsIgnoreCase: sin una red
+        // insensible a mayúsculas, la segunda hoja hace que lance y se cae el
+        // fichero entero.
+        byte[] xlsx = builder.generar(List.of(
+                new HojaEtiquetas("USL738.AL0137 NOIR 07704", BOLSO),
+                new HojaEtiquetas("USL738.AL0137 Noir 07704", BOLSO)));
+
+        try (XSSFWorkbook libro = reabrir(xlsx)) {
+            assertEquals(2, libro.getNumberOfSheets());
+        }
+    }
+
+    @Test
     void elSufijoDeDesempateRecortaCuandoElNombreYaMideTreintaYUno() {
         java.util.Set<String> usados = new java.util.HashSet<>();
         String largo = "A".repeat(31);

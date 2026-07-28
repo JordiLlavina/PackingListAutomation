@@ -148,6 +148,25 @@ class AmiEtiquetasArticuloGeneradorTest {
     }
 
     @Test
+    void dosColorisConLibelleQueSoloDifiereEnMayusculasCaenLosDosAlColoris() throws Exception {
+        // POI compara nombres de hoja con equalsIgnoreCase: "NOIR" y "Noir"
+        // tienen que tratarse como el mismo nombre repetido, igual que si
+        // fueran idénticos, y caer los dos al fallback de COLORIS. Antes del
+        // arreglo el fallback no se disparaba y la generación entera fallaba
+        // con "The workbook already contains a sheet named...".
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new Fila("MOROCCO", "USL738.AL0137", "A236", "NOIR", "U", 7704, EAN_A),
+                new Fila("MOROCCO", "USL738.AL0137", "A237", "Noir", "U", 7704, EAN_B));
+
+        ResultadoEtiquetasArticulo resultado = generador.generar(pedido, "H26");
+
+        assertEquals(1, resultado.getExcels().size());
+        assertEquals(List.of("USL738.AL0137 A237 07704", "USL738.AL0137 A236 07704"),
+                nombresDeHoja(porNombre(resultado, "AMI CODE BARRE H26 MOROCCO.xlsx")
+                        .contenido()));
+    }
+
+    @Test
     void ordenaTodoDescendenteYLaTallaNumericamente() throws Exception {
         byte[] pedido = PedidoAmiExcel.crear("EAN H26",
                 new Fila("SPAIN", "UBL029.AL0104", "0014", "NOIR", "75", 7704, EAN_A),
