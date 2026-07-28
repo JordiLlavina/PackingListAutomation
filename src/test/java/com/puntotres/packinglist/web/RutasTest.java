@@ -31,9 +31,11 @@ class RutasTest {
         mvc.perform(get("/menu"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("menu"))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("/packing-list")))
+                // Que sean href de un enlace, no solo texto suelto en la página.
                 .andExpect(content().string(
-                        org.hamcrest.Matchers.containsString("/etiquetas-articulo")));
+                        org.hamcrest.Matchers.containsString("href=\"/packing-list\"")))
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("href=\"/etiquetas-articulo\"")));
     }
 
     @Test
