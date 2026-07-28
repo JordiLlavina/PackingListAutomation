@@ -27,9 +27,6 @@ import com.puntotres.packinglist.service.etiquetas.CodigoBarrasEan13;
 @Service
 public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticuloCliente {
 
-    /** Longitud máxima de un nombre de hoja en Excel. */
-    private static final int MAX_NOMBRE_HOJA = 31;
-
     /** Caracteres que Excel no admite en un nombre de hoja. */
     private static final Pattern PROHIBIDOS_EN_HOJA = Pattern.compile("[/\\\\?*:\\[\\]]");
 
@@ -130,13 +127,13 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
         List<String> nombres = new ArrayList<>();
         for (int i = 0; i < filas.size(); i++) {
             String candidato = conLibelle.get(i);
-            boolean cabe = candidato.length() <= MAX_NOMBRE_HOJA;
+            boolean cabe = candidato.length() <= EtiquetasArticuloExcelBuilder.MAX_NOMBRE_HOJA;
             // Comparación insensible a mayúsculas, como hace POI al crear la
             // hoja: dos colores con el mismo libellé salvo mayúsculas ("NOIR"
-            // / "Noir") tienen que caer al mismo fallback que un libellé
-            // repetido tal cual, o la segunda hoja tumbaría la generación.
-            // O(n²) sobre 79 filas como máximo: irrelevante y más claro que
-            // montar un mapa de frecuencias.
+            // / "Noir") deben caer al mismo fallback que un libellé repetido
+            // tal cual, o la segunda hoja tumbaría la generación al llegar al
+            // builder. O(n²) sobre 79 filas como máximo: irrelevante y más
+            // claro que montar un mapa de frecuencias.
             boolean unico = conLibelle.stream()
                     .filter(candidato::equalsIgnoreCase)
                     .count() == 1;
@@ -152,9 +149,10 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
         String completo = cinturon ? base + " " + fila.taille() : base;
         // Se sanea el nombre ENTERO, no solo el color: ARTICLE y PO también
         // acaban aquí, y un carácter prohibido en cualquiera de ellos haría
-        // que POI rechazara la hoja y se cayera el grupo completo. El trim
-        // final quita el espacio que deja un cinturón sin talla.
-        return sanear(completo).trim();
+        // que POI rechazara la hoja y se cayera el grupo completo. sanear()
+        // ya hace el trim (antes del regex): eso es lo que quita el espacio
+        // que deja un cinturón sin talla, así que aquí no hace falta repetirlo.
+        return sanear(completo);
     }
 
     private static String sanear(String texto) {
@@ -167,9 +165,9 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
      * dejar que POI lance al crear la hoja.
      */
     private static String recortar(String nombre) {
-        return nombre.length() <= MAX_NOMBRE_HOJA
+        return nombre.length() <= EtiquetasArticuloExcelBuilder.MAX_NOMBRE_HOJA
                 ? nombre
-                : nombre.substring(0, MAX_NOMBRE_HOJA);
+                : nombre.substring(0, EtiquetasArticuloExcelBuilder.MAX_NOMBRE_HOJA);
     }
 
     /** La talla como número para ordenar; -1 si no es numérica ("U"). */

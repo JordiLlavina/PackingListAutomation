@@ -30,6 +30,13 @@ public interface GeneradorEtiquetasArticuloCliente {
      * temporadaPorDefecto: la que ha escrito el usuario en la pantalla. Solo
      * se usa si no se puede deducir del propio excel (el nombre de la hoja
      * "EAN H26"), que es la fuente preferente.
+     *
+     * El {@code nombreFichero} de cada {@link ExcelEtiquetasArticulo} del
+     * resultado NO viene saneado (compone temporada y "Made in" tal cual, sin
+     * validar sus caracteres): hoy solo lo sanea EtiquetasArticuloController,
+     * en el punto de entrada a la sesión. Cualquier otro consumidor que use
+     * nombreFichero como nombre de fichero, segmento de ruta o entrada de ZIP
+     * debe sanearlo él mismo.
      */
     ResultadoEtiquetasArticulo generar(byte[] excelPedido, String temporadaPorDefecto)
             throws IOException;

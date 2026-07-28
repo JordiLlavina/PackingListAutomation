@@ -1,11 +1,16 @@
 package com.puntotres.packinglist.service.etiquetasarticulo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
 
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
@@ -125,6 +130,37 @@ class AmiCatalogoEanTest {
                 new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7672)));
 
         assertEquals("", catalogo.filas().get(0).ean13());
+    }
+
+    /** Mismas columnas que PedidoAmiExcel.crear, pero sin "Libellé coloris". */
+    private static byte[] pedidoSinColumnaLibelle() throws Exception {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            var hoja = libro.createSheet("EAN H26");
+            Row cabecera = hoja.createRow(0);
+            String[] titulos = {"Made in", "ARTICLE", "COLORIS", "TAILLE", "PO", "EAN13"};
+            for (int i = 0; i < titulos.length; i++) {
+                cabecera.createCell(i).setCellValue(titulos[i]);
+            }
+            Row fila = hoja.createRow(1);
+            fila.createCell(0).setCellValue("SPAIN");
+            fila.createCell(1).setCellValue("ULL163.AL0052");
+            ByteArrayOutputStream salida = new ByteArrayOutputStream();
+            libro.write(salida);
+            return salida.toByteArray();
+        }
+    }
+
+    @Test
+    void sinLaColumnaDeLibelleElMensajeDeErrorUsaElRotuloHumano() throws Exception {
+        // La clave de búsqueda interna es "LIBELL"; el usuario conoce la
+        // columna por su nombre real en el excel, "Libellé coloris".
+        byte[] pedido = pedidoSinColumnaLibelle();
+
+        IllegalArgumentException excepcion = assertThrows(IllegalArgumentException.class,
+                () -> AmiCatalogoEan.desdeBytes(pedido));
+
+        assertTrue(excepcion.getMessage().contains("Libellé coloris"), excepcion.getMessage());
+        assertFalse(excepcion.getMessage().contains("LIBELL'"), excepcion.getMessage());
     }
 
     @Test

@@ -150,10 +150,10 @@ class AmiEtiquetasArticuloGeneradorTest {
     @Test
     void dosColorisConLibelleQueSoloDifiereEnMayusculasCaenLosDosAlColoris() throws Exception {
         // POI compara nombres de hoja con equalsIgnoreCase: "NOIR" y "Noir"
-        // tienen que tratarse como el mismo nombre repetido, igual que si
-        // fueran idénticos, y caer los dos al fallback de COLORIS. Antes del
-        // arreglo el fallback no se disparaba y la generación entera fallaba
-        // con "The workbook already contains a sheet named...".
+        // deben tratarse como el mismo nombre repetido, igual que si fueran
+        // idénticos, y caer los dos al fallback de COLORIS. Antes del arreglo
+        // el fallback no se disparaba y la generación entera fallaba con
+        // "The workbook already contains a sheet named...".
         byte[] pedido = PedidoAmiExcel.crear("EAN H26",
                 new Fila("MOROCCO", "USL738.AL0137", "A236", "NOIR", "U", 7704, EAN_A),
                 new Fila("MOROCCO", "USL738.AL0137", "A237", "Noir", "U", 7704, EAN_B));

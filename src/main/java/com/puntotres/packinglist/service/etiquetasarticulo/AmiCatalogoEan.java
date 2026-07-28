@@ -37,7 +37,7 @@ public final class AmiCatalogoEan {
             int colMadeIn = hoja.columna("MADE IN");
             int colArticle = hoja.columna("ARTICLE");
             int colColoris = hoja.columna("COLORIS");
-            int colLibelle = hoja.columna("LIBELL");
+            int colLibelle = hoja.columna("LIBELL", "Libellé coloris");
             int colTaille = hoja.columna("TAILLE");
             int colPo = hoja.columna("PO");
             int colEan13 = hoja.columna("EAN13");

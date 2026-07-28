@@ -57,6 +57,15 @@ public class EtiquetasArticuloController {
      */
     private static final Pattern CARACTERES_INSEGUROS = Pattern.compile("[\\\\/:*?\"<>|]+");
 
+    /**
+     * Texto genérico para cualquier fallo que no sea una de nuestras
+     * IllegalArgumentException (que ya llevan mensaje en español): una
+     * excepción de POI en inglés, o una sin mensaje, no le dice nada a
+     * Jordi sobre qué fila o columna mirar.
+     */
+    private static final String MENSAJE_FORMATO_INESPERADO =
+            "el fichero no tiene el formato esperado: revisa que sea el excel de pedido del cliente";
+
     private final EtiquetasArticuloGenerationService etiquetasArticuloService;
     private final ClientesProperties clientesProperties;
     private final EtiquetasArticuloEnCurso enCurso;
@@ -98,12 +107,22 @@ public class EtiquetasArticuloController {
         ResultadoEtiquetasArticulo resultado;
         try {
             resultado = generador.generar(pedido.getBytes(), temporada);
-        } catch (IOException | RuntimeException e) {
+        } catch (IllegalArgumentException e) {
             // Un excel que no es el que toca (sin hoja EAN, sin columna
             // EAN13) llega aquí: es lo único que bloquea, porque no hay nada
-            // útil que generar.
+            // útil que generar. Nuestras IllegalArgumentException ya llevan
+            // mensaje en español (HojaEan, AmiCatalogoEan...) y se pueden
+            // mostrar tal cual.
+            redirect.addFlashAttribute("error", "No se pudieron generar las etiquetas: "
+                    + (e.getMessage() != null ? e.getMessage() : MENSAJE_FORMATO_INESPERADO));
+            return "redirect:/etiquetas-articulo";
+        } catch (IOException | RuntimeException e) {
+            // Cualquier otra cosa (un fichero corrupto, una excepción de POI
+            // en inglés, un mensaje null) no es algo que Jordi pueda leer y
+            // arreglar tal cual: un texto genérico es más útil que trasladar
+            // la excepción original.
             redirect.addFlashAttribute("error",
-                    "No se pudieron generar las etiquetas: " + e.getMessage());
+                    "No se pudieron generar las etiquetas: " + MENSAJE_FORMATO_INESPERADO);
             return "redirect:/etiquetas-articulo";
         }
         if (resultado.getExcels().isEmpty()) {

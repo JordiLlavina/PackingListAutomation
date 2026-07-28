@@ -349,6 +349,23 @@ button:disabled {
     margin-top: 0.6rem;
 }
 
+/* Avisos plegados por defecto (etiquetas de artículo): un pedido con muchas
+   filas incompletas puede generar un aviso por fila y no debe empujar la
+   tabla de descargas fuera de la pantalla. */
+.avisos-plegables {
+    margin: 1rem 0;
+}
+
+.avisos-plegables summary {
+    cursor: pointer;
+    color: var(--acento);
+    font-weight: 600;
+}
+
+.avisos-plegables .alerta {
+    margin: 0.5rem 0 0;
+}
+
 .f-cajas h5 { margin: 0.9rem 0 0; font-size: 0.95rem; }
 
 .f-pie-cajas {

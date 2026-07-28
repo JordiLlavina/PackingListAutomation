@@ -62,6 +62,17 @@ public final class HojaEan implements AutoCloseable {
      * hacer nada útil con el fichero, así que aquí sí se bloquea.
      */
     public int columna(String titulo) {
+        return columna(titulo, titulo);
+    }
+
+    /**
+     * Igual que {@link #columna(String)}, pero con un rótulo distinto para
+     * el mensaje de error: la clave de búsqueda no siempre es cómoda de leer
+     * ("LIBELL" para encontrar cualquier variante de "Libellé coloris"), y el
+     * usuario que lee el aviso conoce su fichero por el nombre de columna
+     * real, no por la clave interna.
+     */
+    public int columna(String titulo, String rotuloEnElError) {
         String buscado = titulo.toUpperCase(Locale.ROOT);
         for (Cell celda : cabecera) {
             if (texto(celda).trim().toUpperCase(Locale.ROOT).startsWith(buscado)) {
@@ -69,7 +80,7 @@ public final class HojaEan implements AutoCloseable {
             }
         }
         throw new IllegalArgumentException("La hoja '" + nombre()
-                + "' del excel de pedido no tiene la columna '" + titulo + "'");
+                + "' del excel de pedido no tiene la columna '" + rotuloEnElError + "'");
     }
 
     public int primeraFilaDatos() {

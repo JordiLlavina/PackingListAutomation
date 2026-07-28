@@ -9,7 +9,10 @@
         <span th:text="${#lists.size(excels)}"></span> excel(s) generado(s)
     </p>
 
-    <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
+        <summary th:text="|${#lists.size(avisos)} aviso(s)|"></summary>
+        <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+    </details>
 
     <section class="tarjeta seccion-salida">
         <h3 class="titulo-seccion">🏷️ Excels de etiquetas</h3>
@@ -26,8 +29,7 @@
                 <td th:text="${excel.descripcion}"></td>
                 <td th:text="${excel.nombreFichero}"></td>
                 <td>
-                    <a class="boton mini"
-                       th:href="@{/etiquetas-articulo/descargar/{nombre}(nombre=${excel.nombreFichero})}">
+                    <a th:href="@{/etiquetas-articulo/descargar/{nombre}(nombre=${excel.nombreFichero})}">
                         Descargar</a>
                 </td>
             </tr>

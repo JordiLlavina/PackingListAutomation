@@ -3,11 +3,11 @@ package com.puntotres.packinglist.service.etiquetasarticulo;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.TreeSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -44,42 +44,50 @@ import com.puntotres.packinglist.service.etiquetas.CodigoBarrasEan13;
 public class EtiquetasArticuloExcelBuilder {
 
     /** Anchos de columna en unidades POI (caracteres × 256). */
-    static final int[] ANCHOS_COLUMNA =
+    private static final int[] ANCHOS_COLUMNA =
             {3766, 4425, 621, 3766, 4534, 512, 3766, 4534, 621, 3766, 4534};
 
     /**
      * Columna izquierda de cada par de columnas de etiqueta. La derecha es
      * la siguiente; las columnas 2, 5 y 8 son separadores estrechos.
+     *
+     * Package-private: EtiquetasArticuloExcelBuilderTest la recorre para
+     * comprobar las cuatro columnas repetidas de la rejilla.
      */
     static final int[] COLUMNAS_IZQUIERDA = {0, 3, 6, 9};
 
     static final int BLOQUES = 10;
     static final int FILAS_POR_BLOQUE = 8;
     /** Fila 0-based del primer bloque: la 0 es el margen superior. */
-    static final int PRIMERA_FILA_BLOQUE = 1;
+    private static final int PRIMERA_FILA_BLOQUE = 1;
     static final int ETIQUETAS_POR_HOJA = COLUMNAS_IZQUIERDA.length * BLOQUES;
 
-    static final float ALTO_MARGEN_SUPERIOR = 6f;
-    static final float ALTO_SEPARADORA = 9.95f;
-    static final float ALTO_DEFECTO = 15f;
+    private static final float ALTO_MARGEN_SUPERIOR = 6f;
+    private static final float ALTO_SEPARADORA = 9.95f;
+    private static final float ALTO_DEFECTO = 15f;
 
-    static final short ESCALA = 74;
-    static final double MARGEN_IZQUIERDO = 0.0;
+    private static final short ESCALA = 74;
+    private static final double MARGEN_IZQUIERDO = 0.0;
     /** 1 mm en pulgadas, que es lo que guarda el fichero del cliente. */
-    static final double MARGEN = 0.03937007874015748;
+    private static final double MARGEN = 0.03937007874015748;
     /** Margen de cabecera/pie del fichero del cliente, en pulgadas. */
-    static final double MARGEN_CABECERA_PIE = 0.31496062992125984;
+    private static final double MARGEN_CABECERA_PIE = 0.31496062992125984;
 
-    /** Longitud máxima de un nombre de hoja en Excel. */
-    private static final int MAX_NOMBRE_HOJA = 31;
+    /**
+     * Longitud máxima de un nombre de hoja en Excel. Package-private: es la
+     * restricción de Excel que este builder impone al crear la hoja, y
+     * AmiEtiquetasArticuloGenerador (y cualquier otro cliente futuro) la
+     * reutiliza al componer el nombre en vez de declarar la suya.
+     */
+    static final int MAX_NOMBRE_HOJA = 31;
 
     /** Desplazamiento del código de barras respecto a la fila base del bloque. */
-    static final int BARCODE_OFFSET_FILA = 2;
+    private static final int BARCODE_OFFSET_FILA = 2;
     /** Desplazamiento y tamaño del código de barras, en EMU. dx lo centra. */
-    static final long BARCODE_DX = 342901;
-    static final long BARCODE_DY = 9525;
-    static final long BARCODE_CX = 1463802;
-    static final long BARCODE_CY = 647700;
+    private static final long BARCODE_DX = 342901;
+    private static final long BARCODE_DY = 9525;
+    private static final long BARCODE_CX = 1463802;
+    private static final long BARCODE_CY = 647700;
 
     /**
      * Cuerpo de la celda de color en veinteavos de punto, según la longitud
@@ -100,9 +108,10 @@ public class EtiquetasArticuloExcelBuilder {
         }
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             Estilos estilos = new Estilos(libro);
-            // Insensible a mayúsculas, como compara POI al crear la hoja: si
-            // no, dos nombres que solo difieran en mayúsculas se cuelan por
-            // esta red y POI lanza al crear la segunda.
+            // POI compara los nombres de hoja con equalsIgnoreCase (locale-
+            // independiente): la red de unicidad tiene que usar la misma
+            // semántica o dos nombres que solo difieran en mayúsculas
+            // ("NOIR" / "Noir") tumban la generación entera.
             Set<String> nombresUsados = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
             for (HojaEtiquetas hoja : hojas) {
                 XSSFSheet destino =
