@@ -144,7 +144,12 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
 
     private static String nombre(FilaEan fila, boolean cinturon, String color) {
         String base = fila.article() + " " + color + " " + fila.poCompacto();
-        return cinturon ? base + " " + fila.taille() : base;
+        String completo = cinturon ? base + " " + fila.taille() : base;
+        // Se sanea el nombre ENTERO, no solo el color: ARTICLE y PO también
+        // acaban aquí, y un carácter prohibido en cualquiera de ellos haría
+        // que POI rechazara la hoja y se cayera el grupo completo. El trim
+        // final quita el espacio que deja un cinturón sin talla.
+        return sanear(completo).trim();
     }
 
     private static String sanear(String texto) {

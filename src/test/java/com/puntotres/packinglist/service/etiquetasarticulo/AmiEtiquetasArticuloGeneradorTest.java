@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service.etiquetasarticulo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -220,6 +221,36 @@ class AmiEtiquetasArticuloGeneradorTest {
 
         assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("Sin talla")),
                 resultado.getAvisos().toString());
+    }
+
+    @Test
+    void unCinturonSinTallaAvisaYSuHojaNoQuedaConEspacioFinal() throws Exception {
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new Fila("SPAIN", "UBL214.AL0223", "001", "BLACK", "", "07694 JP", EAN_A));
+
+        ResultadoEtiquetasArticulo resultado = generador.generar(pedido, "H26");
+
+        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("Sin talla")),
+                resultado.getAvisos().toString());
+        assertEquals(List.of("UBL214.AL0223 BLACK 07694JP"), nombresDeHoja(
+                porNombre(resultado, "AMI CODE BARRE ITEMS H26 SPAIN CINTURONES.xlsx")
+                        .contenido()));
+    }
+
+    @Test
+    void unCaracterProhibidoEnElPoNoTumbaLaGeneracion() throws Exception {
+        // Un '/' tecleado por error en la celda PO llegaría a createSheet y
+        // POI rechazaría la hoja: debe quedar saneado antes.
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new Fila("MOROCCO", "USL738.AL0137", "A236", "TRUFFLE", "U", "07714/CH", EAN_A));
+
+        ResultadoEtiquetasArticulo resultado = generador.generar(pedido, "H26");
+
+        assertEquals(1, resultado.getExcels().size());
+        List<String> hojas = nombresDeHoja(
+                porNombre(resultado, "AMI CODE BARRE H26 MOROCCO.xlsx").contenido());
+        assertEquals(1, hojas.size());
+        assertFalse(hojas.get(0).contains("/"), hojas.get(0));
     }
 
     @Test
