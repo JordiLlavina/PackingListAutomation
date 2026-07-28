@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Inicio')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('')}"></header>
+<main>
+    <p class="menu-intro">
+        Dos cosas distintas que salen de dos documentos distintos. Elige por dónde empezar.
+    </p>
+
+    <div class="menu-tarjetas">
+        <section class="tarjeta menu-tarjeta">
+            <h2 class="menu-titulo"><span class="menu-icono">📦</span> Packing List y albarán</h2>
+            <p class="menu-descripcion">
+                Del JSON del envío —pegado a mano, rellenado en el formulario o extraído de
+                fotos— a los excels que espera el cliente. Los pesos que falten se infieren
+                y se pueden revisar y corregir antes de generar.
+            </p>
+            <p class="menu-entrada">Necesitas: el packing list del envío.</p>
+            <ul class="menu-lista">
+                <li>Un packing list por destinación, en la plantilla real del cliente</li>
+                <li>Etiquetas de caja y de palet</li>
+                <li>Volcado del albarán para el ERP</li>
+            </ul>
+            <a class="boton" th:href="@{/packing-list}">Empezar →</a>
+        </section>
+
+        <section class="tarjeta menu-tarjeta">
+            <h2 class="menu-titulo"><span class="menu-icono">🏷️</span> Etiquetas de artículo</h2>
+            <p class="menu-descripcion">
+                Del excel de pedido de la temporada a los códigos de barras EAN13 que se
+                enganchan a cada bolso y a cada cinturón. Una hoja por referencia, color,
+                pedido y talla.
+            </p>
+            <p class="menu-entrada">Necesitas: el excel de pedido del cliente.</p>
+            <ul class="menu-lista">
+                <li>Un excel de bolsos por país de fabricación</li>
+                <li>Un excel de cinturones</li>
+                <li>40 etiquetas por hoja, ajustadas a un A4</li>
+            </ul>
+            <a class="boton" th:href="@{/etiquetas-articulo}">Empezar →</a>
+        </section>
+    </div>
+</main>
+</body>
+</html>

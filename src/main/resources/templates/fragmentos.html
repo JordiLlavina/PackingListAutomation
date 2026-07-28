@@ -10,7 +10,7 @@
 <body>
 <header class="cabecera" th:fragment="cabecera(paso)">
     <div class="titulo">
-        Generador de Packing Lists
+        <a th:href="@{/menu}" class="enlace-menu">Generador de Packing Lists</a>
         <span class="paso" th:text="${paso}">paso</span>
     </div>
 </header>

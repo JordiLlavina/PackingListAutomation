@@ -423,3 +423,63 @@ button:disabled {
     font-size: 1.4rem;
     line-height: 1;
 }
+
+/* --- Menú de inicio: una tarjeta por familia de salidas --- */
+
+header.cabecera .enlace-menu {
+    color: inherit;
+    text-decoration: none;
+}
+
+header.cabecera .enlace-menu:hover {
+    text-decoration: underline;
+}
+
+.menu-intro {
+    margin: 1.2rem 0 0;
+    color: #5a6673;
+}
+
+.menu-tarjetas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1rem;
+    align-items: start;
+}
+
+/* Botón pegado al fondo para que las dos tarjetas queden a la misma altura. */
+.menu-tarjeta {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 1.5rem;
+}
+
+.menu-tarjeta .boton { margin-top: auto; align-self: flex-start; }
+
+.menu-titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 0 0 0.6rem;
+    font-size: 1.3rem;
+}
+
+.menu-icono { font-size: 1.8rem; line-height: 1; }
+
+.menu-descripcion { margin: 0 0 0.8rem; line-height: 1.5; }
+
+.menu-entrada {
+    margin: 0 0 0.8rem;
+    padding: 0.45rem 0.7rem;
+    border-left: 3px solid var(--acento);
+    background: var(--fondo-suave);
+    font-size: 0.9rem;
+}
+
+.menu-lista {
+    margin: 0 0 1.2rem;
+    padding-left: 1.2rem;
+    font-size: 0.9rem;
+    line-height: 1.7;
+}

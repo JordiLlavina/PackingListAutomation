@@ -70,7 +70,7 @@ class PackingListControllerTest {
 
     @Test
     void laPantallaDeEntradaRenderizaElFormularioConElDesplegableDeClientes() throws Exception {
-        mvc.perform(get("/"))
+        mvc.perform(get("/packing-list"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("entrada"))
                 .andExpect(content().string(containsString("JSON del envío")))
@@ -209,7 +209,7 @@ class PackingListControllerTest {
     void revisionSinEnvioEnCursoRedirigeALaEntrada() throws Exception {
         mvc.perform(get("/revision"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"));
+                .andExpect(redirectedUrl("/packing-list"));
     }
 
     @Test

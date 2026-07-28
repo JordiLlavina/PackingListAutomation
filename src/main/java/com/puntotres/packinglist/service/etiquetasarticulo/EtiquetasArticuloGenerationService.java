@@ -35,11 +35,6 @@ public class EtiquetasArticuloGenerationService {
         return Optional.ofNullable(porCliente.get(normalizar(claveCliente)));
     }
 
-    /** ¿Hay algún cliente con etiquetas de artículo implementadas? */
-    public boolean tieneAlguno() {
-        return !porCliente.isEmpty();
-    }
-
     private static String normalizar(String clave) {
         return clave.trim().toUpperCase(Locale.ROOT);
     }

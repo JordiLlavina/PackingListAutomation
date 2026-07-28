@@ -60,6 +60,10 @@ import jakarta.validation.Valid;
  * entrada (pegar JSON + cabecera) → revisión (avisos y pesos editables)
  * → resultados (descarga de excels). Orquesta los mismos servicios que
  * {@code Main.java}, con el estado del envío en la sesión HTTP.
+ *
+ * Su primera pantalla vive en /packing-list: la raíz es el menú
+ * (MenuController), desde el que se llega también a las etiquetas de
+ * artículo, que son un flujo aparte.
  */
 @Controller
 public class PackingListController {
@@ -109,7 +113,7 @@ public class PackingListController {
 
     // --- Paso 1: entrada ---
 
-    @GetMapping("/")
+    @GetMapping("/packing-list")
     public String entrada(Model model) {
         if (!model.containsAttribute("envioForm")) {
             EnvioForm form = new EnvioForm();
@@ -460,7 +464,7 @@ public class PackingListController {
     @GetMapping("/nuevo")
     public String nuevo() {
         envioEnCurso.reiniciar();
-        return "redirect:/";
+        return "redirect:/packing-list";
     }
 
     // --- Internos ---
@@ -497,7 +501,7 @@ public class PackingListController {
 
     private String sinEnvio(RedirectAttributes redirect) {
         redirect.addFlashAttribute("mensaje", "No hay ningún envío en curso: empieza pegando el JSON.");
-        return "redirect:/";
+        return "redirect:/packing-list";
     }
 
     /**
