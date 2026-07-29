@@ -181,10 +181,14 @@ public class AmiEtiquetasExcelBuilder {
                     "EAN13:" + etiqueta.ean13(),
                     () -> CodigoBarrasEan13.png(etiqueta.ean13()).orElseThrow())));
         }
+        // El hueco del EAN128 es muy apaisado (casi 6:1) y el código no sale
+        // así de serie: se genera ya con la proporción del hueco para que no
+        // se estire al encajarlo. El del PO se deja como estaba.
         if (tiene(etiqueta.ean128())) {
             imagenes.add(new ImagenAnclada(layout.ean128(), indice(libro, cache,
                     "EAN128:" + etiqueta.ean128(),
-                    () -> CodigoBarrasCode128.png(etiqueta.ean128()))));
+                    () -> CodigoBarrasCode128.png(etiqueta.ean128(),
+                            layout.ean128().proporcion()))));
         }
         if (direccionJapan != null && "AMI JAPAN".equals(layout.nombreHoja())) {
             imagenes.add(new ImagenAnclada(AmiEtiquetaLayout.JAPAN_DIRECCION,

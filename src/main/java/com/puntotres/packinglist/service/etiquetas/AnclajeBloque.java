@@ -12,4 +12,13 @@ package com.puntotres.packinglist.service.etiquetas;
  * imagen-dirección de Japan.
  */
 public record AnclajeBloque(int fila, long dx, long dy, long cx, long cy) {
+
+    /**
+     * Proporción ancho/alto del hueco. Las imágenes se encajan a tamaño fijo,
+     * así que una que no venga con esta proporción se deforma: quien la genera
+     * la usa para renderizarla ya con la forma buena.
+     */
+    public double proporcion() {
+        return (double) cx / cy;
+    }
 }

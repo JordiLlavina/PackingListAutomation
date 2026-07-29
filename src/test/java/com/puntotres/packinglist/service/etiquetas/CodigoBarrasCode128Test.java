@@ -42,6 +42,30 @@ class CodigoBarrasCode128Test {
                 "el texto legible toca el borde de la imagen: sale cortado");
     }
 
+    @Test
+    void puedeGenerarseConLaProporcionDelHuecoDeLaEtiqueta() throws Exception {
+        // El hueco del EAN128 en la etiqueta de AMI es de casi 6:1; sin pedir
+        // la proporción el código sale sobre 3,7:1 y se estira al encajarlo.
+        String ean128 = "366659835477100001000076650000000000000000ES";
+        double proporcion = AmiEtiquetaLayout.FRANCE.ean128().proporcion();
+
+        BufferedImage ajustado = ImageIO.read(
+                new ByteArrayInputStream(CodigoBarrasCode128.png(ean128, proporcion)));
+        BufferedImage sinAjustar = ImageIO.read(
+                new ByteArrayInputStream(CodigoBarrasCode128.png(ean128)));
+
+        // Se aproxima, no se clava: el alto del texto que declara barcode4j en
+        // calcDimensions no es exactamente el que acaba ocupando en el bitmap.
+        // Queda en un 7% en vez del 62% de antes, que es imperceptible.
+        double proporcionAjustada = (double) ajustado.getWidth() / ajustado.getHeight();
+        assertTrue(Math.abs(proporcionAjustada - proporcion) / proporcion < 0.10,
+                "proporción " + proporcionAjustada + ", se esperaba cerca de " + proporcion);
+        assertTrue(proporcionAjustada > (double) sinAjustar.getWidth() / sinAjustar.getHeight(),
+                "el ajuste no ha aplanado la imagen");
+        // Aplanarla no puede volver a cortar el texto.
+        assertTrue(margenBlancoEnLaBandaDelTexto(ajustado));
+    }
+
     /**
      * ¿Queda blanco a los dos lados en la franja inferior, la del texto? El
      * texto va centrado, así que si no cabe pinta hasta el píxel del borde.

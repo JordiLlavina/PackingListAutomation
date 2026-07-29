@@ -32,9 +32,21 @@ public final class CodigoBarrasCode128 {
     }
 
     public static byte[] png(String texto) {
+        return png(texto, 0);
+    }
+
+    /**
+     * Igual que {@link #png(String)} pero ajustando el alto de las barras para
+     * que la imagen salga con la proporción ancho/alto pedida (0 = la que
+     * salga). El hueco de la etiqueta tiene un tamaño fijo, así que una imagen
+     * con otra proporción se deforma al encajarla: el EAN128 de AMI, con su
+     * hueco muy apaisado, llegaba a estirarse un 60% de ancho.
+     */
+    public static byte[] png(String texto, double proporcion) {
         Code128Bean codigo = new Code128Bean();
         codigo.doQuietZone(true);
         ajustarLaFuenteAlAnchoDelCodigo(codigo, texto);
+        ajustarElAltoALaProporcion(codigo, texto, proporcion);
         BitmapCanvasProvider lienzo =
                 new BitmapCanvasProvider(300, BufferedImage.TYPE_BYTE_BINARY, false, 0);
         codigo.generateBarcode(lienzo, texto);
@@ -61,6 +73,24 @@ public final class CodigoBarrasCode128 {
         double anchoTexto = texto.length() * codigo.getFontSize() * ANCHO_MEDIO_CARACTER;
         if (anchoTexto > anchoBarras) {
             codigo.setFontSize(codigo.getFontSize() * anchoBarras / anchoTexto);
+        }
+    }
+
+    /**
+     * Deja el alto total (barras + texto) en ancho/proporción, tocando solo el
+     * alto de las barras. Si la proporción pedida no deja sitio ni para las
+     * barras se ignora: mejor una imagen algo deformada que una sin barras.
+     */
+    private static void ajustarElAltoALaProporcion(Code128Bean codigo, String texto,
+                                                   double proporcion) {
+        if (proporcion <= 0) {
+            return;
+        }
+        var dimensiones = codigo.calcDimensions(texto);
+        double altoDelTexto = dimensiones.getHeight() - codigo.getBarHeight();
+        double altoDeLasBarras = dimensiones.getWidth() / proporcion - altoDelTexto;
+        if (altoDeLasBarras > 0) {
+            codigo.setBarHeight(altoDeLasBarras);
         }
     }
 }
