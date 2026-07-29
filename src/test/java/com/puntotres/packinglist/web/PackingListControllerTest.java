@@ -43,7 +43,8 @@ import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 @AutoConfigureMockMvc
 class PackingListControllerTest {
 
-    private static final String FICHERO_PARIS_USL728 = "PKL_PARIS_USL728.AL217_NOIR.xlsx";
+    private static final String FICHERO_PARIS_USL728 =
+            "2026.07.24_PUN_07685_USL728.AL217.NOIR_H26_FR.xlsx";
 
     @Autowired
     private MockMvc mvc;
@@ -435,8 +436,10 @@ class PackingListControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("resultados"))
                 .andExpect(content().string(containsString(FICHERO_PARIS_USL728)))
-                .andExpect(content().string(containsString("PKL_PARIS_USL737.ACO137_ROJO_PASION_69.xlsx")))
-                .andExpect(content().string(containsString("PKL_CHINA_USL737.ACO137_NOIR.xlsx")));
+                .andExpect(content().string(containsString(
+                        "2026.07.24_PUN_07685_USL737.ACO137.ROJO_PASION_69_H26_FR.xlsx")))
+                .andExpect(content().string(containsString(
+                        "2026.07.24_PUN_07713_USL737.ACO137.NOIR_H26_CHINA.xlsx")));
 
         byte[] excel = mvc.perform(get("/descargar/" + FICHERO_PARIS_USL728).session(sesion))
                 .andExpect(status().isOk())

@@ -78,9 +78,14 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             PackingListData data = mapearCabecera(destino, envio);
             data.setCajas(esCinturon ? mapearCajasCinturon(cajas) : mapearCajasBolso(cajas));
 
+            // El product order es el mismo para todo el grupo (viene por
+            // bloque de referencia en el JSON): basta con el de la primera caja.
+            String pedido = cajas.get(0).getNumeroPedido();
+
             byte[] excel = excelBuilder.generar(data, layout);
             resultado.add(new ExcelGenerado(destino.getNombreDestino(), referencia, color,
-                    nombreFichero(destino.getNombreDestino(), referencia, color),
+                    AmiNombreFichero.componer(envio.getFechaEnvio(), pedido, referencia, color,
+                            envio.getTemporada(), destino.getNombreDestino()),
                     excel, pendientes));
         }
         return resultado;
@@ -157,10 +162,5 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             filas.add(fila);
         }
         return filas;
-    }
-
-    private static String nombreFichero(String destino, String referencia, String color) {
-        String base = "PKL_" + destino + "_" + referencia + "_" + color + ".xlsx";
-        return base.replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
     }
 }

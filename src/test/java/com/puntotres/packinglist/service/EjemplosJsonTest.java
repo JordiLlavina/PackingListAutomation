@@ -79,7 +79,7 @@ class EjemplosJsonTest {
         // El cinturón de France (UBL029.AL0216) reúne las cajas 8 y 9: la 8 es
         // talla única (75) y la 9 mezcla tres tallas (85-95-105).
         ExcelGenerado belt = excels.stream()
-                .filter(e -> e.getNombreFichero().equals("PKL_FRANCE_UBL029.AL0216_001.xlsx"))
+                .filter(e -> e.getNombreFichero().equals("2026.07.24_PUN_7672_UBL029.AL0216.001_H26_FR.xlsx"))
                 .findFirst().orElseThrow();
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(belt.getContenido()))) {
             Sheet hoja = wb.getSheet("STANDARD PKL E25");

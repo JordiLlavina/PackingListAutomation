@@ -58,8 +58,8 @@ class AmiGeneradorTest {
 
         // Misma referencia pero distinto color -> dos packing lists.
         assertEquals(2, excels.size());
-        assertEquals("PKL_France_BOLSO_NAT03.xlsx", excels.get(0).getNombreFichero());
-        assertEquals("PKL_France_BOLSO_ROJO02.xlsx", excels.get(1).getNombreFichero());
+        assertEquals("2026.07.24_PUN_OF-1_BOLSO.NAT03_H26_FR.xlsx", excels.get(0).getNombreFichero());
+        assertEquals("2026.07.24_PUN_OF-1_BOLSO.ROJO02_H26_FR.xlsx", excels.get(1).getNombreFichero());
         assertEquals("France · BOLSO NAT03", excels.get(0).getDescripcion());
 
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
@@ -74,6 +74,11 @@ class AmiGeneradorTest {
         }
     }
 
+    /**
+     * El formato del nombre lo cubre {@link AmiNombreFicheroTest}; aquí se
+     * comprueba que el generador le pasa los datos del envío correctos (fecha,
+     * pedido, temporada) y que un destino raro no rompe el nombre.
+     */
     @Test
     void elNombreDeFicheroSaneaCaracteresInvalidosEnWindows() throws Exception {
         DestinoData destino = new DestinoData();
@@ -82,7 +87,8 @@ class AmiGeneradorTest {
 
         List<ExcelGenerado> excels = generador.generar(destino, List.of(), envio(), ami);
 
-        assertEquals("PKL_New_York_Boston_BOLSO_TOTE_NAT_03.xlsx", excels.get(0).getNombreFichero());
+        assertEquals("2026.07.24_PUN_OF-1_BOLSO_TOTE.NAT_03_H26_NEWYORK_BOSTON.xlsx",
+                excels.get(0).getNombreFichero());
     }
 
     @Test

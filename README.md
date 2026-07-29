@@ -27,7 +27,7 @@ Esto compila y ejecuta [`Main.java`](src/main/java/com/puntotres/packinglist/Mai
 1. Importa el envío (expande los rangos de cajas y valida `cantidadTotal`).
 2. Asigna palets a cada caja según los rangos.
 3. Intenta inferir los pesos que faltan (con las taras de `application.yml`).
-4. Genera **un excel por destinación + referencia + color** en `target\PKL_*.xlsx`.
+4. Genera **un excel por destinación + referencia + color** en `target\`. Los de AMI se nombran con el formato que pide el cliente: `<fecha de envío yyyy.MM.dd>_PUN_<product order>_<referencia>.<color>_<temporada>_<destinación abreviada>.xlsx` (p.ej. `2026.05.21_PUN_07705_ULL027.AL0103.001_H26_CHINA.xlsx`); los de APC y los genéricos siguen con `PKL_*.xlsx`.
 
 Por consola salen los avisos de validación, las cajas sin palet y los excels con pesos pendientes. Para probar con otros datos, edita ese JSON (o apunta `JSON_PRUEBA` en `Main.java` a otro fichero) y relanza el comando. Formato del JSON de envío:
 
