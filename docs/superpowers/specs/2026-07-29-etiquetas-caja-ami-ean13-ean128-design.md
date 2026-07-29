@@ -123,10 +123,16 @@ Una caja de cinturones mezcla tallas y cada talla tiene su propio EAN13
 (`UBL029.AL0216` 001: 75→`3666598890040`, 85→`…64`, 95→`…88`, 105→`…101`), pero
 en la etiqueta solo cabe un par de códigos.
 
-**Decisión**: el EAN de la **línea líder** de la caja física, es decir la
-primera talla — la misma línea de la que ya salen el peso, la referencia y el
-color (`model/CajaFisica`). Así la etiqueta es coherente consigo misma y nunca
-se queda sin códigos.
+**Decisión**: el EAN de la talla de la **línea líder** de la caja física — la
+misma línea de la que ya salen el peso, la referencia y el color
+(`model/CajaFisica`). Así la etiqueta es coherente consigo misma y nunca se
+queda sin códigos.
+
+Ojo: la línea líder es la **primera línea del JSON con ese número de caja**, no
+la talla más pequeña. Suelen coincidir porque el JSON viene ordenado, pero no
+está garantizado: en una caja cuyas líneas llegan 95, 85, 105 el `SIZE` de la
+etiqueta se imprime ordenado (`85-95-105`) y el EAN es el de la 95. Es lo
+coherente con el peso, que también es el de la 95.
 
 ### Las filas ocultas se leen
 
