@@ -115,15 +115,36 @@ La temporada del formulario va a la columna SEASON.
 
 ## Ejemplos completos (pasan los tests)
 
-Los tres JSON de `src/test/resources/ejemplos/` son ejemplos completos y
-válidos que los tests importan y generan de verdad:
+> ⚠️ **Son envíos inventados, no envíos que hayan existido.** Los generó una IA
+> a partir de la forma del JSON, sin conocer la realidad del almacén: los
+> números de caja, unidades, pesos, medidas y el reparto en palets están
+> puestos a ojo. Sirven para ejercitar el flujo de punta a punta y como
+> fixture, y **no son autoridad sobre nada**. Lo mismo vale para los JSON
+> recortados que aparecen como ejemplo más arriba en este documento.
+>
+> Los únicos ficheros de `docs/` con **datos reales** de cliente son los dos
+> excels de pedido: `docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI) y
+> `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC). De los demás `.xlsx`
+> de `docs/` lo real es la **maquetación** (son las plantillas y salidas que
+> usa el cliente); su contenido es también de relleno.
+
+De los cuatro JSON de `src/test/resources/ejemplos/`, `EjemplosJsonTest`
+importa y genera de verdad los tres primeros contra el catálogo real de
+`application.yml`; el de etiquetas de APC no lo carga ningún test:
 
 - `envio-ami-bags-y-belts.json`: AMI con las tres destinaciones
   (China/Japan/France), bolsos y carteras (ULL/USL) y cinturones (UBL),
   incluida una caja con tres tallas (85-95-105 en France) y `pesoBruto` por
-  caja (en las cajas mixtas de cinturón, en la primera talla). Referencias,
-  colores, POs y tallas reales del pedido `AMI EAN H26.xlsx` (el sufijo del
-  PO marca la destinación: CH China, JP Japan, sin sufijo France).
+  caja (en las cajas mixtas de cinturón, en la primera talla). De este el
+  único que tiene las **claves** copiadas del pedido real: referencias,
+  colores, POs y tallas existen en `EAN PUNTOTRES H26.xlsx` (el sufijo del PO
+  marca la destinación: CH China, JP Japan, sin sufijo France), así que las
+  etiquetas salen con EAN de verdad. Las cantidades y los pesos siguen siendo
+  inventados, y nada impide que una edición futura rompa esa correspondencia:
+  si un PO deja de existir, las etiquetas salen sin EAN y con aviso.
 - `envio-apc.json`: APC destino IVRY con bolsos y cinturones, caja de tres
   líneas y taras de palet mixtas (8.04 del JSON + 10 por defecto).
+- `envio-apc-etiquetas.json`: APC con sus siete destinos (Australia, Chine
+  franch, D. USA, Japan, Korea, Retail, C-LOG), para probar a mano el flujo de
+  etiquetas de caja. Ningún test lo usa.
 - `envio-generico.json`: ACKERMANN con un palet de 16 cajas.

@@ -73,13 +73,19 @@ mvn test -Dtest=PackingListGenerationServiceTest
 
 ### Los JSON de ejemplo son inventados
 
-Los `envio-*.json` de [`src/test/resources/ejemplos/`](src/test/resources/ejemplos/README.md)
-y el `packing_list_ami_test.json` del `Main` son **fixtures autogenerados**:
-envíos escritos a ojo para ejercitar el flujo y hacer pruebas visuales. Sus
-referencias, colores, tallas y números de pedido **no son datos de ningún
-cliente**, así que no describen qué colores tiene una referencia ni qué pedidos
-usa una destinación. Los ficheros reales, con sus rarezas, están en
-[`docs/`](docs/) y sus copias en `src/test/resources/ejemplos/*.xlsx`.
+Los `envio-*.json` de [`src/test/resources/ejemplos/`](src/test/resources/ejemplos/README.md),
+el `packing_list_ami_test.json` del `Main` y los JSON recortados que aparecen en
+los documentos de `docs/` son **fixtures generados por IA**: envíos escritos a
+ojo, sin conocer la realidad del almacén, para ejercitar el flujo y hacer
+pruebas visuales. Cajas, unidades, pesos y palets **no son datos de ningún
+cliente** y no describen qué colores tiene una referencia ni qué pedidos usa una
+destinación.
+
+Los únicos **datos reales** de cliente son los dos excels de pedido:
+`docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI) y
+`docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC). De los demás `.xlsx` de
+[`docs/`](docs/) lo real es la maquetación, no el contenido. Detalle en
+[`src/test/resources/ejemplos/README.md`](src/test/resources/ejemplos/README.md).
 
 ## Estructura del proyecto
 
