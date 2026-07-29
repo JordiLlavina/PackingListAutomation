@@ -199,7 +199,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         String pesoTexto = peso == null
                 ? null : String.format(ESPANOL, "%.2f KGS", peso);
         return new EtiquetaCaja(envio.getTemporada(), lider.getReferencia(), colorCode,
-                talla, cantidad, pesoTexto, posicion + " / " + total, orderNumber);
+                talla, cantidad, pesoTexto, posicion + " / " + total, orderNumber,
+                null, null);
     }
 
     private static String claveRefColor(CajaData caja) {
