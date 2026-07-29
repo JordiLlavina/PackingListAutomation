@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -21,9 +22,13 @@ class AmiEtiquetasExcelBuilderTest {
 
     private final AmiEtiquetasExcelBuilder builder = new AmiEtiquetasExcelBuilder();
 
+    private static final String EAN13_BOLSO = "3666598354771";
+    private static final String EAN128_BOLSO =
+            "366659835477100001000077030000000000000000MA";
+
     private static EtiquetaCaja etiquetaBolso(String parcel) {
         return new EtiquetaCaja("H26", "ULL163.AL0052", "221 BLACK",
-                "U", "50", "5,28 KGS", parcel, "07703");
+                "U", "50", "5,28 KGS", parcel, "07703", EAN13_BOLSO, EAN128_BOLSO);
     }
 
     @Test
@@ -61,9 +66,11 @@ class AmiEtiquetasExcelBuilderTest {
     void replicaElBloqueParaCadaCajaYSeparaLasPaginas() throws IOException {
         byte[] excel = builder.generar(AmiEtiquetaLayout.FRANCE, List.of(
                 new EtiquetaCaja("H26", "UBL029.AL0216", "001 BLACK", "85-95",
-                        "4-85,33-95", "9,93 KGS", "1 / 2", "07672"),
+                        "4-85,33-95", "9,93 KGS", "1 / 2", "07672",
+                        EAN13_BOLSO, EAN128_BOLSO),
                 new EtiquetaCaja("H26", "UBL029.AL0216", "001 BLACK", "105",
-                        "3-105", null, "2 / 2", "07672")));
+                        "3-105", null, "2 / 2", "07672",
+                        EAN13_BOLSO, EAN128_BOLSO)));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
             // Caja 1, etiqueta 1 (FRANCE: bloque de 32 filas, valores desde fila 10).
@@ -87,16 +94,32 @@ class AmiEtiquetasExcelBuilderTest {
     }
 
     @Test
-    void insertaUnCodigoDeBarrasPorEtiquetaYNingunaImagenDeEjemplo() throws IOException {
+    void insertaLosTresCodigosPorEtiquetaYNingunaImagenDeEjemplo() throws IOException {
         byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA, List.of(
                 etiquetaBolso("1 / 2"), etiquetaBolso("2 / 2")));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
             XSSFDrawing dibujo = hoja.getDrawingPatriarch();
             assertNotNull(dibujo);
-            // 2 cajas x 2 etiquetas = 4 códigos de barras, y nada más
+            // 2 cajas x 2 etiquetas x 3 códigos = 12 imágenes, y nada más
             // (las imágenes de ejemplo de la plantilla se limpian).
-            assertEquals(4, dibujo.getShapes().size());
+            assertEquals(12, dibujo.getShapes().size());
+        }
+    }
+
+    @Test
+    void cadaCodigoSeAnclaEnLaFilaQueDiceElLayout() throws IOException {
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA,
+                List.of(etiquetaBolso("1 / 1")));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFDrawing dibujo = libro.getSheetAt(0).getDrawingPatriarch();
+            List<Integer> filas = dibujo.getShapes().stream()
+                    .map(forma -> ((XSSFPicture) forma).getClientAnchor().getRow1())
+                    .sorted()
+                    .toList();
+            // Las tres filas del layout de CHINA (8, 10, 12) y las mismas
+            // + offsetSegundaEtiqueta (17) para la etiqueta de abajo.
+            assertEquals(List.of(8, 10, 12, 8 + 17, 10 + 17, 12 + 17), filas);
         }
     }
 
@@ -106,7 +129,7 @@ class AmiEtiquetasExcelBuilderTest {
         // así la quiere el cliente: el builder no debe alterar su estilo.
         byte[] excel = builder.generar(AmiEtiquetaLayout.FRANCE, List.of(
                 new EtiquetaCaja("H26", "UBL029.AL0216", "001 BLACK", "85",
-                        "4", "9,93 KGS", "1 / 1", "07672")));
+                        "4", "9,93 KGS", "1 / 1", "07672", EAN13_BOLSO, EAN128_BOLSO)));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
             for (int fila : new int[] {10, 10 + 16}) {
@@ -124,8 +147,51 @@ class AmiEtiquetasExcelBuilderTest {
                 etiquetaBolso("1 / 2"), etiquetaBolso("2 / 2")));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            // 2 cajas x (2 barcodes + 2 direcciones) = 8 imágenes.
-            assertEquals(8, hoja.getDrawingPatriarch().getShapes().size());
+            // 2 cajas x 2 etiquetas x (3 códigos + 1 dirección) = 16 imágenes.
+            assertEquals(16, hoja.getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void sinEanLosOtrosCodigosSiguenSaliendo() throws IOException {
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA, List.of(
+                new EtiquetaCaja("H26", "ULL163.AL0052", "221 BLACK", "U", "50",
+                        "5,28 KGS", "1 / 1", "07703", null, null)));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            // Solo el barcode del PO, en las dos etiquetas del par.
+            assertEquals(2, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void unEan13InvalidoNoRompeElExcel() throws IOException {
+        // El generador ya lo filtra, pero el builder no debe reventar si le
+        // llega uno malo: la etiqueta sale sin ese código.
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA, List.of(
+                new EtiquetaCaja("H26", "ULL163.AL0052", "221 BLACK", "U", "50",
+                        "5,28 KGS", "1 / 1", "07703", "123", EAN128_BOLSO)));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            // PO + EAN128 en las dos etiquetas = 4 (el EAN13 malo no se dibuja).
+            assertEquals(4, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void elMismoCodigoNoSeGuardaDosVecesEnElLibro() throws IOException {
+        // 3 cajas iguales = 18 imágenes ancladas, pero el .xlsx no debe
+        // guardar el PNG de cada código más de una vez. Se compara contra una
+        // sola caja en vez de contra un número fijo porque el libro arrastra
+        // además las imágenes de ejemplo de la plantilla (solo se les quita
+        // el anclaje, la parte de imagen se queda).
+        byte[] unaCaja = builder.generar(AmiEtiquetaLayout.CHINA,
+                List.of(etiquetaBolso("1 / 1")));
+        byte[] tresCajas = builder.generar(AmiEtiquetaLayout.CHINA, List.of(
+                etiquetaBolso("1 / 3"), etiquetaBolso("2 / 3"), etiquetaBolso("3 / 3")));
+        try (XSSFWorkbook conUna = abrir(unaCaja); XSSFWorkbook conTres = abrir(tresCajas)) {
+            assertEquals(6, conUna.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+            assertEquals(18, conTres.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+            assertEquals(conUna.getAllPictures().size(), conTres.getAllPictures().size(),
+                    "tres cajas iguales han guardado más PNGs que una: falta la caché");
         }
     }
 
@@ -133,7 +199,7 @@ class AmiEtiquetasExcelBuilderTest {
     void sinOrderNumberNoHayBarcodePeroElExcelSaleIgual() throws IOException {
         byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA, List.of(
                 new EtiquetaCaja("H26", "ULL163.AL0052", null, "U", "50",
-                        null, "1 / 1", null)));
+                        null, "1 / 1", null, null, null)));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet hoja = libro.getSheetAt(0);
             assertEquals("ULL163.AL0052", texto(hoja, 11, 2));

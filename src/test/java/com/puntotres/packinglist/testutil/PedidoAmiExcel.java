@@ -15,17 +15,26 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  */
 public final class PedidoAmiExcel {
 
+    private static final String[] TITULOS = {"Made in", "ARTICLE", "COLORIS",
+            "Libellé coloris", "", "TAILLE", "PO", "Commandé", "EAN13", "EAN128"};
+
     /**
      * po: String ("07704 CH") o Number (7672 = PO de France sin sufijo).
-     * ean13: null para los tests que no lo necesitan (etiquetas de caja).
+     * ean13/ean128: null para los tests que no los necesitan.
      */
-    public record Fila(String madeIn, String article, String coloris,
-                       String libelle, String taille, Object po, String ean13) {
+    public record Fila(String madeIn, String article, String coloris, String libelle,
+                       String taille, Object po, String ean13, String ean128) {
 
-        /** Sin EAN13: firma que ya usaban los tests de etiquetas de caja. */
+        /** Sin EAN: firma que ya usaban los tests de etiquetas de caja. */
         public Fila(String madeIn, String article, String coloris,
                     String libelle, String taille, Object po) {
-            this(madeIn, article, coloris, libelle, taille, po, null);
+            this(madeIn, article, coloris, libelle, taille, po, null, null);
+        }
+
+        /** Solo con EAN13: firma que ya usaban los tests de etiquetas de artículo. */
+        public Fila(String madeIn, String article, String coloris, String libelle,
+                    String taille, Object po, String ean13) {
+            this(madeIn, article, coloris, libelle, taille, po, ean13, null);
         }
     }
 
@@ -33,14 +42,24 @@ public final class PedidoAmiExcel {
     }
 
     public static byte[] crear(String nombreHojaEan, Fila... filas) {
+        return crear(nombreHojaEan, TITULOS.length, filas);
+    }
+
+    /**
+     * El mismo libro pero sin las columnas EAN13/EAN128 en la cabecera, para
+     * los tests de excels de pedido de temporadas antiguas.
+     */
+    public static byte[] crearSinColumnasEan(String nombreHojaEan, Fila... filas) {
+        return crear(nombreHojaEan, 8, filas);
+    }
+
+    private static byte[] crear(String nombreHojaEan, int numColumnas, Fila... filas) {
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             libro.createSheet("BOLSITAS ANTIHUMEDAD"); // señuelo: no es la primera hoja EAN
             Sheet hoja = libro.createSheet(nombreHojaEan);
             Row cabecera = hoja.createRow(0);
-            String[] titulos = {"Made in", "ARTICLE", "COLORIS", "Libellé coloris",
-                    "", "TAILLE", "PO", "Commandé", "EAN13", "EAN128"};
-            for (int i = 0; i < titulos.length; i++) {
-                cabecera.createCell(i).setCellValue(titulos[i]);
+            for (int i = 0; i < numColumnas; i++) {
+                cabecera.createCell(i).setCellValue(TITULOS[i]);
             }
             int numFila = 1;
             for (Fila fila : filas) {
@@ -55,8 +74,11 @@ public final class PedidoAmiExcel {
                 } else {
                     f.createCell(6).setCellValue((String) fila.po());
                 }
-                if (fila.ean13() != null) {
+                if (numColumnas > 8 && fila.ean13() != null) {
                     f.createCell(8).setCellValue(fila.ean13());
+                }
+                if (numColumnas > 9 && fila.ean128() != null) {
+                    f.createCell(9).setCellValue(fila.ean128());
                 }
             }
             ByteArrayOutputStream salida = new ByteArrayOutputStream();

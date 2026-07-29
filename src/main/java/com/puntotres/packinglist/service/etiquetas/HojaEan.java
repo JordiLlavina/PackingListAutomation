@@ -73,14 +73,27 @@ public final class HojaEan implements AutoCloseable {
      * real, no por la clave interna.
      */
     public int columna(String titulo, String rotuloEnElError) {
+        int indice = columnaOpcional(titulo);
+        if (indice < 0) {
+            throw new IllegalArgumentException("La hoja '" + nombre()
+                    + "' del excel de pedido no tiene la columna '" + rotuloEnElError + "'");
+        }
+        return indice;
+    }
+
+    /**
+     * Igual que {@link #columna(String)} pero devuelve -1 en vez de lanzar
+     * cuando la columna no está. Para las columnas de las que se puede
+     * prescindir: sin ellas la salida sale incompleta y con aviso, pero sale.
+     */
+    public int columnaOpcional(String titulo) {
         String buscado = titulo.toUpperCase(Locale.ROOT);
         for (Cell celda : cabecera) {
             if (texto(celda).trim().toUpperCase(Locale.ROOT).startsWith(buscado)) {
                 return celda.getColumnIndex();
             }
         }
-        throw new IllegalArgumentException("La hoja '" + nombre()
-                + "' del excel de pedido no tiene la columna '" + rotuloEnElError + "'");
+        return -1;
     }
 
     public int primeraFilaDatos() {
