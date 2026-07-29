@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPictureData;
 import org.apache.poi.xssf.usermodel.XSSFRow;
@@ -156,19 +157,19 @@ public class AmiEtiquetasExcelBuilder {
         for (int offset : offsets) {
             if (barcode != null) {
                 int indice = libro.addPicture(barcode, Workbook.PICTURE_TYPE_PNG);
-                dibujo.createPicture(AnclajeImagen.fijo(hoja, AmiEtiquetaLayout.COL_BARCODE,
-                        layout.dxBarcode(), base + offset + layout.filaBarcode(),
-                        layout.dyBarcode(), layout.cxBarcode(), layout.cyBarcode()), indice);
+                dibujo.createPicture(anclar(hoja, layout.po(), base + offset), indice);
             }
             if (direccionJapan != null && "AMI JAPAN".equals(layout.nombreHoja())) {
                 int indice = libro.addPicture(direccionJapan, Workbook.PICTURE_TYPE_PNG);
-                dibujo.createPicture(AnclajeImagen.fijo(hoja, AmiEtiquetaLayout.COL_BARCODE,
-                        AmiEtiquetaLayout.JAPAN_DIRECCION_DX,
-                        base + offset + AmiEtiquetaLayout.JAPAN_DIRECCION_FILA,
-                        AmiEtiquetaLayout.JAPAN_DIRECCION_DY,
-                        AmiEtiquetaLayout.JAPAN_DIRECCION_CX,
-                        AmiEtiquetaLayout.JAPAN_DIRECCION_CY), indice);
+                dibujo.createPicture(
+                        anclar(hoja, AmiEtiquetaLayout.JAPAN_DIRECCION, base + offset), indice);
             }
         }
+    }
+
+    /** Traduce un anclaje relativo al bloque a un anclaje de tamaño fijo de POI. */
+    private static XSSFClientAnchor anclar(XSSFSheet hoja, AnclajeBloque anclaje, int base) {
+        return AnclajeImagen.fijo(hoja, AmiEtiquetaLayout.COL_BARCODE, anclaje.dx(),
+                base + anclaje.fila(), anclaje.dy(), anclaje.cx(), anclaje.cy());
     }
 }
