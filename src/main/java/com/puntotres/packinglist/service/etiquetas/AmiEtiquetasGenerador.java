@@ -3,7 +3,6 @@ package com.puntotres.packinglist.service.etiquetas;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -25,10 +24,15 @@ import com.puntotres.packinglist.service.etiquetas.AmiEtiquetasExcelBuilder.Etiq
  * Etiquetas de caja de AMI: tres destinaciones (China, Japan, France; el
  * JSON suele llamar PARIS a la de France). Necesita del usuario el excel
  * del pedido completo de la temporada (ej. "AMI EAN H26.xlsx") para el
- * order number (columna PO, que distingue destinación por sufijo) y el
- * color code. Una caja física = un numeroCaja: los cinturones multi-talla
- * llegan como varias CajaData del mismo número y comparten par de
- * etiquetas (SIZE "85-90-95", QUANTITY "4-85,33-95,...").
+ * color code y para los dos códigos de barras que no salen del JSON: el
+ * EAN-13 del artículo y el Code 128 de la columna EAN128, que codifica el
+ * producto y el PO juntos y por eso es distinto en cada destinación.
+ *
+ * Una caja física = un numeroCaja: los cinturones multi-talla llegan como
+ * varias CajaData del mismo número y comparten par de etiquetas (SIZE
+ * "85-90-95", QUANTITY "4-85,33-95,..."). Como en la etiqueta solo cabe un
+ * par de EAN, se usa el de la talla de la <b>línea líder</b>, la misma de la
+ * que sale el peso.
  */
 @Service
 public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
@@ -79,6 +83,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(contenidoPedido);
 
         ResultadoEtiquetas resultado = new ResultadoEtiquetas();
+        // Avisos de nivel de fichero (columnas ausentes) antes que los de caja.
+        resultado.getAvisos().addAll(pedido.avisos());
         for (EnvioImportado.DestinoImportado importado : destinos) {
             DestinoData destino = importado.getDestino();
             AmiEtiquetaLayout layout =
@@ -177,12 +183,22 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     + "ni código de barras");
         }
 
+        // La talla solo entra en la clave de los cinturones: los bolsos van
+        // como talla única ("U") en el excel de pedido.
         Optional<AmiPedidoExcel.FilaPedido> fila = pedido.buscar(lider.getReferencia(),
                 lider.getCodigoColor(), lider.esCinturon() ? lider.getTalla() : null,
                 layout.sufijoPo());
         String colorCode;
+        String ean13 = null;
+        String ean128 = null;
         if (fila.isPresent()) {
             colorCode = fila.get().colorCode();
+            ean13 = fila.get().ean13();
+            ean128 = fila.get().ean128();
+            for (String aviso : fila.get().avisosEan()) {
+                avisos.add("Caja " + lider.getNumeroCaja() + " de " + nombreDestino
+                        + ": " + aviso);
+            }
             if (orderNumber != null
                     && Long.parseLong(fila.get().orderNumber()) != Long.parseLong(orderNumber)) {
                 avisos.add("Caja " + lider.getNumeroCaja() + " de " + nombreDestino
@@ -192,7 +208,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             }
         } else {
             avisos.add("Referencia '" + lider.getReferencia() + "' (" + nombreDestino
-                    + ") no encontrada en el excel de pedido: el color code sale del JSON");
+                    + ") no encontrada en el excel de pedido: el color code sale del JSON"
+                    + " y la etiqueta va sin EAN13 ni EAN128");
             colorCode = lider.getCodigoColor();
         }
 
@@ -200,7 +217,7 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 ? null : String.format(ESPANOL, "%.2f KGS", peso);
         return new EtiquetaCaja(envio.getTemporada(), lider.getReferencia(), colorCode,
                 talla, cantidad, pesoTexto, posicion + " / " + total, orderNumber,
-                null, null);
+                ean13, ean128);
     }
 
     private static String claveRefColor(CajaData caja) {

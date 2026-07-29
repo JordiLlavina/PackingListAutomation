@@ -61,13 +61,23 @@ class AmiEtiquetasGeneradorTest {
         return new EnvioImportado.DestinoImportado(destino, List.of());
     }
 
+    /** EAN128 bien formado: EAN13 + 00001 + PO a 8 dígitos + 16 ceros + país. */
+    private static String ean128(String ean13, int po, String pais) {
+        return ean13 + "00001" + String.format("%08d", po) + "0000000000000000" + pais;
+    }
+
     private static byte[] pedido() {
         return PedidoAmiExcel.crear("EAN H26",
-                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665),
-                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", "07703 CH"),
-                new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "85", 7672),
-                new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "95", 7672),
-                new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "105", 7672));
+                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665,
+                        "3666598354771", ean128("3666598354771", 7665, "ES")),
+                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", "07703 CH",
+                        "3666598354771", ean128("3666598354771", 7703, "ES")),
+                new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "85", 7672,
+                        "3666598890064", ean128("3666598890064", 7672, "MA")),
+                new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "95", 7672,
+                        "3666598890088", ean128("3666598890088", 7672, "MA")),
+                new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "105", 7672,
+                        "3666598890101", ean128("3666598890101", 7672, "MA")));
     }
 
     // --- tests ---
@@ -224,6 +234,84 @@ class AmiEtiquetasGeneradorTest {
         assertTrue(generador.camposRequeridos(List.of(destino("HONG KONG"))).isEmpty());
         assertTrue(generador.soportaDestino("paris"));
         assertFalse(generador.soportaDestino("HONG KONG"));
+    }
+
+    // --- EAN13 y EAN128 ---
+
+    @Test
+    void laEtiquetaLlevaLosTresCodigosDeBarras() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("CHINA", caja(1, "ULL163.AL0052", "221", null, 40, 4.10, "07703")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            // PO + EAN13 + EAN128 en las dos etiquetas del par.
+            assertEquals(6, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+    }
+
+    @Test
+    void enCinturonMultiTallaElEanEsElDeLaLineaLider() throws IOException {
+        // Las líneas llegan 95, 85, 105: la líder es la 95 (la que lleva el
+        // peso), así que el EAN13 es el de la 95, no el de la talla menor.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(2, "UBL029.AL0216", "001", "95", 33, 9.93, "07672"),
+                        caja(2, "UBL029.AL0216", "001", "85", 4, null, "07672"),
+                        caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            // SIZE sí sale ordenado, aunque el EAN sea el de la líder.
+            assertEquals("85-95-105", texto(hoja, 12, 2));
+            assertEquals(6, hoja.getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void tallaAusenteDelPedidoAvisaConLaCajaYLaEtiquetaVaSinEan() throws IOException {
+        // El pedido de PARIS no tiene la talla 75 de este cinturón.
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PARIS", caja(1, "UBL029.AL0216", "001", "75", 45, 8.5, "07672")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("Caja 1") && aviso.contains("PARIS")
+                        && aviso.contains("75")), resultado.getAvisos().toString());
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            // Solo el barcode del PO, en las dos etiquetas.
+            assertEquals(2, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+            // El resto de la etiqueta sale igual.
+            assertEquals("001 BLACK", texto(libro.getSheetAt(0), 11, 2));
+        }
+    }
+
+    @Test
+    void referenciaAusenteDelPedidoVaSinEan() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PARIS", caja(1, "USL999.XX0000", "007", null, 10, 2.0, "07699")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("USL999.XX0000") && aviso.contains("EAN")),
+                resultado.getAvisos().toString());
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals(2, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void sinColumnasEanElAvisoDelLibroLlegaAlResultado() throws IOException {
+        byte[] pedidoViejo = PedidoAmiExcel.crearSinColumnasEan("EAN H26",
+                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665));
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665")))),
+                cabecera(), Map.of("pedido", pedidoViejo));
+
+        assertTrue(resultado.getAvisos().stream().anyMatch(aviso -> aviso.contains("EAN13")));
+        assertEquals(1, resultado.getExcels().size());
     }
 
     private static XSSFWorkbook abrir(ExcelGenerado excel) throws IOException {
