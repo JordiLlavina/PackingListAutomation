@@ -72,6 +72,26 @@ class HojaEanTest {
     }
 
     @Test
+    void columnaOpcionalDevuelveElIndiceCuandoLaColumnaEsta() throws Exception {
+        try (HojaEan hoja = HojaEan.abrir(pedido())) {
+            assertEquals(8, hoja.columnaOpcional("EAN13"));
+            assertEquals(9, hoja.columnaOpcional("EAN128"));
+        }
+    }
+
+    @Test
+    void columnaOpcionalDevuelveMenosUnoSinLanzar() throws Exception {
+        byte[] sinEan = PedidoAmiExcel.crearSinColumnasEan("EAN H26",
+                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7672));
+        try (HojaEan hoja = HojaEan.abrir(sinEan)) {
+            assertEquals(-1, hoja.columnaOpcional("EAN13"));
+            assertEquals(-1, hoja.columnaOpcional("EAN128"));
+            // Las obligatorias siguen ahí y siguen lanzando si faltan.
+            assertEquals(1, hoja.columna("ARTICLE"));
+        }
+    }
+
+    @Test
     void columnaQueNoExisteAvisaConElNombreDeLaHoja() throws Exception {
         try (HojaEan hoja = HojaEan.abrir(pedido())) {
             IllegalArgumentException e =
