@@ -177,8 +177,9 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     + "ni código de barras");
         }
 
-        Optional<AmiPedidoExcel.FilaPedido> fila =
-                pedido.buscar(lider.getReferencia(), lider.getCodigoColor(), layout.sufijoPo());
+        Optional<AmiPedidoExcel.FilaPedido> fila = pedido.buscar(lider.getReferencia(),
+                lider.getCodigoColor(), lider.esCinturon() ? lider.getTalla() : null,
+                layout.sufijoPo());
         String colorCode;
         if (fila.isPresent()) {
             colorCode = fila.get().colorCode();
