@@ -71,6 +71,16 @@ Un solo test:
 mvn test -Dtest=PackingListGenerationServiceTest
 ```
 
+### Los JSON de ejemplo son inventados
+
+Los `envio-*.json` de [`src/test/resources/ejemplos/`](src/test/resources/ejemplos/README.md)
+y el `packing_list_ami_test.json` del `Main` son **fixtures autogenerados**:
+envíos escritos a ojo para ejercitar el flujo y hacer pruebas visuales. Sus
+referencias, colores, tallas y números de pedido **no son datos de ningún
+cliente**, así que no describen qué colores tiene una referencia ni qué pedidos
+usa una destinación. Los ficheros reales, con sus rarezas, están en
+[`docs/`](docs/) y sus copias en `src/test/resources/ejemplos/*.xlsx`.
+
 ## Estructura del proyecto
 
 ```
