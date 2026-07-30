@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
@@ -60,6 +59,30 @@ public final class ArticulosDeCaja {
      */
     public static String unir(List<ArticuloEtiqueta> articulos,
                               Function<ArticuloEtiqueta, String> campo) {
-        return articulos.stream().map(campo).collect(Collectors.joining(SEPARADOR));
+        return unirValores(articulos.stream().map(campo).toList());
+    }
+
+    /**
+     * Igual que {@link #unir}, pero para valores ya extraídos: el color code
+     * de AMI no sale de {@link ArticuloEtiqueta} sino de la fila del pedido
+     * de cada artículo, así que quien llama no siempre tiene un
+     * {@code ArticuloEtiqueta} a mano.
+     *
+     * Un valor {@code null} deja un <b>hueco vacío en su posición</b> en vez
+     * de imprimir el literal "null" o desaparecer de la lista: la etiqueta
+     * se lee en paralelo, columna a columna, y perder una posición
+     * descuadraría las demás (referencia del artículo 2 con el color code
+     * del artículo 3). Si TODOS los valores quedan vacíos, devuelve
+     * {@code null} para que la celda salga en blanco en vez de una ristra
+     * de separadores sueltos.
+     */
+    public static String unirValores(List<String> valores) {
+        List<String> normalizados = valores.stream()
+                .map(valor -> valor == null ? "" : valor)
+                .toList();
+        if (normalizados.stream().allMatch(String::isBlank)) {
+            return null;
+        }
+        return String.join(SEPARADOR, normalizados);
     }
 }

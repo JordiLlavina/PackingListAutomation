@@ -9,7 +9,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -201,9 +200,11 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     .map(ArticuloResuelto::articulo).toList();
             referencia = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::referencia);
             // El color code no sale del artículo sino de su fila del pedido,
-            // así que este no puede pasar por ArticulosDeCaja.unir.
-            colorCode = resueltos.stream().map(ArticuloResuelto::colorCode)
-                    .collect(Collectors.joining(" / "));
+            // así que este no puede pasar por ArticulosDeCaja.unir (toma
+            // ArticuloEtiqueta, no String); unirValores comparte la misma
+            // regla de huecos y celda en blanco con un valor ya extraído.
+            colorCode = ArticulosDeCaja.unirValores(
+                    resueltos.stream().map(ArticuloResuelto::colorCode).toList());
             talla = TALLA_UNICA;
             cantidad = ArticulosDeCaja.unir(articulos, a -> String.valueOf(a.cantidad()));
         }

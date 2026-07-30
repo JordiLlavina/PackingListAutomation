@@ -312,6 +312,43 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
+    void colorAusenteDeJsonYPedidoDejaLaCeldaColorCodeEnBlanco() throws IOException {
+        // Caja de un solo bolso cuya referencia no está en el pedido y cuyo
+        // JSON no trae color: antes de esta corrección, unir() imprimía el
+        // literal "null" en la celda en vez de dejarla en blanco (regla
+        // general del proyecto: dato ausente = celda vacía, nunca "null").
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PARIS", caja(1, "USL999.XX0000", null, null, 10, 2.0, "07699")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertEquals("USL999.XX0000", texto(hoja, 10, 2));
+            assertEquals("", texto(hoja, 11, 2));
+            assertEquals("10", texto(hoja, 13, 2));
+        }
+    }
+
+    @Test
+    void unArticuloSinColorDejaUnHuecoSinDescuadrarLasDemasPosiciones() throws IOException {
+        // El segundo de tres artículos no tiene color (ni en el JSON ni en
+        // el pedido): pierde su posición en COLOR CODE, pero REFERENCE y
+        // QUANTITY conservan las tres posiciones alineadas con él, no dos.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "USL999.XX0000", null, null, 2, null, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertEquals("ULL163.AL0052 / USL999.XX0000 / ULL753.AL0168", texto(hoja, 10, 2));
+            assertEquals("221 BLACK /  / 001 IVORY", texto(hoja, 11, 2));
+            assertEquals("3 / 2 / 5", texto(hoja, 13, 2));
+        }
+    }
+
+    @Test
     void declaraElCampoDelExcelDePedidoSoloSiHayDestinosSoportados() {
         assertEquals("pedido", generador.camposRequeridos(
                 List.of(destino("CHINA"))).get(0).nombre());
