@@ -348,7 +348,7 @@ git commit -m "las lineas de una caja se agrupan en articulos de etiqueta"
 package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -392,15 +392,24 @@ class AjusteFuenteTest {
 
     // --- la aplicación sobre la celda ---
 
+    // POI devuelve un XSSFCellStyle nuevo en cada getCellStyle(): "el mismo
+    // estilo" solo se puede comprobar por getIndex(), nunca con assertSame.
     @Test
     void unaCeldaQueCabeNoCambiaDeEstilo() throws IOException {
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             Cell celda = celdaCon(libro, "CORTO", (short) 11, 30);
-            XSSFCellStyle antes = (XSSFCellStyle) celda.getCellStyle();
+            short indiceAntes = celda.getCellStyle().getIndex();
+            int estilosAntes = libro.getNumCellStyles();
 
             new AjusteFuente(libro).ajustar(celda);
 
-            assertSame(antes, celda.getCellStyle());
+            // Ni estilo nuevo, ni shrinkToFit: una caja de un solo artículo
+            // tiene que producir el mismo fichero que antes de esta clase.
+            assertEquals(indiceAntes, celda.getCellStyle().getIndex());
+            assertEquals(estilosAntes, libro.getNumCellStyles());
+            assertFalse(((XSSFCellStyle) celda.getCellStyle()).getShrinkToFit());
+            assertEquals((short) 11,
+                    ((XSSFCellStyle) celda.getCellStyle()).getFont().getFontHeightInPoints());
         }
     }
 
@@ -449,7 +458,7 @@ class AjusteFuenteTest {
             ajuste.ajustar(otra);
 
             assertEquals(estilosAntes + 1, libro.getNumCellStyles());
-            assertSame(una.getCellStyle(), otra.getCellStyle());
+            assertEquals(una.getCellStyle().getIndex(), otra.getCellStyle().getIndex());
         }
     }
 
