@@ -223,7 +223,7 @@ class PackingListControllerTest {
         // (47 uds) debe quedar con neto 47.0 y bruto 47.6.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].indicesCaja", "0")
                         .param("pesos[0].pesoBrutoKg", "50.6"))
                 .andExpect(redirectedUrl("/revision"));
 
@@ -243,7 +243,7 @@ class PackingListControllerTest {
         // propia caja 1 completa su bruto (50.0 + tara 0.6).
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].indicesCaja", "0")
                         .param("pesos[0].pesoNetoKg", "50.0"))
                 .andExpect(redirectedUrl("/revision"));
 
@@ -263,7 +263,7 @@ class PackingListControllerTest {
         // formulario localiza la fila por posición, no por nº de caja.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].indiceCaja", "32")
+                        .param("pesos[0].indicesCaja", "32")
                         .param("pesos[0].pesoNetoKg", "68.0"))
                 .andExpect(redirectedUrl("/revision"));
 
@@ -308,7 +308,7 @@ class PackingListControllerTest {
         // 50.0 / 50 = 1.0 kg.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].indicesCaja", "0")
                         .param("pesos[0].pesoNetoKg", "50.0"))
                 .andExpect(redirectedUrl("/revision"));
 
@@ -382,6 +382,72 @@ class PackingListControllerTest {
         assertEquals(2, contarOcurrencias(html, "pesoBrutoKg"));
     }
 
+    /**
+     * Cinco cajas correlativas idénticas (1-5) de la misma referencia: se
+     * compactan en una sola fila "1-5".
+     *
+     * El tamaño 99x99x99 no tiene tara configurada A PROPÓSITO: sin tara la
+     * inferencia no puede derivar el peso unitario y por tanto no propaga nada
+     * al resto de la referencia. Con una tara conocida (60x40x40) el peso
+     * tecleado en la primera caja llegaría a las otras cuatro POR INFERENCIA, y
+     * el test pasaría aunque el formulario solo aplicara el peso a una caja.
+     */
+    private static final String JSON_CINCO_CAJAS_IGUALES = """
+            {"cliente": "AMI", "destinos": [{"destino": "PARIS",
+              "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 5}],
+              "referencias": [{"referencia": "ULL163.AL217", "color": "NOIR",
+                "medidaCaja": "99x99x99", "pedido": "07685",
+                "cajas": [{"cajaInicio": 1, "cajaFin": 5, "unidadesPorCaja": 5}]}]}]}
+            """;
+
+    private void importarCincoCajasIguales(MockHttpSession sesion) throws Exception {
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", JSON_CINCO_CAJAS_IGUALES)
+                        .param("temporada", "H26").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+    }
+
+    @Test
+    void cincoCajasEquivalentesSePintanEnUnaSolaFilaConSuRango() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarCincoCajasIguales(sesion);
+
+        String html = mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                // El rango en la columna CAJA, y el encabezado sigue contando
+                // las 5 cajas físicas aunque solo haya una fila.
+                .andExpect(content().string(containsString(">1-5<")))
+                .andExpect(content().string(containsString("PARIS (5 cajas)")))
+                .andReturn().getResponse().getContentAsString();
+
+        // Una sola fila: un único par de campos de peso para las cinco cajas.
+        assertEquals(1, contarOcurrencias(html, "pesoNetoKg"));
+        assertEquals(1, contarOcurrencias(html, "pesoBrutoKg"));
+        // ...y un índice de caja por cada una de las cinco.
+        assertEquals(5, contarOcurrencias(html, "indicesCaja"));
+    }
+
+    @Test
+    void elPesoDeUnaFilaCompactadaSeAplicaATodasSusCajas() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarCincoCajasIguales(sesion);
+
+        // Lo que manda la fila "1-5": un peso y los cinco índices.
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("pesos[0].indiceDestino", "0")
+                        .param("pesos[0].indicesCaja", "0", "1", "2", "3", "4")
+                        .param("pesos[0].pesoBrutoKg", "5.6"))
+                .andExpect(redirectedUrl("/revision"));
+
+        EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
+        var cajas = envio.getImportado().getDestinos().get(0).getDestino().getCajas();
+        assertEquals(5, cajas.size());
+        for (var caja : cajas) {
+            assertEquals(5.6, caja.getPesoBrutoKg(), "caja " + caja.getNumeroCaja());
+        }
+    }
+
     private static int contarOcurrencias(String texto, String fragmento) {
         int total = 0;
         for (int i = texto.indexOf(fragmento); i >= 0; i = texto.indexOf(fragmento, i + fragmento.length())) {
@@ -413,7 +479,7 @@ class PackingListControllerTest {
         // revisión debe decirlo, no callar.
         mvc.perform(post("/recalcular").session(sesion)
                         .param("pesos[0].indiceDestino", "0")
-                        .param("pesos[0].indiceCaja", "0")
+                        .param("pesos[0].indicesCaja", "0")
                         .param("pesos[0].pesoBrutoKg", "11.0"))
                 .andExpect(redirectedUrl("/revision"));
 

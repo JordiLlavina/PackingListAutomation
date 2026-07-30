@@ -88,7 +88,9 @@ en `getStringCellValue()`. Nombre de hoja = modelo + color (`NombresHoja`), porq
 hay un escandallo por color y todos comparten `MODEL`. Sin plantilla `.xlsx`: la
 maquetación son constantes de `EscandallosExcelBuilder`.
 
-**Web** (`web/`): asistente de 3 pantallas — `entrada` (pegar JSON o subir fotos) → `revision` (avisos, pesos editables, "↻ modelo" propaga un peso a toda su referencia) → `resultados` (descarga individual, ZIP y volcado ERP). Estado del envío en sesión HTTP (`EnvioEnCurso`). Las cajas en la revisión se localizan por **posición** (`indiceCaja`), no por número de caja, porque los números pueden repetirse (cajas mixtas).
+**Web** (`web/`): asistente de 3 pantallas — `entrada` (pegar JSON o subir fotos) → `revision` (avisos, pesos editables, "↻ modelo" propaga un peso a toda su referencia) → `resultados` (descarga individual, ZIP y volcado ERP). Estado del envío en sesión HTTP (`EnvioEnCurso`). Las cajas en la revisión se localizan por **posición** (`indicesCaja`), no por número de caja, porque los números pueden repetirse (cajas mixtas).
+
+La tabla de revisión va **compactada** (`AgrupadorFilasRevision`): un tramo de cajas consecutivas equivalentes se pinta en una sola fila con el rango en la columna CAJA (`4-8`), y esa fila manda un índice por cada caja del tramo, así que el peso tecleado se aplica a todas. Regla del criterio de agrupación: **una fila compactada nunca muestra un valor que no sea cierto para todas sus cajas** — cualquier diferencia en referencia, color, PO, cantidad, tamaño, palet, pesos o *talla* parte el grupo, y las cajas mixtas no se compactan. Ojo al escribir tests de esto: con una tara conocida la inferencia rellena el resto de la referencia por su cuenta y **enmascara** un fallo de propagación; usar un tamaño sin tara para probarlo de verdad.
 
 ## Reglas del proyecto
 

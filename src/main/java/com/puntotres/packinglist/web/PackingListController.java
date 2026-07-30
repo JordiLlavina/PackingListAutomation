@@ -532,6 +532,12 @@ public class PackingListController {
      * nulls, nunca pisa un valor manual). La caja se localiza por su
      * POSICIÓN en la destinación, no por su número, que puede repetirse
      * (caja mixta con dos colores).
+     *
+     * Una entrada del formulario puede apuntar a VARIAS cajas: las filas
+     * compactadas ("4-8") llevan un peso para todo su tramo. Aplicarlo a todas
+     * es imprescindible aunque compartieran peso al agruparse — si no, el
+     * grupo se partiría en el siguiente render y el usuario vería la caja 4 con
+     * el peso nuevo y las 5-8 con el viejo.
      */
     private void aplicarPesosYReinferir(RevisionForm form) {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
@@ -541,15 +547,17 @@ public class PackingListController {
                 continue;
             }
             List<CajaData> cajas = destinos.get(peso.getIndiceDestino()).getDestino().getCajas();
-            if (peso.getIndiceCaja() < 0 || peso.getIndiceCaja() >= cajas.size()) {
-                continue;
-            }
-            CajaData caja = cajas.get(peso.getIndiceCaja());
-            if (peso.getPesoNetoKg() != null) {
-                caja.setPesoNetoKg(peso.getPesoNetoKg());
-            }
-            if (peso.getPesoBrutoKg() != null) {
-                caja.setPesoBrutoKg(peso.getPesoBrutoKg());
+            for (Integer indice : peso.getIndicesCaja()) {
+                if (indice == null || indice < 0 || indice >= cajas.size()) {
+                    continue;
+                }
+                CajaData caja = cajas.get(indice);
+                if (peso.getPesoNetoKg() != null) {
+                    caja.setPesoNetoKg(peso.getPesoNetoKg());
+                }
+                if (peso.getPesoBrutoKg() != null) {
+                    caja.setPesoBrutoKg(peso.getPesoBrutoKg());
+                }
             }
         }
         reinferirTodoElEnvio();
@@ -572,49 +580,32 @@ public class PackingListController {
                 inferidorPesos.inferirPesosDelEnvio(cajasPorDestino).getAvisos());
     }
 
+    /**
+     * El peso es de la caja física entera (un bulto = un numeroCaja) y solo lo
+     * lleva su primera línea, la "líder": es la única con campos de peso
+     * editables. Las demás líneas de la caja —otras tallas, colores o
+     * referencias del mismo bulto— comparten ese peso y no se editan por
+     * separado. Quien decide eso, y qué cajas se compactan en una sola fila,
+     * es {@link AgrupadorFilasRevision}.
+     */
     private List<DestinoVista> montarVistaDestinos() {
         List<DestinoVista> vista = new ArrayList<>();
         int indiceGlobal = 0;
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
         for (int i = 0; i < destinos.size(); i++) {
             List<CajaData> cajas = destinos.get(i).getDestino().getCajas();
-
-            // El peso es de la caja física entera (un bulto = un numeroCaja)
-            // y solo lo lleva su primera línea, la "líder": es la única con
-            // campos de peso editables. Las demás líneas de la caja —otras
-            // tallas, colores o referencias del mismo bulto— comparten ese
-            // peso y no se editan por separado.
-            Map<Integer, CajaData> liderPorCaja = new LinkedHashMap<>();
-            for (CajaData caja : cajas) {
-                liderPorCaja.putIfAbsent(caja.getNumeroCaja(), caja);
-            }
-
-            List<FilaCaja> filas = new ArrayList<>();
-            for (int j = 0; j < cajas.size(); j++) {
-                CajaData caja = cajas.get(j);
-                CajaData lider = liderPorCaja.get(caja.getNumeroCaja());
-                filas.add(new FilaCaja(indiceGlobal++, j, caja,
-                        lider == caja, !lider.tienePesosCompletos()));
-            }
-            vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(), filas));
+            List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, indiceGlobal);
+            // El índice global nombra los inputs y es único en toda la página:
+            // la siguiente destinación arranca donde acabó esta.
+            indiceGlobal += filas.size();
+            vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(),
+                    filas, contarCajasFisicas(cajas)));
         }
         return vista;
     }
 
-    /** Una destinación en la pantalla de revisión. */
-    public record DestinoVista(int indice, String nombre, List<FilaCaja> filas) {
-    }
-
-    /**
-     * Una fila de la tabla de revisión: la caja, su índice global en el
-     * formulario (los inputs se llaman pesos[indiceGlobal].*) y su posición
-     * dentro de la destinación (para localizarla al aplicar los pesos).
-     *
-     * {@code esLider}: es la primera línea de su caja física, la única que
-     * muestra campos de peso editables. {@code cajaPendiente}: la caja física
-     * (su líder) aún no tiene los dos pesos, para resaltar la fila.
-     */
-    public record FilaCaja(int indiceGlobal, int indiceEnDestino, CajaData caja,
-                           boolean esLider, boolean cajaPendiente) {
+    /** Bultos reales de la destinación: las filas ya no los cuentan (van compactadas). */
+    private static int contarCajasFisicas(List<CajaData> cajas) {
+        return (int) cajas.stream().map(CajaData::getNumeroCaja).distinct().count();
     }
 }
