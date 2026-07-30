@@ -117,6 +117,43 @@ class AjusteFuenteTest {
         }
     }
 
+    @Test
+    void unaFuenteYaEnElSueloQueNoCabeRecibeShrinkToFitSinBajarMas() throws IOException {
+        // "Cabe" y "se puede bajar más" son preguntas independientes: la
+        // fuente ya está en el suelo (8pt) y no hay margen para bajarla,
+        // pero el texto tampoco cabe -> shrinkToFit tiene que saltar igual,
+        // si no la celda se queda desbordada en silencio.
+        // Ancho 5 chars a 8pt -> capacidad 5*11/8 = 6,875; el texto son 10.
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            Cell celda = celdaCon(libro, "X".repeat(10), (short) 8, 5);
+
+            new AjusteFuente(libro).ajustar(celda);
+
+            XSSFCellStyle estilo = (XSSFCellStyle) celda.getCellStyle();
+            assertEquals((short) AjusteFuente.TAMANO_MINIMO_PT,
+                    estilo.getFont().getFontHeightInPoints());
+            assertTrue(estilo.getShrinkToFit());
+        }
+    }
+
+    @Test
+    void dosCeldasEnElSueloQueNoCabenComparteEstilo() throws IOException {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            AjusteFuente ajuste = new AjusteFuente(libro);
+            Cell una = celdaCon(libro, "X".repeat(10), (short) 8, 5);
+            Cell otra = una.getRow().getSheet().createRow(1).createCell(0);
+            otra.setCellStyle(una.getSheet().getRow(0).getCell(0).getCellStyle());
+            otra.setCellValue("X".repeat(10));
+
+            int estilosAntes = libro.getNumCellStyles();
+            ajuste.ajustar(una);
+            ajuste.ajustar(otra);
+
+            assertEquals(estilosAntes + 1, libro.getNumCellStyles());
+            assertEquals(una.getCellStyle().getIndex(), otra.getCellStyle().getIndex());
+        }
+    }
+
     /** Una celda con texto, tamaño de fuente y ancho de columna dados. */
     private static Cell celdaCon(XSSFWorkbook libro, String texto, short tamanoPt,
                                  int anchoEnChars) {

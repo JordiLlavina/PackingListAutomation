@@ -52,13 +52,16 @@ public final class AjusteFuente {
     /**
      * Tamaño de fuente con el que el texto cabe en una columna de ese ancho.
      * anchoEnChars es getColumnWidth()/256: caracteres de la fuente por
-     * defecto. Devuelve el tamaño original si ya cabe.
+     * defecto. Devuelve el tamaño original si ya cabe, o si el original ya
+     * está en el suelo o por debajo (no hay margen para bajarlo más: la red
+     * de seguridad para ese caso es shrinkToFit, que aplica ajustar(), no
+     * este cálculo).
      */
     public static short tamano(String texto, double anchoEnChars, short tamanoOriginalPt) {
         if (texto == null || texto.isBlank() || tamanoOriginalPt <= TAMANO_MINIMO_PT) {
             return tamanoOriginalPt;
         }
-        double capacidad = anchoEnChars * TAMANO_DE_REFERENCIA_PT / tamanoOriginalPt;
+        double capacidad = capacidad(anchoEnChars, tamanoOriginalPt);
         if (texto.length() <= capacidad) {
             return tamanoOriginalPt;
         }
@@ -66,19 +69,40 @@ public final class AjusteFuente {
         return (short) Math.max(TAMANO_MINIMO_PT, Math.floor(escalado));
     }
 
-    /** Ajusta la fuente de la celda a su contenido; no hace nada si cabe. */
+    /**
+     * Ajusta la fuente de la celda a su contenido. "Cabe" y "se puede bajar
+     * más el tamaño" son preguntas independientes: si el texto no cabe pero
+     * la fuente ya está en el suelo (o por debajo), el tamaño no cambia pero
+     * igualmente se marca shrinkToFit — es la red de seguridad para ese
+     * caso, y si no se marcara aquí la celda se quedaría desbordada en
+     * silencio. Si el texto cabe, no se toca nada.
+     */
     public void ajustar(Cell celda) {
         if (celda.getCellType() != CellType.STRING) {
             return;
         }
         XSSFCellStyle original = (XSSFCellStyle) celda.getCellStyle();
         short tamanoOriginal = original.getFont().getFontHeightInPoints();
+        String texto = celda.getStringCellValue();
         double anchoEnChars = celda.getSheet().getColumnWidth(celda.getColumnIndex()) / 256.0;
-        short nuevo = tamano(celda.getStringCellValue(), anchoEnChars, tamanoOriginal);
-        if (nuevo == tamanoOriginal) {
+        if (cabe(texto, anchoEnChars, tamanoOriginal)) {
             return;
         }
+        short nuevo = tamano(texto, anchoEnChars, tamanoOriginal);
         celda.setCellStyle(estiloCon(original, nuevo));
+    }
+
+    /** Si el texto entra en una columna de ese ancho al tamaño dado. */
+    private static boolean cabe(String texto, double anchoEnChars, short tamanoPt) {
+        if (texto == null || texto.isBlank()) {
+            return true;
+        }
+        return texto.length() <= capacidad(anchoEnChars, tamanoPt);
+    }
+
+    /** Caracteres que caben en una columna de ese ancho a ese tamaño de fuente. */
+    private static double capacidad(double anchoEnChars, short tamanoPt) {
+        return anchoEnChars * TAMANO_DE_REFERENCIA_PT / tamanoPt;
     }
 
     /** El estilo original con otro tamaño de fuente, creado una sola vez. */
