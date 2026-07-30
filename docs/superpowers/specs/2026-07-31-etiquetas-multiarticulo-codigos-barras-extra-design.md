@@ -61,6 +61,16 @@ La pieza que faltaba: pasar de "líneas de la caja" a "artículos de la caja".
   EAN-13** en el excel de pedido de AMI. Una caja de una sola referencia con
   tallas 85/90/95 son tres artículos, y dos de ellos van a la hoja extra.
 
+  Está anclado contra el fichero real del cliente en `AmiPedidoRealTest`:
+  `UBL029.AL0216 / 001` tiene cuatro EAN-13 distintos para las tallas
+  75/85/95/105. Hoy la etiqueta imprime solo el de la talla líder y los demás
+  **se pierden**; el objetivo explícito del usuario es que no se pierda ningún
+  EAN.
+
+  Consecuencia asumida a propósito: una caja de cinturones con varias tallas es
+  lo **habitual**, no la excepción, así que la hoja extra y su aviso aparecerán
+  en casi todos los envíos con cinturones, no solo en las cajas mixtas.
+
 ## 1. Concatenación en la etiqueta (bolsos)
 
 Campos de la etiqueta de AMI y su tratamiento:
