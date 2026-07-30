@@ -69,11 +69,12 @@ public class AmiEtiquetasExcelBuilder {
             // Un envío repite mucho la misma referencia y el mismo PO: sin
             // esta caché el .xlsx guardaría el mismo PNG una vez por etiqueta.
             Map<String, Integer> imagenesDelLibro = new HashMap<>();
+            AjusteFuente ajuste = new AjusteFuente(libro);
             for (int i = 0; i < etiquetas.size(); i++) {
                 int base = i * layout.alturaBloque();
-                escribirEtiqueta(hoja, layout, base, etiquetas.get(i));
+                escribirEtiqueta(hoja, layout, base, etiquetas.get(i), ajuste);
                 escribirEtiqueta(hoja, layout, base + layout.offsetSegundaEtiqueta(),
-                        etiquetas.get(i));
+                        etiquetas.get(i), ajuste);
                 insertarImagenes(libro, hoja, layout, base, etiquetas.get(i), direccionJapan,
                         imagenesDelLibro);
                 if (i < etiquetas.size() - 1) {
@@ -127,8 +128,8 @@ public class AmiEtiquetasExcelBuilder {
         }
     }
 
-    private static void escribirEtiqueta(XSSFSheet hoja, AmiEtiquetaLayout layout,
-                                         int base, EtiquetaCaja etiqueta) {
+    private void escribirEtiqueta(XSSFSheet hoja, AmiEtiquetaLayout layout, int base,
+                                  EtiquetaCaja etiqueta, AjusteFuente ajuste) {
         // El order number va también como texto bajo su encabezado (la
         // plantilla trae un valor de ejemplo que hay que pisar siempre).
         escribir(hoja, base + layout.filaOrderNumber(), AmiEtiquetaLayout.COL_VALOR,
@@ -137,14 +138,15 @@ public class AmiEtiquetasExcelBuilder {
         // el aspecto que quiere el cliente, no un placeholder a corregir.
         escribir(hoja, base + layout.filaTemporada(),
                 AmiEtiquetaLayout.COL_TEMPORADA, etiqueta.temporada());
-        escribir(hoja, base + layout.filaReferencia(), AmiEtiquetaLayout.COL_VALOR,
-                etiqueta.referencia());
-        escribir(hoja, base + layout.filaColor(), AmiEtiquetaLayout.COL_VALOR,
-                etiqueta.colorCode());
+        // Estas tres pueden llevar varios artículos concatenados y crecer.
+        ajuste.ajustar(escribir(hoja, base + layout.filaReferencia(),
+                AmiEtiquetaLayout.COL_VALOR, etiqueta.referencia()));
+        ajuste.ajustar(escribir(hoja, base + layout.filaColor(),
+                AmiEtiquetaLayout.COL_VALOR, etiqueta.colorCode()));
         escribir(hoja, base + layout.filaTalla(), AmiEtiquetaLayout.COL_VALOR,
                 etiqueta.talla());
-        escribir(hoja, base + layout.filaCantidad(), AmiEtiquetaLayout.COL_VALOR,
-                etiqueta.cantidad());
+        ajuste.ajustar(escribir(hoja, base + layout.filaCantidad(),
+                AmiEtiquetaLayout.COL_VALOR, etiqueta.cantidad()));
         escribir(hoja, base + layout.filaPeso(), AmiEtiquetaLayout.COL_VALOR,
                 etiqueta.pesoBruto());
         escribir(hoja, base + layout.filaParcel(), AmiEtiquetaLayout.COL_VALOR,

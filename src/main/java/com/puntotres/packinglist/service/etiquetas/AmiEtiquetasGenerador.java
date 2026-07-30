@@ -9,6 +9,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -41,6 +42,9 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             new CampoEtiquetas("pedido", "Introducir excel del pedido de AMI");
 
     private static final Locale ESPANOL = Locale.forLanguageTag("es-ES");
+
+    /** Los bolsos van como talla única en la etiqueta y en el pedido. */
+    private static final String TALLA_UNICA = "U";
 
     private static final Map<String, AmiEtiquetaLayout> LAYOUT_POR_DESTINO = Map.of(
             "CHINA", AmiEtiquetaLayout.CHINA,
@@ -125,12 +129,18 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 contenido, cajasPendientes);
     }
 
+    /** Un artículo de la caja con lo que aporta el excel de pedido. */
+    private record ArticuloResuelto(ArticuloEtiqueta articulo, String colorCode,
+                                    String ean13, String ean128) {
+    }
+
     private EtiquetaCaja etiquetaDe(CajaFisica caja, int posicion, int total,
                                     AmiEtiquetaLayout layout, AmiPedidoExcel pedido,
                                     DatosEnvio envio, String nombreDestino,
                                     List<String> avisos, List<CajaData> cajasPendientes) {
         List<CajaData> lineas = caja.lineas();
         CajaData lider = caja.lider();
+        boolean cinturones = lider.esCinturon();
 
         // Caja mixta de verdad (varias referencias o colores): el spec no la
         // contempla para etiquetas; se etiqueta con la primera y se avisa.
@@ -138,37 +148,10 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         for (CajaData linea : lineas) {
             refsColores.add(claveRefColor(linea));
         }
-        if (refsColores.size() > 1) {
+        if (refsColores.size() > 1 && cinturones) {
             avisos.add("La caja " + lider.getNumeroCaja() + " de " + nombreDestino
                     + " mezcla varias referencias/colores: la etiqueta lleva "
                     + lider.getReferencia() + " " + lider.getCodigoColor());
-        }
-
-        String talla;
-        String cantidad;
-        if (lider.esCinturon()) {
-            List<CajaData> ordenadas = lineas.stream()
-                    .filter(linea -> claveRefColor(lider).equals(claveRefColor(linea)))
-                    .sorted(Comparator.comparingInt(AmiEtiquetasGenerador::tallaNumerica))
-                    .toList();
-            talla = String.join("-", ordenadas.stream()
-                    .map(CajaData::getTalla).toList());
-            // Los pares cantidad-talla solo tienen sentido con varias tallas;
-            // con una sola, QUANTITY es la cantidad a secas (regla general).
-            cantidad = ordenadas.size() == 1
-                    ? String.valueOf(ordenadas.get(0).getCantidad())
-                    : String.join(",", ordenadas.stream()
-                            .map(linea -> linea.getCantidad() + "-" + linea.getTalla()).toList());
-        } else {
-            talla = "U";
-            cantidad = String.valueOf(lineas.stream().mapToInt(CajaData::getCantidad).sum());
-        }
-
-        // El peso es de la caja física ENTERA y viene una sola vez, en su
-        // línea líder; las demás líneas no aportan peso.
-        Double peso = caja.pesoBrutoKg();
-        if (peso == null) {
-            cajasPendientes.add(lider);
         }
 
         // El ORDER NUMBER (celda y código de barras) sale SIEMPRE del campo
@@ -183,41 +166,88 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     + "ni código de barras");
         }
 
-        // La talla solo entra en la clave de los cinturones: los bolsos van
-        // como talla única ("U") en el excel de pedido.
-        Optional<AmiPedidoExcel.FilaPedido> fila = pedido.buscar(lider.getReferencia(),
-                lider.getCodigoColor(), lider.esCinturon() ? lider.getTalla() : null,
-                layout.sufijoPo());
+        // Un artículo por referencia+color (bolsos) o +talla (cinturones), y
+        // cada uno con su fila del pedido: su color code y sus dos EAN.
+        List<ArticuloResuelto> resueltos = ArticulosDeCaja.de(caja, cinturones).stream()
+                .map(articulo -> resolver(articulo, layout, pedido, orderNumber,
+                        lider.getNumeroCaja(), nombreDestino, avisos))
+                .toList();
+        ArticuloResuelto primero = resueltos.get(0);
+
+        String referencia;
         String colorCode;
-        String ean13 = null;
-        String ean128 = null;
-        if (fila.isPresent()) {
-            colorCode = fila.get().colorCode();
-            ean13 = fila.get().ean13();
-            ean128 = fila.get().ean128();
-            for (String aviso : fila.get().avisosEan()) {
-                avisos.add("Caja " + lider.getNumeroCaja() + " de " + nombreDestino
-                        + ": " + aviso);
-            }
-            if (orderNumber != null
-                    && Long.parseLong(fila.get().orderNumber()) != Long.parseLong(orderNumber)) {
-                avisos.add("Caja " + lider.getNumeroCaja() + " de " + nombreDestino
-                        + ": el pedido del JSON (" + orderNumber
-                        + ") no coincide con el PO del excel de pedido ("
-                        + fila.get().orderNumber() + "); la etiqueta lleva el del JSON");
-            }
+        String talla;
+        String cantidad;
+        if (cinturones) {
+            // Los cinturones no cambian: SIZE con las tallas ordenadas y
+            // QUANTITY con los pares cantidad-talla de la referencia líder.
+            List<CajaData> ordenadas = lineas.stream()
+                    .filter(linea -> claveRefColor(lider).equals(claveRefColor(linea)))
+                    .sorted(Comparator.comparingInt(AmiEtiquetasGenerador::tallaNumerica))
+                    .toList();
+            referencia = lider.getReferencia();
+            colorCode = primero.colorCode();
+            talla = String.join("-", ordenadas.stream().map(CajaData::getTalla).toList());
+            // Los pares cantidad-talla solo tienen sentido con varias tallas;
+            // con una sola, QUANTITY es la cantidad a secas (regla general).
+            cantidad = ordenadas.size() == 1
+                    ? String.valueOf(ordenadas.get(0).getCantidad())
+                    : String.join(",", ordenadas.stream()
+                            .map(linea -> linea.getCantidad() + "-" + linea.getTalla()).toList());
         } else {
-            avisos.add("Referencia '" + lider.getReferencia() + "' (" + nombreDestino
-                    + ") no encontrada en el excel de pedido: el color code sale del JSON"
-                    + " y la etiqueta va sin EAN13 ni EAN128");
-            colorCode = lider.getCodigoColor();
+            // Bolsos: un valor por artículo en cada campo, en el orden del
+            // packing list. La talla no se concatena: "U / U" no dice nada.
+            List<ArticuloEtiqueta> articulos = resueltos.stream()
+                    .map(ArticuloResuelto::articulo).toList();
+            referencia = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::referencia);
+            // El color code no sale del artículo sino de su fila del pedido,
+            // así que este no puede pasar por ArticulosDeCaja.unir.
+            colorCode = resueltos.stream().map(ArticuloResuelto::colorCode)
+                    .collect(Collectors.joining(" / "));
+            talla = TALLA_UNICA;
+            cantidad = ArticulosDeCaja.unir(articulos, a -> String.valueOf(a.cantidad()));
         }
 
+        // El peso es de la caja física ENTERA y viene una sola vez, en su
+        // línea líder; las demás líneas no aportan peso.
+        Double peso = caja.pesoBrutoKg();
+        if (peso == null) {
+            cajasPendientes.add(lider);
+        }
         String pesoTexto = peso == null
                 ? null : String.format(ESPANOL, "%.2f KGS", peso);
-        return new EtiquetaCaja(envio.getTemporada(), lider.getReferencia(), colorCode,
+        return new EtiquetaCaja(envio.getTemporada(), referencia, colorCode,
                 talla, cantidad, pesoTexto, posicion + " / " + total, orderNumber,
-                ean13, ean128);
+                primero.ean13(), primero.ean128());
+    }
+
+    /** La fila del pedido de un artículo, o el color del JSON con aviso. */
+    private ArticuloResuelto resolver(ArticuloEtiqueta articulo, AmiEtiquetaLayout layout,
+                                      AmiPedidoExcel pedido, String orderNumber,
+                                      int numeroCaja, String nombreDestino,
+                                      List<String> avisos) {
+        // La talla solo entra en la clave de los cinturones: los bolsos van
+        // como talla única ("U") en el excel de pedido.
+        Optional<AmiPedidoExcel.FilaPedido> fila = pedido.buscar(articulo.referencia(),
+                articulo.codigoColor(), articulo.talla(), layout.sufijoPo());
+        if (fila.isEmpty()) {
+            avisos.add("Referencia '" + articulo.referencia() + "' (" + nombreDestino
+                    + ") no encontrada en el excel de pedido: el color code sale del JSON"
+                    + " y la etiqueta va sin EAN13 ni EAN128");
+            return new ArticuloResuelto(articulo, articulo.codigoColor(), null, null);
+        }
+        for (String aviso : fila.get().avisosEan()) {
+            avisos.add("Caja " + numeroCaja + " de " + nombreDestino + ": " + aviso);
+        }
+        if (orderNumber != null
+                && Long.parseLong(fila.get().orderNumber()) != Long.parseLong(orderNumber)) {
+            avisos.add("Caja " + numeroCaja + " de " + nombreDestino
+                    + ": el pedido del JSON (" + orderNumber
+                    + ") no coincide con el PO del excel de pedido ("
+                    + fila.get().orderNumber() + "); la etiqueta lleva el del JSON");
+        }
+        return new ArticuloResuelto(articulo, fila.get().colorCode(),
+                fila.get().ean13(), fila.get().ean128());
     }
 
     private static String claveRefColor(CajaData caja) {

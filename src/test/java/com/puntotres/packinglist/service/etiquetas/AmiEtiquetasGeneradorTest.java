@@ -72,6 +72,8 @@ class AmiEtiquetasGeneradorTest {
                         "3666598354771", ean128("3666598354771", 7665, "ES")),
                 new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", "07703 CH",
                         "3666598354771", ean128("3666598354771", 7703, "ES")),
+                new Fila("SPAIN", "ULL753.AL0168", "001", "IVORY", "U", 7665,
+                        "3666598313495", ean128("3666598313495", 7665, "ES")),
                 new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "85", 7672,
                         "3666598890064", ean128("3666598890064", 7672, "MA")),
                 new Fila("MOROCCO", "UBL029.AL0216", "001", "BLACK", "95", 7672,
@@ -225,6 +227,88 @@ class AmiEtiquetasGeneradorTest {
                 cabecera(), Map.of("pedido", pedido()));
 
         assertEquals(1, resultado.getExcels().get(0).getCajasPendientes().size());
+    }
+
+    @Test
+    void unaCajaDeBolsosConDosArticulosLosConcatenaConBarras() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertEquals("ULL163.AL0052 / ULL753.AL0168", texto(hoja, 10, 2));
+            assertEquals("221 BLACK / 001 IVORY", texto(hoja, 11, 2));
+            // SIZE sigue siendo único: "U / U" no aporta nada.
+            assertEquals("U", texto(hoja, 12, 2));
+            assertEquals("3 / 5", texto(hoja, 13, 2));
+            // Peso y parcel son de la caja, no del artículo.
+            assertEquals("5,28 KGS", texto(hoja, 14, 2));
+            assertEquals("1 / 1", texto(hoja, 15, 2));
+        }
+    }
+
+    @Test
+    void unaCajaDeBolsosConTresArticulosLosConcatenaTodos() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665"),
+                        caja(1, "USL999.XX0000", "007", null, 2, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertEquals("ULL163.AL0052 / ULL753.AL0168 / USL999.XX0000", texto(hoja, 10, 2));
+            assertEquals("3 / 5 / 2", texto(hoja, 13, 2));
+            // El tercero no está en el pedido: color del JSON tal cual.
+            assertEquals("221 BLACK / 001 IVORY / 007", texto(hoja, 11, 2));
+        }
+    }
+
+    @Test
+    void laEtiquetaDeVariosArticulosLlevaLosCodigosDeBarrasDelPrimero() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            // PO + EAN13 + EAN128 del primer artículo, en las dos etiquetas
+            // del par: tres imágenes por etiqueta, no seis.
+            assertEquals(6, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void unaCajaDeUnSoloBolsoSaleExactamenteIgualQueAntes() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertEquals("ULL163.AL0052", texto(hoja, 10, 2));
+            assertEquals("221 BLACK", texto(hoja, 11, 2));
+            assertEquals("U", texto(hoja, 12, 2));
+            assertEquals("50", texto(hoja, 13, 2));
+        }
+        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+    }
+
+    @Test
+    void dosLineasDelMismoBolsoEnUnaCajaSumanLaCantidadComoAntes() throws IOException {
+        // Mismo artículo repartido en dos líneas: un solo artículo, cantidad
+        // sumada. Nada de "30 / 20".
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 30, 5.28, "07665"),
+                        caja(1, "ULL163.AL0052", "221", null, 20, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals("ULL163.AL0052", texto(libro.getSheetAt(0), 10, 2));
+            assertEquals("50", texto(libro.getSheetAt(0), 13, 2));
+        }
     }
 
     @Test
