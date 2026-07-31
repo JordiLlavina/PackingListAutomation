@@ -19,7 +19,7 @@
 - Los tests se instancian con `new` (JUnit 5 puro). Los de builder **reabren el `.xlsx` generado con POI y comprueban celdas reales**.
 - Comando de la suite: `mvn test`. Una sola clase: `mvn test -Dtest=NombreTest`.
 - Ejecutar `mvn test` completo antes de cada commit de tarea; ningún test existente puede romperse.
-- Los cinturones **no cambian de aspecto**: cualquier cambio en `SIZE`/`QUANTITY` de una caja de cinturones es un fallo.
+- Los cinturones **no cambian de valor**: cualquier cambio en el texto de `SIZE`/`QUANTITY` de una caja de cinturones es un fallo. El **tamaño de fuente sí puede encoger** en esas celdas si el texto no cabe — decisión del usuario del 2026-07-31: un `QUANTITY` de 6+ tallas hoy se recorta, y encogerlo es una mejora, no una regresión. `AjusteFuente` se aplica por celda, no por tipo de caja.
 - Separador de concatenación: exactamente `" / "` (espacio, barra, espacio).
 - Nombre de la hoja nueva: exactamente `CODIGOS BARRAS EXTRA`.
 
