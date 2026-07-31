@@ -426,6 +426,52 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
+    void cinturonConVariasTallasAusentesDelPedidoNoRepiteElAvisoDeReferencia()
+            throws IOException {
+        // "UBL999.XX0000" no está en el pedido para ninguna talla: buscar()
+        // devuelve Optional.empty() para las tres, así que sin dedup el
+        // mismo aviso saldría tres veces (uno por talla, resolver() corre
+        // una vez por artículo). Es un solo hecho -no depende de la talla-
+        // así que debe aparecer una sola vez, y la caja sigue siendo
+        // identificable en el texto.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(3, "UBL999.XX0000", "001", "85", 4, 8.5, "07672"),
+                        caja(3, "UBL999.XX0000", "001", "95", 3, null, "07672"),
+                        caja(3, "UBL999.XX0000", "001", "105", 2, null, "07672")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        long apariciones = resultado.getAvisos().stream()
+                .filter(aviso -> aviso.contains("UBL999.XX0000")
+                        && aviso.contains("no encontrada"))
+                .count();
+        assertEquals(1L, apariciones, resultado.getAvisos().toString());
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("Caja 3") && aviso.contains("PARIS")
+                        && aviso.contains("UBL999.XX0000") && aviso.contains("no encontrada")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void cinturonConVariasTallasAusentesDelPedidoSiguenDistinguiblesPorTalla()
+            throws IOException {
+        // Distinto de arriba: aquí la referencia SÍ está en el pedido, pero
+        // le faltan filas exactas para dos tallas concretas. Eso pasa por
+        // FilaPedido.avisosEan, que sí lleva la talla incrustada en el
+        // texto: son dos hechos distintos y el dedup no debe colapsarlos.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(4, "UBL029.AL0216", "001", "70", 4, 8.5, "07672"),
+                        caja(4, "UBL029.AL0216", "001", "75", 3, null, "07672")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        assertTrue(resultado.getAvisos().stream().anyMatch(aviso -> aviso.contains("70")),
+                resultado.getAvisos().toString());
+        assertTrue(resultado.getAvisos().stream().anyMatch(aviso -> aviso.contains("75")),
+                resultado.getAvisos().toString());
+        assertEquals(resultado.getAvisos().size(),
+                resultado.getAvisos().stream().distinct().count());
+    }
+
+    @Test
     void sinColumnasEanElAvisoDelLibroLlegaAlResultado() throws IOException {
         byte[] pedidoViejo = PedidoAmiExcel.crearSinColumnasEan("EAN H26",
                 new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665));

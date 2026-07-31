@@ -137,6 +137,23 @@ class AjusteFuenteTest {
     }
 
     @Test
+    void unaCeldaConWrapTextQueNoCabeEncogeLaFuenteSinMarcarShrinkToFit() throws IOException {
+        // Las plantillas de APC llevan wrapText en las celdas de valor:
+        // Excel lo prioriza sobre shrinkToFit e ignora este último, así que
+        // marcarlo ahí sería un atributo inerte. El tamaño calculado sigue
+        // aplicándose igual: es la única protección real en ese caso.
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            Cell celda = celdaConWrapText(libro, "X".repeat(60), (short) 22, 20);
+
+            new AjusteFuente(libro).ajustar(celda);
+
+            XSSFCellStyle estilo = (XSSFCellStyle) celda.getCellStyle();
+            assertTrue(estilo.getFont().getFontHeightInPoints() < 22);
+            assertFalse(estilo.getShrinkToFit());
+        }
+    }
+
+    @Test
     void dosCeldasEnElSueloQueNoCabenComparteEstilo() throws IOException {
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             AjusteFuente ajuste = new AjusteFuente(libro);
@@ -157,12 +174,24 @@ class AjusteFuenteTest {
     /** Una celda con texto, tamaño de fuente y ancho de columna dados. */
     private static Cell celdaCon(XSSFWorkbook libro, String texto, short tamanoPt,
                                  int anchoEnChars) {
+        return celdaCon(libro, texto, tamanoPt, anchoEnChars, false);
+    }
+
+    /** Igual que {@link #celdaCon}, pero con wrapText en el estilo original. */
+    private static Cell celdaConWrapText(XSSFWorkbook libro, String texto, short tamanoPt,
+                                 int anchoEnChars) {
+        return celdaCon(libro, texto, tamanoPt, anchoEnChars, true);
+    }
+
+    private static Cell celdaCon(XSSFWorkbook libro, String texto, short tamanoPt,
+                                 int anchoEnChars, boolean wrapText) {
         XSSFSheet hoja = libro.createSheet("h" + libro.getNumberOfSheets());
         hoja.setColumnWidth(0, anchoEnChars * 256);
         XSSFFont fuente = libro.createFont();
         fuente.setFontHeightInPoints(tamanoPt);
         XSSFCellStyle estilo = libro.createCellStyle();
         estilo.setFont(fuente);
+        estilo.setWrapText(wrapText);
         Cell celda = hoja.createRow(0).createCell(0);
         celda.setCellValue(texto);
         celda.setCellStyle(estilo);

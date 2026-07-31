@@ -100,7 +100,25 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             resultado.getExcels().add(
                     generarDestino(destino, layout, pedido, envio, resultado.getAvisos()));
         }
+        deduplicarAvisos(resultado);
         return resultado;
+    }
+
+    /**
+     * resolver() se llama una vez por artículo, no por caja: en un cinturón
+     * con varias tallas eso son varias llamadas para la misma caja, y tres de
+     * sus avisos (referencia no encontrada, PO discrepante) no dependen de la
+     * talla, así que salen byte-idénticos una vez por talla. Deduplicar por
+     * igualdad exacta conservando el orden de la primera aparición quita ese
+     * ruido sin tocar los avisos que sí difieren entre tallas (los de
+     * FilaPedido.avisosEan, que llevan la talla o el EAN incrustados en el
+     * texto): esos nunca coinciden byte a byte entre tallas distintas, así
+     * que el dedup no les afecta.
+     */
+    private static void deduplicarAvisos(ResultadoEtiquetas resultado) {
+        List<String> unicos = resultado.getAvisos().stream().distinct().toList();
+        resultado.getAvisos().clear();
+        resultado.getAvisos().addAll(unicos);
     }
 
     private ExcelGenerado generarDestino(DestinoData destino, AmiEtiquetaLayout layout,
@@ -248,9 +266,16 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         Optional<AmiPedidoExcel.FilaPedido> fila = pedido.buscar(articulo.referencia(),
                 articulo.codigoColor(), articulo.talla(), layout.sufijoPo());
         if (fila.isEmpty()) {
-            avisos.add("Referencia '" + articulo.referencia() + "' (" + nombreDestino
-                    + ") no encontrada en el excel de pedido: el color code sale del JSON"
-                    + " y la etiqueta va sin EAN13 ni EAN128");
+            // No depende de la talla (buscar() ni siquiera filtra por ella
+            // en este caso: la referencia falta para todo el PO), así que en
+            // un cinturón con varias tallas ausentes este mismo aviso saldría
+            // repetido; "Caja X de Y" además de nombreDestino la deja
+            // distinguible de la misma referencia fallando en otra caja, y
+            // el dedup de generar() colapsa las repeticiones dentro de la
+            // misma caja porque son, de verdad, el mismo hecho.
+            avisos.add("Caja " + numeroCaja + " de " + nombreDestino + ": referencia '"
+                    + articulo.referencia() + "' no encontrada en el excel de pedido: el"
+                    + " color code sale del JSON y la etiqueta va sin EAN13 ni EAN128");
             return new ArticuloResuelto(articulo, articulo.codigoColor(), null, null);
         }
         for (String aviso : fila.get().avisosEan()) {

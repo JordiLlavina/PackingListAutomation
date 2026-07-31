@@ -68,9 +68,16 @@ artículo es referencia+color en bolsos y referencia+color+**talla** en
 cinturones (cada talla es un SKU con su propio EAN-13). En **bolsos** la
 etiqueta concatena `REFERENCE`, `COLOR CODE` y `QUANTITY` con `" / "` en el
 orden del packing list —`SIZE` sigue siendo `U`— y `AjusteFuente` encoge la
-fuente si el texto no cabe (tamaño calculado con suelo de 8 pt **y**
-`shrinkToFit`; funciona porque las celdas de valor de la plantilla no están
-combinadas ni tienen `wrapText`). Los **cinturones no cambian de valor** en
+fuente si el texto no cabe (tamaño calculado con suelo de 8 pt **y**,
+solo cuando el estilo original no tiene `wrapText`, `shrinkToFit` como red de
+seguridad adicional). Esto se comprobó celda por celda en las cinco
+plantillas: en **AMI** las celdas de valor no están combinadas ni tienen
+`wrapText`, así que `shrinkToFit` sí actúa. En **las cuatro plantillas de
+APC** esas celdas sí tienen `wrapText` — Excel lo prioriza sobre
+`shrinkToFit` e ignora este último —, así que ahí `AjusteFuente` no lo marca
+y la única protección real es el tamaño calculado; que esa clase de código
+también se use en APC (ver más abajo) no significa que `shrinkToFit` esté
+haciendo nada allí. Los **cinturones no cambian de valor** en
 `SIZE`/`QUANTITY`: `SIZE` se escribe sin pasar por `AjusteFuente` y nunca
 encoge, pero `QUANTITY` sí pasa por él como cualquier caja, así que su fuente
 puede encoger si el texto no cabe (`AjusteFuente` se aplica por celda, no por
