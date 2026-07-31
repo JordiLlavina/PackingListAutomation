@@ -109,6 +109,38 @@ class ApcEtiquetasGeneradorTest {
     }
 
     @Test
+    void unaCajaDeBolsosConDosArticulosConcatenaReferenciaColorYPiezas() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("JAPAN", List.of(palet(1, 1, 1, null)),
+                                caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 3, 7.6, 1),
+                                caja(1, "PXCBC-F67009", "LZZ-BLANC", null, 5, null, 1))),
+                envio(), Map.of());
+
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        assertEquals("PXCBC-F67008 / PXCBC-F67009", texto(hoja, 11, 2));
+        assertEquals("LZZ-NOIR / LZZ-BLANC", texto(hoja, 12, 2));
+        // SIZE no se concatena: "U / U" no dice nada.
+        assertEquals("U", texto(hoja, 13, 2));
+        assertEquals("3 / 5", texto(hoja, 14, 2));
+        // Peso y colisage son de la caja, no del artículo.
+        assertEquals("7,60 Kg", texto(hoja, 18, 2));
+        assertEquals("1 / 1", texto(hoja, 17, 2));
+    }
+
+    @Test
+    void unaCajaDeUnSoloBolsoSaleExactamenteIgualQueAntes() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("JAPAN", List.of(palet(1, 1, 1, null)),
+                                caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 1))),
+                envio(), Map.of());
+
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        assertEquals("PXCBC-F67008", texto(hoja, 11, 2));
+        assertEquals("LZZ-NOIR", texto(hoja, 12, 2));
+        assertEquals("11", texto(hoja, 14, 2));
+    }
+
+    @Test
     void losCinturonesAgrupanUnidadesPorTalla() throws IOException {
         // Caso real de envio-apc.json: caja 3 con tallas 85 (7u), 90 (8u) y
         // 85 (5u de otro pedido/canal) de la misma referencia y color.

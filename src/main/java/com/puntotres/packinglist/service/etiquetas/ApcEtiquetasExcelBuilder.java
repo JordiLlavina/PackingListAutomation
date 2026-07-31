@@ -42,7 +42,8 @@ public class ApcEtiquetasExcelBuilder {
                           List<EtiquetaPaletApc> palets) throws IOException {
         try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
              XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
-            escribirHojaCajas(hoja(libro, layout.hojaCajas(), layout), layout, cajas);
+            AjusteFuente ajuste = new AjusteFuente(libro);
+            escribirHojaCajas(hoja(libro, layout.hojaCajas(), layout), layout, cajas, ajuste);
             escribirHojaPalets(hoja(libro, layout.hojaPalet(), layout), palets);
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             libro.write(salida);
@@ -60,7 +61,7 @@ public class ApcEtiquetasExcelBuilder {
     }
 
     private static void escribirHojaCajas(XSSFSheet hoja, ApcEtiquetaLayout layout,
-                                          List<EtiquetaCajaApc> cajas) {
+                                          List<EtiquetaCajaApc> cajas, AjusteFuente ajuste) {
         if (cajas.isEmpty()) {
             return;
         }
@@ -71,8 +72,9 @@ public class ApcEtiquetasExcelBuilder {
         replicarImagenes(hoja, layout.alturaBloque(), cajas.size());
         for (int i = 0; i < cajas.size(); i++) {
             int base = i * layout.alturaBloque();
-            escribirEtiquetaCaja(hoja, layout, base, cajas.get(i));
-            escribirEtiquetaCaja(hoja, layout, base + layout.offsetSegundaEtiqueta(), cajas.get(i));
+            escribirEtiquetaCaja(hoja, layout, base, cajas.get(i), ajuste);
+            escribirEtiquetaCaja(hoja, layout, base + layout.offsetSegundaEtiqueta(),
+                    cajas.get(i), ajuste);
             if (i < cajas.size() - 1) {
                 hoja.setRowBreak(base + layout.alturaBloque() - 1);
             }
@@ -80,18 +82,20 @@ public class ApcEtiquetasExcelBuilder {
     }
 
     private static void escribirEtiquetaCaja(XSSFSheet hoja, ApcEtiquetaLayout layout,
-                                             int base, EtiquetaCajaApc etiqueta) {
+                                             int base, EtiquetaCajaApc etiqueta,
+                                             AjusteFuente ajuste) {
         escribir(hoja, base + layout.filaOrder(), etiqueta.orderNumber());
         escribir(hoja, base + layout.filaLivraison(), etiqueta.livraisonCode());
-        escribir(hoja, base + layout.filaReferencia(), etiqueta.referencia());
-        escribir(hoja, base + layout.filaColor(), etiqueta.colour());
+        // Estas tres pueden llevar varios artículos concatenados y crecer.
+        ajuste.ajustar(escribir(hoja, base + layout.filaReferencia(), etiqueta.referencia()));
+        ajuste.ajustar(escribir(hoja, base + layout.filaColor(), etiqueta.colour()));
         escribir(hoja, base + layout.filaTalla(), etiqueta.size());
-        escribir(hoja, base + layout.filaPiezas(), etiqueta.piecesBySize());
+        ajuste.ajustar(escribir(hoja, base + layout.filaPiezas(), etiqueta.piecesBySize()));
         escribir(hoja, base + layout.filaColisage(), etiqueta.colisage());
         escribir(hoja, base + layout.filaPeso(), etiqueta.poidsBrut());
     }
 
-    private static void escribir(XSSFSheet hoja, int fila, String valor) {
+    private static Cell escribir(XSSFSheet hoja, int fila, String valor) {
         XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
         Cell celda = f.getCell(ApcEtiquetaLayout.COL_VALOR) != null
                 ? f.getCell(ApcEtiquetaLayout.COL_VALOR)
@@ -101,6 +105,7 @@ public class ApcEtiquetasExcelBuilder {
         } else {
             celda.setCellValue(valor);
         }
+        return celda;
     }
 
     /**

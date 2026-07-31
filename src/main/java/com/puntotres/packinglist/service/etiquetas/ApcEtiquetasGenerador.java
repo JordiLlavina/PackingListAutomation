@@ -148,17 +148,30 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
         String size;
         String piezas;
+        String referencia;
+        String colour;
         if (unidadesPorTalla.isEmpty()) {
+            // Bolsos: un valor por artículo en cada campo, en el orden del
+            // packing list. SIZE no se concatena: "U / U" no dice nada.
+            List<ArticuloEtiqueta> articulos = ArticulosDeCaja.de(caja, false);
+            referencia = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::referencia);
+            colour = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::codigoColor);
             size = "U";
-            piezas = String.valueOf(propias.stream().mapToInt(CajaData::getCantidad).sum());
-        } else if (unidadesPorTalla.size() == 1) {
-            var unica = unidadesPorTalla.entrySet().iterator().next();
-            size = unica.getKey();
-            piezas = String.valueOf(unica.getValue());
+            piezas = ArticulosDeCaja.unir(articulos, a -> String.valueOf(a.cantidad()));
         } else {
-            size = String.join("-", unidadesPorTalla.keySet());
-            piezas = String.join(",", unidadesPorTalla.entrySet().stream()
-                    .map(e -> e.getValue() + "-" + e.getKey()).toList());
+            // Cinturones: sin cambios, la referencia y el color son los de la
+            // línea líder y las unidades van agrupadas por talla.
+            referencia = lider.getReferencia();
+            colour = lider.getCodigoColor();
+            if (unidadesPorTalla.size() == 1) {
+                var unica = unidadesPorTalla.entrySet().iterator().next();
+                size = unica.getKey();
+                piezas = String.valueOf(unica.getValue());
+            } else {
+                size = String.join("-", unidadesPorTalla.keySet());
+                piezas = String.join(",", unidadesPorTalla.entrySet().stream()
+                        .map(e -> e.getValue() + "-" + e.getKey()).toList());
+            }
         }
 
         // El peso es de la caja física ENTERA y viene una sola vez, en su
@@ -167,8 +180,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         if (peso == null) {
             cajasPendientes.add(lider);
         }
-        return new EtiquetaCajaApc(NO_DISPONIBLE, NO_DISPONIBLE, lider.getReferencia(),
-                lider.getCodigoColor(), size, piezas, posicion + " / " + total, kg(peso));
+        return new EtiquetaCajaApc(NO_DISPONIBLE, NO_DISPONIBLE, referencia,
+                colour, size, piezas, posicion + " / " + total, kg(peso));
     }
 
     /**
