@@ -524,6 +524,27 @@ class AmiEtiquetasGeneradorTest {
         }
     }
 
+    @Test
+    void dejaUnExcelDeVariosArticulosParaInspeccionManual() throws IOException {
+        // Tres artículos: es donde el texto concatenado se pasa del ancho de
+        // la columna y hay que ver en Excel que la fuente encoge de verdad.
+        DatosEnvio envio = cabecera();
+        envio.setNumeroFactura("F-MULTI");
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665"),
+                        caja(1, "USL999.XX0000", "007", null, 2, null, "07665"),
+                        caja(2, "UBL029.AL0216", "001", "95", 33, 9.93, "07672"),
+                        caja(2, "UBL029.AL0216", "001", "85", 4, null, "07672"),
+                        caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672")))),
+                envio, Map.of("pedido", pedido()));
+
+        ExcelGenerado excel = resultado.getExcels().get(0);
+        Files.createDirectories(Path.of("target"));
+        Files.write(Path.of("target", excel.getNombreFichero()), excel.getContenido());
+        assertEquals("Etiquetas_AMI_PARIS_F-MULTI.xlsx", excel.getNombreFichero());
+    }
+
     private static XSSFWorkbook abrir(ExcelGenerado excel) throws IOException {
         return new XSSFWorkbook(new ByteArrayInputStream(excel.getContenido()));
     }

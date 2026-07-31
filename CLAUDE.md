@@ -62,6 +62,21 @@ Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
 
 **Los dos EAN de las etiquetas de AMI** salen del excel de pedido con **clave exacta** `ARTICLE`+`COLORIS`+`TAILLE`+sufijo de PO (en el fichero real esa clave identifica una sola fila de 151; el color es obligatorio porque hay 59 claves con varios colores). Si no hay fila exacta: aviso y etiqueta sin esos códigos, nunca la fila de otro PO. La talla es la de la **línea líder** de la caja, porque en una caja de cinturones con varias tallas solo cabe un par de EAN. El `EAN128` se pasa a Code 128 **verbatim**, nunca compuesto: lleva dentro el EAN13 y el PO, y en el fichero real hay 8 filas donde eso no cuadra con sus propias columnas — se avisa y se imprime igual, porque es el código del cliente el que espera su escáner. `AmiPedidoRealTest` ancla todo esto contra el fichero real.
 
+**Varios artículos en una caja** (`ArticulosDeCaja`): una caja física puede
+llevar varios artículos y la etiqueta ya no los colapsa a la línea líder. Un
+artículo es referencia+color en bolsos y referencia+color+**talla** en
+cinturones (cada talla es un SKU con su propio EAN-13). En **bolsos** la
+etiqueta concatena `REFERENCE`, `COLOR CODE` y `QUANTITY` con `" / "` en el
+orden del packing list —`SIZE` sigue siendo `U`— y `AjusteFuente` encoge la
+fuente si el texto no cabe (tamaño calculado con suelo de 8 pt **y**
+`shrinkToFit`; funciona porque las celdas de valor de la plantilla no están
+combinadas ni tienen `wrapText`). Los **cinturones no cambian de aspecto**.
+Como en una etiqueta solo cabe un par de EAN, los artículos 2..N van a la hoja
+`CODIGOS BARRAS EXTRA` (`HojaCodigosBarrasExtra`, sin plantilla, maquetación en
+constantes) del mismo libro de la destinación, con un aviso al usuario de que
+hay una hoja más que imprimir. Solo AMI: **APC no imprime códigos de barras**,
+solo hereda la concatenación.
+
 **Etiquetas de artículo** (`service/etiquetasarticulo/`): flujo **independiente
 del envío** (`/etiquetas-articulo`), su única entrada es el excel de pedido del
 cliente. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
