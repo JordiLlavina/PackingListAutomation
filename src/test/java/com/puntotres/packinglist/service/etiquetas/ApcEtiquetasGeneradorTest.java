@@ -125,6 +125,8 @@ class ApcEtiquetasGeneradorTest {
         // Peso y colisage son de la caja, no del artículo.
         assertEquals("7,60 Kg", texto(hoja, 18, 2));
         assertEquals("1 / 1", texto(hoja, 17, 2));
+        // La etiqueta ya muestra todos los artículos: no hay nada que avisar.
+        assertTrue(resultado.getAvisos().isEmpty());
     }
 
     @Test
@@ -156,6 +158,23 @@ class ApcEtiquetasGeneradorTest {
         // El peso de la caja entera viene una sola vez, en su primera línea.
         assertEquals("6,00 Kg", texto(hoja, 18, 2));
         assertEquals("1 / 1", texto(hoja, 17, 2));
+    }
+
+    @Test
+    void unaCajaDeCinturonesConDosReferenciasAvisaDeMezcla() throws IOException {
+        // Los cinturones no muestran todos los artículos (a diferencia de los
+        // bolsos): la etiqueta sigue llevando solo la línea líder, así que
+        // una caja mixta de verdad sigue siendo un aviso.
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("JAPAN", List.of(palet(1, 3, 3, null)),
+                                caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 6.0, 1),
+                                caja(3, "PXBHZ-H65078", "LZZ-NOIR", "90", 8, null, 1))),
+                envio(), Map.of());
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        assertEquals("PXBHZ-H65077", texto(hoja, 11, 2));
+        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("La caja 3 de JAPAN")
+                && a.contains("mezcla varias referencias/colores")
+                && a.contains("la etiqueta lleva PXBHZ-H65077 LZZ-NOIR")));
     }
 
     @Test

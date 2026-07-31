@@ -122,17 +122,6 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         List<CajaData> lineas = caja.lineas();
         CajaData lider = caja.lider();
 
-        // Caja mixta de verdad (varias referencias o colores): se etiqueta
-        // con la primera y se avisa, igual que en AMI.
-        Set<String> refsColores = new LinkedHashSet<>();
-        for (CajaData linea : lineas) {
-            refsColores.add(claveRefColor(linea));
-        }
-        if (refsColores.size() > 1) {
-            avisos.add("La caja " + lider.getNumeroCaja() + " de " + nombreDestino
-                    + " mezcla varias referencias/colores: la etiqueta lleva "
-                    + lider.getReferencia() + " " + lider.getCodigoColor());
-        }
         List<CajaData> propias = lineas.stream()
                 .filter(linea -> claveRefColor(lider).equals(claveRefColor(linea)))
                 .toList();
@@ -145,6 +134,21 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 .sorted(Comparator.comparingInt(ApcEtiquetasGenerador::tallaNumerica))
                 .forEach(linea -> unidadesPorTalla.merge(
                         linea.getTalla(), linea.getCantidad(), Integer::sum));
+        boolean cinturones = !unidadesPorTalla.isEmpty();
+
+        // Caja mixta de verdad (varias referencias o colores): en cinturones
+        // la etiqueta solo lleva la línea líder, así que se avisa. En bolsos
+        // la etiqueta ya muestra todos los artículos (ver más abajo), así que
+        // una caja mixta ya no es un problema y no hay nada que avisar.
+        Set<String> refsColores = new LinkedHashSet<>();
+        for (CajaData linea : lineas) {
+            refsColores.add(claveRefColor(linea));
+        }
+        if (refsColores.size() > 1 && cinturones) {
+            avisos.add("La caja " + lider.getNumeroCaja() + " de " + nombreDestino
+                    + " mezcla varias referencias/colores: la etiqueta lleva "
+                    + lider.getReferencia() + " " + lider.getCodigoColor());
+        }
 
         String size;
         String piezas;
