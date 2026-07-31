@@ -52,8 +52,14 @@ public class AmiEtiquetasExcelBuilder {
     private record ImagenAnclada(AnclajeBloque anclaje, int indice) {
     }
 
+    /** Sin filas extra: la firma que usan los tests y los flujos sin sobrantes. */
     public byte[] generar(AmiEtiquetaLayout layout, List<EtiquetaCaja> etiquetas)
             throws IOException {
+        return generar(layout, etiquetas, List.of());
+    }
+
+    public byte[] generar(AmiEtiquetaLayout layout, List<EtiquetaCaja> etiquetas,
+                          List<FilaCodigoBarrasExtra> filasExtra) throws IOException {
         try (InputStream plantilla = getClass().getResourceAsStream(RUTA_PLANTILLA);
              XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
 
@@ -81,6 +87,10 @@ public class AmiEtiquetasExcelBuilder {
                     hoja.setRowBreak(base + layout.alturaBloque() - 1);
                 }
             }
+
+            // La hoja extra va DESPUÉS de dejarSoloLaHoja, que se lleva por
+            // delante cualquier otra hoja del libro.
+            HojaCodigosBarrasExtra.escribir(libro, filasExtra);
 
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             libro.write(salida);

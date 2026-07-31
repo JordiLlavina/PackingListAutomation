@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -382,7 +383,8 @@ class AmiEtiquetasGeneradorTest {
                         caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672")))),
                 cabecera(), Map.of("pedido", pedido()));
 
-        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+        assertEquals(List.of("La caja 2 de PARIS lleva varias tallas: se han generado "
+                + "códigos de barra aparte para imprimir"), resultado.getAvisos());
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
             // SIZE sí sale ordenado, aunque el EAN sea el de la líder.
@@ -433,6 +435,93 @@ class AmiEtiquetasGeneradorTest {
 
         assertTrue(resultado.getAvisos().stream().anyMatch(aviso -> aviso.contains("EAN13")));
         assertEquals(1, resultado.getExcels().size());
+    }
+
+    // --- hoja de códigos de barras extra ---
+
+    @Test
+    void unaCajaDeBolsosConDosArticulosGeneraLaHojaExtraConElSegundo() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertNotNull(extra);
+            // Solo el segundo artículo: el primero va entero en la etiqueta.
+            assertEquals(1, extra.getLastRowNum());
+            assertEquals("1", texto(extra, 1, 0));
+            assertEquals("ULL753.AL0168", texto(extra, 1, 1));
+            assertEquals("001 IVORY", texto(extra, 1, 2));
+            assertEquals("U", texto(extra, 1, 3));
+            assertEquals("5", texto(extra, 1, 4));
+            assertEquals("3666598313495", texto(extra, 1, 5));
+        }
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.equals("La caja 1 de PARIS mezcla varias "
+                        + "referencias/colores: se han generado códigos de barra aparte "
+                        + "para imprimir")), resultado.getAvisos().toString());
+    }
+
+    @Test
+    void unCinturonMultiTallaGeneraUnaFilaExtraPorTallaNoLider() throws IOException {
+        // La líder es la 95 (la que lleva el peso): la etiqueta imprime su
+        // EAN y las tallas 85 y 105 van a la hoja extra.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(2, "UBL029.AL0216", "001", "95", 33, 9.93, "07672"),
+                        caja(2, "UBL029.AL0216", "001", "85", 4, null, "07672"),
+                        caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            // La etiqueta no cambia.
+            assertEquals("UBL029.AL0216", texto(hoja, 10, 2));
+            assertEquals("85-95-105", texto(hoja, 12, 2));
+            assertEquals("4-85,33-95,3-105", texto(hoja, 13, 2));
+
+            XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertEquals(2, extra.getLastRowNum());
+            assertEquals("85", texto(extra, 1, 3));
+            assertEquals("4", texto(extra, 1, 4));
+            assertEquals("3666598890064", texto(extra, 1, 5));
+            assertEquals("105", texto(extra, 2, 3));
+            assertEquals("3666598890101", texto(extra, 2, 5));
+        }
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.equals("La caja 2 de PARIS lleva varias tallas: "
+                        + "se han generado códigos de barra aparte para imprimir")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void unaCajaDeUnSoloArticuloNoGeneraHojaExtraNiAviso() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PARIS", caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals(1, libro.getNumberOfSheets());
+        }
+        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+    }
+
+    @Test
+    void lasFilasExtraDeVariasCajasVanEnLaMismaHoja() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 3, 5.28, "07665"),
+                        caja(1, "ULL753.AL0168", "001", null, 5, null, "07665"),
+                        caja(2, "ULL163.AL0052", "221", null, 4, 6.10, "07665"),
+                        caja(2, "ULL753.AL0168", "001", null, 6, null, "07665")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertEquals(2, extra.getLastRowNum());
+            assertEquals("1", texto(extra, 1, 0));
+            assertEquals("2", texto(extra, 2, 0));
+        }
     }
 
     private static XSSFWorkbook abrir(ExcelGenerado excel) throws IOException {

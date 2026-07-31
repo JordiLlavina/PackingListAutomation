@@ -214,6 +214,30 @@ class AmiEtiquetasExcelBuilderTest {
         Files.write(Path.of("target", "etiquetas-ami-china-sin-barcode.xlsx"), excel);
     }
 
+    @Test
+    void sinFilasExtraElLibroSoloTieneLaHojaDeEtiquetas() throws IOException {
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA,
+                List.of(etiquetaBolso("1 / 1")), List.of());
+
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertEquals(1, libro.getNumberOfSheets());
+        }
+    }
+
+    @Test
+    void conFilasExtraElLibroAnadeLaHojaDeCodigosDeBarras() throws IOException {
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA,
+                List.of(etiquetaBolso("1 / 1")),
+                List.of(new FilaCodigoBarrasExtra(1, "ULL753.AL0168", "001 IVORY", "U", "5",
+                        "3666598313495", null)));
+
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertEquals(2, libro.getNumberOfSheets());
+            assertEquals("AMI CHINA", libro.getSheetName(0));
+            assertEquals(HojaCodigosBarrasExtra.NOMBRE_HOJA, libro.getSheetName(1));
+        }
+    }
+
     private static XSSFWorkbook abrir(byte[] contenido) throws IOException {
         return new XSSFWorkbook(new ByteArrayInputStream(contenido));
     }

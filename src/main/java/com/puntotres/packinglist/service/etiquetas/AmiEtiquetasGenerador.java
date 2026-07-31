@@ -113,17 +113,18 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
         List<EtiquetaCaja> etiquetas = new ArrayList<>();
         List<CajaData> cajasPendientes = new ArrayList<>();
+        List<FilaCodigoBarrasExtra> filasExtra = new ArrayList<>();
         int posicion = 0;
         int total = cajasFisicas.size();
         for (CajaFisica caja : cajasFisicas) {
             posicion++;
             etiquetas.add(etiquetaDe(caja, posicion, total, layout, pedido, envio,
-                    destino.getNombreDestino(), avisos, cajasPendientes));
+                    destino.getNombreDestino(), avisos, cajasPendientes, filasExtra));
         }
 
         String nombreFichero = ("Etiquetas_AMI_" + destino.getNombreDestino() + "_"
                 + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
-        byte[] contenido = builder.generar(layout, etiquetas);
+        byte[] contenido = builder.generar(layout, etiquetas, filasExtra);
         return new ExcelGenerado(destino.getNombreDestino(), nombreFichero,
                 contenido, cajasPendientes);
     }
@@ -136,21 +137,17 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
     private EtiquetaCaja etiquetaDe(CajaFisica caja, int posicion, int total,
                                     AmiEtiquetaLayout layout, AmiPedidoExcel pedido,
                                     DatosEnvio envio, String nombreDestino,
-                                    List<String> avisos, List<CajaData> cajasPendientes) {
+                                    List<String> avisos, List<CajaData> cajasPendientes,
+                                    List<FilaCodigoBarrasExtra> filasExtra) {
         List<CajaData> lineas = caja.lineas();
         CajaData lider = caja.lider();
         boolean cinturones = lider.esCinturon();
 
-        // Caja mixta de verdad (varias referencias o colores): el spec no la
-        // contempla para etiquetas; se etiqueta con la primera y se avisa.
+        // Varias referencias/colores (bolsos) o varias tallas (cinturones):
+        // solo sirve para elegir el texto del aviso de la hoja extra.
         Set<String> refsColores = new LinkedHashSet<>();
         for (CajaData linea : lineas) {
             refsColores.add(claveRefColor(linea));
-        }
-        if (refsColores.size() > 1 && cinturones) {
-            avisos.add("La caja " + lider.getNumeroCaja() + " de " + nombreDestino
-                    + " mezcla varias referencias/colores: la etiqueta lleva "
-                    + lider.getReferencia() + " " + lider.getCodigoColor());
         }
 
         // El ORDER NUMBER (celda y código de barras) sale SIEMPRE del campo
@@ -172,6 +169,25 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                         lider.getNumeroCaja(), nombreDestino, avisos))
                 .toList();
         ArticuloResuelto primero = resueltos.get(0);
+
+        // Solo el primer artículo conserva sus códigos de barras en la
+        // etiqueta; los demás se imprimen en la hoja "CODIGOS BARRAS EXTRA".
+        for (ArticuloResuelto sobrante : resueltos.subList(1, resueltos.size())) {
+            filasExtra.add(new FilaCodigoBarrasExtra(lider.getNumeroCaja(),
+                    sobrante.articulo().referencia(), sobrante.colorCode(),
+                    sobrante.articulo().talla() == null
+                            ? TALLA_UNICA : sobrante.articulo().talla(),
+                    String.valueOf(sobrante.articulo().cantidad()),
+                    sobrante.ean13(), sobrante.ean128()));
+        }
+        if (resueltos.size() > 1) {
+            // El usuario tiene que saber que ese excel trae una hoja más.
+            avisos.add("La caja " + lider.getNumeroCaja() + " de " + nombreDestino
+                    + (refsColores.size() > 1
+                            ? " mezcla varias referencias/colores"
+                            : " lleva varias tallas")
+                    + ": se han generado códigos de barra aparte para imprimir");
+        }
 
         String referencia;
         String colorCode;
