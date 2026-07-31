@@ -71,8 +71,10 @@ orden del packing list —`SIZE` sigue siendo `U`— y `AjusteFuente` encoge la
 fuente si el texto no cabe (tamaño calculado con suelo de 8 pt **y**
 `shrinkToFit`; funciona porque las celdas de valor de la plantilla no están
 combinadas ni tienen `wrapText`). Los **cinturones no cambian de valor** en
-`SIZE`/`QUANTITY`, pero su fuente sí puede encoger igual que en bolsos —
-`AjusteFuente` se aplica por celda, no por tipo de caja.
+`SIZE`/`QUANTITY`: `SIZE` se escribe sin pasar por `AjusteFuente` y nunca
+encoge, pero `QUANTITY` sí pasa por él como cualquier caja, así que su fuente
+puede encoger si el texto no cabe (`AjusteFuente` se aplica por celda, no por
+tipo de caja).
 Como en una etiqueta solo cabe un par de EAN, los artículos 2..N van a la hoja
 `CODIGOS BARRAS EXTRA` (`HojaCodigosBarrasExtra`, sin plantilla, maquetación en
 constantes) del mismo libro de la destinación, con un aviso al usuario de que
