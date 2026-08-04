@@ -267,8 +267,10 @@ class AmiEtiquetasExcelBuilderTest {
     void conFilasExtraElLibroAnadeLaHojaDeCodigosDeBarras() throws IOException {
         byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA,
                 List.of(etiquetaBolso("1 / 1")),
-                List.of(new FilaCodigoBarrasExtra(1, "ULL753.AL0168", "001 IVORY", "U", "5",
-                        "3666598313495", null)));
+                List.of(new FilaCodigoBarrasExtra("1 / 1", "CHINA",
+                        new EtiquetaArticulo("ULL753.AL0168", "Size: U", "001 IVORY",
+                                "Cde: 07665", "3666598313495"),
+                        null)));
 
         try (XSSFWorkbook libro = abrir(excel)) {
             assertEquals(2, libro.getNumberOfSheets());

@@ -99,7 +99,8 @@ class AmiEtiquetasGeneradorTest {
         try (XSSFWorkbook libro = abrir(paris)) {
             assertEquals("AMI FRANCE", libro.getSheetName(0));
             // El order number sale del campo 'pedido' del JSON.
-            assertEquals("07665", texto(libro.getSheetAt(0), 8, 2));
+            assertEquals("07665", texto(libro.getSheetAt(0),
+                    AmiEtiquetaLayout.FRANCE.filaOrderNumber(), 2));
         }
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(1))) {
             assertEquals("AMI CHINA", libro.getSheetName(0));
@@ -121,18 +122,21 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            // Caja 2 = segundo bloque (FRANCE: 32 filas por bloque).
-            assertEquals("UBL029.AL0216", texto(hoja, 10 + 32, 2));
-            assertEquals("85-95-105", texto(hoja, 12 + 32, 2));
-            assertEquals("4-85,33-95,3-105", texto(hoja, 13 + 32, 2));
-            assertEquals("9,93 KGS", texto(hoja, 14 + 32, 2));
-            assertEquals("2 / 2", texto(hoja, 15 + 32, 2));
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+            // Caja 2 = segundo bloque.
+            int b = layout.alturaBloque();
+            assertEquals("UBL029.AL0216", texto(hoja, layout.filaReferencia() + b, 2));
+            assertEquals("85-95-105", texto(hoja, layout.filaTalla() + b, 2));
+            assertEquals("4-85,33-95,3-105", texto(hoja, layout.filaCantidad() + b, 2));
+            assertEquals("9,93 KGS", texto(hoja, layout.filaPeso() + b, 2));
+            assertEquals("2 / 2", texto(hoja, layout.filaParcel() + b, 2));
             // La caja 1 (bolso) es talla única.
-            assertEquals("U", texto(hoja, 12, 2));
-            assertEquals("50", texto(hoja, 13, 2));
-            assertEquals("1 / 2", texto(hoja, 15, 2));
-            // COLOR CODE sale del excel de pedido (coloris + libellé).
-            assertEquals("001 BLACK", texto(hoja, 11 + 32, 2));
+            assertEquals("U", texto(hoja, layout.filaTalla(), 2));
+            assertEquals("50", texto(hoja, layout.filaCantidad(), 2));
+            assertEquals("1 / 2", texto(hoja, layout.filaParcel(), 2));
+            // COLOR CODE lleva solo el código numérico, no el nombre del
+            // color: el nombre vive en la imagen compuesta y en la hoja extra.
+            assertEquals("001", texto(hoja, layout.filaColor() + b, 2));
         }
         // Las tallas de la misma caja no cuentan como cajas con peso pendiente:
         // el peso es de la caja física entera y lo lleva la línea líder.
@@ -149,7 +153,8 @@ class AmiEtiquetasGeneradorTest {
                 cabecera(), Map.of("pedido", pedido()));
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            assertEquals("5,28 KGS", texto(libro.getSheetAt(0), 14, 2));
+            assertEquals("5,28 KGS",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaPeso(), 2));
         }
         assertTrue(resultado.getExcels().get(0).getCajasPendientes().isEmpty());
     }
@@ -164,8 +169,8 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            assertEquals("75", texto(hoja, 12, 2));
-            assertEquals("45", texto(hoja, 13, 2));
+            assertEquals("75", texto(hoja, AmiEtiquetaLayout.FRANCE.filaTalla(), 2));
+            assertEquals("45", texto(hoja, AmiEtiquetaLayout.FRANCE.filaCantidad(), 2));
         }
     }
 
@@ -191,7 +196,8 @@ class AmiEtiquetasGeneradorTest {
                 .anyMatch(aviso -> aviso.contains("USL999.XX0000")));
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             // Fallback: color del JSON tal cual.
-            assertEquals("007", texto(libro.getSheetAt(0), 11, 2));
+            assertEquals("007",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaColor(), 2));
         }
     }
 
@@ -204,7 +210,8 @@ class AmiEtiquetasGeneradorTest {
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(aviso -> aviso.contains("07777") && aviso.contains("07665")));
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            assertEquals("07777", texto(libro.getSheetAt(0), 8, 2));
+            assertEquals("07777",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaOrderNumber(), 2));
         }
     }
 
@@ -217,7 +224,8 @@ class AmiEtiquetasGeneradorTest {
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(aviso -> aviso.contains("sin campo 'pedido'")));
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            assertEquals("", texto(libro.getSheetAt(0), 8, 2));
+            assertEquals("",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaOrderNumber(), 2));
         }
     }
 
@@ -239,14 +247,17 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            assertEquals("ULL163.AL0052 / ULL753.AL0168", texto(hoja, 10, 2));
-            assertEquals("221 BLACK / 001 IVORY", texto(hoja, 11, 2));
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+            assertEquals("ULL163.AL0052 / ULL753.AL0168",
+                    texto(hoja, layout.filaReferencia(), 2));
+            // COLOR CODE lleva solo los códigos numéricos, no los nombres.
+            assertEquals("221 / 001", texto(hoja, layout.filaColor(), 2));
             // SIZE sigue siendo único: "U / U" no aporta nada.
-            assertEquals("U", texto(hoja, 12, 2));
-            assertEquals("3 / 5", texto(hoja, 13, 2));
+            assertEquals("U", texto(hoja, layout.filaTalla(), 2));
+            assertEquals("3 / 5", texto(hoja, layout.filaCantidad(), 2));
             // Peso y parcel son de la caja, no del artículo.
-            assertEquals("5,28 KGS", texto(hoja, 14, 2));
-            assertEquals("1 / 1", texto(hoja, 15, 2));
+            assertEquals("5,28 KGS", texto(hoja, layout.filaPeso(), 2));
+            assertEquals("1 / 1", texto(hoja, layout.filaParcel(), 2));
         }
     }
 
@@ -260,10 +271,12 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            assertEquals("ULL163.AL0052 / ULL753.AL0168 / USL999.XX0000", texto(hoja, 10, 2));
-            assertEquals("3 / 5 / 2", texto(hoja, 13, 2));
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+            assertEquals("ULL163.AL0052 / ULL753.AL0168 / USL999.XX0000",
+                    texto(hoja, layout.filaReferencia(), 2));
+            assertEquals("3 / 5 / 2", texto(hoja, layout.filaCantidad(), 2));
             // El tercero no está en el pedido: color del JSON tal cual.
-            assertEquals("221 BLACK / 001 IVORY / 007", texto(hoja, 11, 2));
+            assertEquals("221 / 001 / 007", texto(hoja, layout.filaColor(), 2));
         }
     }
 
@@ -275,9 +288,10 @@ class AmiEtiquetasGeneradorTest {
                 cabecera(), Map.of("pedido", pedido()));
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            // PO + EAN13 + EAN128 del primer artículo, en las dos etiquetas
-            // del par: tres imágenes por etiqueta, no seis.
-            assertEquals(6, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+            // EAN13 + EAN128 del primer artículo (dentro de la imagen
+            // compuesta) + EAN128, en las dos etiquetas del par: dos
+            // imágenes por etiqueta, no seis (el Code 128 del PO ya no existe).
+            assertEquals(4, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
         }
     }
 
@@ -289,10 +303,12 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            assertEquals("ULL163.AL0052", texto(hoja, 10, 2));
-            assertEquals("221 BLACK", texto(hoja, 11, 2));
-            assertEquals("U", texto(hoja, 12, 2));
-            assertEquals("50", texto(hoja, 13, 2));
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+            assertEquals("ULL163.AL0052", texto(hoja, layout.filaReferencia(), 2));
+            // COLOR CODE lleva solo el código numérico.
+            assertEquals("221", texto(hoja, layout.filaColor(), 2));
+            assertEquals("U", texto(hoja, layout.filaTalla(), 2));
+            assertEquals("50", texto(hoja, layout.filaCantidad(), 2));
         }
         assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
     }
@@ -307,8 +323,10 @@ class AmiEtiquetasGeneradorTest {
                 cabecera(), Map.of("pedido", pedido()));
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            assertEquals("ULL163.AL0052", texto(libro.getSheetAt(0), 10, 2));
-            assertEquals("50", texto(libro.getSheetAt(0), 13, 2));
+            assertEquals("ULL163.AL0052",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaReferencia(), 2));
+            assertEquals("50",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaCantidad(), 2));
         }
     }
 
@@ -324,9 +342,10 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            assertEquals("USL999.XX0000", texto(hoja, 10, 2));
-            assertEquals("", texto(hoja, 11, 2));
-            assertEquals("10", texto(hoja, 13, 2));
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+            assertEquals("USL999.XX0000", texto(hoja, layout.filaReferencia(), 2));
+            assertEquals("", texto(hoja, layout.filaColor(), 2));
+            assertEquals("10", texto(hoja, layout.filaCantidad(), 2));
         }
     }
 
@@ -343,9 +362,11 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
-            assertEquals("ULL163.AL0052 / USL999.XX0000 / ULL753.AL0168", texto(hoja, 10, 2));
-            assertEquals("221 BLACK /  / 001 IVORY", texto(hoja, 11, 2));
-            assertEquals("3 / 2 / 5", texto(hoja, 13, 2));
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+            assertEquals("ULL163.AL0052 / USL999.XX0000 / ULL753.AL0168",
+                    texto(hoja, layout.filaReferencia(), 2));
+            assertEquals("221 /  / 001", texto(hoja, layout.filaColor(), 2));
+            assertEquals("3 / 2 / 5", texto(hoja, layout.filaCantidad(), 2));
         }
     }
 
@@ -361,14 +382,15 @@ class AmiEtiquetasGeneradorTest {
     // --- EAN13 y EAN128 ---
 
     @Test
-    void laEtiquetaLlevaLosTresCodigosDeBarras() throws IOException {
+    void laEtiquetaLlevaLosDosCodigosDeBarras() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         importado(destino("CHINA", caja(1, "ULL163.AL0052", "221", null, 40, 4.10, "07703")))),
                 cabecera(), Map.of("pedido", pedido()));
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            // PO + EAN13 + EAN128 en las dos etiquetas del par.
-            assertEquals(6, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+            // Imagen compuesta (con el EAN13 dentro) + EAN128, en las dos
+            // etiquetas del par. El Code 128 del PO ya no existe.
+            assertEquals(4, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
         }
         assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
     }
@@ -388,8 +410,9 @@ class AmiEtiquetasGeneradorTest {
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
             // SIZE sí sale ordenado, aunque el EAN sea el de la líder.
-            assertEquals("85-95-105", texto(hoja, 12, 2));
-            assertEquals(6, hoja.getDrawingPatriarch().getShapes().size());
+            assertEquals("85-95-105", texto(hoja, AmiEtiquetaLayout.FRANCE.filaTalla(), 2));
+            // Imagen compuesta + EAN128 en las dos etiquetas del par.
+            assertEquals(4, hoja.getDrawingPatriarch().getShapes().size());
         }
     }
 
@@ -404,10 +427,12 @@ class AmiEtiquetasGeneradorTest {
                 .anyMatch(aviso -> aviso.contains("Caja 1") && aviso.contains("PARIS")
                         && aviso.contains("75")), resultado.getAvisos().toString());
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
-            // Solo el barcode del PO, en las dos etiquetas.
+            // Sin EAN13 ni EAN128 solo queda la imagen compuesta, en las dos
+            // etiquetas del par.
             assertEquals(2, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
-            // El resto de la etiqueta sale igual.
-            assertEquals("001 BLACK", texto(libro.getSheetAt(0), 11, 2));
+            // El resto de la etiqueta sale igual. COLOR CODE solo el número.
+            assertEquals("001",
+                    texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaColor(), 2));
         }
     }
 
@@ -472,6 +497,84 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
+    void laCeldaColorCodeLlevaSoloElCodigoNumerico() throws IOException {
+        // Antes ponía "001 BLACK": ahora el nombre del color vive en la
+        // imagen compuesta y en la hoja extra, no en la celda.
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", "U", 5, 5.28, "7665")))),
+                cabecera(), Map.of("pedido", pedido()));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals("221", texto(libro.getSheetAt(0),
+                    AmiEtiquetaLayout.FRANCE.filaColor(), 2));
+        }
+    }
+
+    @Test
+    void cadaEtiquetaLlevaDosImagenes() throws IOException {
+        // La compuesta y el EAN128, duplicadas por el par de etiquetas. El
+        // Code 128 del PO ya no existe: antes eran 6.
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", "U", 5, 5.28, "7665")))),
+                cabecera(), Map.of("pedido", pedido()));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals(4, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+    }
+
+    @Test
+    void laHojaExtraLlevaLosCuatroTextosDelArticuloSobrante() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", "U", 5, 5.28, "7665"),
+                        caja(1, "ULL753.AL0168", "001", "U", 3, null, "7665")))),
+                cabecera(), Map.of("pedido", pedido()));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertNotNull(extra, "no se ha generado la hoja de códigos extra");
+            int base = RejillaEtiquetas.filaBase(0);
+            assertEquals("1 / 1", texto(extra, base, 1));
+            assertEquals("PARIS", texto(extra, base + 2, 1));
+            assertEquals("ULL753.AL0168", texto(extra, base, 3));
+            assertEquals("Size: U", texto(extra, base, 4));
+            assertEquals("001 IVORY", texto(extra, base + 1, 3));
+            assertEquals("Cde: 07665", texto(extra, base + 1, 4));
+        }
+    }
+
+    @Test
+    void enCinturonesLaHojaExtraLlevaLaTallaDeCadaSobrante() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(importado(destino("PARIS",
+                        caja(1, "UBL029.AL0216", "001", "85", 4, 9.93, "7672"),
+                        caja(1, "UBL029.AL0216", "001", "95", 33, null, "7672"),
+                        caja(1, "UBL029.AL0216", "001", "105", 4, null, "7672")))),
+                cabecera(), Map.of("pedido", pedido()));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertEquals("Size: 95", texto(extra, RejillaEtiquetas.filaBase(0), 4));
+            assertEquals("Size: 105", texto(extra, RejillaEtiquetas.filaBase(1), 4));
+        }
+    }
+
+    @Test
+    void unArticuloQueNoEstaEnElPedidoSaleSinCdeYConSuColorDelJson()
+            throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", "U", 5, 5.28, "7665"),
+                        caja(1, "ULL999.AL9999", "777", "U", 1, null, "7665")))),
+                cabecera(), Map.of("pedido", pedido()));
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            int base = RejillaEtiquetas.filaBase(0);
+            assertEquals("777", texto(extra, base + 1, 3));
+            assertEquals("", texto(extra, base + 1, 4));
+        }
+    }
+
+    @Test
     void sinColumnasEanElAvisoDelLibroLlegaAlResultado() throws IOException {
         byte[] pedidoViejo = PedidoAmiExcel.crearSinColumnasEan("EAN H26",
                 new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665));
@@ -496,13 +599,13 @@ class AmiEtiquetasGeneradorTest {
             XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
             assertNotNull(extra);
             // Solo el segundo artículo: el primero va entero en la etiqueta.
-            assertEquals(1, extra.getLastRowNum());
-            assertEquals("1", texto(extra, 1, 0));
-            assertEquals("ULL753.AL0168", texto(extra, 1, 1));
-            assertEquals("001 IVORY", texto(extra, 1, 2));
-            assertEquals("U", texto(extra, 1, 3));
-            assertEquals("5", texto(extra, 1, 4));
-            assertEquals("3666598313495", texto(extra, 1, 5));
+            int base = RejillaEtiquetas.filaBase(0);
+            assertEquals("1 / 1", texto(extra, base, 1));
+            assertEquals("PARIS", texto(extra, base + 2, 1));
+            assertEquals("ULL753.AL0168", texto(extra, base, 3));
+            assertEquals("Size: U", texto(extra, base, 4));
+            assertEquals("001 IVORY", texto(extra, base + 1, 3));
+            assertEquals("Cde: 07665", texto(extra, base + 1, 4));
         }
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(aviso -> aviso.equals("La caja 1 de PARIS mezcla varias "
@@ -522,18 +625,15 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
+            AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
             // La etiqueta no cambia.
-            assertEquals("UBL029.AL0216", texto(hoja, 10, 2));
-            assertEquals("85-95-105", texto(hoja, 12, 2));
-            assertEquals("4-85,33-95,3-105", texto(hoja, 13, 2));
+            assertEquals("UBL029.AL0216", texto(hoja, layout.filaReferencia(), 2));
+            assertEquals("85-95-105", texto(hoja, layout.filaTalla(), 2));
+            assertEquals("4-85,33-95,3-105", texto(hoja, layout.filaCantidad(), 2));
 
             XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
-            assertEquals(2, extra.getLastRowNum());
-            assertEquals("85", texto(extra, 1, 3));
-            assertEquals("4", texto(extra, 1, 4));
-            assertEquals("3666598890064", texto(extra, 1, 5));
-            assertEquals("105", texto(extra, 2, 3));
-            assertEquals("3666598890101", texto(extra, 2, 5));
+            assertEquals("Size: 85", texto(extra, RejillaEtiquetas.filaBase(0), 4));
+            assertEquals("Size: 105", texto(extra, RejillaEtiquetas.filaBase(1), 4));
         }
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(aviso -> aviso.equals("La caja 2 de PARIS lleva varias tallas: "
@@ -564,9 +664,10 @@ class AmiEtiquetasGeneradorTest {
 
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet extra = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
-            assertEquals(2, extra.getLastRowNum());
-            assertEquals("1", texto(extra, 1, 0));
-            assertEquals("2", texto(extra, 2, 0));
+            // Un bloque por caja, distinguibles por su parcel (ya no se
+            // guarda el número de caja en la hoja extra).
+            assertEquals("1 / 2", texto(extra, RejillaEtiquetas.filaBase(0), 1));
+            assertEquals("2 / 2", texto(extra, RejillaEtiquetas.filaBase(1), 1));
         }
     }
 

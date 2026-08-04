@@ -149,7 +149,17 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
     /** Un artículo de la caja con lo que aporta el excel de pedido. */
     private record ArticuloResuelto(ArticuloEtiqueta articulo, String colorCode,
+                                    String colorCompleto, String poDelPedido,
                                     String ean13, String ean128) {
+
+        /** Los cuatro textos y el EAN-13 tal como van a la imagen y a la hoja extra. */
+        EtiquetaArticulo etiquetaArticulo() {
+            return new EtiquetaArticulo(articulo.referencia(),
+                    "Size: " + (articulo.talla() == null ? TALLA_UNICA : articulo.talla()),
+                    colorCompleto,
+                    poDelPedido == null ? null : "Cde: " + poDelPedido,
+                    ean13);
+        }
     }
 
     private EtiquetaCaja etiquetaDe(CajaFisica caja, int posicion, int total,
@@ -190,13 +200,10 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
         // Solo el primer artículo conserva sus códigos de barras en la
         // etiqueta; los demás se imprimen en la hoja "CODIGOS BARRAS EXTRA".
+        String parcel = posicion + " / " + total;
         for (ArticuloResuelto sobrante : resueltos.subList(1, resueltos.size())) {
-            filasExtra.add(new FilaCodigoBarrasExtra(lider.getNumeroCaja(),
-                    sobrante.articulo().referencia(), sobrante.colorCode(),
-                    sobrante.articulo().talla() == null
-                            ? TALLA_UNICA : sobrante.articulo().talla(),
-                    String.valueOf(sobrante.articulo().cantidad()),
-                    sobrante.ean13(), sobrante.ean128()));
+            filasExtra.add(new FilaCodigoBarrasExtra(parcel, nombreDestino,
+                    sobrante.etiquetaArticulo(), sobrante.ean128()));
         }
         if (resueltos.size() > 1) {
             // El usuario tiene que saber que ese excel trae una hoja más.
@@ -252,8 +259,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         String pesoTexto = peso == null
                 ? null : String.format(ESPANOL, "%.2f KGS", peso);
         return new EtiquetaCaja(envio.getTemporada(), referencia, colorCode,
-                talla, cantidad, pesoTexto, posicion + " / " + total, orderNumber,
-                primero.ean13(), primero.ean128());
+                talla, cantidad, pesoTexto, parcel, orderNumber,
+                primero.ean128(), primero.etiquetaArticulo());
     }
 
     /** La fila del pedido de un artículo, o el color del JSON con aviso. */
@@ -276,7 +283,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             avisos.add("Caja " + numeroCaja + " de " + nombreDestino + ": referencia '"
                     + articulo.referencia() + "' no encontrada en el excel de pedido: el"
                     + " color code sale del JSON y la etiqueta va sin EAN13 ni EAN128");
-            return new ArticuloResuelto(articulo, articulo.codigoColor(), null, null);
+            return new ArticuloResuelto(articulo, articulo.codigoColor(),
+                    articulo.codigoColor(), null, null, null);
         }
         for (String aviso : fila.get().avisosEan()) {
             avisos.add("Caja " + numeroCaja + " de " + nombreDestino + ": " + aviso);
@@ -289,6 +297,7 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     + fila.get().orderNumber() + "); la etiqueta lleva el del JSON");
         }
         return new ArticuloResuelto(articulo, fila.get().colorCode(),
+                fila.get().colorCompleto(), fila.get().orderNumber(),
                 fila.get().ean13(), fila.get().ean128());
     }
 

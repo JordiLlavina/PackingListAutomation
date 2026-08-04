@@ -1,12 +1,11 @@
 package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -15,120 +14,105 @@ import org.junit.jupiter.api.Test;
 
 class HojaCodigosBarrasExtraTest {
 
-    private static final String EAN13 = "3666598890064";
-    private static final String EAN128 =
-            "366659889006400001000076720000000000000000MA";
-
-    private static FilaCodigoBarrasExtra fila(int caja, String referencia, String talla) {
-        return new FilaCodigoBarrasExtra(caja, referencia, "001 BLACK", talla, "4",
-                EAN13, EAN128);
+    private static FilaCodigoBarrasExtra fila(String referencia, String ean13) {
+        return new FilaCodigoBarrasExtra("3 / 15", "CHINA",
+                new EtiquetaArticulo(referencia, "Size: U", "221 DARK COFFEE",
+                        "Cde: 07703", ean13),
+                "366659835477100001000077030000000000000000ES");
     }
 
-    /** Escribe la hoja en un libro nuevo y lo reabre desde bytes. */
-    private static XSSFWorkbook generarYReabrir(List<FilaCodigoBarrasExtra> filas)
-            throws IOException {
-        ByteArrayOutputStream salida = new ByteArrayOutputStream();
+    @Test
+    void sinFilasNoSeCreaLaHoja() {
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
-            libro.createSheet("ETIQUETAS");
-            HojaCodigosBarrasExtra.escribir(libro, filas);
-            libro.write(salida);
-        }
-        return new XSSFWorkbook(new ByteArrayInputStream(salida.toByteArray()));
-    }
-
-    @Test
-    void sinFilasNoCreaLaHoja() throws IOException {
-        try (XSSFWorkbook libro = generarYReabrir(List.of())) {
+            libro.createSheet("AMI CHINA");
+            HojaCodigosBarrasExtra.escribir(libro, List.of());
             assertEquals(1, libro.getNumberOfSheets());
-            assertNull(libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
     @Test
-    void escribeUnaFilaPorArticuloConSusDatos() throws IOException {
-        try (XSSFWorkbook libro = generarYReabrir(List.of(
-                fila(7, "ULL753.AL0168", "U"),
-                fila(9, "UBL029.AL0216", "95")))) {
-
+    void cadaArticuloOcupaUnBloqueConSusTresColumnas() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            HojaCodigosBarrasExtra.escribir(libro,
+                    List.of(fila("ULL163.AL0052", "3666598354771")));
             XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
-            assertNotNull(hoja);
-            assertEquals("CAJA", texto(hoja, 0, 0));
-            assertEquals("REFERENCE", texto(hoja, 0, 1));
-            assertEquals("COLOR CODE", texto(hoja, 0, 2));
-            assertEquals("SIZE", texto(hoja, 0, 3));
-            assertEquals("QUANTITY", texto(hoja, 0, 4));
-            assertEquals("EAN-13", texto(hoja, 0, 5));
-            assertEquals("EAN128", texto(hoja, 0, 6));
-
-            assertEquals("7", texto(hoja, 1, 0));
-            assertEquals("ULL753.AL0168", texto(hoja, 1, 1));
-            assertEquals("001 BLACK", texto(hoja, 1, 2));
-            assertEquals("U", texto(hoja, 1, 3));
-            assertEquals("4", texto(hoja, 1, 4));
-            // El valor del código va como texto además de como imagen.
-            assertEquals(EAN13, texto(hoja, 1, 5));
-            assertEquals(EAN128, texto(hoja, 1, 6));
-
-            assertEquals("9", texto(hoja, 2, 0));
-            assertEquals("95", texto(hoja, 2, 3));
+            int base = RejillaEtiquetas.filaBase(0);
+            assertEquals("CAJA", hoja.getRow(base).getCell(0).getStringCellValue());
+            assertEquals("3 / 15", hoja.getRow(base).getCell(1).getStringCellValue());
+            assertEquals("Destinación",
+                    hoja.getRow(base + 2).getCell(0).getStringCellValue());
+            assertEquals("CHINA", hoja.getRow(base + 2).getCell(1).getStringCellValue());
+            // Los mismos cuatro textos en el bloque del EAN13 y en el del EAN128.
+            for (int columna : new int[] {3, 6}) {
+                assertEquals("ULL163.AL0052",
+                        hoja.getRow(base).getCell(columna).getStringCellValue());
+                assertEquals("Size: U",
+                        hoja.getRow(base).getCell(columna + 1).getStringCellValue());
+                assertEquals("221 DARK COFFEE",
+                        hoja.getRow(base + 1).getCell(columna).getStringCellValue());
+                assertEquals("Cde: 07703",
+                        hoja.getRow(base + 1).getCell(columna + 1).getStringCellValue());
+            }
+            assertNull(hoja.getRow(base).getCell(9), "la cuarta columna va vacía");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
     @Test
-    void cadaFilaLlevaSusDosCodigosDeBarrasComoImagen() throws IOException {
-        try (XSSFWorkbook libro = generarYReabrir(List.of(
-                fila(7, "ULL753.AL0168", "U"),
-                fila(9, "UBL029.AL0216", "95")))) {
-
+    void cadaArticuloLlevaSusDosImagenes() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            HojaCodigosBarrasExtra.escribir(libro, List.of(
+                    fila("ULL163.AL0052", "3666598354771"),
+                    fila("ULL745.AL0103", "3666598354771")));
             XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
             assertEquals(4, hoja.getDrawingPatriarch().getShapes().size());
-        }
-    }
-
-    @Test
-    void unArticuloSinCodigosSaleIgualPeroSinImagenes() throws IOException {
-        try (XSSFWorkbook libro = generarYReabrir(List.of(
-                new FilaCodigoBarrasExtra(7, "USL999.XX0000", "007", "U", "2",
-                        null, null)))) {
-
-            XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
-            assertEquals("USL999.XX0000", texto(hoja, 1, 1));
-            assertEquals("", texto(hoja, 1, 5));
-            assertEquals(0, hoja.getDrawingPatriarch().getShapes().size());
-        }
-    }
-
-    @Test
-    void unEan13InvalidoNoSeDibujaPeroSuTextoSiSeVe() throws IOException {
-        // Mismo criterio que la etiqueta: no se imprime un código que el
-        // escáner no va a leer, pero el dato no se oculta al operario.
-        try (XSSFWorkbook libro = generarYReabrir(List.of(
-                new FilaCodigoBarrasExtra(7, "ULL753.AL0168", "001", "U", "5",
-                        "1234567890123", EAN128)))) {
-
-            XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
-            assertEquals("1234567890123", texto(hoja, 1, 5));
-            // Solo la imagen del EAN128.
-            assertEquals(1, hoja.getDrawingPatriarch().getShapes().size());
-        }
-    }
-
-    @Test
-    void elMismoCodigoEnVariasFilasSeGuardaUnaSolaVez() throws IOException {
-        // Un envío repite mucho el mismo artículo: sin caché el .xlsx
-        // guardaría el mismo PNG una vez por fila.
-        try (XSSFWorkbook libro = generarYReabrir(List.of(
-                fila(7, "UBL029.AL0216", "95"),
-                fila(8, "UBL029.AL0216", "95")))) {
-
+            // El mismo código en dos artículos se guarda una sola vez.
             assertEquals(2, libro.getAllPictures().size());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
-    private static String texto(XSSFSheet hoja, int fila, int col) {
-        if (hoja.getRow(fila) == null || hoja.getRow(fila).getCell(col) == null) {
-            return "";
+    @Test
+    void unArticuloSinEan13SaleIgualPeroSinEsaImagen() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            HojaCodigosBarrasExtra.escribir(libro, List.of(fila("ULL163.AL0052", null)));
+            XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertEquals("ULL163.AL0052",
+                    hoja.getRow(RejillaEtiquetas.filaBase(0)).getCell(3).getStringCellValue());
+            assertEquals(1, hoja.getDrawingPatriarch().getShapes().size());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return hoja.getRow(fila).getCell(col).toString().trim();
+    }
+
+    @Test
+    void onceArticulosOcupanDosPaginas() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            HojaCodigosBarrasExtra.escribir(libro, java.util.stream.IntStream.range(0, 11)
+                    .mapToObj(i -> fila("REF" + i, "3666598354771")).toList());
+            XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertEquals(1, hoja.getRowBreaks().length);
+            assertEquals("REF10",
+                    hoja.getRow(RejillaEtiquetas.filaBase(10)).getCell(3).getStringCellValue());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Test
+    void laHojaSaleEnVerticalYAEscalaDeImpresion() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            HojaCodigosBarrasExtra.escribir(libro,
+                    List.of(fila("ULL163.AL0052", "3666598354771")));
+            XSSFSheet hoja = libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA);
+            assertTrue(!hoja.getPrintSetup().getLandscape());
+            assertEquals(74, hoja.getPrintSetup().getScale());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }
