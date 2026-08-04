@@ -582,10 +582,15 @@ Añadir este test al final de la clase, que deja la imagen en `target/` para ins
 ```java
     @Test
     void dejaUnaMuestraEnTargetParaMirarla() throws Exception {
-        java.nio.file.Files.write(java.nio.file.Path.of("target/imagen-etiqueta-articulo.png"),
-                ImagenEtiquetaArticulo.png(ETIQUETA, PROPORCION));
+        // Existe para abrirla y compararla con el mock del cliente: lo que
+        // afirma es lo único afirmable de un artefacto cuyo juez es el ojo.
+        Path muestra = Path.of("target/imagen-etiqueta-articulo.png");
+        Files.write(muestra, ImagenEtiquetaArticulo.png(ETIQUETA, PROPORCION));
+        assertNotNull(ImageIO.read(muestra.toFile()), "la muestra no es un PNG legible");
     }
 ```
+
+Imports nuevos para este test: `java.nio.file.Files`, `java.nio.file.Path`.
 
 Run: `mvn test -Dtest=ImagenEtiquetaArticuloTest`
 Expected: PASS y `target/imagen-etiqueta-articulo.png` existe. Abrirla y comprobar que se parece al mock del cliente (`docs/Etiquetas cajas/ETIQUETA CAJA AMI.xlsx`, imagen `image2.png`).
@@ -2252,8 +2257,15 @@ En `AmiEtiquetasExcelBuilderTest`, actualizar (o añadir, si no existe ya) el te
                         ean128("3666598890064", 7665)));
         byte[] contenido = new AmiEtiquetasExcelBuilder()
                 .generar(AmiEtiquetaLayout.FRANCE, List.of(etiqueta), extras);
-        Files.write(Path.of("target/Etiquetas_AMI_PARIS_IMAGEN-COMPUESTA.xlsx"), contenido);
-        assertTrue(contenido.length > 0);
+        Path muestra = Path.of("target/Etiquetas_AMI_PARIS_IMAGEN-COMPUESTA.xlsx");
+        Files.write(muestra, contenido);
+        // Lo único afirmable de un artefacto cuyo juez es el ojo y el lector
+        // de códigos: que el libro se ha escrito y se puede volver a abrir con
+        // sus dos hojas.
+        try (XSSFWorkbook libro = new XSSFWorkbook(Files.newInputStream(muestra))) {
+            assertEquals(2, libro.getNumberOfSheets());
+            assertNotNull(libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA));
+        }
     }
 ```
 
