@@ -111,7 +111,7 @@ class AmiPedidoRealTest {
     }
 
     @Test
-    void elColorCodeEsSoloElColigoYElCompletoLlevaTambienElNombre() {
+    void elColorCodeEsSoloElCodigoYElCompletoLlevaTambienElNombre() {
         // Fila 81: ULL027.AL0103 / 001 (con libellé).
         AmiPedidoExcel.FilaPedido fila =
                 pedido.buscar("ULL027.AL0103", "001", null, "CH").orElseThrow();

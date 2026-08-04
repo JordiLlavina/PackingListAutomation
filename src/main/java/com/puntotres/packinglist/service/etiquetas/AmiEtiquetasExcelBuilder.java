@@ -9,8 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
+import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.AreaReference;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
@@ -91,6 +93,7 @@ public class AmiEtiquetasExcelBuilder {
                     hoja.setRowBreak(base + layout.alturaBloque() - 1);
                 }
             }
+            actualizarAreaImpresion(libro, etiquetas.size(), layout.alturaBloque());
 
             // La hoja extra va DESPUÉS de dejarSoloLaHoja, que se lleva por
             // delante cualquier otra hoja del libro.
@@ -142,6 +145,29 @@ public class AmiEtiquetasExcelBuilder {
                     + nombreHoja + "': revisar client-labels/ami-etiquetas-template.xlsx");
         }
         libro.setActiveSheet(0);
+    }
+
+    /**
+     * FRANCE trae un área de impresión en la plantilla del cliente
+     * ($A$1:$D$32, justo la primera caja); POI la remapea a la hoja
+     * superviviente al borrar las otras dos. Sin tocarla, un envío de más de
+     * una caja imprime solo la primera: se estira hasta la última fila
+     * escrita, conservando las columnas que eligió el cliente. CHINA y JAPAN
+     * no traen área de impresión (POI se la lleva por delante junto con la
+     * hoja a la que apuntaba) y no hay que inventarles una.
+     */
+    private static void actualizarAreaImpresion(XSSFWorkbook libro, int numeroDeEtiquetas,
+                                                 int alturaBloque) {
+        String areaActual = libro.getPrintArea(0);
+        if (areaActual == null) {
+            return;
+        }
+        AreaReference referencia = new AreaReference(areaActual, SpreadsheetVersion.EXCEL2007);
+        int primeraFila = referencia.getFirstCell().getRow();
+        int primeraColumna = referencia.getFirstCell().getCol();
+        int ultimaColumna = referencia.getLastCell().getCol();
+        int ultimaFila = numeroDeEtiquetas * alturaBloque - 1;
+        libro.setPrintArea(0, primeraColumna, ultimaColumna, primeraFila, ultimaFila);
     }
 
     /** Quita los anclajes de las imágenes de ejemplo (los gifs de barcode y el png). */

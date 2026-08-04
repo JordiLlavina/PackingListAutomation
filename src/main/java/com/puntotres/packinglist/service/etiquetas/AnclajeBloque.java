@@ -8,7 +8,7 @@ package com.puntotres.packinglist.service.etiquetas;
  * La columna no va aquí: las cuatro imágenes de las etiquetas de AMI viven en
  * la columna C (AmiEtiquetaLayout.COL_BARCODE).
  *
- * Lo usan los tres códigos de barras de la etiqueta (PO, EAN13, EAN128) y la
+ * Lo usan la imagen compuesta del artículo, el Code 128 del EAN128 y la
  * imagen-dirección de Japan.
  */
 public record AnclajeBloque(int fila, long dx, long dy, long cx, long cy) {

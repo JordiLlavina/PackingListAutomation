@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -10,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.apache.poi.ss.SpreadsheetVersion;
+import org.apache.poi.ss.util.AreaReference;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -276,6 +279,35 @@ class AmiEtiquetasExcelBuilderTest {
             assertEquals(2, libro.getNumberOfSheets());
             assertEquals("AMI CHINA", libro.getSheetName(0));
             assertEquals(HojaCodigosBarrasExtra.NOMBRE_HOJA, libro.getSheetName(1));
+        }
+    }
+
+    @Test
+    void elAreaDeImpresionDeFranceCubreTodasLasCajasEscritas() throws IOException {
+        // Finding 1: la plantilla nueva trae Print_Area = $A$1:$D$32 (justo
+        // la primera caja) solo en FRANCE; sin estirarla, un envío de más de
+        // una caja "parece" completo pero imprime solo la primera. 3 cajas x
+        // 32 filas/bloque -> el área tiene que llegar hasta la fila 96.
+        AmiEtiquetaLayout layout = AmiEtiquetaLayout.FRANCE;
+        byte[] excel = builder.generar(layout, List.of(
+                etiquetaBolso("1 / 3"), etiquetaBolso("2 / 3"), etiquetaBolso("3 / 3")));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            String area = libro.getPrintArea(0);
+            assertNotNull(area, "FRANCE debe conservar su área de impresión");
+            AreaReference referencia = new AreaReference(area, SpreadsheetVersion.EXCEL2007);
+            assertEquals(0, referencia.getFirstCell().getRow());
+            assertEquals(3 * layout.alturaBloque() - 1, referencia.getLastCell().getRow());
+        }
+    }
+
+    @Test
+    void elAreaDeImpresionNoExisteEnChina() throws IOException {
+        // CHINA no trae Print_Area en la plantilla del cliente: el builder no
+        // debe inventarle una.
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA, List.of(
+                etiquetaBolso("1 / 2"), etiquetaBolso("2 / 2")));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertNull(libro.getPrintArea(0));
         }
     }
 

@@ -95,9 +95,10 @@ class ImagenEtiquetaArticuloTest {
     }
 
     @Test
-    void unTextoLargoNoSeSaleDelLienzo() throws Exception {
-        // No se puede afirmar el cuerpo elegido desde fuera, pero sí que la
-        // imagen sigue teniendo el mismo tamaño: el texto encoge, el lienzo no.
+    void elLienzoNoCambiaDeTamanoConTextosLargos() throws Exception {
+        // No se puede afirmar el cuerpo elegido desde fuera (eso lo cubre el
+        // bucle de encogido en otro sitio); lo único comprobable aquí es que
+        // el lienzo siempre sale con el tamaño pedido, aunque el texto no quepa.
         EtiquetaArticulo larga = new EtiquetaArticulo(
                 "ULL163.AL0052 / ULL745.AL0103 / UBL029.AL0216", "Size: U",
                 "221 DARK COFFEE / 001 BLACK", "Cde: 07703", "3666598354771");

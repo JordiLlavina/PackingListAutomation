@@ -3,39 +3,108 @@ package com.puntotres.packinglist.service.etiquetas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Comparator;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.ClientAnchor.AnchorType;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Ancla las coordenadas medidas en client-labels/ami-etiquetas-template.xlsx.
- * Si un test de aquí falla es que alguien ha tocado la plantilla o el layout
- * sin el otro: comparar contra docs/Etiquetas cajas/ETIQUETA CAJA AMI.xlsx.
+ * Ancla las coordenadas de AmiEtiquetaLayout abriendo de verdad
+ * client-labels/ami-etiquetas-template.xlsx: cada assert compara un valor
+ * leído del propio fichero (por el nombre de la etiqueta de la columna B,
+ * por el mimetype/tipo de anclaje de la imagen) contra la constante Java, no
+ * un literal contra otro. Si un test de aquí falla es que alguien ha tocado
+ * la plantilla o el layout sin el otro: comparar contra docs/Etiquetas
+ * cajas/ETIQUETA CAJA AMI.xlsx.
  */
 class AmiEtiquetaLayoutTest {
 
+    private static final String RUTA_PLANTILLA = "/client-labels/ami-etiquetas-template.xlsx";
+
+    private static XSSFWorkbook plantilla;
+
+    @BeforeAll
+    static void cargarPlantilla() throws IOException {
+        try (InputStream in = AmiEtiquetaLayoutTest.class.getResourceAsStream(RUTA_PLANTILLA)) {
+            plantilla = new XSSFWorkbook(in);
+        }
+    }
+
+    @AfterAll
+    static void cerrarPlantilla() throws IOException {
+        plantilla.close();
+    }
+
     @Test
     void chinaTieneLaImagenYElEan128EnSuSitio() {
-        assertEquals(new AnclajeBloque(10, 2481943, 54429, 1674091, 762000),
-                AmiEtiquetaLayout.CHINA.imagenArticulo());
-        assertEquals(new AnclajeBloque(8, 1352897, 143333, 2727960, 452413),
-                AmiEtiquetaLayout.CHINA.ean128());
+        verificarImagenes(AmiEtiquetaLayout.CHINA);
     }
 
     @Test
     void japanTieneLaImagenElEan128YLaDireccion() {
-        assertEquals(new AnclajeBloque(9, 2241177, 26896, 1674091, 762000),
-                AmiEtiquetaLayout.JAPAN.imagenArticulo());
-        assertEquals(new AnclajeBloque(7, 918884, 62682, 3009900, 502991),
-                AmiEtiquetaLayout.JAPAN.ean128());
-        assertEquals(new AnclajeBloque(2, 66675, 95250, 2562225, 1143000),
-                AmiEtiquetaLayout.JAPAN_DIRECCION);
+        verificarImagenes(AmiEtiquetaLayout.JAPAN);
+        // Solo JAPAN lleva imagen-dirección, y es un PNG anclado a tamaño
+        // fijo de una sola celda (MOVE_DONT_RESIZE), a diferencia de los
+        // mocks de imagenArticulo/ean128 (MOVE_AND_RESIZE): eso es lo que la
+        // distingue de la imagen compuesta sin usar ya la fila esperada.
+        ImagenAnclada direccion = imagenDelTipo(hoja(AmiEtiquetaLayout.JAPAN),
+                "image/png", AnchorType.MOVE_DONT_RESIZE);
+        assertEquals(AmiEtiquetaLayout.JAPAN_DIRECCION.fila(), direccion.fila());
+        assertEquals(AmiEtiquetaLayout.JAPAN_DIRECCION.dx(), direccion.dx());
+        assertEquals(AmiEtiquetaLayout.JAPAN_DIRECCION.dy(), direccion.dy());
     }
 
     @Test
     void franceTieneLaImagenYElEan128EnSuSitio() {
-        assertEquals(new AnclajeBloque(9, 2937163, 69273, 1674091, 762000),
-                AmiEtiquetaLayout.FRANCE.imagenArticulo());
-        assertEquals(new AnclajeBloque(7, 2057400, 156331, 2575560, 430408),
-                AmiEtiquetaLayout.FRANCE.ean128());
+        verificarImagenes(AmiEtiquetaLayout.FRANCE);
+    }
+
+    /**
+     * La imagen compuesta del artículo es siempre el PNG anclado a
+     * tamaño-y-posición-relativos (MOVE_AND_RESIZE, el mismo que usa el
+     * builder al insertarla); el Code128 del EAN128 es el GIF con el mismo
+     * tipo de anclaje. El mimetype y el tipo de anclaje son propiedades del
+     * fichero, no del layout que se está comprobando: identificar así las
+     * imágenes no es circular.
+     */
+    private static void verificarImagenes(AmiEtiquetaLayout layout) {
+        XSSFSheet hoja = hoja(layout);
+
+        ImagenAnclada ean128 = imagenDelTipo(hoja, "image/gif", AnchorType.MOVE_AND_RESIZE);
+        assertEquals(layout.ean128().fila(), ean128.fila(), layout.nombreHoja());
+        assertEquals(layout.ean128().dx(), ean128.dx(), layout.nombreHoja());
+        assertEquals(layout.ean128().dy(), ean128.dy(), layout.nombreHoja());
+
+        ImagenAnclada articulo = imagenDelTipo(hoja, "image/png", AnchorType.MOVE_AND_RESIZE);
+        assertEquals(layout.imagenArticulo().fila(), articulo.fila(), layout.nombreHoja());
+        assertEquals(layout.imagenArticulo().dx(), articulo.dx(), layout.nombreHoja());
+        assertEquals(layout.imagenArticulo().dy(), articulo.dy(), layout.nombreHoja());
+    }
+
+    @Test
+    void lasFilasDeValorSonLasDeLaPlantillaNueva() {
+        for (AmiEtiquetaLayout layout : todos()) {
+            XSSFSheet hoja = hoja(layout);
+
+            int filaOrderNumber = filaDeLaEtiquetaDeTexto(hoja, "ORDER NUMBER");
+            assertEquals(layout.filaOrderNumber(), filaOrderNumber, layout.nombreHoja());
+            asertarEsCimaDeCeldaCombinada(hoja, filaOrderNumber, layout.nombreHoja());
+
+            int filaReferencia = filaDeLaEtiquetaDeTexto(hoja, "REFERENCE");
+            assertEquals(layout.filaReferencia(), filaReferencia, layout.nombreHoja());
+            asertarEsCimaDeCeldaCombinada(hoja, filaReferencia, layout.nombreHoja());
+        }
     }
 
     @Test
@@ -46,16 +115,6 @@ class AmiEtiquetaLayoutTest {
             assertEquals(1674091, layout.imagenArticulo().cx(), layout.nombreHoja());
             assertEquals(762000, layout.imagenArticulo().cy(), layout.nombreHoja());
         }
-    }
-
-    @Test
-    void lasFilasDeValorSonLasDeLaPlantillaNueva() {
-        assertEquals(8, AmiEtiquetaLayout.CHINA.filaOrderNumber());
-        assertEquals(10, AmiEtiquetaLayout.CHINA.filaReferencia());
-        assertEquals(7, AmiEtiquetaLayout.JAPAN.filaOrderNumber());
-        assertEquals(9, AmiEtiquetaLayout.JAPAN.filaReferencia());
-        assertEquals(7, AmiEtiquetaLayout.FRANCE.filaOrderNumber());
-        assertEquals(9, AmiEtiquetaLayout.FRANCE.filaReferencia());
     }
 
     @Test
@@ -70,6 +129,76 @@ class AmiEtiquetaLayoutTest {
                                 + " se sale de la primera etiqueta del par");
             }
         }
+    }
+
+    // --- lectura de la plantilla ---
+
+    private record ImagenAnclada(int fila, long dx, long dy) {
+    }
+
+    private static XSSFSheet hoja(AmiEtiquetaLayout layout) {
+        XSSFSheet hoja = plantilla.getSheet(layout.nombreHoja());
+        assertTrue(hoja != null, () -> "la plantilla no tiene la hoja '" + layout.nombreHoja() + "'");
+        return hoja;
+    }
+
+    /** La primera (fila más baja) de las imágenes del mimetype y anclaje pedidos. */
+    private static ImagenAnclada imagenDelTipo(XSSFSheet hoja, String mime, AnchorType... tipos) {
+        return hoja.getDrawingPatriarch().getShapes().stream()
+                .filter(XSSFPicture.class::isInstance)
+                .map(XSSFPicture.class::cast)
+                .filter(imagen -> mime.equals(imagen.getPictureData().getMimeType()))
+                .filter(imagen -> esDeAlgunTipo(imagen.getClientAnchor().getAnchorType(), tipos))
+                .min(Comparator.comparingInt(imagen -> imagen.getClientAnchor().getFrom().getRow()))
+                .map(imagen -> new ImagenAnclada(imagen.getClientAnchor().getFrom().getRow(),
+                        // getColOff()/getRowOff() son Object por una manía de
+                        // XMLBeans: en realidad siempre traen un Number.
+                        ((Number) imagen.getClientAnchor().getFrom().getColOff()).longValue(),
+                        ((Number) imagen.getClientAnchor().getFrom().getRowOff()).longValue()))
+                .orElseThrow(() -> new AssertionError(
+                        "no hay ninguna imagen " + mime + " en " + hoja.getSheetName()));
+    }
+
+    private static boolean esDeAlgunTipo(AnchorType real, AnchorType... esperados) {
+        for (AnchorType esperado : esperados) {
+            if (real == esperado) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Fila de la celda de columna B (la de las etiquetas de campo, no la de
+     * valores) cuyo texto es exactamente el pedido. Encontrar así la fila de
+     * "ORDER NUMBER"/"REFERENCE" es independiente de AmiEtiquetaLayout: solo
+     * depende de lo que trae la plantilla.
+     */
+    private static int filaDeLaEtiquetaDeTexto(XSSFSheet hoja, String textoEtiqueta) {
+        for (Row fila : hoja) {
+            Cell celda = fila.getCell(AmiEtiquetaLayout.COL_TEMPORADA);
+            if (celda != null && celda.getCellType() == CellType.STRING
+                    && textoEtiqueta.equals(celda.getStringCellValue())) {
+                return fila.getRowNum();
+            }
+        }
+        throw new AssertionError(
+                "no se encontró la etiqueta '" + textoEtiqueta + "' en " + hoja.getSheetName());
+    }
+
+    /**
+     * La fila pedida tiene que ser la fila superior de la celda combinada de
+     * la columna de valores que la contiene: es lo que hace visible el valor
+     * de una celda combinada en Excel.
+     */
+    private static void asertarEsCimaDeCeldaCombinada(XSSFSheet hoja, int fila, String contexto) {
+        CellRangeAddress combinada = hoja.getMergedRegions().stream()
+                .filter(merge -> merge.isInRange(fila, AmiEtiquetaLayout.COL_VALOR))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(contexto + ": la fila " + fila
+                        + " no está dentro de ninguna celda combinada en columna de valores"));
+        assertEquals(fila, combinada.getFirstRow(), contexto
+                + ": la fila " + fila + " no es la fila superior de su celda combinada");
     }
 
     private static AmiEtiquetaLayout[] todos() {

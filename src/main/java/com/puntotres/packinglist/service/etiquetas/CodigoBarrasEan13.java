@@ -15,7 +15,7 @@ import org.krysalis.barcode4j.output.bitmap.BitmapCanvasProvider;
  * Genera la imagen PNG de un código de barras EAN-13 con los dígitos
  * legibles debajo, igual que los .gif de los ficheros de etiquetas de
  * artículo del cliente. Hermano de CodigoBarrasCode128, que hace lo mismo
- * para el PO de las etiquetas de caja.
+ * para el EAN128 de las etiquetas de caja.
  *
  * Devuelve Optional.empty() en vez de lanzar cuando el código no es un
  * EAN-13 válido: regla del proyecto, la etiqueta se imprime igual sin su
