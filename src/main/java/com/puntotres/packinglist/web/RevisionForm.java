@@ -20,8 +20,31 @@ public class RevisionForm {
 
     private List<CajaEditada> cajas = new ArrayList<>();
 
+    /**
+     * Lo editado en la CABECERA de cada destinación (hoy solo el Livraison
+     * code de APC). Va aparte de las cajas porque es un dato de la destinación
+     * entera: como columna se repetiría en cada fila y ensuciaría el criterio
+     * de compactación de {@link AgrupadorFilasRevision}.
+     */
+    private List<DestinoEditado> destinos = new ArrayList<>();
+
     public List<CajaEditada> getCajas() { return cajas; }
     public void setCajas(List<CajaEditada> cajas) { this.cajas = cajas; }
+
+    public List<DestinoEditado> getDestinos() { return destinos; }
+    public void setDestinos(List<DestinoEditado> destinos) { this.destinos = destinos; }
+
+    public static class DestinoEditado {
+
+        private int indiceDestino;
+        private String livraisonCode;
+
+        public int getIndiceDestino() { return indiceDestino; }
+        public void setIndiceDestino(int indiceDestino) { this.indiceDestino = indiceDestino; }
+
+        public String getLivraisonCode() { return livraisonCode; }
+        public void setLivraisonCode(String livraisonCode) { this.livraisonCode = livraisonCode; }
+    }
 
     public static class CajaEditada {
 

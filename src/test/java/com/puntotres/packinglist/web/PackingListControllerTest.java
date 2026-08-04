@@ -3,6 +3,7 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -1058,5 +1059,49 @@ class PackingListControllerTest {
                 .andExpect(redirectedUrl("/revision"));
 
         assertTrue(revision(sesion).contains("4100128721"));
+    }
+
+    @Test
+    void laRevisionMuestraElLivraisonCodeGeneradoDeCadaDestinacion() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        assertTrue(revision(sesion).contains("PUN20260428WH1"));
+    }
+
+    @Test
+    void editarElLivraisonCodeLoReescribeEnSuDestinacion() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("destinos[0].indiceDestino", "0")
+                        .param("destinos[0].livraisonCode", "PUN20260428WH3"))
+                .andExpect(redirectedUrl("/revision"));
+
+        String html = revision(sesion);
+        assertTrue(html.contains("PUN20260428WH3"));
+        assertFalse(html.contains("PUN20260428WH1"));
+    }
+
+    @Test
+    void unLivraisonCodeVacioNoBorraElGenerado() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("destinos[0].indiceDestino", "0")
+                        .param("destinos[0].livraisonCode", ""))
+                .andExpect(redirectedUrl("/revision"));
+
+        assertTrue(revision(sesion).contains("PUN20260428WH1"));
+    }
+
+    @Test
+    void unaDestinacionDeAmiNoMuestraCampoDeLivraisonCode() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        assertFalse(revision(sesion).contains("livraisonCode"));
     }
 }

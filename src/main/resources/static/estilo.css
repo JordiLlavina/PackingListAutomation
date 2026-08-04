@@ -219,6 +219,26 @@ section.destino thead th {
     z-index: 2;
 }
 
+/* Livraison code de la destinación. NO lleva sticky a propósito: el h2 y el
+   thead se anclan a 0 y 3.2rem, y meter aquí una tercera capa fija obligaría
+   a recalcular esos dos offsets cada vez que cambie este campo. */
+section.destino .campo-destino {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.6rem;
+}
+
+section.destino .campo-destino label {
+    margin: 0;
+    font-size: 0.85rem;
+    opacity: 0.75;
+}
+
+section.destino .campo-destino input {
+    width: 12rem;
+}
+
 td input[type="number"], td input[type="text"] {
     width: 6.5rem;
     padding: 0.25rem 0.4rem;

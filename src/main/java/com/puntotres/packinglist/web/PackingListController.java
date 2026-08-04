@@ -608,6 +608,17 @@ public class PackingListController {
      */
     private void aplicarEdicionesYReinferir(RevisionForm form) {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
+        // Cabecera de la destinación (Livraison code): vacío = "no tocar",
+        // igual que en las cajas, así que no se puede borrar sin querer.
+        for (RevisionForm.DestinoEditado edicion : form.getDestinos()) {
+            if (edicion == null || edicion.getIndiceDestino() < 0
+                    || edicion.getIndiceDestino() >= destinos.size()
+                    || !tieneTexto(edicion.getLivraisonCode())) {
+                continue;
+            }
+            destinos.get(edicion.getIndiceDestino()).getDestino().getCajas()
+                    .forEach(caja -> caja.setLivraisonCode(edicion.getLivraisonCode().trim()));
+        }
         for (RevisionForm.CajaEditada edicion : form.getCajas()) {
             if (edicion == null || edicion.getIndiceDestino() < 0
                     || edicion.getIndiceDestino() >= destinos.size()) {
@@ -712,8 +723,11 @@ public class PackingListController {
             // El índice global nombra los inputs y es único en toda la página:
             // la siguiente destinación arranca donde acabó esta.
             indiceGlobal += filas.size();
+            // El Livraison code es de la destinación entera: todas sus cajas
+            // llevan el mismo, así que basta con mirar la primera.
+            String livraisonCode = cajas.isEmpty() ? null : cajas.get(0).getLivraisonCode();
             vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(),
-                    filas, contarCajasFisicas(cajas)));
+                    filas, contarCajasFisicas(cajas), livraisonCode));
         }
         return vista;
     }
