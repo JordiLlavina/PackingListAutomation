@@ -17,6 +17,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
+import com.puntotres.packinglist.service.etiquetas.RejillaEtiquetas;
 
 /**
  * Compara la maquetación generada contra la del fichero REAL del cliente.
@@ -64,9 +65,9 @@ class EtiquetasArticuloMaquetacionTest {
 
             // Filas separadoras de los bloques 0 a 8, sin excepciones: las 9
             // deben existir y coincidir en alto en los dos ficheros.
-            for (int bloque = 0; bloque < EtiquetasArticuloExcelBuilder.BLOQUES - 1; bloque++) {
-                int separadora = EtiquetasArticuloExcelBuilder.filaBase(bloque)
-                        + EtiquetasArticuloExcelBuilder.FILAS_POR_BLOQUE - 1;
+            for (int bloque = 0; bloque < RejillaEtiquetas.BLOQUES_POR_PAGINA - 1; bloque++) {
+                int separadora = RejillaEtiquetas.filaBase(bloque)
+                        + RejillaEtiquetas.FILAS_POR_BLOQUE - 1;
                 assertEquals(esperada.getRow(separadora).getHeightInPoints(),
                         obtenida.getRow(separadora).getHeightInPoints(), 0.001f,
                         "alto de la fila separadora " + separadora);
@@ -75,9 +76,9 @@ class EtiquetasArticuloMaquetacionTest {
             // El bloque 9 (el último) NO lleva separadora: se comprueba
             // explícitamente en los dos ficheros, no con un bucle que se
             // salta el caso y lo esconde.
-            int separadoraUltimoBloque = EtiquetasArticuloExcelBuilder.filaBase(
-                    EtiquetasArticuloExcelBuilder.BLOQUES - 1)
-                    + EtiquetasArticuloExcelBuilder.FILAS_POR_BLOQUE - 1;
+            int separadoraUltimoBloque = RejillaEtiquetas.filaBase(
+                    RejillaEtiquetas.BLOQUES_POR_PAGINA - 1)
+                    + RejillaEtiquetas.FILAS_POR_BLOQUE - 1;
             assertNull(esperada.getRow(separadoraUltimoBloque),
                     "el fichero real no debe tener la fila " + separadoraUltimoBloque);
             assertNull(obtenida.getRow(separadoraUltimoBloque),

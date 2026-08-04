@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.service.etiquetas.CodigoBarrasEan13;
 import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
+import com.puntotres.packinglist.service.etiquetas.RejillaEtiquetas;
 
 /**
  * Etiquetas de artículo de AMI: las que se enganchan al bolso o al cinturón,
@@ -128,7 +129,7 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
         List<String> nombres = new ArrayList<>();
         for (int i = 0; i < filas.size(); i++) {
             String candidato = conLibelle.get(i);
-            boolean cabe = candidato.length() <= EtiquetasArticuloExcelBuilder.MAX_NOMBRE_HOJA;
+            boolean cabe = candidato.length() <= RejillaEtiquetas.MAX_NOMBRE_HOJA;
             // Comparación insensible a mayúsculas, como hace POI al crear la
             // hoja: dos colores con el mismo libellé salvo mayúsculas ("NOIR"
             // / "Noir") deben caer al mismo fallback que un libellé repetido
@@ -166,9 +167,9 @@ public class AmiEtiquetasArticuloGenerador implements GeneradorEtiquetasArticulo
      * dejar que POI lance al crear la hoja.
      */
     private static String recortar(String nombre) {
-        return nombre.length() <= EtiquetasArticuloExcelBuilder.MAX_NOMBRE_HOJA
+        return nombre.length() <= RejillaEtiquetas.MAX_NOMBRE_HOJA
                 ? nombre
-                : nombre.substring(0, EtiquetasArticuloExcelBuilder.MAX_NOMBRE_HOJA);
+                : nombre.substring(0, RejillaEtiquetas.MAX_NOMBRE_HOJA);
     }
 
     /** La talla como número para ordenar; -1 si no es numérica ("U"). */
