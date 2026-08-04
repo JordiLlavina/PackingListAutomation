@@ -78,7 +78,7 @@ No entra:
   nombre-cliente: A.P.C.
   direccion: CROSSLOG, 104 RUE DENIS PAPIN, 77550 MOISSY CRAMAYEL, FRANCE
   abreviatura: WH
-  destinos-hijo: [AUSTRALIA, WHOLESALE, CHINE FRANCH, C-LOG]
+  destinos-hijo: [AUSTRALIA, WHOLESALE, CHINE FRANCH]
 "[RETAIL]":
   nombre-cliente: A.P.C.
   direccion: 74 BIS AV MAURICE THOREZ 94200 IVRY SUR SEINE FRANCE
@@ -91,22 +91,25 @@ No entra:
 "[KOREA]":
   abreviatura: KRT
 "[IVRY]":
-  # sin abreviatura conocida todavía: ver más abajo
+  abreviatura: IVRY
 ```
 
 Las abreviaturas no son inventadas: son los valores de la columna
 `Catégorie de stock` del pedido real de APC, donde cada línea trae su
 destinación hija en `Notre référence` y su padre abreviado en esa columna.
 
-- **`C-LOG` se mantiene como hija de WHOLESALE** aunque no esté en la lista
-  del cliente: los JSON de ejemplo lo usan y `ApcEtiquetaLayout` lo mapea a la
-  plantilla de Crosslog. Mantenerlo no cuesta nada y no rompe nada.
-- **`IVRY` no tiene abreviatura conocida**: no aparece en el pedido de APC,
-  que solo trae WH, RT, UST, JPT y KRT. Regla general para ese caso: un
-  destino sin `abreviatura` usa **su nombre en mayúsculas y sin espacios**, y
-  se avisa. Es la misma caída que ya usa `AmiNombreFichero` con una
-  destinación desconocida. Cuando el cliente diga la abreviatura de IVRY es
-  una línea de yml.
+- **`C-LOG` desaparece**: no es una hija ni un destino aparte, es el nombre
+  viejo de WHOLESALE. Eso obliga a dos migraciones, que son parte del trabajo:
+  la destinación `C-LOG` de `envio-apc-etiquetas.json` pasa a `Wholesale`, y
+  `ApcEtiquetaLayout.POR_DESTINO` cambia la clave `C-LOG` por `WHOLESALE`
+  (mantiene `WH CROSSLOG`, que es el nombre de la plantilla del cliente).
+- **`IVRY` no aparece en el pedido de APC** —que solo trae WH, RT, UST, JPT y
+  KRT—, pero el cliente confirma que su abreviatura es `IVRY`, así que va
+  explícita en el yml. Aun así se define la regla general para un destino
+  **sin** `abreviatura`: usa su nombre en mayúsculas y sin espacios, y se
+  avisa. Es la misma caída que ya usa `AmiNombreFichero` con una destinación
+  desconocida, y evita que un destino nuevo mal configurado rompa la
+  generación.
 - Añadir una hija nueva = una línea en `destinos-hijo`, sin tocar Java. Misma
   regla que las taras y que los clientes de plantilla GENERIC.
 - Un cliente que no declara `destinos-hijo` (AMI, genéricos) no cambia en nada.
