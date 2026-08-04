@@ -5,8 +5,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
@@ -168,6 +170,53 @@ class AjusteFuenteTest {
 
             assertEquals(estilosAntes + 1, libro.getNumCellStyles());
             assertEquals(una.getCellStyle().getIndex(), otra.getCellStyle().getIndex());
+        }
+    }
+
+    @Test
+    void enUnaCeldaCombinadaNoSeMarcaShrinkToFitPeroSiSeEncogeLaFuente() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            XSSFSheet hoja = libro.createSheet();
+            hoja.setColumnWidth(0, 10 * 256);
+            hoja.addMergedRegion(new CellRangeAddress(0, 1, 0, 0));
+            XSSFCellStyle estilo = libro.createCellStyle();
+            XSSFFont fuente = libro.createFont();
+            fuente.setFontHeightInPoints((short) 22);
+            estilo.setFont(fuente);
+            Cell celda = hoja.createRow(0).createCell(0);
+            celda.setCellStyle(estilo);
+            celda.setCellValue("UN TEXTO LARGUISIMO QUE NO CABE NI DE LEJOS");
+
+            new AjusteFuente(libro).ajustar(celda);
+
+            XSSFCellStyle resultante = (XSSFCellStyle) celda.getCellStyle();
+            assertTrue(resultante.getFont().getFontHeightInPoints() < 22,
+                    "la fuente tenía que encoger igual");
+            assertFalse(resultante.getShrinkToFit(),
+                    "Excel ignora shrinkToFit en celdas combinadas: no hay que marcarlo");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Test
+    void enUnaCeldaSueltaSeSigueMarcandoShrinkToFit() {
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            XSSFSheet hoja = libro.createSheet();
+            hoja.setColumnWidth(0, 10 * 256);
+            XSSFCellStyle estilo = libro.createCellStyle();
+            XSSFFont fuente = libro.createFont();
+            fuente.setFontHeightInPoints((short) 22);
+            estilo.setFont(fuente);
+            Cell celda = hoja.createRow(0).createCell(0);
+            celda.setCellStyle(estilo);
+            celda.setCellValue("UN TEXTO LARGUISIMO QUE NO CABE NI DE LEJOS");
+
+            new AjusteFuente(libro).ajustar(celda);
+
+            assertTrue(((XSSFCellStyle) celda.getCellStyle()).getShrinkToFit());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 

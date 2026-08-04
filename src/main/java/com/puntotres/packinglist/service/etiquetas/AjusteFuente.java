@@ -1,10 +1,14 @@
 package com.puntotres.packinglist.service.etiquetas;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -28,13 +32,16 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  * (ver excepción);</li>
  * <li>se marca además <b>shrinkToFit</b>, que es el "Reducir hasta ajustar"
  * de Excel, como red de seguridad para cuando el texto se pasa incluso al
- * tamaño mínimo — pero <b>solo si el estilo original no tiene wrapText</b>:
- * Excel ignora shrinkToFit en una celda con wrapText (gana el ajuste de
- * línea, y el texto se corta en una fila de altura fija en vez de encoger),
- * así que marcarlo ahí sería un atributo escrito que no hace nada y que
- * podría hacer creer que el mecanismo está activo cuando no lo está. En la
- * plantilla de <b>AMI</b> las celdas de valor no están combinadas ni tienen
- * wrapText, así que shrinkToFit sí es una red de seguridad real ahí.</li>
+ * tamaño mínimo — pero <b>solo si el estilo original no tiene wrapText
+ * ni la celda está combinada</b>: Excel ignora shrinkToFit en una celda con
+ * wrapText (gana el ajuste de línea, y el texto se corta en una fila de altura
+ * fija en vez de encoger) y también en celdas combinadas, así que marcarlo ahí
+ * sería un atributo escrito que no hace nada y que podría hacer creer que el
+ * mecanismo está activo cuando no lo está. En la plantilla antigua de
+ * <b>AMI</b> las celdas de valor no estaban combinadas ni tenían wrapText, así
+ * que shrinkToFit era una red de seguridad real. En la plantilla nueva, la
+ * celda de <b>REFERENCE</b> está combinada, así que ahí tampoco es una
+ * protección activa: el tamaño calculado es la única que queda.</li>
  * </ul>
  *
  * Si el texto cabe, no se toca nada: una caja de un solo artículo produce el
@@ -53,6 +60,14 @@ public final class AjusteFuente {
 
     private final XSSFWorkbook libro;
     private final Map<String, XSSFCellStyle> estilos = new HashMap<>();
+    /**
+     * Celdas cubiertas por una región combinada, por hoja, como "fila:columna".
+     * Se calcula la primera vez que se ajusta una celda de esa hoja: los dos
+     * builders que usan esta clase replican todos sus bloques —y con ellos
+     * todos sus merges— antes de escribir ningún valor, así que para entonces
+     * la hoja ya tiene todas sus combinaciones.
+     */
+    private final Map<Sheet, Set<String>> combinadasPorHoja = new HashMap<>();
 
     public AjusteFuente(XSSFWorkbook libro) {
         this.libro = libro;
@@ -88,7 +103,9 @@ public final class AjusteFuente {
      *
      * Excepción: si el estilo original ya tiene wrapText, shrinkToFit no se
      * marca porque Excel lo ignora en ese caso (ver javadoc de la clase); la
-     * única protección que queda ahí es el tamaño calculado.
+     * única protección que queda ahí es el tamaño calculado. Lo mismo vale
+     * para celdas combinadas: Excel ignora shrinkToFit ahí también, así que
+     * el tamaño calculado es la única protección real.
      */
     public void ajustar(Cell celda) {
         if (celda.getCellType() != CellType.STRING) {
@@ -102,7 +119,7 @@ public final class AjusteFuente {
             return;
         }
         short nuevo = tamano(texto, anchoEnChars, tamanoOriginal);
-        celda.setCellStyle(estiloCon(original, nuevo));
+        celda.setCellStyle(estiloCon(original, nuevo, !estaCombinada(celda)));
     }
 
     /** Si el texto entra en una columna de ese ancho al tamaño dado. */
@@ -119,14 +136,38 @@ public final class AjusteFuente {
     }
 
     /**
+     * Si la celda cae dentro de una región combinada. Excel ignora
+     * shrinkToFit en esas celdas, igual que lo ignora con wrapText.
+     */
+    private boolean estaCombinada(Cell celda) {
+        Set<String> combinadas = combinadasPorHoja.computeIfAbsent(
+                celda.getSheet(), AjusteFuente::mapearCombinadas);
+        return combinadas.contains(celda.getRowIndex() + ":" + celda.getColumnIndex());
+    }
+
+    private static Set<String> mapearCombinadas(Sheet hoja) {
+        Set<String> combinadas = new HashSet<>();
+        for (CellRangeAddress region : hoja.getMergedRegions()) {
+            for (int fila = region.getFirstRow(); fila <= region.getLastRow(); fila++) {
+                for (int col = region.getFirstColumn(); col <= region.getLastColumn(); col++) {
+                    combinadas.add(fila + ":" + col);
+                }
+            }
+        }
+        return combinadas;
+    }
+
+    /**
      * El estilo original con otro tamaño de fuente, creado una sola vez.
      * shrinkToFit solo se marca si el original no tiene wrapText: con
      * wrapText, Excel ignora shrinkToFit (ver javadoc de la clase) y
      * marcarlo sería un atributo inerte que además engaña sobre si la red de
-     * seguridad está activa.
+     * seguridad está activa. Lo mismo para celdas combinadas: Excel ignora
+     * shrinkToFit ahí también.
      */
-    private XSSFCellStyle estiloCon(XSSFCellStyle original, short tamano) {
-        return estilos.computeIfAbsent(original.getIndex() + ":" + tamano, clave -> {
+    private XSSFCellStyle estiloCon(XSSFCellStyle original, short tamano, boolean puedeEncoger) {
+        String clave = original.getIndex() + ":" + tamano + ":" + puedeEncoger;
+        return estilos.computeIfAbsent(clave, k -> {
             XSSFFont fuenteOriginal = original.getFont();
             XSSFFont fuente = libro.createFont();
             fuente.setFontName(fuenteOriginal.getFontName());
@@ -139,7 +180,7 @@ public final class AjusteFuente {
             XSSFCellStyle estilo = libro.createCellStyle();
             estilo.cloneStyleFrom(original);
             estilo.setFont(fuente);
-            if (!original.getWrapText()) {
+            if (puedeEncoger && !original.getWrapText()) {
                 estilo.setShrinkToFit(true);
             }
             return estilo;
