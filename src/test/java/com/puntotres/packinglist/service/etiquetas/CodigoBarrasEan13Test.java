@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -17,6 +18,9 @@ class CodigoBarrasEan13Test {
 
     /** EAN13 real del pedido de H26; su dígito de control (2) es correcto. */
     private static final String VALIDO = "3666598543892";
+
+    /** El EAN13 del mock de la plantilla del cliente. */
+    private static final String EAN_VALIDO = "3666598354771";
 
     @Test
     void generaUnPngApaisadoParaUnEan13Valido() throws Exception {
@@ -51,5 +55,35 @@ class CodigoBarrasEan13Test {
             assertFalse(CodigoBarrasEan13.esValido(malo), "debería rechazar: " + malo);
             assertTrue(CodigoBarrasEan13.png(malo).isEmpty(), "debería rechazar: " + malo);
         }
+    }
+
+    @Test
+    void conProporcionLaImagenSaleConEsaProporcion() throws Exception {
+        byte[] png = CodigoBarrasEan13.png(EAN_VALIDO, 3.3).orElseThrow();
+        BufferedImage imagen = ImageIO.read(new ByteArrayInputStream(png));
+        assertEquals(3.3, (double) imagen.getWidth() / imagen.getHeight(), 0.15);
+    }
+
+    @Test
+    void conProporcionCeroSaleExactamenteLoMismoQueSinProporcion() {
+        assertArrayEquals(CodigoBarrasEan13.png(EAN_VALIDO).orElseThrow(),
+                CodigoBarrasEan13.png(EAN_VALIDO, 0).orElseThrow());
+    }
+
+    @Test
+    void laProporcionNoCambiaElAnchoDelCodigo() throws Exception {
+        // El ancho lo fija el ancho de módulo, no la proporción: lo que se
+        // ajusta es el alto de las barras. Si esto cambiara, la imagen
+        // compuesta dejaría de poder dimensionarse a partir del código.
+        BufferedImage suelto = ImageIO.read(new ByteArrayInputStream(
+                CodigoBarrasEan13.png(EAN_VALIDO).orElseThrow()));
+        BufferedImage ajustado = ImageIO.read(new ByteArrayInputStream(
+                CodigoBarrasEan13.png(EAN_VALIDO, 3.3).orElseThrow()));
+        assertEquals(suelto.getWidth(), ajustado.getWidth());
+    }
+
+    @Test
+    void unEan13InvalidoConProporcionSigueDevolviendoVacio() {
+        assertTrue(CodigoBarrasEan13.png("1234567890123", 3.3).isEmpty());
     }
 }

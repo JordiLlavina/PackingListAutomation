@@ -49,15 +49,31 @@ public final class CodigoBarrasEan13 {
     }
 
     public static Optional<byte[]> png(String ean13) {
+        return png(ean13, 0);
+    }
+
+    /**
+     * Igual que {@link #png(String)} pero ajustando el alto de las barras para
+     * que la imagen salga con la proporción ancho/alto pedida (0 = la que
+     * salga). Lo usa ImagenEtiquetaArticulo: el código se pega en la imagen
+     * compuesta a resolución nativa, sin reescalar, así que tiene que salir ya
+     * con la forma del hueco que le toca.
+     *
+     * El ancho NO cambia: lo fija el ancho de módulo. Lo que se ajusta es el
+     * alto de las barras.
+     */
+    public static Optional<byte[]> png(String ean13, double proporcion) {
         if (!esValido(ean13)) {
             return Optional.empty();
         }
+        String digitos = ean13.trim();
         EAN13Bean codigo = new EAN13Bean();
         codigo.doQuietZone(true);
+        ajustarElAltoALaProporcion(codigo, digitos, proporcion);
         BitmapCanvasProvider lienzo =
                 new BitmapCanvasProvider(300, BufferedImage.TYPE_BYTE_BINARY, false, 0);
         try {
-            codigo.generateBarcode(lienzo, ean13.trim());
+            codigo.generateBarcode(lienzo, digitos);
             lienzo.finish();
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             ImageIO.write(lienzo.getBufferedImage(), "png", salida);
@@ -65,6 +81,25 @@ public final class CodigoBarrasEan13 {
         } catch (IOException e) {
             throw new UncheckedIOException(
                     "No se pudo generar el código de barras de '" + ean13 + "'", e);
+        }
+    }
+
+    /**
+     * Deja el alto total (barras + dígitos legibles) en ancho/proporción,
+     * tocando solo el alto de las barras. Si la proporción pedida no deja
+     * sitio ni para las barras se ignora: mejor una imagen algo achatada que
+     * una sin barras.
+     */
+    private static void ajustarElAltoALaProporcion(EAN13Bean codigo, String texto,
+                                                   double proporcion) {
+        if (proporcion <= 0) {
+            return;
+        }
+        var dimensiones = codigo.calcDimensions(texto);
+        double altoDeLosDigitos = dimensiones.getHeight() - codigo.getBarHeight();
+        double altoDeLasBarras = dimensiones.getWidthPlusQuiet() / proporcion - altoDeLosDigitos;
+        if (altoDeLasBarras > 0) {
+            codigo.setBarHeight(altoDeLasBarras);
         }
     }
 }
