@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.service.etiquetas.AnclajeImagen;
 import com.puntotres.packinglist.service.etiquetas.CodigoBarrasEan13;
+import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
 
 /**
  * Escribe un excel de etiquetas de artículo: una hoja por HojaEtiquetas y,

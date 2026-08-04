@@ -1,5 +1,7 @@
 package com.puntotres.packinglist.service.etiquetasarticulo;
 
+import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
+
 /**
  * Una hoja del excel de etiquetas: su nombre y la etiqueta que se repite en
  * ella.

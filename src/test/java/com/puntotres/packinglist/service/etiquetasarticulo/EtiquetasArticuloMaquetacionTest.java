@@ -16,6 +16,8 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
+import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
+
 /**
  * Compara la maquetación generada contra la del fichero REAL del cliente.
  *

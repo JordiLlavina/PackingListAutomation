@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.service.etiquetas.CodigoBarrasEan13;
+import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
 
 /**
  * Etiquetas de artículo de AMI: las que se enganchan al bolso o al cinturón,

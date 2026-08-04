@@ -13,6 +13,8 @@ import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
+import com.puntotres.packinglist.service.etiquetas.EtiquetaArticulo;
+
 class EtiquetasArticuloExcelBuilderTest {
 
     private final EtiquetasArticuloExcelBuilder builder = new EtiquetasArticuloExcelBuilder();

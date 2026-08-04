@@ -1,4 +1,4 @@
-package com.puntotres.packinglist.service.etiquetasarticulo;
+package com.puntotres.packinglist.service.etiquetas;
 
 /**
  * Las cinco partes de una etiqueta de artículo, YA formateadas tal como van
