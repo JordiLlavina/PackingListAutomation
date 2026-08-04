@@ -220,6 +220,61 @@ class AjusteFuenteTest {
         }
     }
 
+    @Test
+    void celdaCombinaDaysueltaConMismoEstiloYTamanoCalculadoDifierenEnShrinkToFit() {
+        // Prueba de regresión: la clave del caché debe incluir puedeEncoger para que
+        // el mismo estilo original, aplicado a dos celdas que necesitan el mismo
+        // tamaño de destino (una combinada y otra suelta), produzca estilos distintos
+        // con valores de shrinkToFit diferentes. Si se quitara el flag de la clave,
+        // la segunda celda se llevaría el estilo de la primera y este test fallaría.
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            XSSFSheet hoja = libro.createSheet();
+
+            // Ancho de columna igual para ambas, de modo que el tamaño calculado sea
+            // el mismo si el texto es igual.
+            hoja.setColumnWidth(0, 20 * 256);
+
+            // Crear el estilo original compartido
+            XSSFFont fuente = libro.createFont();
+            fuente.setFontHeightInPoints((short) 22);
+            XSSFCellStyle estiloOriginal = libro.createCellStyle();
+            estiloOriginal.setFont(fuente);
+
+            // Celda combinada
+            hoja.addMergedRegion(new CellRangeAddress(0, 1, 0, 0));
+            Cell celdaCombinada = hoja.createRow(0).createCell(0);
+            celdaCombinada.setCellStyle(estiloOriginal);
+            // Texto igual, ancho igual => tamaño calculado igual
+            celdaCombinada.setCellValue("X".repeat(60));
+
+            // Celda suelta con el mismo estilo original
+            Cell celdaSuelta = hoja.createRow(2).createCell(0);
+            celdaSuelta.setCellStyle(estiloOriginal);
+            celdaSuelta.setCellValue("X".repeat(60));
+
+            // Ajustar ambas con la misma instancia de AjusteFuente
+            AjusteFuente ajuste = new AjusteFuente(libro);
+            ajuste.ajustar(celdaCombinada);
+            ajuste.ajustar(celdaSuelta);
+
+            // Las dos deben encoger la fuente al mismo tamaño
+            short tamanoMerged = ((XSSFCellStyle) celdaCombinada.getCellStyle()).getFont()
+                    .getFontHeightInPoints();
+            short tamanoUnmerged = ((XSSFCellStyle) celdaSuelta.getCellStyle()).getFont()
+                    .getFontHeightInPoints();
+            assertEquals(tamanoMerged, tamanoUnmerged,
+                    "mismo texto+ancho => mismo tamaño calculado");
+
+            // Pero shrinkToFit debe diferir: la combinada no lo tiene, la suelta sí
+            assertFalse(((XSSFCellStyle) celdaCombinada.getCellStyle()).getShrinkToFit(),
+                    "celda combinada: no shrinkToFit");
+            assertTrue(((XSSFCellStyle) celdaSuelta.getCellStyle()).getShrinkToFit(),
+                    "celda suelta: shrinkToFit marcado");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     /** Una celda con texto, tamaño de fuente y ancho de columna dados. */
     private static Cell celdaCon(XSSFWorkbook libro, String texto, short tamanoPt,
                                  int anchoEnChars) {
