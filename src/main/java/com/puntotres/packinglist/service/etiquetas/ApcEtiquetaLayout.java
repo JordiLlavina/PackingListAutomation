@@ -51,14 +51,14 @@ record ApcEtiquetaLayout(
             40, 20, 12, 11, 13, 14, 15, 16, 18, 19);
 
     /**
-     * Se aceptan la clave del catálogo de packing (D. USA, C-LOG) y el
+     * Se aceptan la clave del catálogo de packing (D. USA, WHOLESALE) y el
      * nombre de la plantilla del cliente (USA, WH CROSSLOG).
      */
     private static final Map<String, ApcEtiquetaLayout> POR_DESTINO = Map.of(
             "JAPAN", JAPAN,
             "KOREA", KOREA,
             "D. USA", USA, "USA", USA,
-            "C-LOG", WH_CROSSLOG, "WH CROSSLOG", WH_CROSSLOG);
+            "WHOLESALE", WH_CROSSLOG, "WH CROSSLOG", WH_CROSSLOG);
 
     public static Optional<ApcEtiquetaLayout> paraDestino(String nombreDestino) {
         if (nombreDestino == null) {

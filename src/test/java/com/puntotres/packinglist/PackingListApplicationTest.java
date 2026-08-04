@@ -1,8 +1,10 @@
 package com.puntotres.packinglist;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
@@ -45,11 +47,27 @@ class PackingListApplicationTest {
 
         ClienteConfig apc = clientes.clientePara("APC").orElseThrow();
         assertEquals(TipoPlantilla.APC, apc.getPlantilla());
-        assertEquals(5, apc.getDestinos().size());
+        assertEquals(6, apc.getDestinos().size());
         assertEquals("I.D.LOOK. LTD.",
                 apc.destinoPara("korea").orElseThrow().getNombreCliente());
         assertTrue(apc.destinoPara("D. USA").orElseThrow()
                 .getDireccion().contains("43 BROOME STREET"));
+
+        // Los campos de la jerarquía de APC: si Spring dejara de enlazar
+        // "destinos-hijo" a destinosHijo, las hijas se quedarían sin padre y
+        // sus envíos volverían a no generar packing list, en silencio.
+        assertEquals("WH", apc.destinoPara("WHOLESALE").orElseThrow().getAbreviatura());
+        assertEquals(List.of("AUSTRALIA", "WHOLESALE", "CHINE FRANCH"),
+                apc.destinoPara("WHOLESALE").orElseThrow().getDestinosHijo());
+        assertEquals("WHOLESALE", apc.destinoPadrePara("Chine franch").orElseThrow().nombrePadre());
+        assertEquals("RETAIL", apc.destinoPadrePara("Wholesale concess").orElseThrow().nombrePadre());
+        assertEquals("IVRY", apc.destinoPara("IVRY").orElseThrow().getAbreviatura());
+        assertTrue(apc.destinoPara("IVRY").orElseThrow().getDestinosHijo().isEmpty());
+
+        // Solo APC y AMI piden el excel de pedido en la pantalla de entrada.
+        assertTrue(apc.isPedidoCliente());
+        assertTrue(clientes.clientePara("AMI").orElseThrow().isPedidoCliente());
+        assertFalse(clientes.clientePara("ACKERMANN").orElseThrow().isPedidoCliente());
 
         ClienteConfig sonia = clientes.clientePara("SONIA RYKIEL").orElseThrow();
         assertEquals(TipoPlantilla.GENERIC, sonia.getPlantilla());

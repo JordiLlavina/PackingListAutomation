@@ -15,13 +15,14 @@ class ApcEtiquetaLayoutTest {
 
     @Test
     void resuelveLosNombresDeDestinoConocidosYRechazaElResto() {
-        // Acepta tanto la clave de la config de packing ("D. USA", "C-LOG")
+        // Acepta tanto la clave de la config de packing ("D. USA", "WHOLESALE")
         // como el nombre del fichero de plantilla ("USA", "WH CROSSLOG").
         assertSame(ApcEtiquetaLayout.JAPAN, ApcEtiquetaLayout.paraDestino(" japan ").orElseThrow());
         assertSame(ApcEtiquetaLayout.KOREA, ApcEtiquetaLayout.paraDestino("KOREA").orElseThrow());
         assertSame(ApcEtiquetaLayout.USA, ApcEtiquetaLayout.paraDestino("D. USA").orElseThrow());
         assertSame(ApcEtiquetaLayout.USA, ApcEtiquetaLayout.paraDestino("USA").orElseThrow());
-        assertSame(ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.paraDestino("C-LOG").orElseThrow());
+        assertSame(ApcEtiquetaLayout.WH_CROSSLOG,
+                ApcEtiquetaLayout.paraDestino("WHOLESALE").orElseThrow());
         assertSame(ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.paraDestino("WH CROSSLOG").orElseThrow());
         assertTrue(ApcEtiquetaLayout.paraDestino("IVRY").isEmpty());
         assertTrue(ApcEtiquetaLayout.paraDestino(null).isEmpty());

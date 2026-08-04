@@ -38,6 +38,9 @@ packing-list:
       nombre: AMI
       plantilla: AMI
       placeholder-temporada: H26
+      # AMI no usa el pedido para el packing list, pero subirlo aquí evita
+      # que el Paso 2 de etiquetas lo vuelva a pedir.
+      pedido-cliente: true
       # Destinos habituales (informativo, la plantilla los escribe tal cual
       # llegan del JSON): PARIS, CHINA, JAPAN, HONG KONG. Pueden llegar más.
 
@@ -45,22 +48,41 @@ packing-list:
       nombre: A.P.C.
       plantilla: APC
       placeholder-temporada: E25
+      # APC manda su excel de pedido de la temporada: de ahí sale el número
+      # de pedido completo (ver PedidoCompletionService).
+      pedido-cliente: true
+      # abreviatura: la que APC usa en su Livraison code (columna
+      #   "Catégorie de stock" de su excel de pedido).
+      # destinos-hijo: destinaciones que viajan bajo este destino y se tratan
+      #   como él; la hija solo sale en la columna DESTINATION de su línea.
+      #   Añadir una hija nueva es UNA LÍNEA aquí, sin tocar Java.
       destinos:
+        "[WHOLESALE]":
+          nombre-cliente: A.P.C.
+          direccion: CROSSLOG, 104 RUE DENIS PAPIN, 77550 MOISSY CRAMAYEL, FRANCE
+          abreviatura: WH
+          destinos-hijo: [AUSTRALIA, WHOLESALE, CHINE FRANCH]
+        "[RETAIL]":
+          nombre-cliente: A.P.C.
+          direccion: 74 BIS AV MAURICE THOREZ 94200 IVRY SUR SEINE FRANCE
+          abreviatura: RT
+          destinos-hijo: [RETAIL, WHOLESALE CONCESS]
         "[D. USA]":
           nombre-cliente: A.P.C.-USNY-TOUITOU
           direccion: 43 BROOME STREET, 5TH FLOOR; 10013 NEW YORK; USA
+          abreviatura: UST
         "[IVRY]":
           nombre-cliente: A.P.C.
           direccion: 74 BIS AV MAURICE THOREZ 94200 IVRY SUR SEINE FRANCE
+          abreviatura: IVRY
         "[JAPAN]":
           nombre-cliente: A.P.C. JAPAN LTD.
           direccion: 4F AOYAMA 1-CHOME BUILDING; 8-5-30, AKASAKA,MINATO-KU; TOKYO
+          abreviatura: JPT
         "[KOREA]":
           nombre-cliente: I.D.LOOK. LTD.
           direccion: 6TH FL. PUREUN BLDG. 581, GANGNAMDE-RO, SEOCHO-GU, 06530 SEOUL,SOUTH KOREA
-        "[C-LOG]":
-          nombre-cliente: A.P.C.
-          direccion: CROSSLOG, 104 RUE DENIS PAPIN, 77550 MOISSY CRAMAYEL, FRANCE
+          abreviatura: KRT
 
     "[ACKERMANN]":
       nombre: Ackermann

@@ -904,7 +904,13 @@ class PackingListControllerTest {
     // --- destinaciones sin configurar (clientes con catálogo de destinos) ---
 
     /** Dos destinaciones APC: JAPAN (configurada) y AUSTRALIA (desconocida). */
-    private static final String JSON_APC_JAPAN_Y_AUSTRALIA = """
+    /**
+     * La segunda destinación tiene que ser una que NO esté en el catálogo de
+     * APC ni como clave ni como hija de nadie. "HONG KONG" lo cumple; ojo con
+     * usar AUSTRALIA o RETAIL, que lo parecen pero hoy son destinaciones
+     * configuradas (hijas de WHOLESALE y clave del catálogo).
+     */
+    private static final String JSON_APC_JAPAN_Y_DESCONOCIDA = """
             {"cliente": "APC", "destinos": [
               {"destino": "JAPAN",
                "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
@@ -912,10 +918,10 @@ class PackingListControllerTest {
                  "pedido": "4100128683", "canal": "JAPAN", "color": "LZZ-NOIR",
                  "medidaCaja": "60x40x40", "cantidadTotal": 10,
                  "cajas": [{"caja": 1, "unidades": 10, "pesoBruto": 3.5}]}]},
-              {"destino": "AUSTRALIA",
+              {"destino": "HONG KONG",
                "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
                "referencias": [{"referencia": "PXBHZ-H65077", "modelo": "CEINTURE PARIS",
-                 "pedido": "4100128721", "canal": "AUSTRALIA", "color": "LZZ-NOIR",
+                 "pedido": "4100128721", "canal": "HONG KONG", "color": "LZZ-NOIR",
                  "medidaCaja": "60x40x40", "talla": "95", "cantidadTotal": 3,
                  "cajas": [{"caja": 1, "unidades": 3, "pesoBruto": 1.4}]}]}
             ]}
@@ -935,30 +941,30 @@ class PackingListControllerTest {
     @Test
     void unaDestinacionSinConfigurarAvisaYGeneraLasDemas() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
-        importarJsonApc(sesion, JSON_APC_JAPAN_Y_AUSTRALIA);
+        importarJsonApc(sesion, JSON_APC_JAPAN_Y_DESCONOCIDA);
 
         mvc.perform(post("/generar").session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
-        // JAPAN se genera; AUSTRALIA sale como aviso, no como error.
+        // JAPAN se genera; HONG KONG sale como aviso, no como error.
         mvc.perform(get("/resultados").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("PKL_APC_JAPAN_FA-26-2.xlsx")))
-                .andExpect(content().string(containsString("AUSTRALIA")))
+                .andExpect(content().string(containsString("HONG KONG")))
                 .andExpect(content().string(containsString("packing no generado")));
     }
 
     @Test
     void sinNingunaDestinacionConfiguradaVuelveARevisionConElError() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
-        // Solo AUSTRALIA: no hay nada que generar.
-        importarJsonApc(sesion, JSON_APC_JAPAN_Y_AUSTRALIA
-                .replace("\"JAPAN\"", "\"RETAIL\""));
+        // Las dos destinaciones fuera del catálogo: no hay nada que generar.
+        importarJsonApc(sesion, JSON_APC_JAPAN_Y_DESCONOCIDA
+                .replace("\"JAPAN\"", "\"SINGAPORE\""));
 
         mvc.perform(post("/generar").session(sesion))
                 .andExpect(redirectedUrl("/revision"))
                 .andExpect(flash().attribute("error", containsString("packing no generado")))
-                .andExpect(flash().attribute("error", containsString("AUSTRALIA")));
+                .andExpect(flash().attribute("error", containsString("HONG KONG")));
     }
 
     @Test
