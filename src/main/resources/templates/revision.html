@@ -19,11 +19,6 @@
              th:text="|Sin palet: la caja ${caja.numeroCaja} (${caja.referencia} ${caja.codigoColor}) no cae en ningún rango de palet|"></div>
     </section>
 
-    <!-- Tamaños con tara configurada, para la columna TAMAÑO. -->
-    <datalist id="listaTamanos">
-        <option th:each="tamano : ${tamanosCaja}" th:value="${tamano}"></option>
-    </datalist>
-
     <!-- action por defecto: generar. Los botones de recálculo usan formaction. -->
     <form th:action="@{/generar}" method="post">
         <section class="destino" th:each="destino : ${destinos}">
@@ -31,6 +26,7 @@
             <table>
                 <thead>
                 <tr>
+                    <th class="c-desplegar"></th>
                     <th>Referencia</th>
                     <th>Color</th>
                     <th>Talla</th>
@@ -55,6 +51,20 @@
                      manda un índice por caja del tramo. -->
                 <tr th:each="fila : ${destino.filas}"
                     th:classappend="${fila.cajaPendiente} ? 'pendiente'">
+                    <!-- El triángulo va fuera de la tabla de datos, en su
+                         propia columna: ▶ despliega el tramo compactado en sus
+                         cajas, ▼ lo vuelve a plegar. Es un submit del mismo
+                         formulario, así que lo ya tecleado se aplica antes de
+                         recargar. Las filas de una sola caja no lo llevan. -->
+                    <td class="c-desplegar">
+                        <button th:if="${fila.alternable}" type="submit" class="triangulo"
+                                th:formaction="@{/alternar-fila(destino=${destino.indice},
+                                                                indice=${fila.indicesEnDestino[0]})}"
+                                th:text="${fila.desplegada} ? '▼' : '▶'"
+                                th:title="${fila.desplegada}
+                                          ? 'Plegar estas cajas en una sola fila'
+                                          : 'Desplegar el tramo para editar cada caja por separado'"></button>
+                    </td>
                     <td>
                         <input type="hidden" th:name="|cajas[${fila.indiceGlobal}].indiceDestino|"
                                th:value="${destino.indice}">
@@ -81,22 +91,24 @@
                                th:name="|cajas[${fila.indiceGlobal}].numeroCaja|"
                                th:value="${fila.caja.numeroCaja}">
                         <span th:unless="${fila.numeroCajaEditable}" th:text="${fila.rangoCajas}"></span>
-                        <!-- ▶ despliega el tramo en sus cajas, ▼ lo vuelve a
-                             plegar. Es un submit del mismo formulario, así que
-                             lo ya tecleado se aplica antes de recargar. -->
-                        <button th:if="${fila.alternable}" type="submit" class="triangulo"
-                                th:formaction="@{/alternar-fila(destino=${destino.indice},
-                                                                indice=${fila.indicesEnDestino[0]})}"
-                                th:text="${fila.desplegada} ? '▼' : '▶'"
-                                th:title="${fila.desplegada}
-                                          ? 'Plegar estas cajas en una sola fila'
-                                          : 'Desplegar el tramo para editar cada caja por separado'"></button>
                     </td>
-                    <!-- El tamaño manda la tara con la que se infiere el neto:
-                         el datalist ofrece los que tienen tara configurada. -->
-                    <td><input type="text" class="c-tamano" list="listaTamanos"
-                               th:name="|cajas[${fila.indiceGlobal}].tamanoCaja|"
-                               th:value="${fila.caja.tamanoCaja}"></td>
+                    <!-- El tamaño manda la tara con la que se infiere el neto,
+                         así que el desplegable ofrece los de application.yml.
+                         Un tamaño que NO esté en el catálogo se añade como
+                         opción propia: quitarlo lo cambiaría en silencio al
+                         guardar la fila. -->
+                    <td>
+                        <select class="c-tamano" th:name="|cajas[${fila.indiceGlobal}].tamanoCaja|">
+                            <option value="" th:if="${fila.caja.tamanoCaja == null}"></option>
+                            <option th:if="${fila.caja.tamanoCaja != null
+                                             and !tamanosCaja.contains(fila.caja.tamanoCaja)}"
+                                    th:value="${fila.caja.tamanoCaja}" th:selected="${true}"
+                                    th:text="|${fila.caja.tamanoCaja} (sin tara)|"></option>
+                            <option th:each="tamano : ${tamanosCaja}" th:value="${tamano}"
+                                    th:selected="${tamano == fila.caja.tamanoCaja}"
+                                    th:text="${tamano}"></option>
+                        </select>
+                    </td>
                     <!-- Cantidad de UNA caja, no la suma del tramo. -->
                     <td><input type="number" min="0" class="c-cantidad"
                                th:name="|cajas[${fila.indiceGlobal}].cantidad|"

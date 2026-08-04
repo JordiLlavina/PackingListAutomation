@@ -229,20 +229,32 @@ td input[type="number"], td input[type="text"] {
 
 /* La tabla de revisión es toda campos editables: cualquier dato puede venir
    mal leído de las fotos, no solo un peso. Los anchos van por columna para que
-   las once quepan en las 72rem de main. Deliberadamente SIN overflow-x en la
+   las doce quepan en las 72rem de main. Deliberadamente SIN overflow-x en la
    sección: poner scroll horizontal aquí convertiría la sección en el contenedor
-   de scroll y rompería las cabeceras sticky de arriba. */
-section.destino td input.c-referencia { width: 8.5rem; }
-section.destino td input.c-color { width: 6.5rem; }
+   de scroll y rompería las cabeceras sticky de arriba.
+
+   La referencia es la más larga con diferencia (ULL136.AL00544); las
+   numéricas —caja, cantidad, palet y los dos pesos— comparten el ancho de
+   talla, que es el mínimo cómodo. */
+section.destino td input.c-referencia { width: 10rem; }
+section.destino td input.c-color { width: 5rem; }
 section.destino td input.c-pedido { width: 6rem; }
 section.destino td input.c-talla { width: 3.5rem; }
-section.destino td input.c-tamano { width: 7rem; }
-section.destino td input.c-cantidad { width: 4.5rem; }
-section.destino td input.c-palet { width: 3.5rem; }
-section.destino td.c-caja input[type="number"] { width: 4rem; }
-section.destino td input.c-peso { width: 5.5rem; }
+section.destino td select.c-tamano { width: 8.5rem; }
+section.destino td input.c-cantidad,
+section.destino td input.c-palet,
+section.destino td input.c-peso,
+section.destino td.c-caja input[type="number"] { width: 3.5rem; }
 
-/* Las celdas de la revisión aprietan en horizontal: son once y casi todas
+section.destino td select.c-tamano {
+    padding: calc(0.25rem - 2px) 0.2rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+    background: #fff;
+}
+
+/* Las celdas de la revisión aprietan en horizontal: son doce y casi todas
    llevan un campo con su propio padding. */
 section.destino th, section.destino td {
     padding-left: 0.3rem;
@@ -252,22 +264,32 @@ section.destino th, section.destino td {
 /* Una caja sin palet: el hueco vacío se ve, pero conviene que grite. */
 section.destino td input.sin-palet { border-color: var(--error-borde); }
 
-/* El triángulo de desplegar/plegar un tramo compactado, pegado al número
-   de caja. Es un submit, pero no debe parecer un botón. */
-section.destino td.c-caja {
-    white-space: nowrap;
+/* Columna propia a la izquierda de la tabla para el triángulo de
+   desplegar/plegar un tramo compactado. Va estrecha y solo la ocupan las
+   filas que representan más de una caja. */
+section.destino th.c-desplegar, section.destino td.c-desplegar {
+    width: 1.4rem;
+    padding-left: 0.15rem;
+    padding-right: 0.15rem;
+    text-align: center;
 }
 
 button.triangulo {
-    margin: 0 0 0 0.2rem;
-    padding: 0 0.2rem;
-    background: none;
+    display: block;
+    width: 1.1rem;
+    height: 1.1rem;
+    margin: 0 auto;
+    padding: 0;
+    background: #4a5560;
     border: none;
-    color: var(--acento);
-    font-size: 0.75rem;
-    line-height: 1;
+    border-radius: 3px;
+    color: #d7dce1;
+    font-size: 0.6rem;
+    line-height: 1.1rem;
     cursor: pointer;
 }
+
+button.triangulo:hover { background: #333c45; }
 
 /* Filas de la tabla de revisión 4px más estrechas: se recortan 2px por
    lado tanto en las celdas como en los inputs, que son los que marcan

@@ -39,6 +39,18 @@ class RutasTest {
     }
 
     @Test
+    void elCssSeSirveConElHashDeSuContenidoEnElNombre() throws Exception {
+        // Sin esto el navegador se queda con la copia vieja de estilo.css tras
+        // cada cambio de estilos y hay que vaciar la caché a mano: un fallo
+        // invisible desde el código, que solo se nota mirando la pantalla.
+        mvc.perform(get("/menu"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.matchesPattern(
+                                "(?s).*href=\"/estilo-[0-9a-f]{32}\\.css\".*")));
+    }
+
+    @Test
     void elAsistenteDePackingListViveEnSuPropiaRuta() throws Exception {
         mvc.perform(get("/packing-list"))
                 .andExpect(status().isOk())

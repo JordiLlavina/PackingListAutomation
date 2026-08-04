@@ -8,6 +8,18 @@ spring:
       max-file-size: 20MB
       max-request-size: 60MB
 
+  # El CSS y el JS se sirven con un hash del contenido en el nombre
+  # (/estilo-a1b2c3.css): sin esto el navegador se queda con la copia vieja
+  # tras cada cambio de estilos y hay que vaciar la caché a mano.
+  web:
+    resources:
+      chain:
+        enabled: true
+        strategy:
+          content:
+            enabled: true
+            paths: /**
+
 #
 # Taras conocidas (kg de embalaje vacío) por tamaño de caja "LxWxH" en cm.
 # Para soportar un tamaño nuevo basta con añadirlo aquí; las claves van

@@ -611,6 +611,25 @@ class PackingListControllerTest {
     }
 
     @Test
+    void elDesplegableDeTamanosOfreceLasTarasYConservaUnTamanoSinTara() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        // El fixture trae 99x99x99, que NO está en las taras de application.yml.
+        // Si el desplegable solo ofreciera el catálogo, guardar la fila
+        // cambiaría el tamaño del envío en silencio por el primero de la lista.
+        importarCincoCajasIguales(sesion);
+
+        String html = mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()
+                .replaceAll("\\s+", " ");
+
+        assertTrue(html.contains("<option value=\"99x99x99\" selected=\"selected\">"),
+                "el tamaño sin tara debe seguir seleccionado en el desplegable");
+        assertTrue(html.contains("<option value=\"60x40x40\">"),
+                "el desplegable debe ofrecer las taras de application.yml");
+    }
+
+    @Test
     void alternarFilaSinEnvioEnCursoRedirigeALaEntrada() throws Exception {
         mvc.perform(post("/alternar-fila").param("destino", "0").param("indice", "0"))
                 .andExpect(status().is3xxRedirection())
