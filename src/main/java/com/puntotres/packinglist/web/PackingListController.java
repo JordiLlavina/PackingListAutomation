@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.TaraProperties;
+import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
@@ -44,7 +45,10 @@ import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.PackingListGenerationService;
 import com.puntotres.packinglist.service.PaletAssignmentService;
+import com.puntotres.packinglist.service.PedidoCompletionService;
+import com.puntotres.packinglist.service.ResolutorDestinosPadre;
 import com.puntotres.packinglist.service.ResultadoAsignacion;
+import com.puntotres.packinglist.service.ResultadoDestinos;
 import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
 import com.puntotres.packinglist.service.VolcadoErpGenerationService;
 import com.puntotres.packinglist.service.WeightInferenceService;
@@ -76,6 +80,8 @@ public class PackingListController {
     private final ClaudeEnvioExtractionService extractorClaude;
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
+    private final ResolutorDestinosPadre resolutorDestinos;
+    private final PedidoCompletionService completadorPedidos;
     private final PackingListGenerationService generador;
     private final VolcadoErpGenerationService generadorVolcado;
     private final VolcadoErpExcelBuilder constructorVolcado;
@@ -89,6 +95,8 @@ public class PackingListController {
                                  ClaudeEnvioExtractionService extractorClaude,
                                  PaletAssignmentService asignadorPalets,
                                  WeightInferenceService inferidorPesos,
+                                 ResolutorDestinosPadre resolutorDestinos,
+                                 PedidoCompletionService completadorPedidos,
                                  PackingListGenerationService generador,
                                  VolcadoErpGenerationService generadorVolcado,
                                  VolcadoErpExcelBuilder constructorVolcado,
@@ -101,6 +109,8 @@ public class PackingListController {
         this.extractorClaude = extractorClaude;
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
+        this.resolutorDestinos = resolutorDestinos;
+        this.completadorPedidos = completadorPedidos;
         this.generador = generador;
         this.generadorVolcado = generadorVolcado;
         this.constructorVolcado = constructorVolcado;
@@ -220,6 +230,38 @@ public class PackingListController {
         envioEnCurso.reiniciar();
         envioEnCurso.setCabecera(cabecera);
         envioEnCurso.setImportado(importado);
+
+        // El excel de pedido se guarda aunque el cliente no lo use en el
+        // packing list: AMI lo reutiliza en el Paso 2 de etiquetas.
+        byte[] excelPedido = null;
+        MultipartFile pedidoSubido = envioForm.getPedidoCliente();
+        if (pedidoSubido != null && !pedidoSubido.isEmpty()) {
+            try {
+                excelPedido = pedidoSubido.getBytes();
+                envioEnCurso.setExcelPedidoCliente(excelPedido, pedidoSubido.getOriginalFilename());
+            } catch (IOException e) {
+                importado.getAvisos().add("No se ha podido leer el excel de pedido subido: "
+                        + e.getMessage());
+            }
+        }
+
+        // Las destinaciones hijas se resuelven a su padre ANTES de asignar
+        // palets, para que la asignación y la inferencia trabajen ya sobre
+        // las destinaciones definitivas.
+        ResultadoDestinos resueltos = resolutorDestinos.resolver(
+                importado.getDestinos(), cliente, cabecera.getFechaEnvio());
+        importado.getDestinos().clear();
+        importado.getDestinos().addAll(resueltos.getDestinos());
+        importado.getAvisos().addAll(resueltos.getAvisos());
+
+        // Solo APC completa el pedido: es el único con un excel de pedido del
+        // que sacar el número entero a partir de la referencia. Corre aquí y
+        // no en los recálculos de la revisión, que pisarían lo tecleado.
+        if (cliente.getPlantilla() == TipoPlantilla.APC) {
+            importado.getAvisos().addAll(
+                    completadorPedidos.completar(importado.getDestinos(), excelPedido).getAvisos());
+        }
+
         for (EnvioImportado.DestinoImportado destino : importado.getDestinos()) {
             ResultadoAsignacion asignacion =
                     asignadorPalets.asignar(destino.getDestino(), destino.getPalets());
@@ -540,6 +582,8 @@ public class PackingListController {
             datos.put("plantilla", config.getPlantilla().name());
             datos.put("placeholderTemporada",
                     config.getPlaceholderTemporada() != null ? config.getPlaceholderTemporada() : "");
+            // Solo los clientes que trabajan con excel de pedido ven su input.
+            datos.put("pedidoCliente", String.valueOf(config.isPedidoCliente()));
             clientesJs.put(clave, datos);
         });
         model.addAttribute("clientesJs", clientesJs);

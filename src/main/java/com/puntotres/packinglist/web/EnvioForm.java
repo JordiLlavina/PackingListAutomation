@@ -35,6 +35,13 @@ public class EnvioForm {
     /** Fotos del packing list para el modo CLAUDE. */
     private List<MultipartFile> imagenes = new ArrayList<>();
 
+    /**
+     * Excel de pedido de la temporada del cliente. Opcional: APC lo usa para
+     * completar el nº de pedido y AMI para no volver a pedirlo en el Paso 2
+     * de etiquetas. Solo se muestra a los clientes que lo declaran.
+     */
+    private MultipartFile pedidoCliente;
+
     @NotBlank(message = "La temporada es obligatoria")
     private String temporada;
 
@@ -69,6 +76,9 @@ public class EnvioForm {
 
     public String getJson() { return json; }
     public void setJson(String json) { this.json = json; }
+
+    public MultipartFile getPedidoCliente() { return pedidoCliente; }
+    public void setPedidoCliente(MultipartFile pedidoCliente) { this.pedidoCliente = pedidoCliente; }
 
     public String getCiudadProveedor() { return ciudadProveedor; }
     public void setCiudadProveedor(String ciudadProveedor) { this.ciudadProveedor = ciudadProveedor; }

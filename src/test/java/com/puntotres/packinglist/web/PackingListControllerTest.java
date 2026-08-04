@@ -19,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -975,5 +976,87 @@ class PackingListControllerTest {
 
         mvc.perform(get("/descargar/NO_EXISTE.xlsx").session(sesion))
                 .andExpect(status().isNotFound());
+    }
+
+    // --- Excel de pedido del cliente y destinos padre de APC ---
+
+    private static final String JSON_APC_AUSTRALIA = """
+            {"cliente": "APC", "destinos": [{"destino": "Australia",
+              "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
+              "referencias": [
+                {"referencia": "PXBHZ-H65077", "color": "LZZ-NOIR",
+                 "medidaCaja": "40x30x20", "pedido": "721",
+                 "cajas": [{"caja": 1, "unidades": 3, "pesoBruto": 4.2}]}
+              ]}]}
+            """;
+
+    /** POST /importar de un envío de APC a Australia, una hija de WHOLESALE. */
+    private void importarApcAustralia(MockHttpSession sesion) throws Exception {
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "APC").param("json", JSON_APC_AUSTRALIA)
+                        .param("temporada", "E25").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "28/04/2026").param("fechaEnvio", "28/04/2026"))
+                .andExpect(redirectedUrl("/revision"));
+    }
+
+    private String revision(MockHttpSession sesion) throws Exception {
+        return mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void soloLosClientesConPedidoDeclaradoPidenSuExcelEnLaEntrada() throws Exception {
+        Map<String, Map<String, String>> clientesJs =
+                (Map<String, Map<String, String>>) mvc.perform(get("/packing-list"))
+                        .andExpect(status().isOk())
+                        .andReturn().getModelAndView().getModel().get("clientesJs");
+
+        assertEquals("true", clientesJs.get("APC").get("pedidoCliente"));
+        assertEquals("true", clientesJs.get("AMI").get("pedidoCliente"));
+        assertEquals("false", clientesJs.get("ACKERMANN").get("pedidoCliente"));
+    }
+
+    @Test
+    void unaHijaDeApcSeRevisaBajoSuDestinoPadre() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        // La sección de la revisión es la del padre; "Australia" solo
+        // sobrevive en el canal, que esta tabla no muestra.
+        assertTrue(revision(sesion).contains("WHOLESALE"));
+    }
+
+    @Test
+    void sinExcelDePedidoElNumeroSeQuedaEnLosTresDigitosYSeAvisa() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        String html = revision(sesion);
+
+        assertTrue(html.contains("721"));
+        assertTrue(html.contains("No se ha subido el excel de pedido"));
+    }
+
+    @Test
+    void conElExcelDePedidoSubidoElNumeroDePedidoSaleCompleto() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        byte[] pedido;
+        try (var in = getClass().getResourceAsStream("/ejemplos/APC_PEDIDO_FALL26.xlsx")) {
+            pedido = in.readAllBytes();
+        }
+
+        mvc.perform(multipart("/importar").file(new MockMultipartFile(
+                                "pedidoCliente", "APC_PEDIDO_FALL26.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                pedido))
+                        .session(sesion)
+                        .param("cliente", "APC").param("json", JSON_APC_AUSTRALIA)
+                        .param("temporada", "E25").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "28/04/2026").param("fechaEnvio", "28/04/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        assertTrue(revision(sesion).contains("4100128721"));
     }
 }

@@ -38,6 +38,17 @@
             </div>
         </div>
 
+        <!-- Excel de pedido de la temporada. Solo lo ven los clientes que lo
+             declaran (pedido-cliente en application.yml): APC lo usa para
+             completar el nº de pedido, AMI para no repetirlo en etiquetas. -->
+        <div id="bloquePedidoCliente" style="display: none">
+            <label for="pedidoCliente">Excel de pedido del cliente</label>
+            <p class="ayuda">Opcional. En APC se usa para completar el número de pedido
+                (de las fotos solo salen sus tres últimos dígitos). En AMI evita tener que
+                volver a subirlo al generar las etiquetas de caja.</p>
+            <input type="file" id="pedidoCliente" name="pedidoCliente" accept=".xlsx">
+        </div>
+
         <div id="bloqueJson">
             <label for="json">JSON del envío</label>
             <textarea id="json" class="json" th:field="*{json}"
@@ -217,6 +228,9 @@
 
             const esAmi = config && config.plantilla === 'AMI';
             camposAmi.style.display = esAmi ? '' : 'none';
+
+            document.getElementById('bloquePedidoCliente').style.display =
+                (config && config.pedidoCliente === 'true') ? '' : 'none';
 
             if (config && config.placeholderTemporada) {
                 temporada.placeholder = config.placeholderTemporada;

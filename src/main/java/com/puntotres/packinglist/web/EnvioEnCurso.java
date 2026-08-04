@@ -37,6 +37,8 @@ public class EnvioEnCurso {
     private final List<ExcelGenerado> etiquetas = new ArrayList<>();
     private final List<String> avisosEtiquetas = new ArrayList<>();
     private final Set<ClaveFila> filasDesplegadas = new HashSet<>();
+    private byte[] excelPedidoCliente;
+    private String nombreExcelPedidoCliente;
 
     /**
      * Una fila compactada de la tabla de revisión que el usuario ha desplegado,
@@ -64,6 +66,8 @@ public class EnvioEnCurso {
         etiquetas.clear();
         avisosEtiquetas.clear();
         filasDesplegadas.clear();
+        excelPedidoCliente = null;
+        nombreExcelPedidoCliente = null;
     }
 
     /** Despliega la fila compactada que arranca ahí, o la vuelve a plegar. */
@@ -99,4 +103,13 @@ public class EnvioEnCurso {
 
     public List<ExcelGenerado> getEtiquetas() { return etiquetas; }
     public List<String> getAvisosEtiquetas() { return avisosEtiquetas; }
+
+    public byte[] getExcelPedidoCliente() { return excelPedidoCliente; }
+    public String getNombreExcelPedidoCliente() { return nombreExcelPedidoCliente; }
+
+    /** El excel de pedido subido en la entrada; lo reutiliza el Paso 2 de etiquetas. */
+    public void setExcelPedidoCliente(byte[] contenido, String nombre) {
+        this.excelPedidoCliente = contenido;
+        this.nombreExcelPedidoCliente = nombre;
+    }
 }
