@@ -13,8 +13,9 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
-import org.apache.poi.xssf.usermodel.XSSFPictureData;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFShape;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
@@ -27,8 +28,8 @@ import org.springframework.stereotype.Service;
  * La plantilla trae una hoja por destinación con un par de etiquetas
  * modelo y sus imágenes de EJEMPLO; aquí se conserva solo la hoja pedida,
  * se limpian esas imágenes, se replica el bloque modelo para cada caja
- * (estilos, altos de fila y celdas combinadas incluidos) y se insertan los
- * tres códigos de barras generados (PO, EAN13 y EAN128) y, en JAPAN, la
+ * (estilos, altos de fila y celdas combinadas incluidos) y se insertan
+ * la imagen compuesta del artículo y el Code 128 del EAN128 y, en JAPAN, la
  * imagen-dirección extraída de la propia plantilla. Cada par lleva su salto
  * de página: un A4 por caja.
  */
@@ -39,13 +40,16 @@ public class AmiEtiquetasExcelBuilder {
 
     /**
      * Los datos ya formateados de la etiqueta de una caja física. null =
-     * celda en blanco, y sin ese código de barras: sin orderNumber no hay
-     * Code 128 del PO, sin ean13 no hay EAN-13 y sin ean128 no hay su Code 128.
+     * celda en blanco, y sin ese código de barras: sin ean128 no hay su
+     * Code 128. articulo son los cuatro textos y el EAN-13 del PRIMER
+     * artículo de la caja, los que van dentro de la imagen compuesta; con
+     * varios artículos, referencia/colorCode/cantidad vienen concatenados
+     * pero la imagen habla solo del primero, que es de quien es su EAN-13.
      */
     public record EtiquetaCaja(String temporada, String referencia, String colorCode,
                                String talla, String cantidad, String pesoBruto,
-                               String parcel, String orderNumber,
-                               String ean13, String ean128) {
+                               String parcel, String orderNumber, String ean128,
+                               EtiquetaArticulo articulo) {
     }
 
     /** Una imagen ya resuelta: dónde va en el bloque y su índice en el libro. */
@@ -100,11 +104,28 @@ public class AmiEtiquetasExcelBuilder {
 
     // --- pasos ---
 
-    /** La dirección de entrega de JAPAN va como imagen: el único PNG del libro. */
+    /**
+     * La dirección de entrega de JAPAN va como imagen. No vale coger "el
+     * primer PNG del libro": la plantilla nueva trae también el mock de la
+     * imagen compuesta, y el orden de getAllPictures() no lo distingue. Se
+     * busca en la hoja de JAPAN la imagen anclada en la fila de
+     * JAPAN_DIRECCION. null si no está: JAPAN sale sin dirección y el resto
+     * de la etiqueta se genera igual.
+     */
     private static byte[] extraerPngDireccion(XSSFWorkbook libro) {
-        for (XSSFPictureData imagen : libro.getAllPictures()) {
-            if (imagen.getPictureType() == Workbook.PICTURE_TYPE_PNG) {
-                return imagen.getData();
+        XSSFSheet japan = libro.getSheet(AmiEtiquetaLayout.JAPAN.nombreHoja());
+        if (japan == null || japan.getDrawingPatriarch() == null) {
+            return null;
+        }
+        for (XSSFShape forma : japan.getDrawingPatriarch().getShapes()) {
+            // getClientAnchor() y no getPreferredSize(): esta última intenta
+            // reescalar a un anclaje de dos celdas y revienta con NPE cuando
+            // la imagen de la plantilla (como esta) está anclada con una sola
+            // celda + tamaño fijo, que es como la trae el cliente.
+            if (forma instanceof XSSFPicture imagen
+                    && imagen.getClientAnchor().getFrom().getRow()
+                            == AmiEtiquetaLayout.JAPAN_DIRECCION.fila()) {
+                return imagen.getPictureData().getData();
             }
         }
         return null;
@@ -179,23 +200,20 @@ public class AmiEtiquetasExcelBuilder {
                                   Map<String, Integer> cache) {
         XSSFDrawing dibujo = hoja.createDrawingPatriarch();
         List<ImagenAnclada> imagenes = new ArrayList<>();
-        if (tiene(etiqueta.orderNumber())) {
-            imagenes.add(new ImagenAnclada(layout.po(), indice(libro, cache,
-                    "PO:" + etiqueta.orderNumber(),
-                    () -> CodigoBarrasCode128.png(etiqueta.orderNumber()))));
-        }
-        // El EAN13 puede llegar inválido: entonces no se dibuja y la etiqueta
-        // sale igual (el aviso lo dio ya AmiPedidoExcel). Se comprueba con
-        // esValido para no pagar el render aquí: el Supplier lo hace luego, y
-        // solo la primera vez que aparece ese código.
-        if (tiene(etiqueta.ean13()) && CodigoBarrasEan13.esValido(etiqueta.ean13())) {
-            imagenes.add(new ImagenAnclada(layout.ean13(), indice(libro, cache,
-                    "EAN13:" + etiqueta.ean13(),
-                    () -> CodigoBarrasEan13.png(etiqueta.ean13()).orElseThrow())));
+        // La imagen compuesta lleva los cuatro textos del artículo y su
+        // EAN-13; se genera con la proporción del hueco para que no se
+        // deforme. Se cachea por su contenido entero, no solo por el EAN-13:
+        // un artículo sin fila en el pedido no tiene EAN-13 y aun así su
+        // imagen es distinta de la de otro artículo sin fila.
+        if (etiqueta.articulo() != null) {
+            imagenes.add(new ImagenAnclada(layout.imagenArticulo(), indice(libro, cache,
+                    "ARTICULO:" + etiqueta.articulo(),
+                    () -> ImagenEtiquetaArticulo.png(etiqueta.articulo(),
+                            layout.imagenArticulo().proporcion()))));
         }
         // El hueco del EAN128 es muy apaisado (casi 6:1) y el código no sale
         // así de serie: se genera ya con la proporción del hueco para que no
-        // se estire al encajarlo. El del PO se deja como estaba.
+        // se estire al encajarlo.
         if (tiene(etiqueta.ean128())) {
             imagenes.add(new ImagenAnclada(layout.ean128(), indice(libro, cache,
                     "EAN128:" + etiqueta.ean128(),
