@@ -312,6 +312,21 @@ class AmiEtiquetasExcelBuilderTest {
     }
 
     @Test
+    void unDestinoSinCajasNoRompeElAreaDeImpresion() throws IOException {
+        // Un destino sin cajas es mal input que un humano puede corregir, no
+        // una razón para reventar. Con una lista vacía, FRANCE conserva su área
+        // de impresión original intacta y el libro es abrible (por poco que sea).
+        byte[] excel = builder.generar(AmiEtiquetaLayout.FRANCE, List.of());
+        try (XSSFWorkbook libro = abrir(excel)) {
+            // La plantilla de FRANCE tiene Print_Area = $A$1:$D$32 (la primera
+            // caja); sin etiquetas escritas se deja igual, no debe reventar al
+            // intentar estirarlo a la fila -1.
+            String area = libro.getPrintArea(0);
+            assertNotNull(area, "FRANCE debe conservar su área de impresión incluso sin etiquetas");
+        }
+    }
+
+    @Test
     void yaNoHayCodigoDeBarrasDelPo() throws Exception {
         // Antes había 3 imágenes por etiqueta (PO, EAN13, EAN128) y ahora 2
         // (imagen compuesta y EAN128), duplicadas por el par de etiquetas.

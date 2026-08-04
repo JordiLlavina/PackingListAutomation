@@ -152,14 +152,15 @@ public class AmiEtiquetasExcelBuilder {
      * ($A$1:$D$32, justo la primera caja); POI la remapea a la hoja
      * superviviente al borrar las otras dos. Sin tocarla, un envío de más de
      * una caja imprime solo la primera: se estira hasta la última fila
-     * escrita, conservando las columnas que eligió el cliente. CHINA y JAPAN
-     * no traen área de impresión (POI se la lleva por delante junto con la
-     * hoja a la que apuntaba) y no hay que inventarles una.
+     * escrita, conservando las columnas que eligió el cliente. Con cero
+     * etiquetas se deja el área intacta (si la hay). CHINA y JAPAN no traen
+     * área de impresión (POI se la lleva por delante junto con la hoja a la
+     * que apuntaba) y no hay que inventarles una.
      */
     private static void actualizarAreaImpresion(XSSFWorkbook libro, int numeroDeEtiquetas,
                                                  int alturaBloque) {
         String areaActual = libro.getPrintArea(0);
-        if (areaActual == null) {
+        if (areaActual == null || numeroDeEtiquetas == 0) {
             return;
         }
         AreaReference referencia = new AreaReference(areaActual, SpreadsheetVersion.EXCEL2007);
