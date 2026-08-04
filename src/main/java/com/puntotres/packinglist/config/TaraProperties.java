@@ -1,6 +1,8 @@
 package com.puntotres.packinglist.config;
 
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -41,6 +43,38 @@ public class TaraProperties {
             return Optional.empty();
         }
         return Optional.ofNullable(taras.get(normalizar(tamanoCaja)));
+    }
+
+    /**
+     * Los tamaños configurados, de la caja más grande a la más pequeña, para
+     * los desplegables de la web. El orden es por VOLUMEN y no alfabético:
+     * "100x40x40" es la caja más grande y como texto iría antes que
+     * "40x30x20". Un tamaño que no siga el patrón LxAxH no rompe el orden: se
+     * va al final, y los empates se deshacen por nombre para que la lista sea
+     * siempre la misma.
+     */
+    public List<String> tamanosDeMayorAMenor() {
+        return taras.keySet().stream()
+                .sorted(Comparator.comparingLong(TaraProperties::volumen).reversed()
+                        .thenComparing(Comparator.naturalOrder()))
+                .toList();
+    }
+
+    /** Volumen en cm³ de un "LxAxH", o 0 si no se puede leer así. */
+    private static long volumen(String tamano) {
+        String[] partes = tamano.split("x");
+        if (partes.length != 3) {
+            return 0;
+        }
+        long total = 1;
+        for (String parte : partes) {
+            try {
+                total *= Long.parseLong(parte.trim());
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+        return total;
     }
 
     private static String normalizar(String tamano) {

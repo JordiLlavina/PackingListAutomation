@@ -9,7 +9,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeSet;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -243,9 +242,9 @@ public class PackingListController {
         model.addAttribute("avisosPalets", envioEnCurso.getAvisosPalets());
         model.addAttribute("avisosInferencia", envioEnCurso.getAvisosInferencia());
         model.addAttribute("cajasSinPalet", envioEnCurso.getCajasSinPalet());
-        // Tamaños con tara conocida para el datalist de la columna TAMAÑO:
-        // teclear uno sin tara deja la caja sin inferencia posible.
-        model.addAttribute("tamanosCaja", new TreeSet<>(taraProperties.getTaras().keySet()));
+        // Tamaños con tara conocida para el desplegable de la columna TAMAÑO,
+        // de la caja más grande a la más pequeña.
+        model.addAttribute("tamanosCaja", taraProperties.tamanosDeMayorAMenor());
         return "revision";
     }
 
@@ -534,7 +533,7 @@ public class PackingListController {
         model.addAttribute("clientes", clientesProperties.getClientes());
         // Tamaños de caja con tara conocida, para el datalist del modo
         // FORMULARIO (evita teclear un tamaño que luego no tendría tara).
-        model.addAttribute("tamanosCaja", new TreeSet<>(taraProperties.getTaras().keySet()));
+        model.addAttribute("tamanosCaja", taraProperties.tamanosDeMayorAMenor());
         Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
         clientesProperties.getClientes().forEach((clave, config) -> {
             Map<String, String> datos = new LinkedHashMap<>();
