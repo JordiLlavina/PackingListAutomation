@@ -116,18 +116,19 @@ public class ResolutorDestinosPadre {
     private void avisarDeNumerosRepetidos(String nombrePadre,
                                           List<EnvioImportado.DestinoImportado> hijas,
                                           List<String> avisos) {
-        avisarDe("caja", nombrePadre, hijas, avisos, hija -> {
+        avisarDe("la caja", nombrePadre, hijas, avisos, hija -> {
             Set<Integer> numeros = new TreeSet<>();
             hija.getDestino().getCajas().forEach(caja -> numeros.add(caja.getNumeroCaja()));
             return numeros;
         });
-        avisarDe("palet", nombrePadre, hijas, avisos, hija -> {
+        avisarDe("el palet", nombrePadre, hijas, avisos, hija -> {
             Set<Integer> numeros = new TreeSet<>();
             hija.getPalets().forEach(palet -> numeros.add(palet.getNumeroPalet()));
             return numeros;
         });
     }
 
+    /** queEs incluye su artículo ("la caja", "el palet") para que el aviso concuerde. */
     private void avisarDe(String queEs, String nombrePadre,
                           List<EnvioImportado.DestinoImportado> hijas, List<String> avisos,
                           Function<EnvioImportado.DestinoImportado, Set<Integer>> numerosDe) {
@@ -140,7 +141,7 @@ public class ResolutorDestinosPadre {
         }
         hijasPorNumero.forEach((numero, nombres) -> {
             if (nombres.size() > 1) {
-                avisos.add(nombrePadre + ": el " + queEs + " " + numero + " llega de "
+                avisos.add(nombrePadre + ": " + queEs + " " + numero + " llega de "
                         + String.join(" y de ", nombres)
                         + "; se fusionan sin renumerar, revísalo en la tabla");
             }

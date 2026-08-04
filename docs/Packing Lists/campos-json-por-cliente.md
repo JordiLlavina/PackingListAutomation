@@ -78,16 +78,31 @@ proveedor (por defecto Badalona / Spain).
 ## APC (plantilla APC, un excel por destino)
 
 Bolsos y cinturones comparten plantilla. Destinos configurados en
-`application.yml` (D. USA, IVRY, JAPAN, KOREA, C-LOG): un destino que no
-esté en el catálogo hace fallar la generación con un error claro.
+`application.yml`: **WHOLESALE**, **RETAIL**, D. USA, IVRY, JAPAN y KOREA.
+
+WHOLESALE y RETAIL son **destinos padre**: agrupan destinaciones hijas que se
+tratan como si fueran ellos (mismo fichero, misma hoja, misma dirección), y la
+hija solo sobrevive en la columna DESTINATION de sus líneas.
+
+| Padre | Hijas |
+|---|---|
+| WHOLESALE | AUSTRALIA, WHOLESALE, CHINE FRANCH |
+| RETAIL | RETAIL, WHOLESALE CONCESS |
+
+Dos hijas del mismo padre en un envío salen en UN solo excel, con sus cajas
+concatenadas. Si sus números de caja o de palet se repiten se avisa y **no se
+renumera nada**: el número está pegado físicamente en el bulto. Un destino que
+no sea ni clave ni hija sigue sin generar, con aviso.
+
+`C-LOG` era el nombre viejo de WHOLESALE y ya no existe.
 
 | Campo | Uso |
 |---|---|
 | `modelo` | columna MODÈLE (p. ej. "LE NEIGE") |
-| `livraisonCode` | columna Livraison code (p. ej. "PUN20260428WH1") |
-| `pedido` | columna COMMANDE |
+| `livraisonCode` | **se ignora**: lo genera la aplicación (`PUN` + fecha de envío `yyyyMMdd` + abreviatura del padre + contador, p. ej. `PUN20260428WH1`) y se edita en la cabecera de cada destinación de la pantalla de revisión |
+| `pedido` | los **tres últimos dígitos** del pedido; el número entero se busca por referencia en el excel de pedido del cliente que se sube en la entrada. Sin excel o sin fila, se queda como llegó, con aviso. Columna COMMANDE |
 | `referencia` | columna RÉFÉRENCE |
-| `canal` | columna DESTINATION de la línea (WHOLESALE, RETAIL, AUSTRALIA...) |
+| `canal` | columna DESTINATION de la línea (WHOLESALE, RETAIL, AUSTRALIA...). Si falta, se rellena con el nombre de la destinación hija |
 | `color` | columna COLORIS |
 | `talla` | columna SIZE (solo cinturones) |
 | `palets[].tara` | tara del palet en el subtotal "PALET n" (10 kg si falta) |
@@ -95,6 +110,11 @@ esté en el catálogo hace fallar la generación con un error claro.
 
 Una caja con varias líneas (tallas/canales/colores) ocupa varias filas: el
 Nº COLIS y el peso de la caja entera van solo en la primera.
+
+En la pantalla de entrada, APC y AMI muestran un campo opcional para subir el
+**excel de pedido del cliente**. En APC es de donde sale el número de pedido
+completo; en AMI solo se guarda para no tener que volver a subirlo en el Paso 2
+de etiquetas de caja.
 
 ## Clientes genéricos (plantilla GENERIC, un excel por destino)
 
@@ -145,6 +165,8 @@ importa y genera de verdad los tres primeros contra el catálogo real de
 - `envio-apc.json`: APC destino IVRY con bolsos y cinturones, caja de tres
   líneas y taras de palet mixtas (8.04 del JSON + 10 por defecto).
 - `envio-apc-etiquetas.json`: APC con sus siete destinos (Australia, Chine
-  franch, D. USA, Japan, Korea, Retail, C-LOG), para probar a mano el flujo de
-  etiquetas de caja. Ningún test lo usa.
+  franch, D. USA, Japan, Korea, Retail, Wholesale), para probar a mano el flujo
+  de etiquetas de caja. Ningún test lo usa. Ojo: Australia, Chine franch y
+  Wholesale son las tres hijas de WHOLESALE, así que al importarlo se fusionan
+  en una sola destinación y avisa de sus números de caja repetidos.
 - `envio-generico.json`: ACKERMANN con un palet de 16 cajas.

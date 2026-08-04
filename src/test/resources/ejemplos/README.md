@@ -27,8 +27,13 @@ nada, simplemente el ejemplo deja de ser realista.
 
 - `docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI, temporada H26), copiado
   aquí como `EAN PUNTOTRES H26.xlsx`.
-- `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC, Fall 26), que hoy no lo
-  lee ni el código ni ningún test.
+- `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC, Fall 26), copiado aquí
+  como `APC_PEDIDO_FALL26.xlsx`. Lo lee `ApcPedidoExcel` para completar el
+  número de pedido, y `ApcPedidoExcelTest` ancla su comportamiento: la hoja se
+  localiza por sus tres cabeceras (`Article`, `Document d'achat` y `Notre
+  référence`, porque otras dos hojas del libro tienen las dos primeras) y
+  `Article` + los tres últimos dígitos del pedido identifican una única fila de
+  las 130.
 
 De los demás `.xlsx` de `docs/` lo real es la **maquetación** (son las
 plantillas y las salidas que usa el cliente); su contenido es de relleno.
@@ -40,5 +45,10 @@ comportamiento. Si se actualiza el de `docs/`, actualizar también la copia:
 
     cp "docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx" \
        "src/test/resources/ejemplos/EAN PUNTOTRES H26.xlsx"
+
+Lo mismo con el de APC:
+
+    cp "docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx" \
+       "src/test/resources/ejemplos/APC_PEDIDO_FALL26.xlsx"
 
 `escandallos/` son también copias de escandallos reales del ERP.

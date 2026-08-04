@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.util.WebUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +58,7 @@ import com.puntotres.packinglist.service.etiquetas.EtiquetasGenerationService;
 import com.puntotres.packinglist.service.etiquetas.GeneradorEtiquetasCliente;
 import com.puntotres.packinglist.service.etiquetas.ResultadoEtiquetas;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /**
@@ -477,8 +479,14 @@ public class PackingListController {
         return "etiquetas";
     }
 
+    /**
+     * Recibe {@link HttpServletRequest} y no {@code MultipartHttpServletRequest}
+     * a propósito: desde que el excel de pedido puede venir de la sesión, este
+     * formulario se puede enviar sin ningún fichero, y con el tipo multipart
+     * una petición que no lo sea revienta con un 500 antes de entrar aquí.
+     */
     @PostMapping("/etiquetas/generar")
-    public String generarEtiquetas(MultipartHttpServletRequest peticion,
+    public String generarEtiquetas(HttpServletRequest peticion,
                                    RedirectAttributes redirect) {
         if (envioEnCurso.estaVacio()) {
             return sinEnvio(redirect);
@@ -490,8 +498,13 @@ public class PackingListController {
         List<DestinoData> destinos = destinosDelEnvio();
         Map<String, byte[]> archivos = new LinkedHashMap<>();
         try {
+            // getNativeRequest desenvuelve los decoradores de Tomcat/Spring;
+            // null = la petición no traía ningún fichero.
+            MultipartHttpServletRequest multipart =
+                    WebUtils.getNativeRequest(peticion, MultipartHttpServletRequest.class);
             for (CampoEtiquetas campo : generador.camposRequeridos(destinos)) {
-                MultipartFile archivo = peticion.getFile(campo.nombre());
+                MultipartFile archivo =
+                        (multipart == null) ? null : multipart.getFile(campo.nombre());
                 if (archivo != null && !archivo.isEmpty()) {
                     archivos.put(campo.nombre(), archivo.getBytes());
                     continue;

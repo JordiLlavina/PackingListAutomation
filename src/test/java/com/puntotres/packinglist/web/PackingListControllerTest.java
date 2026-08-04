@@ -859,6 +859,20 @@ class PackingListControllerTest {
                 .andExpect(content().string(not(containsString("accept=\".xlsx\" required"))));
     }
 
+    /**
+     * Enviado como POST normal, no multipart: desde que el excel de pedido
+     * puede venir de la sesión el formulario se manda sin ningún fichero, y
+     * el controlador no puede exigir que la petición sea multipart (lo era
+     * siempre cuando el input era obligatorio).
+     */
+    @Test
+    void generarEtiquetasSinPeticionMultipartNoRevienta() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
+
+        mvc.perform(post("/etiquetas/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+    }
+
     @Test
     void conElPedidoEnSesionSeGeneranLasEtiquetasSinVolverASubirlo() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();

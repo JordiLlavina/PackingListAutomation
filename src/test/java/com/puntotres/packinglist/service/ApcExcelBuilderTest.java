@@ -107,6 +107,33 @@ class ApcExcelBuilderTest {
         }
     }
 
+    /**
+     * Las tres columnas que rellena esta feature, de punta a punta: el
+     * Livraison code (F) y el pedido completo (G) los trae ya la caja desde el
+     * import, y la columna DESTINATION (K) lleva la destinación HIJA, que es
+     * lo único que sobrevive de ella cuando el excel es del padre.
+     */
+    @Test
+    void escribeLivraisonCodePedidoYLaHijaEnLaColumnaDestination() throws Exception {
+        CajaData linea = linea(1, 1, "LE NEIGE", "PXCBC-F67008", "AUSTRALIA", null, 11, 8.18);
+        linea.setNumeroPedido("4100128721");
+        linea.setLivraisonCode("PUN20260428WH1");
+        DestinoData destino = new DestinoData();
+        destino.setNombreDestino("IVRY");
+        destino.setCajas(List.of(linea));
+
+        List<ExcelGenerado> excels =
+                builder.generar(destino, List.of(palet("IVRY", 1, 1, 1)), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(
+                new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Row fila = wb.getSheetAt(0).getRow(17); // primera fila de caja
+            assertEquals("PUN20260428WH1", fila.getCell(5).getStringCellValue());   // F
+            assertEquals("4100128721", fila.getCell(6).getStringCellValue());       // G
+            assertEquals("AUSTRALIA", fila.getCell(10).getStringCellValue());       // K
+        }
+    }
+
     @Test
     void agrupaPorPaletConSuTaraYSubtotales() throws Exception {
         List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());
