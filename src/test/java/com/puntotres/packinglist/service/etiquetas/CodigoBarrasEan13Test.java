@@ -22,6 +22,9 @@ class CodigoBarrasEan13Test {
     /** El EAN13 del mock de la plantilla del cliente. */
     private static final String EAN_VALIDO = "3666598354771";
 
+    /** Proporción barras:dígitos medida en el mock del cliente. */
+    private static final double RATIO_BARRAS_DIGITOS_DEL_MOCK = 5.5;
+
     @Test
     void generaUnPngApaisadoParaUnEan13Valido() throws Exception {
         byte[] png = CodigoBarrasEan13.png(VALIDO).orElseThrow();
@@ -85,5 +88,45 @@ class CodigoBarrasEan13Test {
     @Test
     void unEan13InvalidoConProporcionSigueDevolviendoVacio() {
         assertTrue(CodigoBarrasEan13.png("1234567890123", 3.3).isEmpty());
+    }
+
+    @Test
+    void conProporcionAlargadaLasBarrasImitanElAltoDelMockDelCliente() throws Exception {
+        // Con una proporción de hueco muy alargada como la de AMI, dejar el
+        // cuerpo de los dígitos en su valor por defecto hacía que toda la
+        // compresión se la llevaran las barras (regresión encontrada en
+        // revisión: 4,36:1 en vez del 5,5:1 del mock del cliente). Se mide
+        // fila a fila, como hizo el revisor: una fila de barra llena tiene
+        // una densidad de negro alta y uniforme (barra+hueco alternando en
+        // todo el ancho); una fila de dígitos o de cola de guarda, mucha
+        // menos. La proporción de la imagen compuesta de AMI es la que se
+        // usa aquí porque es la que desencadenó el hallazgo.
+        double proporcionDelCodigo = 2.1969 * 0.96 / 0.64;
+        BufferedImage imagen = ImageIO.read(new ByteArrayInputStream(
+                CodigoBarrasEan13.png(EAN_VALIDO, proporcionDelCodigo).orElseThrow()));
+
+        int umbralFilaDeBarras = imagen.getWidth() * 3 / 10;
+        int filasDeBarras = 0;
+        int filasDeDigitos = 0;
+        for (int y = 0; y < imagen.getHeight(); y++) {
+            int negros = 0;
+            for (int x = 0; x < imagen.getWidth(); x++) {
+                if ((imagen.getRGB(x, y) & 0xFFFFFF) == 0x000000) {
+                    negros++;
+                }
+            }
+            if (negros == 0) {
+                continue; // ni barra ni dígito: margen en blanco
+            }
+            if (negros >= umbralFilaDeBarras) {
+                filasDeBarras++;
+            } else {
+                filasDeDigitos++;
+            }
+        }
+        double ratio = (double) filasDeBarras / filasDeDigitos;
+        assertEquals(RATIO_BARRAS_DIGITOS_DEL_MOCK, ratio, 0.75,
+                "barras:dígitos debería imitar el mock del cliente (5,5:1); salió "
+                        + filasDeBarras + ":" + filasDeDigitos + " = " + ratio);
     }
 }

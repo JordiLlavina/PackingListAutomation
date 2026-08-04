@@ -23,6 +23,16 @@ import org.krysalis.barcode4j.output.bitmap.BitmapCanvasProvider;
  */
 public final class CodigoBarrasEan13 {
 
+    /**
+     * Proporción barras:dígitos del mock del cliente ({@code image2.png} en
+     * ETIQUETA CAJA AMI.xlsx), medida fila a fila. Solo se aplica dentro de
+     * {@link #png(String, double)}: con proporciones de hueco muy alargadas
+     * (como la del hueco de AMI) dejar el cuerpo de los dígitos en su valor
+     * por defecto hacía que todo el achatamiento se lo llevaran las barras,
+     * saliendo más aplastadas que en el mock.
+     */
+    private static final double RATIO_BARRAS_DIGITOS = 5.5;
+
     private CodigoBarrasEan13() {
     }
 
@@ -86,18 +96,29 @@ public final class CodigoBarrasEan13 {
 
     /**
      * Deja el alto total (barras + dígitos legibles) en ancho/proporción,
-     * tocando solo el alto de las barras. Si la proporción pedida no deja
-     * sitio ni para las barras se ignora: mejor una imagen algo achatada que
-     * una sin barras.
+     * repartiéndolo entre barras y dígitos con la proporción del mock del
+     * cliente ({@link #RATIO_BARRAS_DIGITOS}) en vez de dejar los dígitos al
+     * cuerpo por defecto. Si la proporción pedida no deja sitio ni para las
+     * barras se ignora: mejor una imagen algo achatada que una sin barras.
+     *
+     * Orden importante: primero se fija el cuerpo de la fuente, luego se
+     * vuelve a preguntar a calcDimensions cuánto alto de dígitos ha salido
+     * de verdad (en vez de asumir que el alto de dígitos es exactamente el
+     * cuerpo de fuente pedido) y solo entonces se ajusta el alto de barras
+     * con ese dato real.
      */
     private static void ajustarElAltoALaProporcion(EAN13Bean codigo, String texto,
                                                    double proporcion) {
         if (proporcion <= 0) {
             return;
         }
-        var dimensiones = codigo.calcDimensions(texto);
-        double altoDeLosDigitos = dimensiones.getHeight() - codigo.getBarHeight();
-        double altoDeLasBarras = dimensiones.getWidthPlusQuiet() / proporcion - altoDeLosDigitos;
+        double anchoConZonaMuda = codigo.calcDimensions(texto).getWidthPlusQuiet();
+        double altoTotal = anchoConZonaMuda / proporcion;
+        double altoDeLosDigitosObjetivo = altoTotal / (RATIO_BARRAS_DIGITOS + 1);
+        codigo.setFontSize(altoDeLosDigitosObjetivo);
+        double altoDeLosDigitosReal =
+                codigo.calcDimensions(texto).getHeight() - codigo.getBarHeight();
+        double altoDeLasBarras = altoTotal - altoDeLosDigitosReal;
         if (altoDeLasBarras > 0) {
             codigo.setBarHeight(altoDeLasBarras);
         }
