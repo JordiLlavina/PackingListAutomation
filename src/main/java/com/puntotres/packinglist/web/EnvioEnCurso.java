@@ -1,7 +1,10 @@
 package com.puntotres.packinglist.web;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.SessionScope;
@@ -33,6 +36,16 @@ public class EnvioEnCurso {
     private VolcadoErpData volcadoErp;
     private final List<ExcelGenerado> etiquetas = new ArrayList<>();
     private final List<String> avisosEtiquetas = new ArrayList<>();
+    private final Set<ClaveFila> filasDesplegadas = new HashSet<>();
+
+    /**
+     * Una fila compactada de la tabla de revisión que el usuario ha desplegado,
+     * identificada por la POSICIÓN de su primera caja dentro de la destinación
+     * —como todo en esa pantalla, nunca por número de caja, que se repite en
+     * las cajas mixtas.
+     */
+    private record ClaveFila(int destino, int indice) {
+    }
 
     public boolean estaVacio() {
         return importado == null;
@@ -50,6 +63,23 @@ public class EnvioEnCurso {
         volcadoErp = null;
         etiquetas.clear();
         avisosEtiquetas.clear();
+        filasDesplegadas.clear();
+    }
+
+    /** Despliega la fila compactada que arranca ahí, o la vuelve a plegar. */
+    public void alternarFilaDesplegada(int destino, int indice) {
+        ClaveFila clave = new ClaveFila(destino, indice);
+        if (!filasDesplegadas.remove(clave)) {
+            filasDesplegadas.add(clave);
+        }
+    }
+
+    /** Posiciones desplegadas de UNA destinación, tal como las pide el agrupador. */
+    public Set<Integer> filasDesplegadasDe(int destino) {
+        return filasDesplegadas.stream()
+                .filter(clave -> clave.destino() == destino)
+                .map(ClaveFila::indice)
+                .collect(Collectors.toSet());
     }
 
     public DatosEnvio getCabecera() { return cabecera; }

@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import com.puntotres.packinglist.model.CajaData;
 
@@ -27,6 +28,11 @@ public final class AgrupadorFilasRevision {
     private AgrupadorFilasRevision() {
     }
 
+    /** Agrupa sin ninguna fila desplegada. */
+    public static List<FilaCaja> agrupar(List<CajaData> cajas, int primerIndiceGlobal) {
+        return agrupar(cajas, primerIndiceGlobal, Set.of());
+    }
+
     /**
      * Agrupa las cajas de UNA destinación, en su orden de la lista.
      *
@@ -35,8 +41,15 @@ public final class AgrupadorFilasRevision {
      * @param primerIndiceGlobal índice con el que arranca a numerar los inputs
      *                          del formulario: es único en toda la página, así
      *                          que cada destinación sigue donde acabó la anterior
+     * @param indicesDesplegados posiciones de arranque de los grupos que el
+     *                          usuario ha desplegado a mano: en vez de una fila
+     *                          compactada se emite una fila por caja. La marca
+     *                          es posicional y se ignora sin más si ahí ya no
+     *                          arranca ningún grupo, porque los datos pueden
+     *                          haber cambiado desde que se puso
      */
-    public static List<FilaCaja> agrupar(List<CajaData> cajas, int primerIndiceGlobal) {
+    public static List<FilaCaja> agrupar(List<CajaData> cajas, int primerIndiceGlobal,
+                                         Set<Integer> indicesDesplegados) {
         // Una caja física son todas las líneas con el mismo numeroCaja dentro
         // de la destinación, y solo la primera —la líder— lleva su peso
         // (ver ARCHITECTURE.md, "un peso por caja física").
@@ -75,10 +88,25 @@ public final class AgrupadorFilasRevision {
                 i++;
             }
 
+            // Un grupo de más de una caja se puede desplegar; si el usuario ya
+            // lo desplegó, se emite una fila por caja. Solo entran en un grupo
+            // cajas de una línea, así que cada fila desplegada es la líder de
+            // su propia caja física y edita sus dos pesos.
+            boolean grupo = indices.size() > 1;
+            if (grupo && indicesDesplegados.contains(indices.get(0))) {
+                for (int k = 0; k < indices.size(); k++) {
+                    CajaData suelta = cajas.get(indices.get(k));
+                    filas.add(new FilaCaja(indiceGlobal++,
+                            String.valueOf(suelta.getNumeroCaja()), List.of(indices.get(k)),
+                            suelta, true, !suelta.tienePesosCompletos(), k == 0, true));
+                }
+                continue;
+            }
+
             CajaData lider = liderPorCaja.get(primera.getNumeroCaja());
             filas.add(new FilaCaja(indiceGlobal++,
                     rango(primera.getNumeroCaja(), ultimoNumero), indices, primera,
-                    lider == primera, !lider.tienePesosCompletos()));
+                    lider == primera, !lider.tienePesosCompletos(), grupo, false));
         }
         return filas;
     }

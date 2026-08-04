@@ -85,6 +85,19 @@ input[type="text"], textarea {
     font: inherit;
 }
 
+/* Sin las flechitas de incremento del navegador: aquí se teclea, no se
+   pulsa, y en una tabla de campos estrechos solo estorban. */
+input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 textarea.json {
     min-height: 18rem;
     font-family: Consolas, monospace;
@@ -206,12 +219,54 @@ section.destino thead th {
     z-index: 2;
 }
 
-td input[type="number"] {
+td input[type="number"], td input[type="text"] {
     width: 6.5rem;
     padding: 0.25rem 0.4rem;
     border: 1px solid var(--borde);
     border-radius: 4px;
     font: inherit;
+}
+
+/* La tabla de revisión es toda campos editables: cualquier dato puede venir
+   mal leído de las fotos, no solo un peso. Los anchos van por columna para que
+   las once quepan en las 72rem de main. Deliberadamente SIN overflow-x en la
+   sección: poner scroll horizontal aquí convertiría la sección en el contenedor
+   de scroll y rompería las cabeceras sticky de arriba. */
+section.destino td input.c-referencia { width: 8.5rem; }
+section.destino td input.c-color { width: 6.5rem; }
+section.destino td input.c-pedido { width: 6rem; }
+section.destino td input.c-talla { width: 3.5rem; }
+section.destino td input.c-tamano { width: 7rem; }
+section.destino td input.c-cantidad { width: 4.5rem; }
+section.destino td input.c-palet { width: 3.5rem; }
+section.destino td.c-caja input[type="number"] { width: 4rem; }
+section.destino td input.c-peso { width: 5.5rem; }
+
+/* Las celdas de la revisión aprietan en horizontal: son once y casi todas
+   llevan un campo con su propio padding. */
+section.destino th, section.destino td {
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+}
+
+/* Una caja sin palet: el hueco vacío se ve, pero conviene que grite. */
+section.destino td input.sin-palet { border-color: var(--error-borde); }
+
+/* El triángulo de desplegar/plegar un tramo compactado, pegado al número
+   de caja. Es un submit, pero no debe parecer un botón. */
+section.destino td.c-caja {
+    white-space: nowrap;
+}
+
+button.triangulo {
+    margin: 0 0 0 0.2rem;
+    padding: 0 0.2rem;
+    background: none;
+    border: none;
+    color: var(--acento);
+    font-size: 0.75rem;
+    line-height: 1;
+    cursor: pointer;
 }
 
 /* Filas de la tabla de revisión 4px más estrechas: se recortan 2px por
@@ -222,7 +277,8 @@ section.destino th, section.destino td {
     padding-bottom: calc(0.35rem - 2px);
 }
 
-section.destino td input[type="number"] {
+section.destino td input[type="number"],
+section.destino td input[type="text"] {
     padding-top: calc(0.25rem - 2px);
     padding-bottom: calc(0.25rem - 2px);
 }

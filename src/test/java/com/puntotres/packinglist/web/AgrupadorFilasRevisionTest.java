@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
@@ -183,6 +184,71 @@ class AgrupadorFilasRevisionTest {
         assertEquals(2, filas.size());
         assertTrue(filas.get(0).cajaPendiente());
         assertFalse(filas.get(1).cajaPendiente());
+    }
+
+    @Test
+    void unaFilaCompactadaSeAnunciaComoAlternableYLaDeUnaSolaCajaNo() {
+        List<CajaData> cajas = List.of(
+                caja(4, "ULL163", "NOIR", "PO123", 5, "60x40x40", 1, 5.0, 5.6),
+                caja(5, "ULL163", "NOIR", "PO123", 5, "60x40x40", 1, 5.0, 5.6),
+                caja(9, "ULL200", "NOIR", "PO123", 5, "60x40x40", 1, 4.0, 4.6));
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertTrue(filas.get(0).alternable());    // "4-5": hay algo que desplegar
+        assertFalse(filas.get(0).desplegada());
+        assertFalse(filas.get(1).alternable());   // "9": una sola caja
+    }
+
+    @Test
+    void unGrupoDesplegadoEmiteUnaFilaPorCajaConSuPropioIndice() {
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas4a8(), 0, Set.of(0));
+
+        assertEquals(5, filas.size());
+        assertEquals(List.of("4", "5", "6", "7", "8"),
+                filas.stream().map(FilaCaja::rangoCajas).toList());
+        assertEquals(List.of(List.of(0), List.of(1), List.of(2), List.of(3), List.of(4)),
+                filas.stream().map(FilaCaja::indicesEnDestino).toList());
+        // Un grupo solo se forma con cajas de una línea: al desplegarlo cada
+        // fila es la líder de su propia caja física y edita sus dos pesos.
+        assertTrue(filas.stream().allMatch(FilaCaja::esLider));
+    }
+
+    @Test
+    void soloLaPrimeraFilaDeUnGrupoDesplegadoLoVuelveAPlegar() {
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas4a8(), 0, Set.of(0));
+
+        assertTrue(filas.get(0).alternable());
+        assertTrue(filas.get(0).desplegada());
+        // El submit de plegar apunta al índice de inicio del grupo, que es el
+        // de la primera fila.
+        assertEquals(0, filas.get(0).indicesEnDestino().get(0));
+        assertFalse(filas.get(1).alternable());
+        assertFalse(filas.get(4).alternable());
+    }
+
+    @Test
+    void marcarUnIndiceQueNoEmpiezaUnGrupoNoCambiaNada() {
+        // La marca es posicional y sobrevive a que los datos cambien: si el
+        // grupo ya no arranca ahí, se ignora en vez de romper la tabla.
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas4a8(), 0, Set.of(2, 7));
+
+        assertEquals(1, filas.size());
+        assertEquals("4-8", filas.get(0).rangoCajas());
+    }
+
+    @Test
+    void unGrupoDesplegadoCuyasCajasDejanDeCoincidirNoSeReagrupaAlPlegar() {
+        // Desplegar el 4-8, cambiarle el color a la caja 6 y volver a plegar
+        // (quitar la marca): no existe un color cierto para las cinco, así que
+        // el agrupador las deja separadas por su cuenta.
+        List<CajaData> cajas = cajas4a8();
+        cajas.get(2).setCodigoColor("ROJO");
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0, Set.of());
+
+        assertEquals(List.of("4-5", "6", "7-8"),
+                filas.stream().map(FilaCaja::rangoCajas).toList());
     }
 
     @Test

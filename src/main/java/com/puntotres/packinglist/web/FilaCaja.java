@@ -24,8 +24,24 @@ import com.puntotres.packinglist.model.CajaData;
  *     muestra campos de peso editables.</li>
  * <li>{@code cajaPendiente}: la caja física aún no tiene los dos pesos, para
  *     resaltar la fila.</li>
+ * <li>{@code alternable}: la fila pinta el triángulo de desplegar/plegar. Solo
+ *     lo lleva la fila compactada (▶) y la PRIMERA fila de un grupo ya
+ *     desplegado (▼); las demás filas del grupo y las cajas sueltas, no. El
+ *     submit apunta al índice de inicio del grupo, que en ambos casos es
+ *     {@code indicesEnDestino.get(0)}.</li>
+ * <li>{@code desplegada}: la fila viene de un grupo desplegado, o sea que el
+ *     triángulo mira hacia abajo y pulsarlo vuelve a plegar.</li>
  * </ul>
  */
 public record FilaCaja(int indiceGlobal, String rangoCajas, List<Integer> indicesEnDestino,
-                       CajaData caja, boolean esLider, boolean cajaPendiente) {
+                       CajaData caja, boolean esLider, boolean cajaPendiente,
+                       boolean alternable, boolean desplegada) {
+
+    /**
+     * El número de caja solo se edita cuando la fila representa UNA caja: en un
+     * rango compactado ("4-8") no hay un número que teclear, hay que desplegarlo.
+     */
+    public boolean numeroCajaEditable() {
+        return indicesEnDestino.size() == 1;
+    }
 }

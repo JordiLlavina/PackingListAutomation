@@ -24,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -242,6 +243,9 @@ public class PackingListController {
         model.addAttribute("avisosPalets", envioEnCurso.getAvisosPalets());
         model.addAttribute("avisosInferencia", envioEnCurso.getAvisosInferencia());
         model.addAttribute("cajasSinPalet", envioEnCurso.getCajasSinPalet());
+        // Tamaños con tara conocida para el datalist de la columna TAMAÑO:
+        // teclear uno sin tara deja la caja sin inferencia posible.
+        model.addAttribute("tamanosCaja", new TreeSet<>(taraProperties.getTaras().keySet()));
         return "revision";
     }
 
@@ -250,7 +254,24 @@ public class PackingListController {
         if (envioEnCurso.estaVacio()) {
             return sinEnvio(redirect);
         }
-        aplicarPesosYReinferir(revisionForm);
+        aplicarEdicionesYReinferir(revisionForm);
+        return "redirect:/revision";
+    }
+
+    /**
+     * Despliega una fila compactada en sus cajas (o la vuelve a plegar). Aplica
+     * ANTES las ediciones del formulario: el triángulo es un submit de la misma
+     * tabla, así que lo ya tecleado no se pierde al desplegar.
+     */
+    @PostMapping("/alternar-fila")
+    public String alternarFila(@RequestParam int destino, @RequestParam int indice,
+                               @ModelAttribute RevisionForm revisionForm,
+                               RedirectAttributes redirect) {
+        if (envioEnCurso.estaVacio()) {
+            return sinEnvio(redirect);
+        }
+        aplicarEdicionesYReinferir(revisionForm);
+        envioEnCurso.alternarFilaDesplegada(destino, indice);
         return "redirect:/revision";
     }
 
@@ -259,7 +280,7 @@ public class PackingListController {
         if (envioEnCurso.estaVacio()) {
             return sinEnvio(redirect);
         }
-        aplicarPesosYReinferir(revisionForm);
+        aplicarEdicionesYReinferir(revisionForm);
 
         List<ExcelGenerado> excels = new ArrayList<>();
         List<String> avisosGeneracion = new ArrayList<>();
@@ -526,41 +547,90 @@ public class PackingListController {
     }
 
     /**
-     * Aplica los pesos introducidos a mano sobre las CajaData de la sesión y
-     * re-ejecuta la inferencia: un peso añadido a mano (neto o bruto) puede
-     * desbloquear el resto de su referencia (la inferencia solo rellena
-     * nulls, nunca pisa un valor manual). La caja se localiza por su
-     * POSICIÓN en la destinación, no por su número, que puede repetirse
-     * (caja mixta con dos colores).
+     * Aplica lo editado a mano sobre las CajaData de la sesión y re-ejecuta la
+     * inferencia: un peso añadido a mano (neto o bruto) puede desbloquear el
+     * resto de su referencia, y corregir un tamaño de caja cambia la tara con
+     * la que se infiere (la inferencia solo rellena nulls, nunca pisa un valor
+     * manual). La caja se localiza por su POSICIÓN en la destinación, no por su
+     * número, que puede repetirse (caja mixta con dos colores).
      *
      * Una entrada del formulario puede apuntar a VARIAS cajas: las filas
-     * compactadas ("4-8") llevan un peso para todo su tramo. Aplicarlo a todas
-     * es imprescindible aunque compartieran peso al agruparse — si no, el
-     * grupo se partiría en el siguiente render y el usuario vería la caja 4 con
-     * el peso nuevo y las 5-8 con el viejo.
+     * compactadas ("4-8") llevan un valor para todo su tramo. Aplicarlo a todas
+     * es imprescindible aunque ya coincidieran al agruparse — si no, el grupo
+     * se partiría en el siguiente render y el usuario vería la caja 4 con el
+     * valor nuevo y las 5-8 con el viejo.
+     *
+     * Un campo que llega vacío significa "no tocar": permite corregir cualquier
+     * dato mal leído sin obligar a reescribir la fila entera.
      */
-    private void aplicarPesosYReinferir(RevisionForm form) {
+    private void aplicarEdicionesYReinferir(RevisionForm form) {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
-        for (RevisionForm.PesoEditado peso : form.getPesos()) {
-            if (peso == null || peso.getIndiceDestino() < 0
-                    || peso.getIndiceDestino() >= destinos.size()) {
+        for (RevisionForm.CajaEditada edicion : form.getCajas()) {
+            if (edicion == null || edicion.getIndiceDestino() < 0
+                    || edicion.getIndiceDestino() >= destinos.size()) {
                 continue;
             }
-            List<CajaData> cajas = destinos.get(peso.getIndiceDestino()).getDestino().getCajas();
-            for (Integer indice : peso.getIndicesCaja()) {
+            List<CajaData> cajas = destinos.get(edicion.getIndiceDestino()).getDestino().getCajas();
+            for (Integer indice : edicion.getIndicesCaja()) {
                 if (indice == null || indice < 0 || indice >= cajas.size()) {
                     continue;
                 }
-                CajaData caja = cajas.get(indice);
-                if (peso.getPesoNetoKg() != null) {
-                    caja.setPesoNetoKg(peso.getPesoNetoKg());
-                }
-                if (peso.getPesoBrutoKg() != null) {
-                    caja.setPesoBrutoKg(peso.getPesoBrutoKg());
-                }
+                aplicarA(cajas.get(indice), edicion);
             }
         }
         reinferirTodoElEnvio();
+        recalcularCajasSinPalet();
+    }
+
+    private static void aplicarA(CajaData caja, RevisionForm.CajaEditada edicion) {
+        if (edicion.getNumeroCaja() != null) {
+            caja.setNumeroCaja(edicion.getNumeroCaja());
+        }
+        if (tieneTexto(edicion.getReferencia())) {
+            caja.setReferencia(edicion.getReferencia().trim());
+        }
+        if (tieneTexto(edicion.getCodigoColor())) {
+            caja.setCodigoColor(edicion.getCodigoColor().trim());
+        }
+        if (tieneTexto(edicion.getNumeroPedido())) {
+            caja.setNumeroPedido(edicion.getNumeroPedido().trim());
+        }
+        if (tieneTexto(edicion.getTalla())) {
+            caja.setTalla(edicion.getTalla().trim());
+        }
+        if (tieneTexto(edicion.getTamanoCaja())) {
+            caja.setTamanoCaja(edicion.getTamanoCaja().trim());
+        }
+        if (edicion.getCantidad() != null) {
+            caja.setCantidad(edicion.getCantidad());
+        }
+        if (edicion.getNumeroPalet() != null) {
+            caja.setNumeroPalet(edicion.getNumeroPalet());
+        }
+        if (edicion.getPesoNetoKg() != null) {
+            caja.setPesoNetoKg(edicion.getPesoNetoKg());
+        }
+        if (edicion.getPesoBrutoKg() != null) {
+            caja.setPesoBrutoKg(edicion.getPesoBrutoKg());
+        }
+    }
+
+    private static boolean tieneTexto(String valor) {
+        return valor != null && !valor.isBlank();
+    }
+
+    /**
+     * Rehace la lista de cajas sin palet leyendo el dato real, en vez de volver
+     * a ejecutar el PaletAssignmentService: sus rangos son los del JSON de
+     * entrada y machacarían el palet que el usuario acaba de teclear a mano.
+     */
+    private void recalcularCajasSinPalet() {
+        envioEnCurso.getCajasSinPalet().clear();
+        for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
+            destino.getDestino().getCajas().stream()
+                    .filter(caja -> caja.getNumeroPalet() == null)
+                    .forEach(envioEnCurso.getCajasSinPalet()::add);
+        }
     }
 
     /**
@@ -594,7 +664,8 @@ public class PackingListController {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
         for (int i = 0; i < destinos.size(); i++) {
             List<CajaData> cajas = destinos.get(i).getDestino().getCajas();
-            List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, indiceGlobal);
+            List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(
+                    cajas, indiceGlobal, envioEnCurso.filasDesplegadasDe(i));
             // El índice global nombra los inputs y es único en toda la página:
             // la siguiente destinación arranca donde acabó esta.
             indiceGlobal += filas.size();
