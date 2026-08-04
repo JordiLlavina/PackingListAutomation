@@ -13,49 +13,67 @@ import org.junit.jupiter.api.Test;
 class AmiEtiquetaLayoutTest {
 
     @Test
-    void chinaTieneLosTresCodigosEnSuSitio() {
-        assertEquals(new AnclajeBloque(8, 2971800, 19050, 1047750, 666750),
-                AmiEtiquetaLayout.CHINA.po());
-        assertEquals(new AnclajeBloque(10, 2613660, 162388, 1478280, 652951),
-                AmiEtiquetaLayout.CHINA.ean13());
-        assertEquals(new AnclajeBloque(12, 1394460, 420424, 2727960, 455876),
+    void chinaTieneLaImagenYElEan128EnSuSitio() {
+        assertEquals(new AnclajeBloque(10, 2481943, 54429, 1674091, 762000),
+                AmiEtiquetaLayout.CHINA.imagenArticulo());
+        assertEquals(new AnclajeBloque(8, 1352897, 143333, 2727960, 452413),
                 AmiEtiquetaLayout.CHINA.ean128());
     }
 
     @Test
-    void japanTieneLosTresCodigosEnSuSitioYLaDireccion() {
-        assertEquals(new AnclajeBloque(7, 2857500, 19050, 990600, 628650),
-                AmiEtiquetaLayout.JAPAN.po());
-        assertEquals(new AnclajeBloque(9, 2430780, 68580, 1478280, 652951),
-                AmiEtiquetaLayout.JAPAN.ean13());
-        assertEquals(new AnclajeBloque(12, 899160, 15168, 3009900, 502991),
+    void japanTieneLaImagenElEan128YLaDireccion() {
+        assertEquals(new AnclajeBloque(9, 2241177, 26896, 1674091, 762000),
+                AmiEtiquetaLayout.JAPAN.imagenArticulo());
+        assertEquals(new AnclajeBloque(7, 918884, 62682, 3009900, 502991),
                 AmiEtiquetaLayout.JAPAN.ean128());
         assertEquals(new AnclajeBloque(2, 66675, 95250, 2562225, 1143000),
                 AmiEtiquetaLayout.JAPAN_DIRECCION);
     }
 
     @Test
-    void franceTieneLosTresCodigosEnSuSitio() {
-        assertEquals(new AnclajeBloque(7, 3457575, 9525, 1209675, 762000),
-                AmiEtiquetaLayout.FRANCE.po());
-        assertEquals(new AnclajeBloque(9, 3116580, 68580, 1569902, 693420),
-                AmiEtiquetaLayout.FRANCE.ean13());
-        assertEquals(new AnclajeBloque(11, 2095500, 423031, 2575560, 430408),
+    void franceTieneLaImagenYElEan128EnSuSitio() {
+        assertEquals(new AnclajeBloque(9, 2937163, 69273, 1674091, 762000),
+                AmiEtiquetaLayout.FRANCE.imagenArticulo());
+        assertEquals(new AnclajeBloque(7, 2057400, 156331, 2575560, 430408),
                 AmiEtiquetaLayout.FRANCE.ean128());
     }
 
     @Test
-    void todosLosCodigosCabenDentroDeSuBloque() {
+    void elHuecoDeLaImagenEsElMismoEnLasTresDestinaciones() {
+        // La imagen compuesta se genera con la proporción del hueco: si una
+        // destinación tuviera otra, saldría deformada en esa.
+        for (AmiEtiquetaLayout layout : todos()) {
+            assertEquals(1674091, layout.imagenArticulo().cx(), layout.nombreHoja());
+            assertEquals(762000, layout.imagenArticulo().cy(), layout.nombreHoja());
+        }
+    }
+
+    @Test
+    void lasFilasDeValorSonLasDeLaPlantillaNueva() {
+        assertEquals(8, AmiEtiquetaLayout.CHINA.filaOrderNumber());
+        assertEquals(10, AmiEtiquetaLayout.CHINA.filaReferencia());
+        assertEquals(7, AmiEtiquetaLayout.JAPAN.filaOrderNumber());
+        assertEquals(9, AmiEtiquetaLayout.JAPAN.filaReferencia());
+        assertEquals(7, AmiEtiquetaLayout.FRANCE.filaOrderNumber());
+        assertEquals(9, AmiEtiquetaLayout.FRANCE.filaReferencia());
+    }
+
+    @Test
+    void todasLasImagenesCabenDentroDeSuBloque() {
         // Las imágenes se replican a +offsetSegundaEtiqueta, así que ninguna
         // puede arrancar más allá de esa mitad o pisaría la etiqueta de abajo.
-        for (AmiEtiquetaLayout layout : new AmiEtiquetaLayout[] {
-                AmiEtiquetaLayout.CHINA, AmiEtiquetaLayout.JAPAN, AmiEtiquetaLayout.FRANCE }) {
+        for (AmiEtiquetaLayout layout : todos()) {
             for (AnclajeBloque anclaje : new AnclajeBloque[] {
-                    layout.po(), layout.ean13(), layout.ean128() }) {
+                    layout.imagenArticulo(), layout.ean128() }) {
                 assertTrue(anclaje.fila() < layout.offsetSegundaEtiqueta(),
                         layout.nombreHoja() + ": el anclaje de la fila " + anclaje.fila()
                                 + " se sale de la primera etiqueta del par");
             }
         }
+    }
+
+    private static AmiEtiquetaLayout[] todos() {
+        return new AmiEtiquetaLayout[] {
+                AmiEtiquetaLayout.CHINA, AmiEtiquetaLayout.JAPAN, AmiEtiquetaLayout.FRANCE };
     }
 }
