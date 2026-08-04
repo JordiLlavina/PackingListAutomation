@@ -57,7 +57,7 @@ class AmiPedidoExcelTest {
     void elColorCodeEsColorisMasLibelle() throws IOException {
         AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoTipico());
         assertEquals("001 BLACK",
-                pedido.buscar("UBL029.AL0216", "001", "85", null).orElseThrow().colorCode());
+                pedido.buscar("UBL029.AL0216", "001", "85", null).orElseThrow().colorCompleto());
     }
 
     @Test
@@ -134,7 +134,7 @@ class AmiPedidoExcelTest {
                 .buscar("UBL029.AL0216", "001", "105", null).orElseThrow();
 
         // El color code y el PO siguen saliendo: lo que falta son los EAN.
-        assertEquals("001 BLACK", fila.colorCode());
+        assertEquals("001 BLACK", fila.colorCompleto());
         assertEquals("07672", fila.orderNumber());
         assertNull(fila.ean13());
         assertNull(fila.ean128());
@@ -147,7 +147,7 @@ class AmiPedidoExcelTest {
                 .buscar("ULL163.AL0052", "999", null, "CH").orElseThrow();
 
         // colorCode cae a la primera candidata, como hasta ahora.
-        assertEquals("221 BLACK", fila.colorCode());
+        assertEquals("221 BLACK", fila.colorCompleto());
         assertNull(fila.ean13());
         assertNull(fila.ean128());
         assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("999")));
@@ -204,8 +204,30 @@ class AmiPedidoExcelTest {
         assertTrue(pedido.avisos().stream().anyMatch(a -> a.contains("EAN128")));
         AmiPedidoExcel.FilaPedido fila =
                 pedido.buscar("ULL163.AL0052", "221", null, null).orElseThrow();
-        assertEquals("221 BLACK", fila.colorCode());
+        assertEquals("221 BLACK", fila.colorCompleto());
         assertNull(fila.ean13());
         assertNull(fila.ean128());
+    }
+
+    @Test
+    void elColorCodeEsSoloElCodigoYElCompletoLlevaTambienElNombre() throws Exception {
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7665,
+                        "3666598354771", "3666598354771000010000766500000000000000ES"));
+        AmiPedidoExcel.FilaPedido fila = AmiPedidoExcel.desdeBytes(pedido)
+                .buscar("ULL163.AL0052", "221", "U", null).orElseThrow();
+        assertEquals("221", fila.colorCode());
+        assertEquals("221 BLACK", fila.colorCompleto());
+    }
+
+    @Test
+    void sinLibelleElColorCompletoEsElCodigoASecas() throws Exception {
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new Fila("SPAIN", "ULL163.AL0052", "221", "", "U", 7665,
+                        "3666598354771", ""));
+        AmiPedidoExcel.FilaPedido fila = AmiPedidoExcel.desdeBytes(pedido)
+                .buscar("ULL163.AL0052", "221", "U", null).orElseThrow();
+        assertEquals("221", fila.colorCode());
+        assertEquals("221", fila.colorCompleto());
     }
 }

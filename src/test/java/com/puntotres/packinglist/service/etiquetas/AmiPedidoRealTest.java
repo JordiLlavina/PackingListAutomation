@@ -109,4 +109,13 @@ class AmiPedidoRealTest {
         assertTrue(poIntercambiado.ean128().contains("00007705"), poIntercambiado.ean128());
         assertTrue(poIntercambiado.avisosEan().stream().anyMatch(a -> a.contains("EAN128")));
     }
+
+    @Test
+    void elColorCodeEsSoloElColigoYElCompletoLlevaTambienElNombre() {
+        // Fila 81: ULL027.AL0103 / 001 (con libellé).
+        AmiPedidoExcel.FilaPedido fila =
+                pedido.buscar("ULL027.AL0103", "001", null, "CH").orElseThrow();
+        assertEquals("001", fila.colorCode());
+        assertEquals("001 BLACK", fila.colorCompleto());
+    }
 }

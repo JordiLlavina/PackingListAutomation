@@ -40,11 +40,15 @@ public class AmiPedidoExcel {
     private static final String TALLA_UNICA = "U";
 
     /**
-     * Una coincidencia del pedido. ean13/ean128 son null cuando no se pueden
-     * dar (sin fila exacta, sin columna, EAN13 inválido); avisosEan explica
-     * por qué, sin contexto de caja ni destinación: lo añade quien llama.
+     * Una coincidencia del pedido. colorCode es SOLO el COLORIS ("221"), que
+     * es lo que la plantilla nueva quiere en la celda COLOR CODE de la
+     * etiqueta; colorCompleto añade el libellé ("221 DARK COFFEE") y es lo que
+     * va a la imagen compuesta y a la hoja de códigos extra, igual que en la
+     * etiqueta de artículo. ean13/ean128 son null cuando no se pueden dar (sin
+     * fila exacta, sin columna, EAN13 inválido); avisosEan explica por qué, sin
+     * contexto de caja ni destinación: lo añade quien llama.
      */
-    public record FilaPedido(String orderNumber, String colorCode,
+    public record FilaPedido(String orderNumber, String colorCode, String colorCompleto,
                              String ean13, String ean128, List<String> avisosEan) {
 
         public FilaPedido {
@@ -146,9 +150,10 @@ public class AmiPedidoExcel {
                 .filter(fila -> fila.coloris().equalsIgnoreCase(color))
                 .findFirst()
                 .orElse(candidatas.get(0));
-        String colorCode = elegida.libelle().isBlank()
-                ? elegida.coloris()
-                : elegida.coloris() + " " + elegida.libelle();
+        String colorCode = elegida.coloris();
+        String colorCompleto = elegida.libelle().isBlank()
+                ? colorCode
+                : colorCode + " " + elegida.libelle();
 
         // Los EAN, solo con clave exacta.
         String tallaBuscada = talla == null || talla.isBlank() ? TALLA_UNICA : talla.trim();
@@ -187,7 +192,7 @@ public class AmiPedidoExcel {
                     + ": etiqueta sin EAN13 ni EAN128 para no elegir a ciegas");
         }
         return Optional.of(
-                new FilaPedido(elegida.poNumerico(), colorCode, ean13, ean128, avisosEan));
+                new FilaPedido(elegida.poNumerico(), colorCode, colorCompleto, ean13, ean128, avisosEan));
     }
 
     /**
