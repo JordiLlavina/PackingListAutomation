@@ -329,6 +329,46 @@ class AmiEtiquetasExcelBuilderTest {
                         .getStringCellValue());
     }
 
+    /** EAN128 bien formado: EAN13 + 00001 + PO a 8 dígitos + 16 ceros + país. */
+    private static String ean128(String ean13, int po) {
+        return ean13 + "00001" + String.format("%08d", po) + "0000000000000000" + "ES";
+    }
+
+    private static EtiquetaArticulo articulo(String referencia, String color, String ean13) {
+        return new EtiquetaArticulo(referencia, "Size: U", color, "Cde: 07665", ean13);
+    }
+
+    @Test
+    void dejaUnExcelEnTargetParaInspeccionManual() throws Exception {
+        // No afirma casi nada: existe para abrirlo en Excel, imprimirlo y
+        // pasarle un lector de códigos de barras. Es lo único que ningún test
+        // puede comprobar.
+        var etiqueta = new AmiEtiquetasExcelBuilder.EtiquetaCaja(
+                "H26",
+                "ULL163.AL0052 / ULL753.AL0168 / UBL029.AL0216",
+                "221 / 001 / 001", "U", "5 / 3 / 4", "5,28 KGS", "1 / 1", "07665",
+                ean128("3666598354771", 7665),
+                articulo("ULL163.AL0052", "221 BLACK", "3666598354771"));
+        var extras = List.of(
+                new FilaCodigoBarrasExtra("1 / 1", "PARIS",
+                        articulo("ULL753.AL0168", "001 IVORY", "3666598313495"),
+                        ean128("3666598313495", 7665)),
+                new FilaCodigoBarrasExtra("1 / 1", "PARIS",
+                        articulo("UBL029.AL0216", "001 BLACK", "3666598890064"),
+                        ean128("3666598890064", 7665)));
+        byte[] contenido = new AmiEtiquetasExcelBuilder()
+                .generar(AmiEtiquetaLayout.FRANCE, List.of(etiqueta), extras);
+        Path muestra = Path.of("target/Etiquetas_AMI_PARIS_IMAGEN-COMPUESTA.xlsx");
+        Files.write(muestra, contenido);
+        // Lo único afirmable de un artefacto cuyo juez es el ojo y el lector
+        // de códigos: que el libro se ha escrito y se puede volver a abrir con
+        // sus dos hojas.
+        try (XSSFWorkbook libro = new XSSFWorkbook(Files.newInputStream(muestra))) {
+            assertEquals(2, libro.getNumberOfSheets());
+            assertNotNull(libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA));
+        }
+    }
+
     private static XSSFWorkbook abrir(byte[] contenido) throws IOException {
         return new XSSFWorkbook(new ByteArrayInputStream(contenido));
     }

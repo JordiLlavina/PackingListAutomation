@@ -58,7 +58,11 @@ Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
 
 **Nombre de los excels de packing list**: APC y GENERIC usan `PKL_<destino>_<factura>.xlsx`, pero **AMI tiene el formato que exige el cliente** y vive en `AmiNombreFichero`: `<fecha envío yyyy.MM.dd>_PUN_<product order>_<referencia>.<color>_<temporada>_<destinación abreviada>.xlsx`. La destinación se abrevia (FRANCE/FRANCIA/PARIS → FR, CHINA, JAPAN) y una destinación desconocida no bloquea: va en mayúsculas y sin espacios. Los campos que falten se omiten en vez de dejar separadores sueltos.
 
-**Etiquetas de caja** (`service/etiquetas/`): estrategia propia `GeneradorEtiquetasCliente` despachada por **clave de cliente** (no por TipoPlantilla); cada implementación declara qué destinaciones soporta y qué archivos extra pide al usuario en la vista `/etiquetas` (Paso 2). Implementado: AMI (China/Japan/France; hoja por destinación, par de etiquetas A4 por caja, y **tres códigos de barras** por etiqueta: Code 128 del PO, EAN-13 de la columna `EAN13` del excel de pedido y Code 128 de su columna `EAN128`). Plantillas en `src/main/resources/client-labels/` — misma regla que las de packing list: **no editarlas sin revisar su builder** (`AmiEtiquetasExcelBuilder`/`AmiEtiquetaLayout`, cuyas coordenadas ancla `AmiEtiquetaLayoutTest`).
+**Etiquetas de caja** (`service/etiquetas/`): estrategia propia `GeneradorEtiquetasCliente` despachada por **clave de cliente** (no por TipoPlantilla); cada implementación declara qué destinaciones soporta y qué archivos extra pide al usuario en la vista `/etiquetas` (Paso 2). Implementado: AMI (China/Japan/France; hoja por destinación, par de etiquetas A4 por caja). Plantillas en `src/main/resources/client-labels/` — misma regla que las de packing list: **no editarlas sin revisar su builder** (`AmiEtiquetasExcelBuilder`/`AmiEtiquetaLayout`, cuyas coordenadas ancla `AmiEtiquetaLayoutTest`).
+
+Cada etiqueta lleva **dos imágenes**, no tres: la **imagen compuesta** del artículo (los cuatro textos de la etiqueta de artículo más su EAN-13, generados en un solo PNG por `ImagenEtiquetaArticulo`, que solo habla del **primer** artículo de la caja) y el Code 128 del `EAN128` del excel de pedido. El Code 128 del PO **ya no existe**: el cliente lo quitó de su plantilla. `COLOR CODE` en la etiqueta es **solo el código** (`221`); el color completo (`221 DARK COFFEE`) va dentro de la imagen compuesta y en la hoja extra — `AmiPedidoExcel.FilaPedido` da los dos. `REFERENCE` y `ORDER NUMBER` son celdas combinadas en la plantilla nueva (ver más abajo por qué importa para `shrinkToFit`). La dirección de JAPAN se extrae **por su anclaje** en la plantilla, no cogiendo el primer PNG del libro: la plantilla trae dos PNG (el mock de la imagen compuesta y la propia dirección) y coger "el primero" sacaría el equivocado.
+
+**El código de barras nunca se reescala**: se genera ya con la altura de barras que le toca (`CodigoBarrasEan13.png(ean13, proporcion)`) y se pega 1:1 con `Graphics2D.drawImage`; reescalarlo con interpolación lo deja bonito en pantalla e ilegible para un lector físico. La proporción barras:dígitos (5,5:1) sale medida del mock del cliente y deja las barras a ~42% de la altura nominal de un EAN-13 en la maqueta del cliente — **eso solo lo puede verificar un lector físico, ningún test lo cubre**. `CodigoBarrasEan13.png(String)` sin proporción sigue saliendo **byte a byte igual** que antes de esta feature, porque lo usan caminos ya en producción (hay un test que lo fija). La zona muda (`doQuietZone(true)`) es parte del símbolo, no un margen decorativo: sin ella muchos lectores no leen.
 
 **Los dos EAN de las etiquetas de AMI** salen del excel de pedido con **clave exacta** `ARTICLE`+`COLORIS`+`TAILLE`+sufijo de PO (en el fichero real esa clave identifica una sola fila de 151; el color es obligatorio porque hay 59 claves con varios colores). Si no hay fila exacta: aviso y etiqueta sin esos códigos, nunca la fila de otro PO. La talla es la de la **línea líder** de la caja, porque en una caja de cinturones con varias tallas solo cabe un par de EAN. El `EAN128` se pasa a Code 128 **verbatim**, nunca compuesto: lleva dentro el EAN13 y el PO, y en el fichero real hay 8 filas donde eso no cuadra con sus propias columnas — se avisa y se imprime igual, porque es el código del cliente el que espera su escáner. `AmiPedidoRealTest` ancla todo esto contra el fichero real.
 
@@ -69,24 +73,29 @@ cinturones (cada talla es un SKU con su propio EAN-13). En **bolsos** la
 etiqueta concatena `REFERENCE`, `COLOR CODE` y `QUANTITY` con `" / "` en el
 orden del packing list —`SIZE` sigue siendo `U`— y `AjusteFuente` encoge la
 fuente si el texto no cabe (tamaño calculado con suelo de 8 pt **y**,
-solo cuando el estilo original no tiene `wrapText`, `shrinkToFit` como red de
-seguridad adicional). Esto se comprobó celda por celda en las cinco
-plantillas: en **AMI** las celdas de valor no están combinadas ni tienen
-`wrapText`, así que `shrinkToFit` sí actúa. En **las cuatro plantillas de
-APC** esas celdas sí tienen `wrapText` — Excel lo prioriza sobre
-`shrinkToFit` e ignora este último —, así que ahí `AjusteFuente` no lo marca
-y la única protección real es el tamaño calculado; que esa clase de código
-también se use en APC (ver más abajo) no significa que `shrinkToFit` esté
-haciendo nada allí. Los **cinturones no cambian de valor** en
+solo cuando el estilo original no tiene `wrapText` ni la celda está
+combinada, `shrinkToFit` como red de seguridad adicional). **Excel ignora
+`shrinkToFit` tanto en celdas con `wrapText` como en celdas combinadas.** En
+las cuatro plantillas de **APC** el motivo es `wrapText`. En **AMI**, con la
+plantilla nueva, la celda `REFERENCE` está **combinada**, así que ahí lo único
+que protege el texto es el tamaño calculado de `AjusteFuente` — igual que en
+APC, aunque por un motivo distinto. Los **cinturones no cambian de valor** en
 `SIZE`/`QUANTITY`: `SIZE` se escribe sin pasar por `AjusteFuente` y nunca
 encoge, pero `QUANTITY` sí pasa por él como cualquier caja, así que su fuente
 puede encoger si el texto no cabe (`AjusteFuente` se aplica por celda, no por
 tipo de caja).
 Como en una etiqueta solo cabe un par de EAN, los artículos 2..N van a la hoja
-`CODIGOS BARRAS EXTRA` (`HojaCodigosBarrasExtra`, sin plantilla, maquetación en
-constantes) del mismo libro de la destinación, con un aviso al usuario de que
-hay una hoja más que imprimir. Solo AMI: **APC no imprime códigos de barras**,
+`CODIGOS BARRAS EXTRA` (`HojaCodigosBarrasExtra`, sin plantilla propia, maquetación
+en constantes) del mismo libro de la destinación, con un aviso al usuario de que
+hay una hoja más que imprimir. Usa **la misma rejilla que las etiquetas de
+artículo** (`RejillaEtiquetas`), 10 artículos por A4, con tres columnas por
+bloque: caja, EAN-13 y EAN128. Solo AMI: **APC no imprime códigos de barras**,
 solo hereda la concatenación.
+
+`EtiquetaArticulo`, `RejillaEtiquetas` y `BloqueEtiquetaArticulo` viven en
+`service/etiquetas/` (no en `service/etiquetasarticulo/`) y los comparten los
+dos flujos, el de etiquetas de caja y el de etiquetas de artículo: **tocar uno
+afecta a los dos**.
 
 **Etiquetas de artículo** (`service/etiquetasarticulo/`): flujo **independiente
 del envío** (`/etiquetas-articulo`), su única entrada es el excel de pedido del
@@ -94,10 +103,12 @@ cliente. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
 clave de cliente; implementado AMI. Una hoja por fila del pedido (= por EAN13),
 40 etiquetas idénticas por hoja en una rejilla 4×10 que cabe en un A4, y un
 fichero por (tipo, Made in): bolsos MOROCCO, bolsos SPAIN, cinturones
-(`UBL*`). **No hay plantilla `.xlsx`**: la maquetación son constantes en
-`EtiquetasArticuloExcelBuilder`, ancladas al fichero real del cliente por
-`EtiquetasArticuloMaquetacionTest` — POI no copia el `pageSetup` al clonar
-hojas, así que heredarla de una plantilla no servía.
+(`UBL*`). **No hay plantilla `.xlsx`**: la maquetación son las constantes de
+`RejillaEtiquetas` y `BloqueEtiquetaArticulo` (capa común, `service/etiquetas/`);
+`EtiquetasArticuloExcelBuilder` es solo el orquestador. Todo eso está anclado
+al fichero real del cliente por `EtiquetasArticuloMaquetacionTest` — POI no
+copia el `pageSetup` al clonar hojas, así que heredarla de una plantilla no
+servía.
 
 **Procesado de escandallos ICSUITE** (`service/escandallos/`): flujo
 **totalmente independiente** del resto (`/escandallos`) — no hay envío, ni
