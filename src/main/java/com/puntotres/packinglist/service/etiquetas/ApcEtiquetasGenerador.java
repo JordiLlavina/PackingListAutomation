@@ -26,9 +26,11 @@ import com.puntotres.packinglist.service.etiquetas.ApcEtiquetasExcelBuilder.Etiq
 /**
  * Etiquetas de caja y palet de APC: cuatro destinaciones con plantilla
  * propia (JAPAN, KOREA, USA, WH CROSSLOG); ver ApcEtiquetaLayout. No pide
- * archivos al usuario: los datos estáticos van horneados en cada plantilla
- * y el Order N° y el Livraison code salen como "NOT FOUND" hasta que se
- * implemente su búsqueda (iteración futura).
+ * archivos al usuario: los datos estáticos van horneados en cada plantilla,
+ * y el Order N° y el Livraison code salen de la propia caja, que ya los trae
+ * rellenos del packing list (PedidoCompletionService completa el pedido desde
+ * el excel del cliente y ResolutorDestinosPadre estampa el código). Solo se
+ * imprime "NOT FOUND" cuando de verdad falten.
  *
  * Una caja física = un numeroCaja; los cinturones (línea con talla, APC no
  * usa el prefijo UBL) agrupan unidades por talla en SIZE/PIECES. El peso es
@@ -184,8 +186,16 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         if (peso == null) {
             cajasPendientes.add(lider);
         }
-        return new EtiquetaCajaApc(NO_DISPONIBLE, NO_DISPONIBLE, referencia,
+        // El Order N° y el Livraison code los trae ya la caja: el packing list
+        // los completó al importar (PedidoCompletionService y
+        // ResolutorDestinosPadre). "NOT FOUND" queda solo para cuando falten.
+        return new EtiquetaCajaApc(oNoDisponible(lider.getNumeroPedido()),
+                oNoDisponible(lider.getLivraisonCode()), referencia,
                 colour, size, piezas, posicion + " / " + total, kg(peso));
+    }
+
+    private static String oNoDisponible(String valor) {
+        return (valor == null || valor.isBlank()) ? NO_DISPONIBLE : valor;
     }
 
     /**

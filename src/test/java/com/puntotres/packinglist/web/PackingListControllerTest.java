@@ -829,6 +829,48 @@ class PackingListControllerTest {
                 .andExpect(flash().attributeExists("error"));
     }
 
+    /** Como sesionConEnvioGenerado, pero con el excel de pedido subido en el paso 1. */
+    private MockHttpSession sesionConEnvioYPedidoSubido() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(multipart("/importar")
+                        .file(new MockMultipartFile("pedidoCliente", "AMI EAN H26.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                pedidoAmiDelFixture()))
+                        .session(sesion)
+                        .param("cliente", "AMI").param("json", jsonDePrueba())
+                        .param("temporada", "H26").param("numeroFactura", "FA-26-1189")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+        return sesion;
+    }
+
+    @Test
+    void elPedidoSubidoEnLaEntradaNoSeVuelveAPedirEnElPasoDeEtiquetas() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
+
+        // El apóstrofo sale escapado por Thymeleaf (&#39;), así que se busca
+        // el texto sin comillas.
+        mvc.perform(get("/etiquetas").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Ya subiste")))
+                .andExpect(content().string(containsString("AMI EAN H26.xlsx")))
+                .andExpect(content().string(not(containsString("accept=\".xlsx\" required"))));
+    }
+
+    @Test
+    void conElPedidoEnSesionSeGeneranLasEtiquetasSinVolverASubirlo() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
+
+        mvc.perform(multipart("/etiquetas/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Etiquetas_AMI_PARIS_FA-26-1189.xlsx")));
+    }
+
     @Test
     void clienteSinGeneradorDeEtiquetasSigueEnDesarrollo() throws Exception {
         MockHttpSession sesion = new MockHttpSession();

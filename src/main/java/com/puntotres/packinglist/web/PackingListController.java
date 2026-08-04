@@ -471,6 +471,9 @@ public class PackingListController {
                 .anyMatch(destino -> generador.soportaDestino(destino.getNombreDestino()));
         model.addAttribute("haySoportadas", haySoportadas);
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
+        // Si el excel de pedido ya se subió en el paso 1, su input deja de ser
+        // obligatorio aquí y la vista dice cuál hay puesto.
+        model.addAttribute("nombrePedidoEnSesion", envioEnCurso.getNombreExcelPedidoCliente());
         return "etiquetas";
     }
 
@@ -489,12 +492,20 @@ public class PackingListController {
         try {
             for (CampoEtiquetas campo : generador.camposRequeridos(destinos)) {
                 MultipartFile archivo = peticion.getFile(campo.nombre());
-                if (archivo == null || archivo.isEmpty()) {
+                if (archivo != null && !archivo.isEmpty()) {
+                    archivos.put(campo.nombre(), archivo.getBytes());
+                    continue;
+                }
+                // El excel de pedido puede venir de la pantalla de entrada:
+                // si ya está en sesión, no se vuelve a pedir.
+                byte[] deSesion = campo.esPedidoCliente()
+                        ? envioEnCurso.getExcelPedidoCliente() : null;
+                if (deSesion == null) {
                     redirect.addFlashAttribute("error",
                             "Falta el archivo: " + campo.titulo());
                     return "redirect:/etiquetas";
                 }
-                archivos.put(campo.nombre(), archivo.getBytes());
+                archivos.put(campo.nombre(), deSesion);
             }
             ResultadoEtiquetas resultado = generador.generar(
                     envioEnCurso.getImportado().getDestinos(), envioEnCurso.getCabecera(), archivos);

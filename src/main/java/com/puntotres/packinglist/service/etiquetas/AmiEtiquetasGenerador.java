@@ -38,7 +38,7 @@ import com.puntotres.packinglist.service.etiquetas.AmiEtiquetasExcelBuilder.Etiq
 public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
     static final CampoEtiquetas CAMPO_PEDIDO =
-            new CampoEtiquetas("pedido", "Introducir excel del pedido de AMI");
+            new CampoEtiquetas("pedido", "Introducir excel del pedido de AMI", true);
 
     private static final Locale ESPANOL = Locale.forLanguageTag("es-ES");
 

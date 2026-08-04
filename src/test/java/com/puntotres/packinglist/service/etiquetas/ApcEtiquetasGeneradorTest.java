@@ -92,7 +92,24 @@ class ApcEtiquetasGeneradorTest {
     }
 
     @Test
-    void laEtiquetaDeCajaLlevaLosDatosDelJsonYNotFoundEnLosCodigos() throws IOException {
+    void laEtiquetaLlevaElPedidoYElLivraisonCodeDeLaCaja() throws IOException {
+        CajaData linea = caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 1);
+        // Los dos los rellena el packing list al importar: el pedido lo
+        // completa PedidoCompletionService y el código, ResolutorDestinosPadre.
+        linea.setNumeroPedido("4100128725");
+        linea.setLivraisonCode("PUN20260717WH1");
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("JAPAN", List.of(palet(1, 1, 1, null)), linea)),
+                envio(), Map.of());
+
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        assertEquals("4100128725", texto(hoja, 9, 2));    // Order N°
+        assertEquals("PUN20260717WH1", texto(hoja, 10, 2)); // Livraison
+    }
+
+    @Test
+    void sinPedidoNiLivraisonCodeLaEtiquetaSigueDiciendoNotFound() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         destino("JAPAN", List.of(palet(1, 1, 1, null)),
                                 caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 1))),

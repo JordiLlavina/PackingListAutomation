@@ -26,8 +26,11 @@
         <form th:action="@{/etiquetas/generar}" method="post" enctype="multipart/form-data">
             <div class="campo" th:each="campo : ${campos}">
                 <label th:for="${campo.nombre}" th:text="${campo.titulo}"></label>
+                <p class="ayuda" th:if="${campo.esPedidoCliente and nombrePedidoEnSesion != null}"
+                   th:text="|Ya subiste '${nombrePedidoEnSesion}' en el paso 1: súbelo otra vez solo si quieres cambiarlo.|"></p>
                 <input type="file" th:id="${campo.nombre}" th:name="${campo.nombre}"
-                       accept=".xlsx" required>
+                       accept=".xlsx"
+                       th:required="${!(campo.esPedidoCliente and nombrePedidoEnSesion != null)}">
             </div>
             <p th:unless="${haySoportadas}">
                 Ninguna destinación de este envío tiene etiquetas implementadas.

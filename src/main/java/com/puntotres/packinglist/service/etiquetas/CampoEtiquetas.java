@@ -7,6 +7,10 @@ package com.puntotres.packinglist.service.etiquetas;
  *
  * nombre: name del input HTML y clave del mapa de archivos.
  * titulo: etiqueta visible, ej. "Introducir excel del pedido de AMI".
+ * esPedidoCliente: es EL excel de pedido de la temporada, el mismo que se
+ *   sube en la pantalla de entrada; si ya está en sesión no hace falta
+ *   volver a subirlo. Se declara explícitamente en vez de deducirlo del
+ *   nombre del input porque un generador futuro puede pedir dos ficheros.
  */
-public record CampoEtiquetas(String nombre, String titulo) {
+public record CampoEtiquetas(String nombre, String titulo, boolean esPedidoCliente) {
 }
