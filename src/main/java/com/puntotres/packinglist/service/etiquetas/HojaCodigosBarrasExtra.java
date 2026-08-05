@@ -48,8 +48,13 @@ public final class HojaCodigosBarrasExtra {
     private static final short CUERPO_PARCEL = 20;
     private static final short CUERPO_DESTINO = 14;
 
-    /** Anclaje del EAN128 dentro de su bloque, en EMU. */
-    private static final long EAN128_DX = 60959;
+    /**
+     * Anclaje del EAN128 dentro de su bloque, en EMU. El dx es menor que el
+     * de la plantilla original: el código, que es ancho, sobresalía por la
+     * derecha de la etiqueta, así que se corrió ~3 pt a la izquierda. El
+     * tamaño (cx, cy) NO se toca: un código de barras reescalado se lee mal.
+     */
+    private static final long EAN128_DX = 22860;
     private static final long EAN128_DY = 129540;
     private static final long EAN128_CX = 2118833;
     private static final long EAN128_CY = 352239;

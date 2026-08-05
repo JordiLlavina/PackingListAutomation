@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -24,6 +26,13 @@ class HojaCodigosBarrasExtraMaquetacionTest {
 
     /** Diferencia máxima admitida en el ancho de columna, en unidades POI. */
     private static final int TOLERANCIA_ANCHO = 100;
+
+    /**
+     * Diferencia máxima admitida en el anclaje de una imagen, en EMU (9525 =
+     * 1 píxel). Las imágenes de la plantilla están colocadas a mano y no
+     * caen las tres en la misma x, así que se comparan con holgura.
+     */
+    private static final int TOLERANCIA_ANCLAJE = 9525;
 
     private static XSSFSheet referencia(XSSFWorkbook libro) {
         return libro.getSheetAt(0);
@@ -79,6 +88,32 @@ class HojaCodigosBarrasExtraMaquetacionTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Test
+    void elCode128SeAnclaDondeLoDejaLaPlantillaDeReferencia() {
+        // Solo la x: el Code 128 sobresalía por la derecha de la etiqueta y
+        // en la plantilla se corrigió moviéndolo, sin tocar su tamaño.
+        try (XSSFWorkbook plantilla = new XSSFWorkbook(Files.newInputStream(REFERENCIA));
+             XSSFWorkbook libro = new XSSFWorkbook()) {
+            List<XSSFClientAnchor> esperados = anclajesCode128(referencia(plantilla));
+            assertEquals(3, esperados.size(), "imágenes de Code 128 en la plantilla");
+            int obtenido = anclajesCode128(generada(libro)).get(0).getDx1();
+            for (XSSFClientAnchor esperado : esperados) {
+                assertEquals(esperado.getDx1(), obtenido, TOLERANCIA_ANCLAJE, "dx del Code 128");
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** Las imágenes ancladas en la columna del Code 128 de cada bloque. */
+    private static List<XSSFClientAnchor> anclajesCode128(XSSFSheet hoja) {
+        return hoja.getDrawingPatriarch().getShapes().stream()
+                .filter(XSSFPicture.class::isInstance)
+                .map(forma -> ((XSSFPicture) forma).getClientAnchor())
+                .filter(ancla -> ancla.getCol1() == RejillaEtiquetas.COLUMNAS_IZQUIERDA[2])
+                .toList();
     }
 
     @Test
