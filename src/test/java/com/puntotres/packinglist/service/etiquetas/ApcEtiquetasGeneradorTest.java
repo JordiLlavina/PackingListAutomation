@@ -15,6 +15,8 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.config.ClienteConfig;
+import com.puntotres.packinglist.config.DestinoClienteConfig;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
@@ -23,6 +25,8 @@ import com.puntotres.packinglist.model.PaletData;
 import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.PaletAssignmentService;
+import com.puntotres.packinglist.service.ResolutorDestinosPadre;
+import com.puntotres.packinglist.service.ResultadoDestinos;
 
 class ApcEtiquetasGeneradorTest {
 
@@ -196,8 +200,8 @@ class ApcEtiquetasGeneradorTest {
 
     @Test
     void losCinturonesAgrupanUnidadesPorTalla() throws IOException {
-        // Caso real de envio-apc.json: caja 3 con tallas 85 (7u), 90 (8u) y
-        // 85 (5u de otro pedido/canal) de la misma referencia y color.
+        // Caja de cinturones con tallas 85 (7u), 90 (8u) y 85 (5u de otro
+        // pedido/canal) de la misma referencia y color.
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         destino("JAPAN", List.of(palet(1, 3, 3, null)),
                                 caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 6.0, 1),
@@ -315,21 +319,46 @@ class ApcEtiquetasGeneradorTest {
     }
 
     @Test
-    void elEnvioDeEjemploCompletoSoloAvisaDeIvry() throws IOException {
-        // envio-apc.json solo trae IVRY (sin plantilla de etiquetas): no se
-        // genera ningún excel pero tampoco se lanza nada.
+    void elEnvioDeEjemploCompletoGeneraEtiquetasDeTodasSusDestinaciones() throws IOException {
+        // envio-apc.json trae Korea, Australia, Wholesale y Retail. Como en el
+        // flujo real, el resolutor fusiona Australia y Wholesale bajo su padre
+        // WHOLESALE antes de asignar palets: salen tres libros de etiquetas y
+        // ninguna destinación se queda sin plantilla.
         EnvioInput envioInput;
         try (InputStream json = getClass().getResourceAsStream("/ejemplos/envio-apc.json")) {
             envioInput = new ObjectMapper().readValue(json, EnvioInput.class);
         }
         EnvioImportado importado = new EnvioImportService().importar(envioInput);
+        ResultadoDestinos resueltos = new ResolutorDestinosPadre()
+                .resolver(importado.getDestinos(), catalogoApc(), "17/07/2026");
         PaletAssignmentService asignador = new PaletAssignmentService();
-        for (EnvioImportado.DestinoImportado destino : importado.getDestinos()) {
+        for (EnvioImportado.DestinoImportado destino : resueltos.getDestinos()) {
             asignador.asignar(destino.getDestino(), destino.getPalets());
         }
         ResultadoEtiquetas resultado =
-                generador.generar(importado.getDestinos(), envio(), Map.of());
-        assertEquals(0, resultado.getExcels().size());
-        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("IVRY")));
+                generador.generar(resueltos.getDestinos(), envio(), Map.of());
+
+        assertEquals(List.of("Etiquetas_APC_KOREA_26071.xlsx",
+                        "Etiquetas_APC_WHOLESALE_26071.xlsx",
+                        "Etiquetas_APC_RETAIL_26071.xlsx"),
+                resultado.getExcels().stream()
+                        .map(e -> e.getNombreFichero()).toList());
+        assertTrue(resultado.getAvisos().stream()
+                .noneMatch(a -> a.contains("sin etiquetas de APC implementadas")));
+    }
+
+    /** Catálogo de destinos de APC calcado del application.yml real. */
+    private static ClienteConfig catalogoApc() {
+        DestinoClienteConfig wholesale = new DestinoClienteConfig();
+        wholesale.setAbreviatura("WH");
+        wholesale.setDestinosHijo(List.of("AUSTRALIA", "WHOLESALE", "CHINE FRANCH"));
+        DestinoClienteConfig retail = new DestinoClienteConfig();
+        retail.setAbreviatura("RT");
+        retail.setDestinosHijo(List.of("RETAIL", "WHOLESALE CONCESS"));
+        DestinoClienteConfig korea = new DestinoClienteConfig();
+        korea.setAbreviatura("KRT");
+        ClienteConfig apc = new ClienteConfig();
+        apc.setDestinos(Map.of("WHOLESALE", wholesale, "RETAIL", retail, "KOREA", korea));
+        return apc;
     }
 }

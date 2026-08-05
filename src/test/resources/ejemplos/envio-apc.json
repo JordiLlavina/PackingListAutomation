@@ -2,66 +2,285 @@
   "cliente": "APC",
   "destinos": [
     {
-      "destino": "IVRY",
+      "destino": "Korea",
       "palets": [
-        { "palet": 1, "cajaInicio": 1, "cajaFin": 2, "medidas": "80x120x130", "tara": 8.04 },
-        { "palet": 2, "cajaInicio": 3, "cajaFin": 3, "medidas": "80x120x130" }
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 5, "medidas": "80x120x130", "tara": 8.04 },
+        { "palet": 2, "cajaInicio": 6, "cajaFin": 7 }
       ],
       "referencias": [
         {
+          "referencia": "PXBHZ-F65101",
+          "modelo": "CEINTURE ROSETTE",
+          "pedido": "689",
+          "canal": "KOREA",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "40x30x20",
+          "talla": "85",
+          "cantidadTotal": 15,
+          "cajas": [
+            { "caja": 1, "unidades": 15, "pesoBruto": 5.2 }
+          ]
+        },
+        {
+          "referencia": "PXBHZ-F65101",
+          "modelo": "CEINTURE ROSETTE",
+          "pedido": "689",
+          "canal": "KOREA",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "40x30x20",
+          "talla": "80",
+          "cantidadTotal": 15,
+          "cajas": [
+            { "caja": 1, "unidades": 15 }
+          ]
+        },
+        {
           "referencia": "PXCBC-F67008",
           "modelo": "LE NEIGE",
-          "livraisonCode": "PUN20260428WH1",
-          "pedido": "4100126780",
-          "canal": "WHOLESALE",
-          "color": "LZZ-NOIR",
+          "pedido": "690",
+          "canal": "KOREA",
+          "color": "LAW-MARINE",
           "medidaCaja": "60x40x40",
-          "cantidadTotal": 22,
+          "cantidadTotal": 50,
           "cajas": [
-            { "caja": 1, "unidades": 11 },
-            { "caja": 2, "unidades": 11 }
+            { "cajaInicio": 2, "cajaFin": 5, "unidadesPorCaja": 10, "pesoBruto": 6.4 },
+            { "caja": 7, "unidades": 10 }
+          ]
+        },
+        {
+          "referencia": "PXCDS-F67008",
+          "modelo": "LE NEIGE",
+          "pedido": "692",
+          "canal": "KOREA",
+          "color": "LAW-MARINE",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 12,
+          "cajas": [
+            { "caja": 6, "unidades": 12, "pesoBruto": 5.8 }
+          ]
+        },
+        {
+          "referencia": "PXCCM-F67080",
+          "modelo": "SAC PALOMA SHOULDER",
+          "pedido": "860",
+          "canal": "KOREA",
+          "color": "CAB-CAMEL",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 6,
+          "cajas": [
+            { "caja": 6, "unidades": 6 }
+          ]
+        }
+      ]
+    },
+    {
+      "destino": "Australia",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 2, "medidas": "80x120x130", "tara": 8.04 }
+      ],
+      "referencias": [
+        {
+          "referencia": "PXBHZ-H65077",
+          "modelo": "CEINTURE PARIS",
+          "pedido": "721",
+          "canal": "AUSTRALIA",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "40x30x20",
+          "talla": "95",
+          "cantidadTotal": 3,
+          "cajas": [
+            { "caja": 1, "unidades": 3, "pesoBruto": 4.1 }
           ]
         },
         {
           "referencia": "PXBHZ-H65077",
           "modelo": "CEINTURE PARIS",
-          "livraisonCode": "PUN20260428WH1",
-          "pedido": "4100126774",
-          "canal": "WHOLESALE",
+          "pedido": "721",
           "color": "LZZ-NOIR",
-          "medidaCaja": "60x40x40",
-          "talla": "85",
-          "cantidadTotal": 7,
+          "medidaCaja": "40x30x20",
+          "talla": "90",
+          "cantidadTotal": 3,
           "cajas": [
-            { "caja": 3, "unidades": 7 }
+            { "caja": 1, "unidades": 3 }
           ]
         },
         {
           "referencia": "PXBHZ-H65077",
           "modelo": "CEINTURE PARIS",
-          "livraisonCode": "PUN20260428WH1",
-          "pedido": "4100126774",
+          "pedido": "721",
+          "canal": "AUSTRALIA",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "40x30x20",
+          "talla": "100",
+          "cantidadTotal": 3,
+          "cajas": [
+            { "caja": 1, "unidades": 3 }
+          ]
+        },
+        {
+          "referencia": "PXCDS-F67008",
+          "modelo": "LE NEIGE",
+          "pedido": "732",
+          "canal": "AUSTRALIA",
+          "color": "LAW-MARINE",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 18,
+          "cajas": [
+            { "caja": 2, "unidades": 18, "pesoBruto": 7.6 }
+          ]
+        }
+      ]
+    },
+    {
+      "destino": "Wholesale",
+      "palets": [
+        { "palet": 2, "cajaInicio": 3, "cajaFin": 6, "medidas": "80x120x130" }
+      ],
+      "referencias": [
+        {
+          "referencia": "PXCEI-F67043",
+          "modelo": "LE NEIGE CLOU",
+          "pedido": "737",
+          "canal": "WHOLESALE",
+          "color": "CAB-CAMEL",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 60,
+          "cajas": [
+            { "cajaInicio": 3, "cajaFin": 4, "unidadesPorCaja": 30, "pesoBruto": 9.8 }
+          ]
+        },
+        {
+          "referencia": "PXCBS-F67066",
+          "modelo": "SAC PALOMA",
+          "pedido": "725",
           "canal": "WHOLESALE",
           "color": "LZZ-NOIR",
           "medidaCaja": "60x40x40",
+          "cantidadTotal": 21,
+          "cajas": [
+            { "caja": 5, "unidades": 21, "pesoBruto": 8.5 }
+          ]
+        },
+        {
+          "referencia": "PXCBS-F67066",
+          "modelo": "SAC PALOMA",
+          "pedido": "725",
+          "canal": "WHOLESALE",
+          "color": "GAU-GALET",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 11,
+          "cajas": [
+            { "caja": 5, "unidades": 11 }
+          ]
+        },
+        {
+          "referencia": "PXCBC-F63024",
+          "modelo": "LE PORTE-MONNAIE NEIGE",
+          "pedido": "723",
+          "canal": "WHOLESALE",
+          "color": "LZZ-NOIR",
+          "medidaCaja": "60x40x30",
+          "cantidadTotal": 4,
+          "cajas": [
+            { "caja": 6, "unidades": 4, "pesoBruto": 2.6 }
+          ]
+        }
+      ]
+    },
+    {
+      "destino": "Retail",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 4, "medidas": "80x120x130", "tara": 8.04 },
+        { "palet": 2, "cajaInicio": 5, "cajaFin": 6 }
+      ],
+      "referencias": [
+        {
+          "referencia": "PXCBS-F67080",
+          "modelo": "PALOMA SMALL",
+          "pedido": "701",
+          "canal": "RETAIL",
+          "color": "GAU-GALET",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 80,
+          "cajas": [
+            { "cajaInicio": 1, "cajaFin": 3, "unidadesPorCaja": 20, "pesoBruto": 7.2 },
+            { "caja": 6, "unidades": 20 }
+          ]
+        },
+        {
+          "referencia": "PXCBT-F65101",
+          "modelo": "CEINTURE ROSETTE",
+          "pedido": "702",
+          "canal": "RETAIL",
+          "color": "KBE-BEIGE",
+          "medidaCaja": "40x30x20",
           "talla": "90",
           "cantidadTotal": 8,
           "cajas": [
-            { "caja": 3, "unidades": 8 }
+            { "caja": 4, "unidades": 8, "pesoBruto": 6.0 }
           ]
         },
         {
-          "referencia": "PXBHZ-H65077",
-          "modelo": "CEINTURE PARIS",
-          "livraisonCode": "PUN20260428WH1",
-          "pedido": "4100126775",
-          "canal": "AUSTRALIA",
+          "referencia": "PXCBT-F65101",
+          "modelo": "CEINTURE ROSETTE",
+          "pedido": "702",
+          "canal": "RETAIL",
+          "color": "KBE-BEIGE",
+          "medidaCaja": "40x30x20",
+          "talla": "85",
+          "cantidadTotal": 8,
+          "cajas": [
+            { "caja": 4, "unidades": 8 }
+          ]
+        },
+        {
+          "referencia": "PXCBT-F65101",
+          "modelo": "CEINTURE ROSETTE",
+          "pedido": "702",
+          "canal": "RETAIL",
+          "color": "KBE-BEIGE",
+          "medidaCaja": "40x30x20",
+          "talla": "80",
+          "cantidadTotal": 8,
+          "cajas": [
+            { "caja": 4, "unidades": 8 }
+          ]
+        },
+        {
+          "referencia": "PXCBT-F65101",
+          "modelo": "CEINTURE ROSETTE",
+          "pedido": "702",
+          "canal": "RETAIL",
+          "color": "KBE-BEIGE",
+          "medidaCaja": "40x30x20",
+          "talla": "75",
+          "cantidadTotal": 8,
+          "cajas": [
+            { "caja": 4, "unidades": 8 }
+          ]
+        },
+        {
+          "referencia": "PXCBC-F67043",
+          "modelo": "LE NEIGE CLOU",
+          "pedido": "697",
+          "canal": "RETAIL",
+          "color": "KAN-KAKI",
+          "medidaCaja": "60x40x40",
+          "cantidadTotal": 10,
+          "cajas": [
+            { "caja": 5, "unidades": 10, "pesoBruto": 4.4 }
+          ]
+        },
+        {
+          "referencia": "PXCBC-F63024",
+          "modelo": "LE PORTE-MONNAIE NEIGE",
+          "pedido": "697",
+          "canal": "RETAIL",
           "color": "LZZ-NOIR",
           "medidaCaja": "60x40x40",
-          "talla": "85",
-          "cantidadTotal": 5,
+          "cantidadTotal": 8,
           "cajas": [
-            { "caja": 3, "unidades": 5 }
+            { "caja": 5, "unidades": 8 }
           ]
         }
       ]

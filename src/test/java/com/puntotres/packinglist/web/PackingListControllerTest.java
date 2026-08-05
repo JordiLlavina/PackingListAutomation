@@ -908,12 +908,17 @@ class PackingListControllerTest {
                 .andExpect(redirectedUrl("/resultados"));
     }
 
-    /** JSON de fixture de APC con la destinación sustituida (IVRY no tiene etiquetas, JAPAN sí). */
-    private String jsonApcConDestino(String destino) throws Exception {
-        try (var in = getClass().getResourceAsStream("/ejemplos/envio-apc.json")) {
-            String json = new String(in.readAllBytes());
-            return json.replace("\"IVRY\"", "\"" + destino + "\"");
-        }
+    /** JSON mínimo de APC con la destinación parametrizada (IVRY no tiene etiquetas, JAPAN sí). */
+    private String jsonApcConDestino(String destino) {
+        return """
+                {"cliente": "APC", "destinos": [{"destino": "%s",
+                  "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
+                  "referencias": [
+                    {"referencia": "PXCBC-F67008", "modelo": "LE NEIGE", "color": "LAW-MARINE",
+                     "medidaCaja": "60x40x40", "pedido": "690", "cantidadTotal": 10,
+                     "cajas": [{"caja": 1, "unidades": 10, "pesoBruto": 6.4}]}
+                  ]}]}
+                """.formatted(destino);
     }
 
     private void importarApc(MockHttpSession sesion, String destino) throws Exception {

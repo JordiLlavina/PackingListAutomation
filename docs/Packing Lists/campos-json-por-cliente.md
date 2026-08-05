@@ -153,17 +153,31 @@ importa y genera de verdad los tres primeros contra el catálogo real de
 `application.yml`; el de etiquetas de APC no lo carga ningún test:
 
 - `envio-ami-bags-y-belts.json`: AMI con las tres destinaciones
-  (China/Japan/France), bolsos y carteras (ULL/USL) y cinturones (UBL),
-  incluida una caja con tres tallas (85-95-105 en France) y `pesoBruto` por
-  caja (en las cajas mixtas de cinturón, en la primera talla). De este el
-  único que tiene las **claves** copiadas del pedido real: referencias,
-  colores, POs y tallas existen en `EAN PUNTOTRES H26.xlsx` (el sufijo del PO
-  marca la destinación: CH China, JP Japan, sin sufijo France), así que las
-  etiquetas salen con EAN de verdad. Las cantidades y los pesos siguen siendo
-  inventados, y nada impide que una edición futura rompa esa correspondencia:
-  si un PO deja de existir, las etiquetas salen sin EAN y con aviso.
-- `envio-apc.json`: APC destino IVRY con bolsos y cinturones, caja de tres
-  líneas y taras de palet mixtas (8.04 del JSON + 10 por defecto).
+  (China/Japan/France), bolsos y carteras (ULL/USL) y cinturones (UBL). Trae
+  rangos de cajas idénticas (comprimibles en la revisión), cajas mixtas de
+  cinturón por talla (la 4 de China con cuatro tallas, la 9 de France con
+  tres), dos cajas de bolso con **varios artículos** (la 1 de China mezcla dos
+  colores de ULL729 y la 7 de France dos referencias distintas — la línea no
+  líder cae en su propio excel sin peso, como caja pendiente), una caja sin
+  `pesoBruto` para la inferencia (la 6 de France) y las tres medidas de caja
+  con tara. De este el único que tiene las **claves** copiadas del pedido
+  real: referencias, colores, POs y tallas existen en `EAN PUNTOTRES
+  H26.xlsx` (el sufijo del PO marca la destinación: CH China, JP Japan, sin
+  sufijo France), así que las etiquetas salen con EAN de verdad. Las
+  cantidades y los pesos siguen siendo inventados (aunque donde la cantidad
+  real ya era de tamaño de caja se copió tal cual), y nada impide que una
+  edición futura rompa esa correspondencia: si un PO deja de existir, las
+  etiquetas salen sin EAN y con aviso.
+- `envio-apc.json`: APC con Korea, Australia, Wholesale y Retail (Australia y
+  Wholesale se fusionan bajo el padre WHOLESALE, con numeración de cajas y
+  palets disjunta para no disparar el aviso de repetidos). Sin `livraisonCode`
+  (lo genera el resolutor) y con el `pedido` en sus **tres últimos dígitos**,
+  que casan con filas reales de `APC_PEDIDO_FALL26.xlsx` por referencia — como
+  llega de las fotos. Trae rangos de cajas idénticas (comprimibles en la
+  revisión), cajas mixtas multi-talla, multi-color y multi-modelo, una línea
+  sin `canal` (lo rellena el resolutor con la hija), dos cajas sin peso para
+  la inferencia, las tres medidas de caja con tara y taras de palet mixtas
+  (8.04 del JSON + 10 por defecto).
 - `envio-apc-etiquetas.json`: APC con sus siete destinos (Australia, Chine
   franch, D. USA, Japan, Korea, Retail, Wholesale), para probar a mano el flujo
   de etiquetas de caja. Ningún test lo usa. Ojo: Australia, Chine franch y
