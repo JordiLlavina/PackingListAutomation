@@ -27,10 +27,20 @@ record BloqueEtiquetaModelo(List<FilaModelo> filas, List<CellRangeAddress> merge
                       List<CeldaModelo> celdas) {
     }
 
+    /** El bloque modelo arranca en la primera fila de la hoja. */
     static BloqueEtiquetaModelo capturar(XSSFSheet hoja, int altura) {
+        return capturar(hoja, 0, altura);
+    }
+
+    /**
+     * El bloque modelo arranca en filaInicio. Las hojas de etiquetas de palet
+     * de AMI llevan encima una fila con un contador apuntado a mano, así que
+     * su bloque empieza en la fila 1 y esa primera fila no se replica.
+     */
+    static BloqueEtiquetaModelo capturar(XSSFSheet hoja, int filaInicio, int altura) {
         List<FilaModelo> filas = new ArrayList<>();
         for (int i = 0; i < altura; i++) {
-            Row fila = hoja.getRow(i);
+            Row fila = hoja.getRow(filaInicio + i);
             if (fila == null) {
                 continue;
             }
@@ -41,13 +51,18 @@ record BloqueEtiquetaModelo(List<FilaModelo> filas, List<CellRangeAddress> merge
                         celda.getCellType() == CellType.STRING
                                 ? celda.getStringCellValue() : null));
             }
+            // La fila se guarda RELATIVA al inicio del bloque: así copiarEn
+            // recibe siempre la fila absoluta donde va la copia entera.
             filas.add(new FilaModelo(i, fila.getHeightInPoints(),
                     ((XSSFRow) fila).getCTRow().getCustomHeight(), celdas));
         }
         List<CellRangeAddress> merges = new ArrayList<>();
         for (CellRangeAddress merge : hoja.getMergedRegions()) {
-            if (merge.getLastRow() < altura) {
-                merges.add(merge);
+            if (merge.getFirstRow() >= filaInicio
+                    && merge.getLastRow() < filaInicio + altura) {
+                merges.add(new CellRangeAddress(merge.getFirstRow() - filaInicio,
+                        merge.getLastRow() - filaInicio,
+                        merge.getFirstColumn(), merge.getLastColumn()));
             }
         }
         return new BloqueEtiquetaModelo(filas, merges, altura);

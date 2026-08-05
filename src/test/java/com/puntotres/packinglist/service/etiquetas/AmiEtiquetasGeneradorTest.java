@@ -3,6 +3,7 @@ package com.puntotres.packinglist.service.etiquetas;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.model.PaletData;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
@@ -60,6 +62,19 @@ class AmiEtiquetasGeneradorTest {
 
     private static EnvioImportado.DestinoImportado importado(DestinoData destino) {
         return new EnvioImportado.DestinoImportado(destino, List.of());
+    }
+
+    /**
+     * Los avisos que NO son de la hoja de palets. Los fixtures de los tests
+     * de etiquetas de caja no traen palets a propósito, así que todos reciben
+     * el aviso de que esa destinación va sin hoja de palets; filtrarlo deja a
+     * la vista lo que cada test sí vigila. Los tests de palets de más abajo
+     * miran los avisos sin filtrar.
+     */
+    private static List<String> avisosDeCaja(ResultadoEtiquetas resultado) {
+        return resultado.getAvisos().stream()
+                .filter(aviso -> !aviso.contains("hoja de etiquetas de palet"))
+                .toList();
     }
 
     /** EAN128 bien formado: EAN13 + 00001 + PO a 8 dígitos + 16 ceros + país. */
@@ -310,7 +325,7 @@ class AmiEtiquetasGeneradorTest {
             assertEquals("U", texto(hoja, layout.filaTalla(), 2));
             assertEquals("50", texto(hoja, layout.filaCantidad(), 2));
         }
-        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+        assertTrue(avisosDeCaja(resultado).isEmpty(), avisosDeCaja(resultado).toString());
     }
 
     @Test
@@ -392,7 +407,7 @@ class AmiEtiquetasGeneradorTest {
             // etiquetas del par. El Code 128 del PO ya no existe.
             assertEquals(4, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
         }
-        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+        assertTrue(avisosDeCaja(resultado).isEmpty(), avisosDeCaja(resultado).toString());
     }
 
     @Test
@@ -406,7 +421,7 @@ class AmiEtiquetasGeneradorTest {
                 cabecera(), Map.of("pedido", pedido()));
 
         assertEquals(List.of("La caja 2 de PARIS lleva varias tallas: se han generado "
-                + "códigos de barra aparte para imprimir"), resultado.getAvisos());
+                + "códigos de barra aparte para imprimir"), avisosDeCaja(resultado));
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
             // SIZE sí sale ordenado, aunque el EAN sea el de la líder.
@@ -650,7 +665,7 @@ class AmiEtiquetasGeneradorTest {
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             assertEquals(1, libro.getNumberOfSheets());
         }
-        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+        assertTrue(avisosDeCaja(resultado).isEmpty(), avisosDeCaja(resultado).toString());
     }
 
     @Test
@@ -690,6 +705,203 @@ class AmiEtiquetasGeneradorTest {
         Files.createDirectories(Path.of("target"));
         Files.write(Path.of("target", excel.getNombreFichero()), excel.getContenido());
         assertEquals("Etiquetas_AMI_PARIS_F-MULTI.xlsx", excel.getNombreFichero());
+    }
+
+    // --- etiquetas de palet ---
+
+    private static CajaData cajaEnPalet(int numero, Double pesoBruto, Integer palet) {
+        CajaData caja = caja(numero, "ULL163.AL0052", "221", null, 10, pesoBruto, "07665");
+        caja.setNumeroPalet(palet);
+        return caja;
+    }
+
+    private static PaletData palet(int numero, int cajaInicio, int cajaFin, Double tara) {
+        PaletData palet = new PaletData();
+        palet.setNumeroPalet(numero);
+        palet.setCajaInicio(cajaInicio);
+        palet.setCajaFin(cajaFin);
+        palet.setTara(tara);
+        return palet;
+    }
+
+    private static EnvioImportado.DestinoImportado importado(DestinoData destino,
+                                                             PaletData... palets) {
+        return new EnvioImportado.DestinoImportado(destino, List.of(palets));
+    }
+
+    private static XSSFSheet hojaDePalets(ExcelGenerado excel, AmiEtiquetaLayout layout)
+            throws IOException {
+        return abrir(excel).getSheet(layout.nombreHojaPalets());
+    }
+
+    private static String colisDelPalet(XSSFSheet hoja, int indice) {
+        return texto(hoja, AmiEtiquetaLayout.FILA_PALET_COLIS
+                + indice * AmiEtiquetaLayout.ALTURA_BLOQUE_PALET, 2);
+    }
+
+    private static String pesoDelPalet(XSSFSheet hoja, int indice) {
+        return texto(hoja, AmiEtiquetaLayout.FILA_PALET_PESO
+                + indice * AmiEtiquetaLayout.ALTURA_BLOQUE_PALET, 2);
+    }
+
+    @Test
+    void elRangoDeCajasSaleDeLasCajasYNoDelRangoDelJson() throws IOException {
+        // El rango del PaletData es el del JSON original y se queda viejo en
+        // cuanto el usuario corrige un palet en la pantalla de revisión: las
+        // cajas 1..3 están en el palet 1 aunque el JSON dijera 1..9.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS",
+                                cajaEnPalet(1, 5.0, 1),
+                                cajaEnPalet(2, 5.0, 1),
+                                cajaEnPalet(3, 5.0, 1)),
+                        palet(1, 1, 9, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        XSSFSheet hoja = hojaDePalets(resultado.getExcels().get(0), AmiEtiquetaLayout.FRANCE);
+        assertEquals("Nº 1 à Nº 3", colisDelPalet(hoja, 0));
+    }
+
+    @Test
+    void elPesoDelPaletSumaSusCajasMasLaTara() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS", cajaEnPalet(1, 5.28, 1), cajaEnPalet(2, 4.10, 1)),
+                        palet(1, 1, 2, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        XSSFSheet hoja = hojaDePalets(resultado.getExcels().get(0), AmiEtiquetaLayout.FRANCE);
+        assertEquals("17,38 Kg", pesoDelPalet(hoja, 0));
+    }
+
+    @Test
+    void sinTaraEnElJsonElPaletPesaDiezKilosMas() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS", cajaEnPalet(1, 5.28, 1)),
+                        palet(1, 1, 1, null))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        XSSFSheet hoja = hojaDePalets(resultado.getExcels().get(0), AmiEtiquetaLayout.FRANCE);
+        assertEquals("15,28 Kg", pesoDelPalet(hoja, 0));
+    }
+
+    @Test
+    void cadaPaletTieneSuEtiquetaEnOrdenDeNumeroDePalet() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS",
+                                cajaEnPalet(1, 5.0, 2),
+                                cajaEnPalet(2, 5.0, 1),
+                                cajaEnPalet(3, 5.0, 2)),
+                        palet(2, 1, 3, 0.0), palet(1, 2, 2, 0.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        XSSFSheet hoja = hojaDePalets(resultado.getExcels().get(0), AmiEtiquetaLayout.FRANCE);
+        assertEquals("Nº 2 à Nº 2", colisDelPalet(hoja, 0));
+        assertEquals("Nº 1 à Nº 3", colisDelPalet(hoja, 1));
+    }
+
+    @Test
+    void unaCajaSinPaletDejaLaDestinacionSinHojaDePalets() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS", cajaEnPalet(1, 5.0, 1), cajaEnPalet(2, 5.0, null)),
+                        palet(1, 1, 1, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertNull(libro.getSheet(AmiEtiquetaLayout.FRANCE.nombreHojaPalets()));
+        }
+        assertTrue(resultado.getAvisos().stream()
+                        .anyMatch(aviso -> aviso.contains("hoja de etiquetas de palet")
+                                && aviso.contains("PARIS")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void sinNingunPaletTampocoHayHojaDePalets() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS", cajaEnPalet(1, 5.0, null)))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertNull(libro.getSheet(AmiEtiquetaLayout.FRANCE.nombreHojaPalets()));
+        }
+        assertTrue(resultado.getAvisos().stream()
+                        .anyMatch(aviso -> aviso.contains("hoja de etiquetas de palet")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void unPaletConUnaCajaSinPesoSaleSinPesoPeroConHoja() throws IOException {
+        // Falta un peso, no un palet: la hoja se genera igual y solo esa
+        // etiqueta va sin peso, como el resto del proyecto.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS", cajaEnPalet(1, 5.0, 1), cajaEnPalet(2, null, 1)),
+                        palet(1, 1, 2, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        XSSFSheet hoja = hojaDePalets(resultado.getExcels().get(0), AmiEtiquetaLayout.FRANCE);
+        assertNotNull(hoja, "la hoja de palets debe generarse: no falta ningún palet");
+        assertEquals("Nº 1 à Nº 2", colisDelPalet(hoja, 0));
+        assertEquals("", pesoDelPalet(hoja, 0));
+        assertTrue(resultado.getAvisos().stream()
+                        .anyMatch(aviso -> aviso.contains("Palet 1") && aviso.contains("peso")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void unPaletSinNingunaCajaSeOmiteConAviso() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS", cajaEnPalet(1, 5.0, 1)),
+                        palet(1, 1, 1, 8.0), palet(2, 2, 2, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        XSSFSheet hoja = hojaDePalets(resultado.getExcels().get(0), AmiEtiquetaLayout.FRANCE);
+        // Solo la etiqueta del palet 1: la del 2 no se inventa.
+        assertEquals("Nº 1 à Nº 1", colisDelPalet(hoja, 0));
+        assertEquals("", colisDelPalet(hoja, 1));
+        assertTrue(resultado.getAvisos().stream()
+                        .anyMatch(aviso -> aviso.contains("Palet 2")
+                                && aviso.contains("sin cajas")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void conPaletsElLibroTraeLaHojaDeCajasPrimeroYLaDePaletsDespues() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("CHINA", cajaEnPalet(1, 5.0, 1)),
+                        palet(1, 1, 1, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals(2, libro.getNumberOfSheets());
+            assertEquals("AMI CHINA", libro.getSheetName(0));
+            assertEquals(AmiEtiquetaLayout.CHINA.nombreHojaPalets(), libro.getSheetName(1));
+        }
+    }
+
+    @Test
+    void dejaUnExcelConEtiquetasDePaletParaInspeccionManual() throws IOException {
+        // No afirma casi nada: existe para abrirlo en Excel y comprobar con el
+        // ojo la maquetación de la hoja de palets y su paginación (tres
+        // palets = dos páginas, la segunda con una sola etiqueta).
+        DatosEnvio envio = cabecera();
+        envio.setNumeroFactura("F-PALETS");
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS",
+                                cajaEnPalet(1, 5.28, 1), cajaEnPalet(2, 4.75, 1),
+                                cajaEnPalet(3, 5.10, 1), cajaEnPalet(4, 6.02, 2),
+                                cajaEnPalet(5, 4.98, 2), cajaEnPalet(6, 5.44, 3)),
+                        palet(1, 1, 3, 12.0), palet(2, 4, 5, 12.0), palet(3, 6, 6, null))),
+                envio, Map.of("pedido", pedido()));
+
+        ExcelGenerado excel = resultado.getExcels().get(0);
+        Files.createDirectories(Path.of("target"));
+        Files.write(Path.of("target", excel.getNombreFichero()), excel.getContenido());
+
+        XSSFSheet hoja = hojaDePalets(excel, AmiEtiquetaLayout.FRANCE);
+        assertEquals("Nº 1 à Nº 3", colisDelPalet(hoja, 0));
+        assertEquals("27,13 Kg", pesoDelPalet(hoja, 0));
+        assertEquals("Nº 6 à Nº 6", colisDelPalet(hoja, 2));
+        // El tercer palet no trae tara en el JSON: 5,44 + 10 por defecto.
+        assertEquals("15,44 Kg", pesoDelPalet(hoja, 2));
     }
 
     private static XSSFWorkbook abrir(ExcelGenerado excel) throws IOException {

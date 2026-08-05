@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import org.apache.poi.ss.SpreadsheetVersion;
@@ -58,19 +60,33 @@ public class AmiEtiquetasExcelBuilder {
     private record ImagenAnclada(AnclajeBloque anclaje, int indice) {
     }
 
+    /** Los datos ya formateados de la etiqueta de un palet. null = en blanco. */
+    public record EtiquetaPaletAmi(String colis, String poidsBrut) {
+    }
+
     /** Sin filas extra: la firma que usan los tests y los flujos sin sobrantes. */
     public byte[] generar(AmiEtiquetaLayout layout, List<EtiquetaCaja> etiquetas)
             throws IOException {
         return generar(layout, etiquetas, List.of());
     }
 
+    /** Sin etiquetas de palet: la firma que usan los flujos sin palets. */
     public byte[] generar(AmiEtiquetaLayout layout, List<EtiquetaCaja> etiquetas,
                           List<FilaCodigoBarrasExtra> filasExtra) throws IOException {
+        return generar(layout, etiquetas, filasExtra, List.of());
+    }
+
+    public byte[] generar(AmiEtiquetaLayout layout, List<EtiquetaCaja> etiquetas,
+                          List<FilaCodigoBarrasExtra> filasExtra,
+                          List<EtiquetaPaletAmi> palets) throws IOException {
         try (InputStream plantilla = getClass().getResourceAsStream(RUTA_PLANTILLA);
              XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
 
             byte[] direccionJapan = extraerPngDireccion(libro);
-            dejarSoloLaHoja(libro, layout.nombreHoja());
+            // Sin etiquetas de palet la hoja no se conserva: el campo palet es
+            // opcional y una hoja a medias se imprimiría y se pegaría igual.
+            dejarHojas(libro, layout.nombreHoja(),
+                    palets.isEmpty() ? null : layout.nombreHojaPalets());
             XSSFSheet hoja = libro.getSheetAt(0);
             limpiarImagenesDeEjemplo(hoja);
 
@@ -93,9 +109,18 @@ public class AmiEtiquetasExcelBuilder {
                     hoja.setRowBreak(base + layout.alturaBloque() - 1);
                 }
             }
-            actualizarAreaImpresion(libro, etiquetas.size(), layout.alturaBloque());
+            actualizarAreaImpresion(libro, 0,
+                    etiquetas.size() * layout.alturaBloque() - 1);
 
-            // La hoja extra va DESPUÉS de dejarSoloLaHoja, que se lleva por
+            if (!palets.isEmpty()) {
+                escribirHojaPalets(libro.getSheet(layout.nombreHojaPalets()), palets);
+                actualizarAreaImpresion(libro,
+                        libro.getSheetIndex(layout.nombreHojaPalets()),
+                        AmiEtiquetaLayout.FILA_PRIMER_PALET
+                                + palets.size() * AmiEtiquetaLayout.ALTURA_BLOQUE_PALET - 1);
+            }
+
+            // La hoja extra va DESPUÉS de dejarHojas, que se lleva por
             // delante cualquier otra hoja del libro.
             HojaCodigosBarrasExtra.escribir(libro, filasExtra);
 
@@ -134,41 +159,96 @@ public class AmiEtiquetasExcelBuilder {
         return null;
     }
 
-    private static void dejarSoloLaHoja(XSSFWorkbook libro, String nombreHoja) {
+    /**
+     * Deja en el libro la hoja de etiquetas de caja de la destinación y, si
+     * hay palets, la suya de palets; el resto se borra. La de cajas queda
+     * SIEMPRE la primera: el resto del builder trabaja contra getSheetAt(0).
+     * hojaPalets null = esta destinación va sin hoja de palets.
+     */
+    private static void dejarHojas(XSSFWorkbook libro, String hojaCajas, String hojaPalets) {
+        Set<String> conservar = new LinkedHashSet<>();
+        conservar.add(hojaCajas);
+        if (hojaPalets != null) {
+            conservar.add(hojaPalets);
+        }
         for (int i = libro.getNumberOfSheets() - 1; i >= 0; i--) {
-            if (!libro.getSheetName(i).equals(nombreHoja)) {
+            if (!conservar.contains(libro.getSheetName(i))) {
                 libro.removeSheetAt(i);
             }
         }
-        if (libro.getNumberOfSheets() != 1) {
-            throw new IllegalStateException("La plantilla de etiquetas AMI no tiene la hoja '"
-                    + nombreHoja + "': revisar client-labels/ami-etiquetas-template.xlsx");
+        if (libro.getNumberOfSheets() != conservar.size()) {
+            throw new IllegalStateException("La plantilla de etiquetas AMI no tiene las hojas "
+                    + conservar + ": revisar client-labels/ami-etiquetas-template.xlsx");
+        }
+        libro.setSheetOrder(hojaCajas, 0);
+        // La plantilla trae una hoja marcada como seleccionada; con dos hojas
+        // vivas eso deja las pestañas agrupadas en Excel y lo que se teclee en
+        // una se escribe en las dos.
+        for (int i = 0; i < libro.getNumberOfSheets(); i++) {
+            libro.getSheetAt(i).setSelected(i == 0);
         }
         libro.setActiveSheet(0);
     }
 
     /**
      * FRANCE trae un área de impresión en la plantilla del cliente
-     * ($A$1:$D$32, justo la primera caja); POI la remapea a la hoja
-     * superviviente al borrar las otras dos. Sin tocarla, un envío de más de
-     * una caja imprime solo la primera: se estira hasta la última fila
-     * escrita, conservando las columnas que eligió el cliente. Con cero
-     * etiquetas se deja el área intacta (si la hay). CHINA y JAPAN no traen
-     * área de impresión (POI se la lleva por delante junto con la hoja a la
-     * que apuntaba) y no hay que inventarles una.
+     * ($A$1:$D$32, justo la primera caja) y las tres hojas de palet la traen
+     * también ($A$1:$D$15, los dos palets de ejemplo); POI las remapea a las
+     * hojas supervivientes al borrar las demás. Sin tocarlas, un envío de más
+     * de un bloque imprime solo el primero: se estira hasta la última fila
+     * escrita, conservando las columnas que eligió el cliente. Con ultimaFila
+     * negativa (cero bloques escritos) se deja el área intacta. CHINA y JAPAN
+     * no traen área en su hoja de cajas y no hay que inventarles una.
      */
-    private static void actualizarAreaImpresion(XSSFWorkbook libro, int numeroDeEtiquetas,
-                                                 int alturaBloque) {
-        String areaActual = libro.getPrintArea(0);
-        if (areaActual == null || numeroDeEtiquetas == 0) {
+    private static void actualizarAreaImpresion(XSSFWorkbook libro, int indiceHoja,
+                                                 int ultimaFila) {
+        String areaActual = libro.getPrintArea(indiceHoja);
+        if (areaActual == null || ultimaFila < 0) {
             return;
         }
         AreaReference referencia = new AreaReference(areaActual, SpreadsheetVersion.EXCEL2007);
-        int primeraFila = referencia.getFirstCell().getRow();
-        int primeraColumna = referencia.getFirstCell().getCol();
-        int ultimaColumna = referencia.getLastCell().getCol();
-        int ultimaFila = numeroDeEtiquetas * alturaBloque - 1;
-        libro.setPrintArea(0, primeraColumna, ultimaColumna, primeraFila, ultimaFila);
+        libro.setPrintArea(indiceHoja, referencia.getFirstCell().getCol(),
+                referencia.getLastCell().getCol(),
+                referencia.getFirstCell().getRow(), ultimaFila);
+    }
+
+    /**
+     * La hoja de etiquetas de palet: un bloque por palet, replicado del
+     * modelo de la plantilla. Caben dos por A4 (media página cada una), así
+     * que el salto de página va tras cada segundo palet, no tras cada uno.
+     */
+    private static void escribirHojaPalets(XSSFSheet hoja, List<EtiquetaPaletAmi> palets) {
+        // La fila 1 de la plantilla trae un contador suelto en E1 apuntado a
+        // mano por el cliente: ni es un dato del envío ni debe replicarse.
+        if (hoja.getRow(0) != null) {
+            hoja.getRow(0).forEach(Cell::setBlank);
+        }
+        int altura = AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+        int primera = AmiEtiquetaLayout.FILA_PRIMER_PALET;
+        BloqueEtiquetaModelo modelo = BloqueEtiquetaModelo.capturar(hoja, primera, altura);
+        for (int i = 1; i < palets.size(); i++) {
+            modelo.copiarEn(hoja, primera + i * altura);
+        }
+        // La plantilla trae DOS bloques de ejemplo (para enseñar que caben dos
+        // por A4). Lo que sobre tras el último palet se borra: si no, la
+        // etiqueta de ejemplo del cliente se imprime y acaba pegada en un
+        // bulto. No hay celdas combinadas en estas hojas que arrastrar.
+        for (int fila = hoja.getLastRowNum();
+                fila >= primera + palets.size() * altura; fila--) {
+            if (hoja.getRow(fila) != null) {
+                hoja.removeRow(hoja.getRow(fila));
+            }
+        }
+        for (int i = 0; i < palets.size(); i++) {
+            int base = i * altura;
+            escribir(hoja, AmiEtiquetaLayout.FILA_PALET_COLIS + base,
+                    AmiEtiquetaLayout.COL_VALOR, palets.get(i).colis());
+            escribir(hoja, AmiEtiquetaLayout.FILA_PALET_PESO + base,
+                    AmiEtiquetaLayout.COL_VALOR, palets.get(i).poidsBrut());
+            if (i % 2 == 1 && i < palets.size() - 1) {
+                hoja.setRowBreak(primera + (i + 1) * altura - 1);
+            }
+        }
     }
 
     /** Quita los anclajes de las imágenes de ejemplo (los gifs de barcode y el png). */

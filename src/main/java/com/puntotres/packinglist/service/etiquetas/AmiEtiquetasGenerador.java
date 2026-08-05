@@ -16,9 +16,11 @@ import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.model.PaletData;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.etiquetas.AmiEtiquetasExcelBuilder.EtiquetaCaja;
+import com.puntotres.packinglist.service.etiquetas.AmiEtiquetasExcelBuilder.EtiquetaPaletAmi;
 
 /**
  * Etiquetas de caja de AMI: tres destinaciones (China, Japan, France; el
@@ -44,6 +46,9 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
     /** Los bolsos van como talla única en la etiqueta y en el pedido. */
     private static final String TALLA_UNICA = "U";
+
+    /** Tara de palet cuando el JSON no la trae, la misma que usa APC. */
+    private static final double TARA_PALET_KG_DEFECTO = 10.0;
 
     private static final Map<String, AmiEtiquetaLayout> LAYOUT_POR_DESTINO = Map.of(
             "CHINA", AmiEtiquetaLayout.CHINA,
@@ -97,8 +102,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                         + "' sin etiquetas de AMI implementadas: se omite");
                 continue;
             }
-            resultado.getExcels().add(
-                    generarDestino(destino, layout, pedido, envio, resultado.getAvisos()));
+            resultado.getExcels().add(generarDestino(destino, importado.getPalets(),
+                    layout, pedido, envio, resultado.getAvisos()));
         }
         deduplicarAvisos(resultado);
         return resultado;
@@ -121,7 +126,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         resultado.getAvisos().addAll(unicos);
     }
 
-    private ExcelGenerado generarDestino(DestinoData destino, AmiEtiquetaLayout layout,
+    private ExcelGenerado generarDestino(DestinoData destino, List<PaletData> palets,
+                                         AmiEtiquetaLayout layout,
                                          AmiPedidoExcel pedido, DatosEnvio envio,
                                          List<String> avisos) throws IOException {
         // Una caja física por numeroCaja, en orden ascendente.
@@ -140,11 +146,85 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     destino.getNombreDestino(), avisos, cajasPendientes, filasExtra));
         }
 
+        List<EtiquetaPaletAmi> etiquetasPalet =
+                etiquetasDePalet(cajasFisicas, destino, palets, avisos);
+
         String nombreFichero = ("Etiquetas_AMI_" + destino.getNombreDestino() + "_"
                 + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
-        byte[] contenido = builder.generar(layout, etiquetas, filasExtra);
+        byte[] contenido = builder.generar(layout, etiquetas, filasExtra, etiquetasPalet);
         return new ExcelGenerado(destino.getNombreDestino(), nombreFichero,
                 contenido, cajasPendientes);
+    }
+
+    /**
+     * Las etiquetas de palet de la destinación, una por palet y en orden de
+     * número de palet.
+     *
+     * El campo palet es OPCIONAL en el JSON, así que basta con que una caja
+     * no lo traiga para que la destinación se quede sin hoja de palets: una
+     * hoja a medias se imprime y se pega en bultos reales igual que una
+     * completa, y quien la mire asumirá que están todas. Distinto de un peso
+     * que falta, que solo deja en blanco su celda.
+     *
+     * El rango de cajas se lee de las CAJAS, no del rango del PaletData: ese
+     * es el del JSON original y se queda viejo en cuanto el usuario corrige
+     * un palet en la pantalla de revisión.
+     */
+    private List<EtiquetaPaletAmi> etiquetasDePalet(List<CajaFisica> cajasFisicas,
+                                                    DestinoData destino,
+                                                    List<PaletData> palets,
+                                                    List<String> avisos) {
+        String nombreDestino = destino.getNombreDestino();
+        boolean algunaSinPalet = destino.getCajas().stream()
+                .anyMatch(caja -> caja.getNumeroPalet() == null);
+        if (palets.isEmpty() || algunaSinPalet) {
+            avisos.add("Destinación " + nombreDestino + ": "
+                    + (palets.isEmpty() ? "no hay datos de palet"
+                            : "hay cajas sin palet asignado")
+                    + ", el excel sale sin hoja de etiquetas de palet");
+            return List.of();
+        }
+        List<EtiquetaPaletAmi> etiquetas = new ArrayList<>();
+        for (PaletData palet : palets.stream()
+                .sorted(Comparator.comparingInt(PaletData::getNumeroPalet)).toList()) {
+            List<CajaFisica> suyas = cajasFisicas.stream()
+                    .filter(caja -> Integer.valueOf(palet.getNumeroPalet())
+                            .equals(caja.numeroPalet()))
+                    .toList();
+            if (suyas.isEmpty()) {
+                avisos.add("Palet " + palet.getNumeroPalet() + " de " + nombreDestino
+                        + " sin cajas asignadas: no se le genera etiqueta");
+                continue;
+            }
+            Double peso = pesoDelPalet(suyas, palet);
+            if (peso == null) {
+                avisos.add("Palet " + palet.getNumeroPalet() + " de " + nombreDestino
+                        + " con cajas sin peso: etiqueta de palet sin peso");
+            }
+            etiquetas.add(new EtiquetaPaletAmi(
+                    "Nº " + suyas.stream().mapToInt(CajaFisica::numeroCaja).min().getAsInt()
+                            + " à Nº "
+                            + suyas.stream().mapToInt(CajaFisica::numeroCaja).max().getAsInt(),
+                    peso == null ? null : String.format(ESPANOL, "%.2f Kg", peso)));
+        }
+        return etiquetas;
+    }
+
+    /**
+     * Suma de los pesos de las cajas FÍSICAS del palet (uno por caja, el de su
+     * línea líder: nunca sumar líneas) más la tara. null si a alguna caja le
+     * falta el peso: sumar solo las que lo traen daría un peso más bajo que el
+     * real sin que se note.
+     */
+    private static Double pesoDelPalet(List<CajaFisica> cajas, PaletData palet) {
+        double total = 0;
+        for (CajaFisica caja : cajas) {
+            if (caja.pesoBrutoKg() == null) {
+                return null;
+            }
+            total += caja.pesoBrutoKg();
+        }
+        return total + (palet.getTara() != null ? palet.getTara() : TARA_PALET_KG_DEFECTO);
     }
 
     /** Un artículo de la caja con lo que aporta el excel de pedido. */

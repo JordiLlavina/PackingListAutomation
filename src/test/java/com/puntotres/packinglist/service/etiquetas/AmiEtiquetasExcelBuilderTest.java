@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 
 import org.apache.poi.ss.SpreadsheetVersion;
@@ -413,6 +414,152 @@ class AmiEtiquetasExcelBuilderTest {
         try (XSSFWorkbook libro = new XSSFWorkbook(Files.newInputStream(muestra))) {
             assertEquals(2, libro.getNumberOfSheets());
             assertNotNull(libro.getSheet(HojaCodigosBarrasExtra.NOMBRE_HOJA));
+        }
+    }
+
+    // --- hoja de etiquetas de palet ---
+
+    private static final AmiEtiquetasExcelBuilder.EtiquetaPaletAmi PALET_1 =
+            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi("Nº 1 à Nº 12", "64,58 Kg");
+    private static final AmiEtiquetasExcelBuilder.EtiquetaPaletAmi PALET_2 =
+            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi("Nº 13 à Nº 20", "41,20 Kg");
+    private static final AmiEtiquetasExcelBuilder.EtiquetaPaletAmi PALET_3 =
+            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi("Nº 21 à Nº 21", null);
+
+    private byte[] conPalets(AmiEtiquetaLayout layout,
+                             List<AmiEtiquetasExcelBuilder.EtiquetaPaletAmi> palets)
+            throws IOException {
+        return builder.generar(layout, List.of(etiquetaBolso("1 / 1")), List.of(), palets);
+    }
+
+    @Test
+    void conPaletsElLibroAnadeLaHojaDeEtiquetasDePalet() throws IOException {
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA, List.of(PALET_1));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertEquals(2, libro.getNumberOfSheets());
+            assertEquals("AMI CHINA", libro.getSheetName(0));
+            assertEquals(AmiEtiquetaLayout.CHINA.nombreHojaPalets(), libro.getSheetName(1));
+        }
+    }
+
+    @Test
+    void sinPaletsElLibroNoTraeLaHojaDeEtiquetasDePalet() throws IOException {
+        // El campo palet es opcional: si el generador no ha podido componer
+        // las etiquetas, esa hoja no debe salir a medias ni en blanco.
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA, List.of());
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertEquals(1, libro.getNumberOfSheets());
+            assertEquals("AMI CHINA", libro.getSheetName(0));
+        }
+    }
+
+    @Test
+    void escribeElRangoDeCajasYElPesoDeCadaPalet() throws IOException {
+        byte[] excel = conPalets(AmiEtiquetaLayout.JAPAN, List.of(PALET_1, PALET_2, PALET_3));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheet(AmiEtiquetaLayout.JAPAN.nombreHojaPalets());
+            int altura = AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+            int colis = AmiEtiquetaLayout.FILA_PALET_COLIS;
+            int peso = AmiEtiquetaLayout.FILA_PALET_PESO;
+            assertEquals("Nº 1 à Nº 12", texto(hoja, colis, 2));
+            assertEquals("64,58 Kg", texto(hoja, peso, 2));
+            assertEquals("Nº 13 à Nº 20", texto(hoja, colis + altura, 2));
+            assertEquals("41,20 Kg", texto(hoja, peso + altura, 2));
+            // Peso desconocido = celda en blanco, nunca el valor de ejemplo
+            // de la plantilla.
+            assertEquals("Nº 21 à Nº 21", texto(hoja, colis + 2 * altura, 2));
+            assertEquals("", texto(hoja, peso + 2 * altura, 2));
+        }
+    }
+
+    @Test
+    void elBloqueDePaletCopiadoConservaLosTextosFijosYLosAltos() throws IOException {
+        // El destinatario y la destinación viven en la plantilla: los bloques
+        // replicados tienen que traerlos igual que el primero.
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA, List.of(PALET_1, PALET_2));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheet(AmiEtiquetaLayout.CHINA.nombreHojaPalets());
+            int altura = AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+            int destinacion = AmiEtiquetaLayout.FILA_PRIMER_PALET + 2;
+            assertEquals(texto(hoja, destinacion, 2), texto(hoja, destinacion + altura, 2));
+            assertEquals("CHINA", texto(hoja, destinacion + altura, 2));
+            assertEquals(hoja.getRow(destinacion).getHeightInPoints(),
+                    hoja.getRow(destinacion + altura).getHeightInPoints(), 0.01);
+        }
+    }
+
+    @Test
+    void separaLasPaginasCadaDosPalets() throws IOException {
+        // Media página por etiqueta: el salto va tras el segundo palet, no
+        // tras cada uno.
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA,
+                List.of(PALET_1, PALET_2, PALET_3, PALET_1));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheet(AmiEtiquetaLayout.CHINA.nombreHojaPalets());
+            int altura = AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+            int primero = AmiEtiquetaLayout.FILA_PRIMER_PALET;
+            // 4 palets = 2 páginas, así que un solo salto: tras el segundo.
+            assertEquals(List.of(primero + 2 * altura - 1),
+                    Arrays.stream(hoja.getRowBreaks()).boxed().toList());
+        }
+    }
+
+    @Test
+    void elAreaDeImpresionDeLosPaletsLlegaHastaElUltimo() throws IOException {
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA, List.of(PALET_1, PALET_2, PALET_3));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            int indice = libro.getSheetIndex(AmiEtiquetaLayout.CHINA.nombreHojaPalets());
+            String area = libro.getPrintArea(indice);
+            assertNotNull(area, "la hoja de palets debe conservar su área de impresión");
+            AreaReference referencia = new AreaReference(area, SpreadsheetVersion.EXCEL2007);
+            assertEquals(0, referencia.getFirstCell().getRow());
+            assertEquals(AmiEtiquetaLayout.FILA_PRIMER_PALET
+                            + 3 * AmiEtiquetaLayout.ALTURA_BLOQUE_PALET - 1,
+                    referencia.getLastCell().getRow());
+        }
+    }
+
+    @Test
+    void elSegundoPaletDeEjemploNoSobreviveConUnSoloPalet() throws IOException {
+        // La plantilla trae DOS bloques de ejemplo en la hoja de palets (para
+        // enseñar que caben dos por A4). Con un solo palet, el segundo tiene
+        // que desaparecer: si no, se imprime y se pega en un bulto la etiqueta
+        // de ejemplo del cliente ("Nº 12 à Nº 24").
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA, List.of(PALET_1));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheet(AmiEtiquetaLayout.CHINA.nombreHojaPalets());
+            int segundoBloque = AmiEtiquetaLayout.FILA_PALET_COLIS
+                    + AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+            assertEquals("", texto(hoja, segundoBloque, 2));
+            assertEquals("", texto(hoja, segundoBloque, 1));
+        }
+    }
+
+    @Test
+    void elContadorApuntadoAManoNoSobrevive() throws IOException {
+        // La fila 1 de la plantilla trae un contador suelto en E1 que es un
+        // apunte del cliente, no un dato del envío.
+        byte[] excel = conPalets(AmiEtiquetaLayout.CHINA, List.of(PALET_1, PALET_2));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheet(AmiEtiquetaLayout.CHINA.nombreHojaPalets());
+            assertEquals("", texto(hoja, 0, 4));
+        }
+    }
+
+    @Test
+    void conPaletsYCodigosExtraSalenLasTresHojasEnOrden() throws IOException {
+        byte[] excel = builder.generar(AmiEtiquetaLayout.CHINA,
+                List.of(etiquetaBolso("1 / 1")),
+                List.of(new FilaCodigoBarrasExtra("1 / 1", "CHINA",
+                        new EtiquetaArticulo("ULL753.AL0168", "Size: U", "001 IVORY",
+                                "Cde: 07665", "3666598313495"),
+                        null)),
+                List.of(PALET_1));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertEquals(3, libro.getNumberOfSheets());
+            assertEquals("AMI CHINA", libro.getSheetName(0));
+            assertEquals(AmiEtiquetaLayout.CHINA.nombreHojaPalets(), libro.getSheetName(1));
+            assertEquals(HojaCodigosBarrasExtra.NOMBRE_HOJA, libro.getSheetName(2));
         }
     }
 

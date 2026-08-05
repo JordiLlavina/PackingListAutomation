@@ -31,7 +31,8 @@ package com.puntotres.packinglist.service.etiquetas;
  * AmiEtiquetaLayoutTest las ancla.
  */
 public record AmiEtiquetaLayout(
-        String nombreHoja, String sufijoPo, int alturaBloque, int offsetSegundaEtiqueta,
+        String nombreHoja, String nombreHojaPalets, String sufijoPo,
+        int alturaBloque, int offsetSegundaEtiqueta,
         int filaOrderNumber, int filaTemporada, int filaReferencia, int filaColor,
         int filaTalla, int filaCantidad, int filaPeso, int filaParcel,
         AnclajeBloque imagenArticulo, AnclajeBloque ean128) {
@@ -40,20 +41,34 @@ public record AmiEtiquetaLayout(
     public static final int COL_VALOR = 2;
     public static final int COL_BARCODE = 2;
 
+    /**
+     * La hoja de etiquetas de palet es idéntica en las tres destinaciones
+     * (solo cambian los textos fijos del destinatario), así que sus
+     * coordenadas son constantes compartidas y no campos del record.
+     *
+     * El bloque NO arranca en la fila 0: encima lleva una fila con el
+     * contador que el cliente apunta a mano. Caben dos etiquetas por A4,
+     * media página cada una.
+     */
+    public static final int FILA_PRIMER_PALET = 1;
+    public static final int ALTURA_BLOQUE_PALET = 7;
+    public static final int FILA_PALET_COLIS = 5;
+    public static final int FILA_PALET_PESO = 6;
+
     public static final AmiEtiquetaLayout CHINA = new AmiEtiquetaLayout(
-            "AMI CHINA", "CH", 34, 17,
+            "AMI CHINA", "Etiquetas Palets CHINA", "CH", 34, 17,
             8, 11, 10, 12, 13, 14, 15, 16,
             new AnclajeBloque(10, 2481943, 54429, 1674091, 762000),
             new AnclajeBloque(8, 1352897, 143333, 2727960, 452413));
 
     public static final AmiEtiquetaLayout JAPAN = new AmiEtiquetaLayout(
-            "AMI JAPAN", "JP", 32, 16,
+            "AMI JAPAN", "Etiquetas Palets JAPAN", "JP", 32, 16,
             7, 10, 9, 11, 12, 13, 14, 15,
             new AnclajeBloque(9, 2241177, 26896, 1674091, 762000),
             new AnclajeBloque(7, 918884, 62682, 3009900, 502991));
 
     public static final AmiEtiquetaLayout FRANCE = new AmiEtiquetaLayout(
-            "AMI FRANCE", null, 32, 16,
+            "AMI FRANCE", "Etiquetas Palets FRANCE", null, 32, 16,
             7, 10, 9, 11, 12, 13, 14, 15,
             new AnclajeBloque(9, 2937163, 69273, 1674091, 762000),
             new AnclajeBloque(7, 2057400, 156331, 2575560, 430408));

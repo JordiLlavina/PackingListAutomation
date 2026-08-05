@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -131,9 +133,97 @@ class AmiEtiquetaLayoutTest {
         }
     }
 
+    // --- hojas de etiquetas de palet ---
+
+    @Test
+    void cadaDestinacionTieneSuHojaDeEtiquetasDePalet() {
+        for (AmiEtiquetaLayout layout : todos()) {
+            assertTrue(plantilla.getSheet(layout.nombreHojaPalets()) != null,
+                    () -> "la plantilla no tiene la hoja '" + layout.nombreHojaPalets() + "'");
+        }
+    }
+
+    /**
+     * El bloque de palet no arranca en la fila 0: encima lleva una fila con
+     * el contador que el cliente apunta a mano. La altura sale de la
+     * separación real entre los dos bloques de ejemplo de la plantilla.
+     */
+    @Test
+    void elBloqueDePaletArrancaTrasElContadorYMideLoQueSepara() {
+        for (AmiEtiquetaLayout layout : todos()) {
+            List<Integer> bloques = filasDeLaEtiquetaDeTexto(
+                    hojaPalets(layout), "EXPEDITEUR");
+            assertEquals(2, bloques.size(),
+                    layout.nombreHojaPalets() + ": se esperaban dos bloques de ejemplo");
+            assertEquals(AmiEtiquetaLayout.FILA_PRIMER_PALET, bloques.get(0),
+                    layout.nombreHojaPalets());
+            assertEquals(AmiEtiquetaLayout.ALTURA_BLOQUE_PALET,
+                    bloques.get(1) - bloques.get(0), layout.nombreHojaPalets());
+        }
+    }
+
+    @Test
+    void lasFilasDeValorDelPaletSonLasDeLaPlantilla() {
+        for (AmiEtiquetaLayout layout : todos()) {
+            XSSFSheet hoja = hojaPalets(layout);
+            assertEquals(AmiEtiquetaLayout.FILA_PALET_COLIS,
+                    filasDeLaEtiquetaDeTexto(hoja, "Nombre total de colis sur la palette")
+                            .get(0),
+                    layout.nombreHojaPalets());
+            assertEquals(AmiEtiquetaLayout.FILA_PALET_PESO,
+                    filasDeLaEtiquetaDeTexto(hoja, "Poids brut").get(0),
+                    layout.nombreHojaPalets());
+        }
+    }
+
+    /**
+     * Las dos filas que se rellenan tienen que caer dentro del primer bloque:
+     * los palets se escriben desplazados i*ALTURA_BLOQUE_PALET y una fila de
+     * fuera pisaría la etiqueta siguiente.
+     */
+    @Test
+    void lasFilasDeValorDelPaletCabenDentroDeSuBloque() {
+        int ultima = AmiEtiquetaLayout.FILA_PRIMER_PALET
+                + AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+        for (int fila : new int[] {AmiEtiquetaLayout.FILA_PALET_COLIS,
+                AmiEtiquetaLayout.FILA_PALET_PESO}) {
+            assertTrue(fila >= AmiEtiquetaLayout.FILA_PRIMER_PALET && fila < ultima,
+                    "la fila " + fila + " se sale del primer bloque de palet");
+        }
+    }
+
     // --- lectura de la plantilla ---
 
     private record ImagenAnclada(int fila, long dx, long dy) {
+    }
+
+    private static XSSFSheet hojaPalets(AmiEtiquetaLayout layout) {
+        XSSFSheet hoja = plantilla.getSheet(layout.nombreHojaPalets());
+        assertTrue(hoja != null,
+                () -> "la plantilla no tiene la hoja '" + layout.nombreHojaPalets() + "'");
+        return hoja;
+    }
+
+    /**
+     * Todas las filas cuya celda de columna B lleva ese rótulo, en orden.
+     * Los rótulos de las hojas de palet son bilingües y de varias líneas
+     * ("EXPEDITEUR\n(Shipper / Sender)\nPROVENANCE\n(Origin)"), así que se
+     * compara solo la PRIMERA línea, y sin espacios de sobra: la plantilla
+     * trae "Poids brut " con uno al final.
+     */
+    private static List<Integer> filasDeLaEtiquetaDeTexto(XSSFSheet hoja, String rotulo) {
+        List<Integer> filas = new ArrayList<>();
+        for (Row fila : hoja) {
+            Cell celda = fila.getCell(AmiEtiquetaLayout.COL_TEMPORADA);
+            if (celda != null && celda.getCellType() == CellType.STRING
+                    && celda.getStringCellValue().lines().findFirst()
+                            .map(String::trim).filter(rotulo::equals).isPresent()) {
+                filas.add(fila.getRowNum());
+            }
+        }
+        assertTrue(!filas.isEmpty(),
+                () -> "no se encontró el rótulo '" + rotulo + "' en " + hoja.getSheetName());
+        return filas;
     }
 
     private static XSSFSheet hoja(AmiEtiquetaLayout layout) {
