@@ -75,8 +75,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             Optional<ApcEtiquetaLayout> layout =
                     ApcEtiquetaLayout.paraDestino(destino.getNombreDestino());
             if (layout.isEmpty()) {
-                resultado.getAvisos().add("Destinación '" + destino.getNombreDestino()
-                        + "' sin etiquetas de APC implementadas: se omite");
+                resultado.getAvisos().add(AvisoEtiquetas.deDestino(destino.getNombreDestino(),
+                        "sin etiquetas de APC implementadas. Se omite"));
                 continue;
             }
             resultado.getExcels().add(generarDestino(destino, importado.getPalets(),
@@ -107,8 +107,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 etiquetasDePalet(cajasFisicas, destino.getNombreDestino(), palets, avisos);
 
         if (destino.getCajas().stream().anyMatch(caja -> caja.getNumeroPalet() == null)) {
-            avisos.add("Destinación " + destino.getNombreDestino()
-                    + ": hay cajas sin palet asignado, no salen en ninguna etiqueta de palet");
+            avisos.add(AvisoEtiquetas.deDestino(destino.getNombreDestino(),
+                    "hay cajas sin palet asignado. No salen en ninguna etiqueta de palet"));
         }
 
         String nombreFichero = ("Etiquetas_APC_" + destino.getNombreDestino() + "_"
@@ -147,9 +147,9 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             refsColores.add(claveRefColor(linea));
         }
         if (refsColores.size() > 1 && cinturones) {
-            avisos.add("La caja " + lider.getNumeroCaja() + " de " + nombreDestino
-                    + " mezcla varias referencias/colores: la etiqueta lleva "
-                    + lider.getReferencia() + " " + lider.getCodigoColor());
+            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, lider.getNumeroCaja(),
+                    "Mezcla de referencias/colores. La etiqueta lleva "
+                    + lider.getReferencia() + " " + lider.getCodigoColor()));
         }
 
         String size;
@@ -208,8 +208,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                                                     List<PaletData> palets,
                                                     List<String> avisos) {
         if (palets.isEmpty()) {
-            avisos.add("Destinación " + nombreDestino
-                    + " sin palets: la hoja de etiquetas de palet sale en blanco");
+            avisos.add(AvisoEtiquetas.deDestino(nombreDestino,
+                    "sin palets. La hoja de etiquetas de palet sale en blanco"));
             return List.of();
         }
         List<EtiquetaPaletApc> etiquetas = new ArrayList<>();
@@ -229,8 +229,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 }
             }
             if (!completo || peso == null) {
-                avisos.add("Palet " + palet.getNumeroPalet() + " de " + nombreDestino
-                        + " con cajas sin peso: etiqueta de palet sin peso");
+                avisos.add(AvisoEtiquetas.deDestino(nombreDestino, "Palet "
+                        + palet.getNumeroPalet() + " con cajas sin peso. Etiqueta de palet sin peso"));
                 peso = null;
             } else {
                 peso += palet.getTara() != null ? palet.getTara() : TARA_PALET_KG_DEFECTO;

@@ -782,29 +782,14 @@ class PackingListControllerTest {
                 new PedidoAmiExcel.Fila("SPAIN", "USL737.ACO137", "NOIR", "BLACK", "U", "07713 CH"));
     }
 
+    /**
+     * El excel de pedido se pide en la pantalla de entrada, así que /generar
+     * ya puede dejar las etiquetas hechas: no hay paso intermedio.
+     */
     @Test
-    void elPasoDeEtiquetasPideElExcelDePedidoDeAmi() throws Exception {
-        MockHttpSession sesion = sesionConEnvioGenerado();
-        mvc.perform(get("/etiquetas").session(sesion))
-                .andExpect(status().isOk())
-                .andExpect(view().name("etiquetas"))
-                .andExpect(content().string(containsString("Introducir excel del pedido de AMI")))
-                .andExpect(content().string(containsString("PARIS")));
-    }
+    void generarDejaLasEtiquetasListasEnResultados() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
 
-    @Test
-    void generarEtiquetasDejaLosExcelsDescargables() throws Exception {
-        MockHttpSession sesion = sesionConEnvioGenerado();
-
-        mvc.perform(multipart("/etiquetas/generar")
-                        .file(new MockMultipartFile("pedido", "AMI EAN H26.xlsx",
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                pedidoAmiDelFixture()))
-                        .session(sesion))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/resultados"));
-
-        // La tarjeta de resultados lista los excels de etiquetas.
         mvc.perform(get("/resultados").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Etiquetas_AMI_PARIS_FA-26-1189.xlsx")));
@@ -821,12 +806,51 @@ class PackingListControllerTest {
         }
     }
 
+    /**
+     * El excel de pedido es opcional en la entrada: sin él las etiquetas no
+     * salen, pero el packing list sí y el aviso dice qué falta. Nunca bloquear
+     * por un dato que el usuario puede resolver.
+     */
     @Test
-    void generarEtiquetasSinArchivoVuelveAlPasoConError() throws Exception {
+    void sinElExcelDePedidoLasEtiquetasAvisanEnVezDeGenerarse() throws Exception {
         MockHttpSession sesion = sesionConEnvioGenerado();
-        mvc.perform(multipart("/etiquetas/generar").session(sesion))
-                .andExpect(redirectedUrl("/etiquetas"))
-                .andExpect(flash().attributeExists("error"));
+
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Falta el excel del pedido de AMI")))
+                .andExpect(content().string(not(containsString("Etiquetas_AMI_"))))
+                // Los packing lists se generan igual.
+                .andExpect(content().string(containsString(FICHERO_PARIS_USL728)));
+    }
+
+    /**
+     * Sin el paso intermedio ya no hay pantalla que confirme qué excel de
+     * pedido se subió, y el equivocado daría etiquetas malas sin decir nada:
+     * la tarjeta de resultados nombra el fichero con el que se generaron.
+     */
+    @Test
+    void laTarjetaDeEtiquetasDiceConQueExcelDePedidoSeGeneraron() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("AMI EAN H26.xlsx")));
+    }
+
+    /** El paso intermedio que pedía el excel de pedido ya no existe. */
+    @Test
+    void elPasoIntermedioDeEtiquetasYaNoExiste() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
+        mvc.perform(get("/etiquetas").session(sesion))
+                .andExpect(status().isNotFound());
+    }
+
+    /** Los avisos de etiquetas se pintan tal cual: sin el prefijo "Etiquetas:". */
+    @Test
+    void losAvisosDeEtiquetasNoLlevanPrefijo() throws Exception {
+        MockHttpSession sesion = sesionConEnvioGenerado();
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("Etiquetas: "))));
     }
 
     /** Como sesionConEnvioGenerado, pero con el excel de pedido subido en el paso 1. */
@@ -846,38 +870,15 @@ class PackingListControllerTest {
         return sesion;
     }
 
-    @Test
-    void elPedidoSubidoEnLaEntradaNoSeVuelveAPedirEnElPasoDeEtiquetas() throws Exception {
-        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
-
-        // El apóstrofo sale escapado por Thymeleaf (&#39;), así que se busca
-        // el texto sin comillas.
-        mvc.perform(get("/etiquetas").session(sesion))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Ya subiste")))
-                .andExpect(content().string(containsString("AMI EAN H26.xlsx")))
-                .andExpect(content().string(not(containsString("accept=\".xlsx\" required"))));
-    }
-
     /**
-     * Enviado como POST normal, no multipart: desde que el excel de pedido
-     * puede venir de la sesión el formulario se manda sin ningún fichero, y
-     * el controlador no puede exigir que la petición sea multipart (lo era
-     * siempre cuando el input era obligatorio).
+     * Volver a revisión y regenerar rehace también las etiquetas con el mismo
+     * excel de pedido: sigue en sesión desde la pantalla de entrada.
      */
     @Test
-    void generarEtiquetasSinPeticionMultipartNoRevienta() throws Exception {
+    void regenerarRehaceLasEtiquetasConElPedidoDeLaSesion() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();
 
-        mvc.perform(post("/etiquetas/generar").session(sesion))
-                .andExpect(redirectedUrl("/resultados"));
-    }
-
-    @Test
-    void conElPedidoEnSesionSeGeneranLasEtiquetasSinVolverASubirlo() throws Exception {
-        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
-
-        mvc.perform(multipart("/etiquetas/generar").session(sesion))
+        mvc.perform(post("/generar").session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
         mvc.perform(get("/resultados").session(sesion))
@@ -904,8 +905,6 @@ class PackingListControllerTest {
         mvc.perform(get("/resultados").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("En desarrollo")));
-        mvc.perform(get("/etiquetas").session(sesion))
-                .andExpect(redirectedUrl("/resultados"));
     }
 
     /** JSON mínimo de APC con la destinación parametrizada (IVRY no tiene etiquetas, JAPAN sí). */
@@ -935,33 +934,28 @@ class PackingListControllerTest {
                 .andExpect(redirectedUrl("/resultados"));
     }
 
+    /** APC no pide ningún archivo extra: sus etiquetas salen sin más. */
     @Test
-    void elPasoDeEtiquetasHabilitaElBotonSinCamposCuandoLaDestinacionEstaSoportada() throws Exception {
+    void apcGeneraSusEtiquetasSinPedirNingunArchivo() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importarApc(sesion, "JAPAN");
 
-        mvc.perform(get("/etiquetas").session(sesion))
+        mvc.perform(get("/resultados").session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(view().name("etiquetas"))
-                .andExpect(model().attribute("haySoportadas", true))
-                // APC no pide ningún archivo extra: sin campos que rellenar.
-                .andExpect(content().string(not(containsString("required"))))
-                .andExpect(content().string(not(containsString("disabled"))));
+                .andExpect(content().string(containsString("Etiquetas_APC_JAPAN_FA-26-1.xlsx")));
     }
 
     @Test
-    void elPasoDeEtiquetasDeshabilitaElBotonCuandoNingunaDestinacionEstaSoportada() throws Exception {
+    void unaDestinacionSinEtiquetasImplementadasAvisaEnResultados() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         // IVRY es una destinación válida de APC para el packing list, pero
         // sin etiquetas implementadas.
         importarApc(sesion, "IVRY");
 
-        mvc.perform(get("/etiquetas").session(sesion))
+        mvc.perform(get("/resultados").session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(view().name("etiquetas"))
-                .andExpect(model().attribute("haySoportadas", false))
-                .andExpect(content().string(containsString("Ninguna destinación de este envío tiene etiquetas implementadas.")))
-                .andExpect(content().string(containsString("disabled")));
+                .andExpect(content().string(containsString("sin etiquetas de APC implementadas")))
+                .andExpect(content().string(not(containsString("Etiquetas_APC_"))));
     }
 
     // --- destinaciones sin configurar (clientes con catálogo de destinos) ---

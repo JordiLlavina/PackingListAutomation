@@ -25,9 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.web.util.WebUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,7 +56,6 @@ import com.puntotres.packinglist.service.etiquetas.EtiquetasGenerationService;
 import com.puntotres.packinglist.service.etiquetas.GeneradorEtiquetasCliente;
 import com.puntotres.packinglist.service.etiquetas.ResultadoEtiquetas;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 /**
@@ -66,6 +63,10 @@ import jakarta.validation.Valid;
  * entrada (pegar JSON + cabecera) → revisión (avisos y pesos editables)
  * → resultados (descarga de excels). Orquesta los mismos servicios que
  * {@code Main.java}, con el estado del envío en la sesión HTTP.
+ *
+ * Las etiquetas de caja salen en el mismo /generar que los packing lists:
+ * el único archivo que hacían falta —el excel de pedido del cliente— se
+ * sube en la pantalla de entrada, así que no hay paso intermedio.
  *
  * Su primera pantalla vive en /packing-list: la raíz es el menú
  * (MenuController), desde el que se llega también a las etiquetas de
@@ -234,7 +235,7 @@ public class PackingListController {
         envioEnCurso.setImportado(importado);
 
         // El excel de pedido se guarda aunque el cliente no lo use en el
-        // packing list: AMI lo reutiliza en el Paso 2 de etiquetas.
+        // packing list: AMI lo necesita para sus etiquetas de caja.
         byte[] excelPedido = null;
         MultipartFile pedidoSubido = envioForm.getPedidoCliente();
         if (pedidoSubido != null && !pedidoSubido.isEmpty()) {
@@ -369,10 +370,54 @@ public class PackingListController {
         envioEnCurso.getAvisosGeneracion().clear();
         envioEnCurso.getAvisosGeneracion().addAll(avisosGeneracion);
         envioEnCurso.setVolcadoErp(volcado);
-        // Regenerar invalida las etiquetas ya hechas (pesos/cajas cambiados).
+        // Las etiquetas se rehacen en el mismo paso: regenerar invalidaría las
+        // ya hechas de todos modos (pesos y cajas pueden haber cambiado).
+        generarEtiquetasDelEnvio();
+        return "redirect:/resultados";
+    }
+
+    /**
+     * Etiquetas de caja del envío, generadas junto con los packing lists: ya
+     * no hay un paso intermedio que pida archivos, porque el único que hacía
+     * falta —el excel de pedido del cliente— se sube en la pantalla de entrada.
+     *
+     * Nada de esto bloquea el envío: un archivo que falte o un fallo del
+     * generador dejan un aviso y las etiquetas sin generar, con los packing
+     * lists ya hechos intactos. Un campo requerido que NO sea el excel de
+     * pedido hoy no lo puede aportar nadie (ningún generador declara otro);
+     * si algún día aparece, el usuario verá qué falta en vez de nada.
+     */
+    private void generarEtiquetasDelEnvio() {
         envioEnCurso.getEtiquetas().clear();
         envioEnCurso.getAvisosEtiquetas().clear();
-        return "redirect:/resultados";
+        GeneradorEtiquetasCliente generadorEtiquetas = generadorEtiquetasDelEnvio().orElse(null);
+        if (generadorEtiquetas == null) {
+            return;
+        }
+        List<CampoEtiquetas> campos = generadorEtiquetas.camposRequeridos(destinosDelEnvio());
+        Map<String, byte[]> archivos = new LinkedHashMap<>();
+        for (CampoEtiquetas campo : campos) {
+            byte[] contenido = campo.esPedidoCliente()
+                    ? envioEnCurso.getExcelPedidoCliente() : null;
+            if (contenido == null) {
+                envioEnCurso.getAvisosEtiquetas().add(
+                        "Falta el " + campo.titulo() + ". No se generan las etiquetas de caja");
+            } else {
+                archivos.put(campo.nombre(), contenido);
+            }
+        }
+        if (archivos.size() < campos.size()) {
+            return;
+        }
+        try {
+            ResultadoEtiquetas resultado = generadorEtiquetas.generar(
+                    envioEnCurso.getImportado().getDestinos(), envioEnCurso.getCabecera(), archivos);
+            envioEnCurso.getEtiquetas().addAll(resultado.getExcels());
+            envioEnCurso.getAvisosEtiquetas().addAll(resultado.getAvisos());
+        } catch (IOException | RuntimeException e) {
+            envioEnCurso.getAvisosEtiquetas().add(
+                    "No se pudieron generar las etiquetas de caja: " + e.getMessage());
+        }
     }
 
     // --- Paso 3: resultados y descargas ---
@@ -391,6 +436,9 @@ public class PackingListController {
         model.addAttribute("volcadoErp", envioEnCurso.getVolcadoErp());
         model.addAttribute("etiquetas", envioEnCurso.getEtiquetas());
         model.addAttribute("avisosEtiquetas", envioEnCurso.getAvisosEtiquetas());
+        // Ya no hay pantalla que confirme qué excel de pedido se subió, así
+        // que la tarjeta de etiquetas nombra el que las ha generado.
+        model.addAttribute("nombrePedidoCliente", envioEnCurso.getNombreExcelPedidoCliente());
         model.addAttribute("hayGeneradorEtiquetas", generadorEtiquetasDelEnvio().isPresent());
         return "resultados";
     }
@@ -441,97 +489,6 @@ public class PackingListController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
                         .attachment().filename(volcado.getNombreFichero()).build().toString())
                 .body(constructorVolcado.generar(volcado));
-    }
-
-    // --- Paso extra: etiquetas de caja ---
-
-    /**
-     * Paso 2 de etiquetas: según las destinaciones del envío, el generador
-     * del cliente declara qué archivos extra necesita (ej. el excel del
-     * pedido de la temporada de AMI) antes de poder generar.
-     */
-    @GetMapping("/etiquetas")
-    public String etiquetas(Model model, RedirectAttributes redirect) {
-        if (envioEnCurso.estaVacio()) {
-            return sinEnvio(redirect);
-        }
-        if (envioEnCurso.getExcels().isEmpty()) {
-            return "redirect:/revision";
-        }
-        GeneradorEtiquetasCliente generador = generadorEtiquetasDelEnvio().orElse(null);
-        if (generador == null) {
-            return "redirect:/resultados";
-        }
-        List<DestinoData> destinos = destinosDelEnvio();
-        model.addAttribute("campos", generador.camposRequeridos(destinos));
-        model.addAttribute("destinos", destinos.stream()
-                .map(destino -> Map.of(
-                        "nombre", destino.getNombreDestino(),
-                        "soportado", generador.soportaDestino(destino.getNombreDestino())))
-                .toList());
-        boolean haySoportadas = destinos.stream()
-                .anyMatch(destino -> generador.soportaDestino(destino.getNombreDestino()));
-        model.addAttribute("haySoportadas", haySoportadas);
-        model.addAttribute("cabecera", envioEnCurso.getCabecera());
-        // Si el excel de pedido ya se subió en el paso 1, su input deja de ser
-        // obligatorio aquí y la vista dice cuál hay puesto.
-        model.addAttribute("nombrePedidoEnSesion", envioEnCurso.getNombreExcelPedidoCliente());
-        return "etiquetas";
-    }
-
-    /**
-     * Recibe {@link HttpServletRequest} y no {@code MultipartHttpServletRequest}
-     * a propósito: desde que el excel de pedido puede venir de la sesión, este
-     * formulario se puede enviar sin ningún fichero, y con el tipo multipart
-     * una petición que no lo sea revienta con un 500 antes de entrar aquí.
-     */
-    @PostMapping("/etiquetas/generar")
-    public String generarEtiquetas(HttpServletRequest peticion,
-                                   RedirectAttributes redirect) {
-        if (envioEnCurso.estaVacio()) {
-            return sinEnvio(redirect);
-        }
-        GeneradorEtiquetasCliente generador = generadorEtiquetasDelEnvio().orElse(null);
-        if (generador == null) {
-            return "redirect:/resultados";
-        }
-        List<DestinoData> destinos = destinosDelEnvio();
-        Map<String, byte[]> archivos = new LinkedHashMap<>();
-        try {
-            // getNativeRequest desenvuelve los decoradores de Tomcat/Spring;
-            // null = la petición no traía ningún fichero.
-            MultipartHttpServletRequest multipart =
-                    WebUtils.getNativeRequest(peticion, MultipartHttpServletRequest.class);
-            for (CampoEtiquetas campo : generador.camposRequeridos(destinos)) {
-                MultipartFile archivo =
-                        (multipart == null) ? null : multipart.getFile(campo.nombre());
-                if (archivo != null && !archivo.isEmpty()) {
-                    archivos.put(campo.nombre(), archivo.getBytes());
-                    continue;
-                }
-                // El excel de pedido puede venir de la pantalla de entrada:
-                // si ya está en sesión, no se vuelve a pedir.
-                byte[] deSesion = campo.esPedidoCliente()
-                        ? envioEnCurso.getExcelPedidoCliente() : null;
-                if (deSesion == null) {
-                    redirect.addFlashAttribute("error",
-                            "Falta el archivo: " + campo.titulo());
-                    return "redirect:/etiquetas";
-                }
-                archivos.put(campo.nombre(), deSesion);
-            }
-            ResultadoEtiquetas resultado = generador.generar(
-                    envioEnCurso.getImportado().getDestinos(), envioEnCurso.getCabecera(), archivos);
-            envioEnCurso.getEtiquetas().clear();
-            envioEnCurso.getEtiquetas().addAll(resultado.getExcels());
-            envioEnCurso.getAvisosEtiquetas().clear();
-            envioEnCurso.getAvisosEtiquetas().addAll(resultado.getAvisos());
-        } catch (IOException | RuntimeException e) {
-            redirect.addFlashAttribute("error",
-                    "No se pudieron generar las etiquetas: " + e.getMessage());
-            return "redirect:/etiquetas";
-        }
-        return "redirect:/resultados";
     }
 
     @GetMapping("/descargar-etiquetas/{nombreFichero}")

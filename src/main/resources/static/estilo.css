@@ -48,13 +48,17 @@ header.cabecera .paso {
 
 h2 { margin-top: 2rem; }
 
+/* Los avisos se apilan de a muchos (una revisión con varias destinaciones
+   pasa de diez): interlineado y márgenes justos para que quepan en pantalla
+   sin que la lista se lea apelmazada. */
 .alerta {
     border: 1px solid var(--aviso-borde);
     background: var(--aviso-fondo);
     border-left-width: 4px;
-    padding: 0.6rem 0.9rem;
-    margin: 0.5rem 0;
+    padding: 0.35rem 0.75rem;
+    margin: 0.3rem 0;
     border-radius: 4px;
+    line-height: 1.35;
 }
 
 .alerta.error {
@@ -475,7 +479,7 @@ button:disabled {
 }
 
 .avisos-plegables .alerta {
-    margin: 0.5rem 0 0;
+    margin: 0.3rem 0 0;
 }
 
 .f-cajas h5 { margin: 0.9rem 0 0; font-size: 0.95rem; }

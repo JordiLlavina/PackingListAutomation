@@ -237,10 +237,33 @@ class AmiEtiquetasGeneradorTest {
                 cabecera(), Map.of("pedido", pedido()));
 
         assertTrue(resultado.getAvisos().stream()
-                .anyMatch(aviso -> aviso.contains("sin campo 'pedido'")));
+                .anyMatch(aviso -> aviso.startsWith(
+                        "PARIS: Caja 1. Sin número de pedido en la entrada.")),
+                resultado.getAvisos().toString());
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             assertEquals("",
                     texto(libro.getSheetAt(0), AmiEtiquetaLayout.FRANCE.filaOrderNumber(), 2));
+        }
+    }
+
+    /**
+     * El pedido que manda en la etiqueta es el de la entrada, pero si no
+     * cuadra con el del excel de pedido hay que decirlo: uno de los dos está
+     * mal y solo un humano sabe cuál.
+     */
+    @Test
+    void unPedidoQueNoCuadraConElExcelAvisaYSeQuedaElDeLaEntrada() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(destino("PARIS",
+                        caja(1, "ULL163.AL0052", "221", null, 50, 5.28, "07666")))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        assertTrue(resultado.getAvisos().contains(
+                        "PARIS: Caja 1. el pedido de entrada (07666) no coincide con el PO"
+                        + " del excel de pedido (07665); la etiqueta lleva el de la entrada"),
+                resultado.getAvisos().toString());
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertEquals("07666", texto(libro.getSheetAt(0),
+                    AmiEtiquetaLayout.FRANCE.filaOrderNumber(), 2));
         }
     }
 
@@ -420,8 +443,8 @@ class AmiEtiquetasGeneradorTest {
                         caja(2, "UBL029.AL0216", "001", "105", 3, null, "07672")))),
                 cabecera(), Map.of("pedido", pedido()));
 
-        assertEquals(List.of("La caja 2 de PARIS lleva varias tallas: se han generado "
-                + "códigos de barra aparte para imprimir"), avisosDeCaja(resultado));
+        assertEquals(List.of("PARIS: Caja 2. Lleva varias tallas. "
+                + "Se generan códigos de barra aparte"), avisosDeCaja(resultado));
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             XSSFSheet hoja = libro.getSheetAt(0);
             // SIZE sí sale ordenado, aunque el EAN sea el de la líder.
@@ -623,9 +646,9 @@ class AmiEtiquetasGeneradorTest {
             assertEquals("Cde: 07665", texto(extra, base + 1, 4));
         }
         assertTrue(resultado.getAvisos().stream()
-                .anyMatch(aviso -> aviso.equals("La caja 1 de PARIS mezcla varias "
-                        + "referencias/colores: se han generado códigos de barra aparte "
-                        + "para imprimir")), resultado.getAvisos().toString());
+                .anyMatch(aviso -> aviso.equals("PARIS: Caja 1. Mezcla de "
+                        + "referencias/colores. Se generan códigos de barra aparte")),
+                resultado.getAvisos().toString());
     }
 
     @Test
@@ -651,8 +674,8 @@ class AmiEtiquetasGeneradorTest {
             assertEquals("Size: 105", texto(extra, RejillaEtiquetas.filaBase(1), 4));
         }
         assertTrue(resultado.getAvisos().stream()
-                .anyMatch(aviso -> aviso.equals("La caja 2 de PARIS lleva varias tallas: "
-                        + "se han generado códigos de barra aparte para imprimir")),
+                .anyMatch(aviso -> aviso.equals("PARIS: Caja 2. Lleva varias tallas. "
+                        + "Se generan códigos de barra aparte")),
                 resultado.getAvisos().toString());
     }
 

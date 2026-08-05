@@ -228,9 +228,9 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
         assertEquals("PXBHZ-H65077", texto(hoja, 11, 2));
-        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("La caja 3 de JAPAN")
-                && a.contains("mezcla varias referencias/colores")
-                && a.contains("la etiqueta lleva PXBHZ-H65077 LZZ-NOIR")));
+        assertTrue(resultado.getAvisos().contains("JAPAN: Caja 3. Mezcla de "
+                        + "referencias/colores. La etiqueta lleva PXBHZ-H65077 LZZ-NOIR"),
+                resultado.getAvisos().toString());
     }
 
     @Test

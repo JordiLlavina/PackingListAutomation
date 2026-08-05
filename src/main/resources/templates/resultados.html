@@ -74,19 +74,21 @@
         <button th:unless="${hayVolcado}" type="button" class="secundario" disabled>Vista previa</button>
     </section>
 
-    <!-- Sección 3: etiquetas de caja (Paso 2 aparte: /etiquetas pide los
-         archivos extra que declare el generador del cliente). -->
+    <!-- Sección 3: etiquetas de caja. Se generan en el mismo /generar que los
+         packing lists: el excel de pedido que necesitan viene de la entrada. -->
     <section class="tarjeta seccion-salida" th:if="${hayGeneradorEtiquetas}">
         <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
 
         <div th:if="${!avisosEtiquetas.isEmpty()}">
             <div class="alerta" th:each="aviso : ${avisosEtiquetas}"
-                 th:text="|Etiquetas: ${aviso}|"></div>
+                 th:text="${aviso}"></div>
         </div>
 
         <p th:if="${etiquetas.isEmpty()}">
-            Requieren datos adicionales según las destinaciones del envío.
+            No se ha generado ninguna etiqueta para este envío.
         </p>
+        <p th:if="${!etiquetas.isEmpty() and nombrePedidoCliente != null}" class="ayuda"
+           th:text="|Generadas con el excel de pedido '${nombrePedidoCliente}'|"></p>
         <table th:if="${!etiquetas.isEmpty()}">
             <thead>
             <tr>
@@ -111,9 +113,6 @@
             </tr>
             </tbody>
         </table>
-
-        <a class="boton" th:href="@{/etiquetas}"
-           th:text="${etiquetas.isEmpty()} ? 'Preparar etiquetas' : 'Regenerar etiquetas'"></a>
     </section>
     <!-- Cliente sin generador de etiquetas: sigue en desarrollo. -->
     <section class="tarjeta seccion-salida deshabilitada" th:unless="${hayGeneradorEtiquetas}">
