@@ -14,8 +14,8 @@ import java.util.Optional;
  * La hoja de palet es uniforme en las 4 plantillas: etiqueta modelo en las
  * filas 0..13, nº de cajas en C13 y peso en C14 (1-based).
  *
- * filaLivraison: en WH CROSSLOG es la fila "ASN N°" (esa plantilla no
- * tiene Livraison); recibe el mismo valor.
+ * filaLivraison: en WH CROSSLOG y en RETAIL es la fila "ASN N°" (esas
+ * plantillas no tienen Livraison); recibe el mismo valor.
  *
  * NO cambiar estas coordenadas sin revisar la plantilla, y viceversa.
  */
@@ -51,14 +51,29 @@ record ApcEtiquetaLayout(
             40, 20, 12, 11, 13, 14, 15, 16, 18, 19);
 
     /**
+     * Mismas coordenadas que WH_CROSSLOG: las dos etiquetas van al mismo
+     * almacén (Crosslog) y el cliente solo partió la plantilla para que se
+     * imprima RETAIL o WHOLESALE en la línea DESTINATION. Aun así son DOS
+     * ficheros distintos y ese estático es lo único que los diferencia, así
+     * que confundirlos no rompe nada visible: lo ancla ApcEtiquetaLayoutTest.
+     */
+    public static final ApcEtiquetaLayout RETAIL = new ApcEtiquetaLayout(
+            "/client-labels/apc-etiquetas-retail.xlsx",
+            "Etiquette colis Retail", "Etiquette Palette Retail",
+            40, 20, 12, 11, 13, 14, 15, 16, 18, 19);
+
+    /**
      * Se aceptan la clave del catálogo de packing (D. USA, WHOLESALE) y el
-     * nombre de la plantilla del cliente (USA, WH CROSSLOG).
+     * nombre de la plantilla del cliente (USA, WH CROSSLOG). RETAIL se llama
+     * igual en los dos sitios. Las destinaciones hijas no llegan aquí:
+     * ResolutorDestinosPadre ya las ha resuelto a su padre al importar.
      */
     private static final Map<String, ApcEtiquetaLayout> POR_DESTINO = Map.of(
             "JAPAN", JAPAN,
             "KOREA", KOREA,
             "D. USA", USA, "USA", USA,
-            "WHOLESALE", WH_CROSSLOG, "WH CROSSLOG", WH_CROSSLOG);
+            "WHOLESALE", WH_CROSSLOG, "WH CROSSLOG", WH_CROSSLOG,
+            "RETAIL", RETAIL);
 
     public static Optional<ApcEtiquetaLayout> paraDestino(String nombreDestino) {
         if (nombreDestino == null) {

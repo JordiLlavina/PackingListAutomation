@@ -24,9 +24,9 @@ import com.puntotres.packinglist.service.etiquetas.ApcEtiquetasExcelBuilder.Etiq
 import com.puntotres.packinglist.service.etiquetas.ApcEtiquetasExcelBuilder.EtiquetaPaletApc;
 
 /**
- * Etiquetas de caja y palet de APC: cuatro destinaciones con plantilla
- * propia (JAPAN, KOREA, USA, WH CROSSLOG); ver ApcEtiquetaLayout. No pide
- * archivos al usuario: los datos estáticos van horneados en cada plantilla,
+ * Etiquetas de caja y palet de APC: cinco destinaciones con plantilla
+ * propia (JAPAN, KOREA, USA, WH CROSSLOG y RETAIL); ver ApcEtiquetaLayout.
+ * No pide archivos al usuario: los datos estáticos van horneados en cada plantilla,
  * y el Order N° y el Livraison code salen de la propia caja, que ya los trae
  * rellenos del packing list (PedidoCompletionService completa el pedido desde
  * el excel del cliente y ResolutorDestinosPadre estampa el código). Solo se

@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -123,6 +124,40 @@ class ApcEtiquetasGeneradorTest {
         assertEquals("11", texto(hoja, 14, 2));
         assertEquals("1 / 1", texto(hoja, 17, 2));
         assertEquals("7,60 Kg", texto(hoja, 18, 2));
+    }
+
+    @Test
+    void retailGeneraSusEtiquetasConSuPropiaPlantilla() throws IOException {
+        CajaData linea = caja(1, "PXCBS-F67066", "LZZ-NOIR", null, 2, 3.0, 1);
+        linea.setNumeroPedido("4100128725");
+        linea.setLivraisonCode("PUN20260717RT1");
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("RETAIL", List.of(palet(1, 1, 1, null)), linea)),
+                envio(), Map.of());
+
+        assertEquals(1, resultado.getExcels().size());
+        assertEquals("Etiquetas_APC_RETAIL_26071.xlsx",
+                resultado.getExcels().get(0).getNombreFichero());
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet hoja = libro.getSheet(ApcEtiquetaLayout.RETAIL.hojaCajas());
+            assertNotNull(hoja);
+            assertNotNull(libro.getSheet(ApcEtiquetaLayout.RETAIL.hojaPalet()));
+            // RETAIL comparte coordenadas con WHOLESALE, así que este estático
+            // de la plantilla es lo ÚNICO que distingue haber abierto una u
+            // otra: sin él, apuntar RETAIL al fichero de Crosslog pasaría
+            // todas las demás aserciones.
+            assertEquals("RETAIL", texto(hoja, 10, 2));
+            assertEquals("PUN20260717RT1", texto(hoja, 11, 2)); // ASN N°
+            assertEquals("4100128725", texto(hoja, 12, 2));     // Order N°
+            assertEquals("PXCBS-F67066", texto(hoja, 13, 2));
+            assertEquals("LZZ-NOIR", texto(hoja, 14, 2));
+            assertEquals("U", texto(hoja, 15, 2));
+            assertEquals("2", texto(hoja, 16, 2));
+            assertEquals("1 / 1", texto(hoja, 18, 2));
+            assertEquals("3,00 Kg", texto(hoja, 19, 2));
+        }
     }
 
     @Test
