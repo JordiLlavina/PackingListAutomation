@@ -145,8 +145,12 @@
                     </td>
                     <td>
                         <!-- Propaga el peso tecleado en esta fila a todas las
-                             cajas de su modelo (mismo recálculo global). -->
-                        <button th:if="${fila.esLider}" type="submit" class="mini" th:formaction="@{/recalcular}"
+                             cajas de su modelo (mismo recálculo global). Un
+                             bulto con varios artículos o varias tallas no lo
+                             ofrece: su peso es el de todos juntos y no hay
+                             peso por unidad que llevarse a otras cajas. -->
+                        <button th:if="${fila.puedeRecalcularPeso}" type="submit" class="mini"
+                                th:formaction="@{/recalcular}"
                                 title="Aplicar este peso a todas las cajas del mismo modelo">recalcula peso</button>
                     </td>
                 </tr>

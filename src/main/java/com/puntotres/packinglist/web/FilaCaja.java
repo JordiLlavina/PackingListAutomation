@@ -22,6 +22,8 @@ import com.puntotres.packinglist.model.CajaData;
  *     todo lo visible, así que da igual cuál se lea.</li>
  * <li>{@code esLider}: es la primera línea de su caja física, la única que
  *     muestra campos de peso editables.</li>
+ * <li>{@code bultoMixto}: la caja física de la fila tiene más de una línea
+ *     (varios artículos o varias tallas en el mismo bulto).</li>
  * <li>{@code cajaPendiente}: la caja física aún no tiene los dos pesos, para
  *     resaltar la fila.</li>
  * <li>{@code alternable}: la fila pinta el triángulo de desplegar/plegar. Solo
@@ -34,7 +36,7 @@ import com.puntotres.packinglist.model.CajaData;
  * </ul>
  */
 public record FilaCaja(int indiceGlobal, String rangoCajas, List<Integer> indicesEnDestino,
-                       CajaData caja, boolean esLider, boolean cajaPendiente,
+                       CajaData caja, boolean esLider, boolean bultoMixto, boolean cajaPendiente,
                        boolean alternable, boolean desplegada) {
 
     /**
@@ -43,5 +45,19 @@ public record FilaCaja(int indiceGlobal, String rangoCajas, List<Integer> indice
      */
     public boolean numeroCajaEditable() {
         return indicesEnDestino.size() == 1;
+    }
+
+    /**
+     * Si la fila ofrece el botón de recalcular peso, que propaga el peso
+     * tecleado al resto de cajas del mismo modelo.
+     *
+     * Un bulto mixto no lo ofrece: su peso es el de varios artículos juntos y
+     * no se sabe qué parte es de cada uno, así que no hay peso por unidad que
+     * llevarse a otras cajas. El peso se sigue editando a mano ({@code
+     * esLider}); lo que se retira es la promesa de que ese número sirva para
+     * calcular los demás.
+     */
+    public boolean puedeRecalcularPeso() {
+        return esLider && !bultoMixto;
     }
 }

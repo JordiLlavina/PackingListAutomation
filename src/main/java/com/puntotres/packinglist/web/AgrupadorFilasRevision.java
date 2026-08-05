@@ -91,14 +91,15 @@ public final class AgrupadorFilasRevision {
             // Un grupo de más de una caja se puede desplegar; si el usuario ya
             // lo desplegó, se emite una fila por caja. Solo entran en un grupo
             // cajas de una línea, así que cada fila desplegada es la líder de
-            // su propia caja física y edita sus dos pesos.
+            // su propia caja física (y nunca un bulto mixto): edita sus dos
+            // pesos y ofrece el recálculo.
             boolean grupo = indices.size() > 1;
             if (grupo && indicesDesplegados.contains(indices.get(0))) {
                 for (int k = 0; k < indices.size(); k++) {
                     CajaData suelta = cajas.get(indices.get(k));
                     filas.add(new FilaCaja(indiceGlobal++,
                             String.valueOf(suelta.getNumeroCaja()), List.of(indices.get(k)),
-                            suelta, true, !suelta.tienePesosCompletos(), k == 0, true));
+                            suelta, true, false, !suelta.tienePesosCompletos(), k == 0, true));
                 }
                 continue;
             }
@@ -106,7 +107,8 @@ public final class AgrupadorFilasRevision {
             CajaData lider = liderPorCaja.get(primera.getNumeroCaja());
             filas.add(new FilaCaja(indiceGlobal++,
                     rango(primera.getNumeroCaja(), ultimoNumero), indices, primera,
-                    lider == primera, !lider.tienePesosCompletos(), grupo, false));
+                    lider == primera, !esDeUnaSolaLinea(primera, lineasPorCaja),
+                    !lider.tienePesosCompletos(), grupo, false));
         }
         return filas;
     }

@@ -188,6 +188,77 @@ class AmiGeneradorTest {
         }
     }
 
+    /**
+     * Caja compartida por dos artículos: AMI hace un excel por
+     * referencia+color, así que la caja aparece en DOS packing lists pero el
+     * peso solo lo lleva su línea líder. El excel del segundo artículo tiene
+     * que repetir ese peso: es el mismo bulto, y un cartón sin peso rompe
+     * también el TOTAL y el bloque SUM UP de ese fichero.
+     */
+    @Test
+    void cajaCompartidaPorDosArticulosLlevaElPesoDelBultoEnLosDosExcels() throws Exception {
+        DestinoData destino = new DestinoData();
+        destino.setNombreDestino("CHINA");
+        CajaData segundoArticulo = caja(1, "OF-1", "BOLSO", "718", 10, null, null);
+        destino.setCajas(List.of(
+                caja(1, "OF-1", "BOLSO", "001", 12, 5.0, 6.3),   // líder del bulto
+                segundoArticulo));
+
+        List<ExcelGenerado> excels = generador.generar(destino, List.of(), envio(), ami);
+
+        assertEquals(2, excels.size());
+        for (ExcelGenerado excel : excels) {
+            assertFalse(excel.tienePesosPendientes(),
+                    excel.getNombreFichero() + " no debería tener pendientes: "
+                    + excel.getCajasPendientes());
+            try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel.getContenido()))) {
+                Row fila = wb.getSheet("STANDARD PKL H26").getRow(19);      // fila modelo
+                assertEquals(5.0, fila.getCell(20).getNumericCellValue(),   // U20 NET
+                        "NET en " + excel.getNombreFichero());
+                assertEquals(6.3, fila.getCell(21).getNumericCellValue(),   // V20 GROSS
+                        "GROSS en " + excel.getNombreFichero());
+            }
+        }
+    }
+
+    /**
+     * Bulto que mezcla tallas de cinturón con un bolso: el líder del bulto es
+     * el bolso, así que el excel de cinturones no ve el peso si se reagrupa
+     * solo dentro de su referencia. Además, dentro de UN mismo excel el peso
+     * va una sola vez por bulto: repetirlo lo contaría dos veces en el SUM.
+     */
+    @Test
+    void elPesoDelBultoSeEscribeUnaSolaVezPorCajaDentroDeCadaExcel() throws Exception {
+        DestinoData destino = new DestinoData();
+        destino.setNombreDestino("CHINA");
+        destino.setCajas(List.of(
+                caja(7, "OF-1", "ULL729.AL0103", "001", 4, 5.0, 6.3),          // líder del bulto
+                cajaConTalla(7, "OF-2", "UBL029.AL0104", "0014", "75", 3, null, null),
+                // Segunda línea de la MISMA referencia+color+caja: el peso ya
+                // lo escribió la anterior y no se puede repetir.
+                caja(8, "OF-1", "ULL729.AL0103", "001", 4, 2.0, 3.0),
+                caja(8, "OF-1", "ULL729.AL0103", "001", 4, null, null)));
+
+        List<ExcelGenerado> excels = generador.generar(destino, List.of(), envio(), ami);
+
+        assertEquals(2, excels.size());
+        ExcelGenerado bolsos = excels.get(0);
+        ExcelGenerado cinturones = excels.get(1);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(cinturones.getContenido()))) {
+            Row fila = wb.getSheet("STANDARD PKL E25").getRow(18);
+            assertEquals(5.0, fila.getCell(19).getNumericCellValue());  // T: NET del bulto 7
+            assertEquals(6.3, fila.getCell(20).getNumericCellValue());  // U: GROSS del bulto 7
+        }
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(bolsos.getContenido()))) {
+            Sheet hoja = wb.getSheet("STANDARD PKL H26");
+            assertEquals(6.3, hoja.getRow(19).getCell(21).getNumericCellValue());  // caja 7
+            assertEquals(3.0, hoja.getRow(20).getCell(21).getNumericCellValue());  // caja 8, 1ª línea
+            // 2ª línea de la caja 8: en blanco, o el SUM contaría el bulto dos veces.
+            assertEquals(CellType.BLANK, hoja.getRow(21).getCell(21).getCellType());
+        }
+    }
+
     @Test
     void referenciaUslUsaLaPlantillaDeBolsos() throws Exception {
         DestinoData destino = new DestinoData();

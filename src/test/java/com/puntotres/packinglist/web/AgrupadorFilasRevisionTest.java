@@ -158,6 +158,49 @@ class AgrupadorFilasRevisionTest {
         assertTrue(filas.get(2).esLider());
     }
 
+    /**
+     * En un bulto con varios artículos no se sabe qué parte del peso es de
+     * cada uno, así que su peso no se puede propagar al resto del modelo: la
+     * fila sigue editando el peso a mano, pero sin ofrecer el recálculo.
+     */
+    @Test
+    void unaCajaMixtaEditaSuPesoPeroNoOfreceRecalcularlo() {
+        List<CajaData> cajas = List.of(
+                caja(9, "ULL163", "NOIR", "PO123", 5, "60x40x40", 1, 5.0, 5.6),
+                caja(9, "UBL010", "NOIR", "PO123", 2, "60x40x40", 1, null, null),
+                caja(10, "ULL163", "NOIR", "PO123", 5, "60x40x40", 1, 5.0, 5.6));
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertTrue(filas.get(0).esLider());
+        assertFalse(filas.get(0).puedeRecalcularPeso());
+        assertFalse(filas.get(1).puedeRecalcularPeso());
+        assertTrue(filas.get(2).puedeRecalcularPeso());
+    }
+
+    /** Mismo caso con un bulto de cinturones que mezcla tallas. */
+    @Test
+    void unaCajaConVariasTallasTampocoOfreceRecalcularElPeso() {
+        CajaData talla75 = caja(3, "UBL010", "NOIR", "PO123", 5, "60x40x30", 1, 5.0, 5.6);
+        talla75.setTalla("75");
+        CajaData talla85 = caja(3, "UBL010", "NOIR", "PO123", 4, "60x40x30", 1, null, null);
+        talla85.setTalla("85");
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(List.of(talla75, talla85), 0);
+
+        assertEquals(2, filas.size());
+        assertFalse(filas.get(0).puedeRecalcularPeso());
+        assertFalse(filas.get(1).puedeRecalcularPeso());
+    }
+
+    /** Un tramo compactado sí lo ofrece: solo entran cajas de una línea. */
+    @Test
+    void unTramoCompactadoSiOfreceRecalcularElPeso() {
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas4a8(), 0);
+
+        assertTrue(filas.get(0).puedeRecalcularPeso());
+    }
+
     @Test
     void unaCajaMixtaNoSeFusionaConLaCajaDeUnaLineaQueLaSigue() {
         // Regresión del criterio "solo cajas de una línea": la segunda línea

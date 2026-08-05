@@ -8,8 +8,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -88,10 +86,10 @@ class EjemplosJsonTest {
         // FRANCE: ULL163, ULL737.AL0206, ULL754.AL0206, UBL029.AL0216 (4)
         assertEquals(11, excels.size());
 
-        // La caja 1 de China mezcla dos artículos (ULL729 en 001 y 718). El
-        // peso del bulto vive en la línea líder (001), así que su bruto del
-        // JSON sale en el excel del 001 y en el del 718 la celda queda en
-        // blanco: nadie sabe cuánto pesa media caja.
+        // La caja 1 de China mezcla dos artículos (ULL729 en 001 y 718), así
+        // que ese bulto aparece en DOS packing lists. El peso es del cartón
+        // entero y sale en los dos: el del 718 describe la misma caja, y sin
+        // peso no se puede expedir. En el JSON solo lo trae la línea líder.
         try (XSSFWorkbook wb = abrir(excels, "2026.07.24_PUN_07706_ULL729.AL0103.001_H26_CHINA.xlsx")) {
             Sheet hoja = wb.getSheet("STANDARD PKL H26");
             assertEquals(12, (int) hoja.getRow(19).getCell(6).getNumericCellValue()); // talla única U
@@ -100,9 +98,8 @@ class EjemplosJsonTest {
         try (XSSFWorkbook wb = abrir(excels, "2026.07.24_PUN_07706_ULL729.AL0103.718_H26_CHINA.xlsx")) {
             Sheet hoja = wb.getSheet("STANDARD PKL H26");
             assertEquals(10, (int) hoja.getRow(19).getCell(6).getNumericCellValue());
-            Cell bruto = hoja.getRow(19).getCell(21);
-            assertTrue(bruto == null || bruto.getCellType() == CellType.BLANK,
-                    "La línea no líder de una caja mixta no debe llevar peso propio");
+            assertEquals(6.3, hoja.getRow(19).getCell(21).getNumericCellValue(),
+                    "El bulto compartido pesa lo mismo en los dos packing lists");
         }
 
         // El cinturón de France (UBL029.AL0216) reúne las cajas 8 y 9: la 8 es

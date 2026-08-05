@@ -100,6 +100,57 @@ class PackingListControllerTest {
                 .andExpect(content().string(containsString("CHINA")));
     }
 
+    /**
+     * El botón de recalcular peso solo sale donde ese peso sirve para calcular
+     * los demás. La caja 1 mezcla dos artículos: se pinta en dos filas y
+     * ninguna lo lleva; la caja 2 es de una línea y sí. Se comprueba sobre el
+     * HTML renderizado porque es la capa donde vive la condición.
+     */
+    @Test
+    void laRevisionNoOfreceRecalcularElPesoEnUnBultoConVariosArticulos() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        String json = """
+                {"cliente":"AMI","destinos":[{"destino":"CHINA",
+                 "palets":[{"palet":1,"cajaInicio":1,"cajaFin":2}],
+                 "referencias":[
+                  {"referencia":"ULL729.AL0103","color":"001","medidaCaja":"60x40x40",
+                   "pedido":"07706","cantidadTotal":12,
+                   "cajas":[{"caja":1,"unidades":12,"pesoBruto":6.3}]},
+                  {"referencia":"ULL729.AL0103","color":"718","medidaCaja":"60x40x40",
+                   "pedido":"07706","cantidadTotal":10,
+                   "cajas":[{"caja":1,"unidades":10}]},
+                  {"referencia":"USL737.AL0137","color":"001","medidaCaja":"60x40x40",
+                   "pedido":"07713","cantidadTotal":25,
+                   "cajas":[{"caja":2,"unidades":25,"pesoBruto":8.2}]}]}]}
+                """;
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", json)
+                        .param("temporada", "H26").param("numeroFactura", "FA-26-1189")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        String html = mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Tres filas (la caja mixta no se compacta) y un solo botón, el de la caja 2.
+        assertEquals(1, contar(html, "recalcula peso"), html);
+        // La líder del bulto mixto sigue editando su peso a mano: dos campos
+        // de peso por caja física, tres cajas físicas... menos la no líder.
+        assertEquals(4, contar(html, "cajas[0].pesoBrutoKg\"") + contar(html, "cajas[1].pesoBrutoKg\"")
+                + contar(html, "cajas[2].pesoBrutoKg\"")
+                + contar(html, "cajas[0].pesoNetoKg\"") + contar(html, "cajas[1].pesoNetoKg\"")
+                + contar(html, "cajas[2].pesoNetoKg\""), html);
+    }
+
+    private static int contar(String texto, String fragmento) {
+        int veces = 0;
+        for (int i = texto.indexOf(fragmento); i >= 0; i = texto.indexOf(fragmento, i + 1)) {
+            veces++;
+        }
+        return veces;
+    }
+
     @Test
     void unClienteDistintoAlDelJsonAvisaSinBloquear() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
