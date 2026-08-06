@@ -164,9 +164,8 @@ La temporada del formulario va a la columna SEASON.
 > de `docs/` lo real es la **maquetación** (son las plantillas y salidas que
 > usa el cliente); su contenido es también de relleno.
 
-De los cuatro JSON de `src/test/resources/ejemplos/`, `EjemplosJsonTest`
-importa y genera de verdad los tres primeros contra el catálogo real de
-`application.yml`; el de etiquetas de APC no lo carga ningún test:
+`EjemplosJsonTest` importa y genera de verdad los tres JSON de
+`src/test/resources/ejemplos/` contra el catálogo real de `application.yml`:
 
 - `envio-ami-bags-y-belts.json`: AMI con las tres destinaciones
   (China/Japan/France), bolsos y carteras (ULL/USL) y cinturones (UBL). Trae
@@ -194,9 +193,8 @@ importa y genera de verdad los tres primeros contra el catálogo real de
   sin `canal` (lo rellena el resolutor con la hija), dos cajas sin peso para
   la inferencia, las tres medidas de caja con tara y taras de palet mixtas
   (8.04 del JSON + 10 por defecto).
-- `envio-apc-etiquetas.json`: APC con sus siete destinos (Australia, Chine
-  franch, D. USA, Japan, Korea, Retail, Wholesale), para probar a mano el flujo
-  de etiquetas de caja. Ningún test lo usa. Ojo: Australia, Chine franch y
-  Wholesale son las tres hijas de WHOLESALE, así que al importarlo se fusionan
-  en una sola destinación y avisa de sus números de caja repetidos.
 - `envio-generico.json`: ACKERMANN con un palet de 16 cajas.
+
+`envio-apc-etiquetas.json` ya no existe: era un fixture aparte para probar a
+mano las etiquetas de caja de APC y ningún test lo cargaba. Desde que
+`envio-apc.json` trae destinos padre con sus hijas, cubre lo mismo.
