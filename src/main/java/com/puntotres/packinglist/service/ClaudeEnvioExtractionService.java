@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -9,8 +10,10 @@ import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.core.http.StreamResponse;
 import com.anthropic.errors.AnthropicIoException;
 import com.anthropic.errors.AnthropicServiceException;
+import com.anthropic.helpers.MessageAccumulator;
 import com.anthropic.models.messages.Base64ImageSource;
 import com.anthropic.models.messages.Base64PdfSource;
 import com.anthropic.models.messages.ContentBlock;
@@ -20,9 +23,10 @@ import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.Model;
+import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.TextBlockParam;
-import com.anthropic.models.messages.ThinkingConfigAdaptive;
+import com.anthropic.models.messages.ThinkingConfigEnabled;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.TipoPlantilla;
@@ -62,6 +66,24 @@ public class ClaudeEnvioExtractionService {
     }
 
     private static final String MEDIA_TYPE_PDF = "application/pdf";
+
+    /**
+     * El razonamiento y el JSON de salida comparten el techo de {@code
+     * max_tokens}: descifrar siete páginas de caligrafía consume MUCHO
+     * razonamiento, y con presupuesto adaptativo se comía el techo entero y
+     * la respuesta llegaba cortada ("se ha cortado por longitud"), sin JSON.
+     * Por eso el presupuesto de razonamiento es explícito y el techo es la
+     * suma: así la salida tiene sitio garantizado pase lo que pase.
+     */
+    private static final long TOKENS_RAZONAMIENTO = 16_000L;
+    private static final long TOKENS_SALIDA = 16_000L;
+
+    /**
+     * Una extracción larga puede tardar varios minutos. Se pide en streaming
+     * (y se acumula) porque una petición normal tan larga acaba en timeout de
+     * lectura, y el timeout del cliente se sube en consecuencia.
+     */
+    private static final Duration TIEMPO_MAXIMO = Duration.ofMinutes(15);
 
     private static final String PROMPT_NUCLEO = """
             Transcribes packing lists escritos A MANO por el operario de almacén de un \
@@ -333,19 +355,9 @@ public class ClaudeEnvioExtractionService {
      * respuesta no es un JSON interpretable.
      */
     public EnvioInput extraer(List<Adjunto> adjuntos, TipoPlantilla plantilla) {
-        List<ContentBlockParam> bloques = bloquesDe(adjuntos);
-        bloques.add(ContentBlockParam.ofText(TextBlockParam.builder()
-                .text(MENSAJE_USUARIO).build()));
-
         Message respuesta;
         try {
-            respuesta = clienteApi().messages().create(MessageCreateParams.builder()
-                    .model(Model.CLAUDE_OPUS_4_8)
-                    .maxTokens(16000L)
-                    .thinking(ThinkingConfigAdaptive.builder().build())
-                    .system(promptPara(plantilla))
-                    .addUserMessageOfBlockParams(bloques)
-                    .build());
+            respuesta = acumular(peticionPara(adjuntos, plantilla));
         } catch (AnthropicServiceException e) {
             throw new ExtraccionException("La API de Claude ha devuelto un error: "
                     + e.getMessage(), e);
@@ -359,10 +371,29 @@ public class ClaudeEnvioExtractionService {
             throw new ExtraccionException("Claude ha rechazado procesar los documentos");
         }
         if (StopReason.MAX_TOKENS.equals(motivoParada)) {
-            throw new ExtraccionException("La respuesta de Claude se ha cortado por longitud; "
-                    + "prueba con menos hojas por envío");
+            throw new ExtraccionException("La respuesta de Claude se ha cortado por longitud "
+                    + "aun con el presupuesto ampliado: parte el envío en menos hojas "
+                    + "(por ejemplo, una destinación cada vez) y pega los JSON a mano");
         }
         return parsear(textoDe(respuesta));
+    }
+
+    /**
+     * La petición completa: documentos, mensaje de usuario, prompt del
+     * cliente y presupuestos de tokens. Package-private para los tests.
+     */
+    static MessageCreateParams peticionPara(List<Adjunto> adjuntos, TipoPlantilla plantilla) {
+        List<ContentBlockParam> bloques = bloquesDe(adjuntos);
+        bloques.add(ContentBlockParam.ofText(TextBlockParam.builder()
+                .text(MENSAJE_USUARIO).build()));
+        return MessageCreateParams.builder()
+                .model(Model.CLAUDE_OPUS_4_8)
+                .maxTokens(TOKENS_RAZONAMIENTO + TOKENS_SALIDA)
+                .thinking(ThinkingConfigEnabled.builder()
+                        .budgetTokens(TOKENS_RAZONAMIENTO).build())
+                .system(promptPara(plantilla))
+                .addUserMessageOfBlockParams(bloques)
+                .build();
     }
 
     /** Núcleo común + bloque del cliente. Package-private para los tests. */
@@ -406,6 +437,21 @@ public class ClaudeEnvioExtractionService {
         return mediaType != null && MEDIA_TYPE_PDF.equals(mediaType.toLowerCase(Locale.ROOT));
     }
 
+    /**
+     * Consume el streaming hasta el final y devuelve el mensaje completo,
+     * igual que si se hubiera pedido de una pieza. El streaming no es por
+     * enseñar nada al usuario: es lo que permite pedir un presupuesto de
+     * tokens grande sin que la petición muera por timeout de lectura.
+     */
+    private Message acumular(MessageCreateParams peticion) {
+        MessageAccumulator acumulador = MessageAccumulator.create();
+        try (StreamResponse<RawMessageStreamEvent> flujo =
+                     clienteApi().messages().createStreaming(peticion)) {
+            flujo.stream().forEach(acumulador::accumulate);
+        }
+        return acumulador.message();
+    }
+
     private AnthropicClient clienteApi() {
         AnthropicClient actual = cliente;
         if (actual != null) {
@@ -414,7 +460,10 @@ public class ClaudeEnvioExtractionService {
         synchronized (this) {
             if (cliente == null) {
                 try {
-                    cliente = AnthropicOkHttpClient.fromEnv();
+                    cliente = AnthropicOkHttpClient.builder()
+                            .fromEnv()
+                            .timeout(TIEMPO_MAXIMO)
+                            .build();
                 } catch (RuntimeException e) {
                     throw new ExtraccionException("Falta configurar la clave de la API de Claude "
                             + "(variable de entorno ANTHROPIC_API_KEY)", e);

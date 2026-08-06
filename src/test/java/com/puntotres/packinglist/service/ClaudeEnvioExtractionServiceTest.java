@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.anthropic.models.messages.ContentBlockParam;
+import com.anthropic.models.messages.MessageCreateParams;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.EnvioInput;
@@ -68,6 +69,24 @@ class ClaudeEnvioExtractionServiceTest {
         assertTrue(bloques.get(1).isDocument());
         assertTrue(bloques.get(2).isText());
         assertTrue(bloques.get(3).isImage());
+    }
+
+    @Test
+    void elRazonamientoTieneSuPropioPresupuestoYDejaSitioALaSalida() {
+        // El razonamiento y el JSON comparten el techo de max_tokens: con
+        // presupuesto adaptativo, descifrar 7 páginas de caligrafía se comía
+        // el techo entero y la respuesta llegaba cortada, sin JSON. El
+        // presupuesto explícito garantiza sitio para la salida.
+        MessageCreateParams peticion = ClaudeEnvioExtractionService.peticionPara(
+                List.of(new ClaudeEnvioExtractionService.Adjunto(
+                        "application/pdf", new byte[] {1})),
+                TipoPlantilla.APC);
+
+        long razonamiento = peticion.thinking().orElseThrow().asEnabled().budgetTokens();
+        assertTrue(peticion.maxTokens() > razonamiento,
+                "sin margen sobre el razonamiento, la salida se corta");
+        assertTrue(peticion.maxTokens() - razonamiento >= 8000,
+                "el JSON de un envío entero necesita sitio de sobra");
     }
 
     @Test
