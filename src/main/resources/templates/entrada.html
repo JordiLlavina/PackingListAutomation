@@ -57,11 +57,12 @@
         </div>
 
         <div id="bloqueClaude" style="display: none">
-            <label for="imagenes">Imágenes del packing list</label>
-            <p class="ayuda">Sube las fotos o capturas del packing list (JPEG, PNG, WebP o GIF).
-                Claude las transcribirá al JSON del envío y pasarás a la revisión como siempre.</p>
+            <label for="imagenes">Escaneos del packing list</label>
+            <p class="ayuda">Sube el PDF escaneado o las fotos del packing list (PDF, JPEG,
+                PNG, WebP o GIF). Claude los transcribirá al JSON del envío y pasarás a la
+                revisión como siempre.</p>
             <input type="file" id="imagenes" name="imagenes" multiple
-                   accept="image/jpeg,image/png,image/webp,image/gif">
+                   accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
             <p class="error-campo" th:errors="*{imagenes}"></p>
         </div>
 

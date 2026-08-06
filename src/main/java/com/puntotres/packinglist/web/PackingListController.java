@@ -45,6 +45,7 @@ import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.PackingListGenerationService;
 import com.puntotres.packinglist.service.PaletAssignmentService;
 import com.puntotres.packinglist.service.PedidoCompletionService;
+import com.puntotres.packinglist.service.ValidadorResumenExtraccion;
 import com.puntotres.packinglist.service.ResolutorDestinosPadre;
 import com.puntotres.packinglist.service.ResultadoAsignacion;
 import com.puntotres.packinglist.service.ResultadoDestinos;
@@ -81,6 +82,7 @@ public class PackingListController {
 
     private final EnvioImportService importador;
     private final ClaudeEnvioExtractionService extractorClaude;
+    private final ValidadorResumenExtraccion validadorResumen;
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
     private final ResolutorDestinosPadre resolutorDestinos;
@@ -96,6 +98,7 @@ public class PackingListController {
 
     public PackingListController(EnvioImportService importador,
                                  ClaudeEnvioExtractionService extractorClaude,
+                                 ValidadorResumenExtraccion validadorResumen,
                                  PaletAssignmentService asignadorPalets,
                                  WeightInferenceService inferidorPesos,
                                  ResolutorDestinosPadre resolutorDestinos,
@@ -110,6 +113,7 @@ public class PackingListController {
                                  EnvioEnCurso envioEnCurso) {
         this.importador = importador;
         this.extractorClaude = extractorClaude;
+        this.validadorResumen = validadorResumen;
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
         this.resolutorDestinos = resolutorDestinos;
@@ -151,7 +155,7 @@ public class PackingListController {
         if (modoClaude) {
             if (imagenesDe(envioForm).isEmpty()) {
                 errores.rejectValue("imagenes", "imagenes.obligatorias",
-                        "Sube al menos una imagen del packing list");
+                        "Sube al menos una imagen o un PDF del packing list");
             }
         } else if (envioForm.getJson() == null || envioForm.getJson().isBlank()) {
             errores.rejectValue("json", "json.obligatorio",
@@ -174,7 +178,8 @@ public class PackingListController {
         EnvioInput envio;
         if (modoClaude) {
             try {
-                envio = extractorClaude.extraer(aImagenesDeServicio(imagenesDe(envioForm)));
+                envio = extractorClaude.extraer(aAdjuntos(imagenesDe(envioForm)),
+                        cliente.getPlantilla());
             } catch (ClaudeEnvioExtractionService.ExtraccionException | IOException e) {
                 model.addAttribute("errorJson",
                         "No se pudo extraer el packing list con Claude: " + e.getMessage());
@@ -192,8 +197,29 @@ public class PackingListController {
         }
         if (envio.getDestinos() == null || envio.getDestinos().isEmpty()) {
             model.addAttribute("errorJson", modoClaude
-                    ? "Claude no ha encontrado ninguna destinación en las imágenes"
+                    ? "Claude no ha encontrado ninguna destinación en los documentos"
                     : "El JSON no contiene ninguna destinación ('destinos')");
+            anadirAtributosDeClientes(model);
+            return "entrada";
+        }
+
+        // Único punto del proyecto que BLOQUEA: si la extracción no cuadra
+        // con los recuentos que las propias hojas declaran, lo más probable
+        // es que falte una hoja en el escaneo, y eso no se arregla en la
+        // revisión. El JSON extraído se vuelca al textarea (modo JSON) para
+        // no perder el trabajo de la API y poder corregirlo a mano.
+        ValidadorResumenExtraccion.ResultadoResumen resumen =
+                validadorResumen.validar(envio, cliente);
+        if (!resumen.errores().isEmpty()) {
+            model.addAttribute("errorJson", "La extracción no cuadra con el resumen de "
+                    + "las hojas: " + String.join(" · ", resumen.errores()));
+            try {
+                envioForm.setJson(mapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(envio));
+                envioForm.setModo("JSON");
+            } catch (JsonProcessingException e) {
+                // Sin JSON que enseñar, el error ya explica el problema.
+            }
             anadirAtributosDeClientes(model);
             return "entrada";
         }
@@ -214,10 +240,11 @@ public class PackingListController {
         // Mismo encadenado que Main.java: importar -> asignar -> inferir.
         EnvioImportado importado = importador.importar(envio);
 
+        importado.getAvisos().addAll(0, resumen.avisos());
         if (modoClaude) {
             importado.getAvisos().add(0, "Datos extraídos por Claude a partir de "
                     + imagenesDe(envioForm).size()
-                    + " imagen(es): revisa referencias, tallas y cantidades antes de generar");
+                    + " documento(s): revisa referencias, tallas y cantidades antes de generar");
         }
 
         // El "cliente" del JSON es informativo (viene de las imágenes); si no
@@ -522,14 +549,14 @@ public class PackingListController {
                 .toList();
     }
 
-    private static List<ClaudeEnvioExtractionService.Imagen> aImagenesDeServicio(
+    private static List<ClaudeEnvioExtractionService.Adjunto> aAdjuntos(
             List<MultipartFile> ficheros) throws IOException {
-        List<ClaudeEnvioExtractionService.Imagen> imagenes = new ArrayList<>();
+        List<ClaudeEnvioExtractionService.Adjunto> adjuntos = new ArrayList<>();
         for (MultipartFile fichero : ficheros) {
-            imagenes.add(new ClaudeEnvioExtractionService.Imagen(
+            adjuntos.add(new ClaudeEnvioExtractionService.Adjunto(
                     fichero.getContentType(), fichero.getBytes()));
         }
-        return imagenes;
+        return adjuntos;
     }
 
     private Optional<GeneradorEtiquetasCliente> generadorEtiquetasDelEnvio() {
