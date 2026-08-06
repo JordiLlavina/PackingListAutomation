@@ -44,6 +44,20 @@ class PedidoCompletionServiceTest {
     }
 
     @Test
+    void unaReferenciaManuscritaSeCompletaConLaDelExcel() throws IOException {
+        // De las hojas llega "H65077" (lo que escribe el operario), no el
+        // Article completo: la fila se encuentra por sufijo y se estampan el
+        // pedido Y la referencia enteros.
+        CajaData linea = caja(1, "721", "H65077", "LZZ-NOIR", 3, null, 4.2);
+
+        ResultadoPedidos resultado = servicio.completar(envioCon(linea), pedidoReal());
+
+        assertEquals("4100128721", linea.getNumeroPedido());
+        assertEquals("PXBHZ-H65077", linea.getReferencia());
+        assertTrue(resultado.getAvisos().isEmpty());
+    }
+
+    @Test
     void sinExcelDePedidoAvisaUnaVezYNoTocaNada() {
         CajaData linea = caja(1, "721", "PXBHZ-H65077", "LZZ-NOIR", 3, null, 4.2);
 

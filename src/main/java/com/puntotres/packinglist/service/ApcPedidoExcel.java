@@ -20,13 +20,18 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 /**
  * Índice en memoria del excel de pedido de la temporada de APC
- * (APC_PEDIDO_FALL26.xlsx), del que sale el número de pedido COMPLETO.
+ * (APC_PEDIDO_FALL26.xlsx), del que salen el número de pedido COMPLETO y la
+ * referencia COMPLETA.
  *
- * Lo que llega de la imagen o del formulario son los <b>tres últimos
- * dígitos</b> del pedido. La clave de búsqueda es por tanto
- * {@code Article + esos tres dígitos}: en el fichero real esa clave
- * identifica una única fila de las 130, mientras que la referencia sola no
- * vale (PXCBC-F63023 aparece en 8 pedidos distintos).
+ * De las hojas manuscritas llegan los dos datos incompletos: del pedido, sus
+ * <b>tres últimos dígitos</b>; de la referencia, lo que el operario escribe
+ * ("67043", "F63023"), que es un SUFIJO del Article real del excel
+ * ("PXCBS-F67043"). La búsqueda casa por tanto por sufijo en los dos campos a
+ * la vez: en el fichero real, Article + tres dígitos identifica una única
+ * fila de las 130, mientras que la referencia sola no vale (PXCBC-F63023
+ * aparece en 8 pedidos distintos). Una referencia escrita entera casa igual
+ * (todo texto es sufijo de sí mismo), y si hay una fila cuyo Article es
+ * EXACTAMENTE lo escrito, esa gana sobre las que solo terminan igual.
  *
  * La hoja buena es la primera cuya fila de cabecera trae las TRES columnas
  * {@code Article}, {@code Document d'achat} y {@code Notre référence}. Las
@@ -45,12 +50,16 @@ public final class ApcPedidoExcel {
     private static final String CABECERA_DESTINO = "NOTRE R";
     private static final int DIGITOS_PARCIALES = 3;
 
-    /** clave "REFERENCIA|3 dígitos" -> número de pedido completo. */
-    private final Map<String, String> pedidosPorClave;
+    /** Una fila del excel: referencia (Article) y pedido completos. */
+    public record FilaPedido(String referencia, String pedido) {
+    }
+
+    /** Filas únicas (referencia + pedido), en el orden del fichero. */
+    private final List<FilaPedido> filas;
     private final List<String> avisos;
 
-    private ApcPedidoExcel(Map<String, String> pedidosPorClave, List<String> avisos) {
-        this.pedidosPorClave = Map.copyOf(pedidosPorClave);
+    private ApcPedidoExcel(List<FilaPedido> filas, List<String> avisos) {
+        this.filas = List.copyOf(filas);
         this.avisos = List.copyOf(avisos);
     }
 
@@ -61,7 +70,9 @@ public final class ApcPedidoExcel {
             int colArticulo = columna(cabecera, CABECERA_ARTICULO);
             int colPedido = columna(cabecera, CABECERA_PEDIDO);
 
-            Map<String, String> pedidos = new LinkedHashMap<>();
+            List<FilaPedido> filas = new ArrayList<>();
+            Set<FilaPedido> vistas = new LinkedHashSet<>();
+            Map<String, String> pedidoPorClave = new LinkedHashMap<>();
             Set<String> ambiguas = new LinkedHashSet<>();
             for (int fila = hoja.getFirstRowNum() + 1; fila <= hoja.getLastRowNum(); fila++) {
                 String referencia = texto(hoja, fila, colArticulo);
@@ -69,34 +80,69 @@ public final class ApcPedidoExcel {
                 if (referencia.isBlank() || pedido.isBlank()) {
                     continue;
                 }
+                FilaPedido entrada = new FilaPedido(referencia.trim(), pedido.trim());
+                if (vistas.add(entrada)) {
+                    filas.add(entrada);
+                }
+                // El aviso de clave ambigua se calcula al cargar, una vez,
+                // para que la revisión lo enseñe aunque nadie busque esa clave.
                 String clave = clave(referencia, pedido);
-                String anterior = pedidos.put(clave, pedido.trim());
-                if (anterior != null && !anterior.equals(pedido.trim())) {
+                String anterior = pedidoPorClave.put(clave, entrada.pedido());
+                if (anterior != null && !anterior.equals(entrada.pedido())) {
                     ambiguas.add(clave);
                 }
             }
 
             List<String> avisos = new ArrayList<>();
             for (String clave : ambiguas) {
-                pedidos.remove(clave);
                 avisos.add("En el excel de pedido, " + clave.replace("|", " + ")
                         + " apunta a más de un pedido: esas líneas se quedan como llegaron");
             }
-            return new ApcPedidoExcel(pedidos, avisos);
+            return new ApcPedidoExcel(filas, avisos);
         }
     }
 
     /**
-     * Número de pedido completo de una línea, o vacío si no hay fila que case.
+     * Filas cuyo Article TERMINA en la referencia escrita y cuyo pedido
+     * termina en los tres dígitos. Vacía = no hay fila; una = el dato bueno;
+     * varias = ambigua (el mismo modelo con dos prefijos, p. ej.
+     * PXBHZ-F65101 y PXCBT-F65101), y entonces quien llama avisa y no toca
+     * nada. Si alguna fila casa EXACTA por referencia, las de solo-sufijo se
+     * descartan: una referencia completa nunca compite con recortes.
+     */
+    public List<FilaPedido> filasPara(String referencia, String pedidoParcial) {
+        if (referencia == null || referencia.isBlank()
+                || pedidoParcial == null || pedidoParcial.isBlank()) {
+            return List.of();
+        }
+        String buscada = referencia.trim().toUpperCase(Locale.ROOT);
+        String digitos = sufijo(pedidoParcial);
+        List<FilaPedido> exactas = new ArrayList<>();
+        List<FilaPedido> porSufijo = new ArrayList<>();
+        for (FilaPedido fila : filas) {
+            String articulo = fila.referencia().toUpperCase(Locale.ROOT);
+            if (!sufijo(fila.pedido()).equals(digitos)) {
+                continue;
+            }
+            if (articulo.equals(buscada)) {
+                exactas.add(fila);
+            } else if (articulo.endsWith(buscada)) {
+                porSufijo.add(fila);
+            }
+        }
+        return exactas.isEmpty() ? porSufijo : exactas;
+    }
+
+    /**
+     * Número de pedido completo cuando la búsqueda es unívoca, o vacío.
      * Funciona igual si {@code pedidoParcial} ya viene completo: sus tres
      * últimos dígitos encuentran la misma fila.
      */
     public Optional<String> pedidoCompleto(String referencia, String pedidoParcial) {
-        if (referencia == null || referencia.isBlank()
-                || pedidoParcial == null || pedidoParcial.isBlank()) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(pedidosPorClave.get(clave(referencia, pedidoParcial)));
+        List<FilaPedido> candidatas = filasPara(referencia, pedidoParcial);
+        return candidatas.size() == 1
+                ? Optional.of(candidatas.get(0).pedido())
+                : Optional.empty();
     }
 
     /** Avisos de nivel de fichero (claves ambiguas). Nunca null. */
