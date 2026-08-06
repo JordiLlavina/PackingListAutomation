@@ -334,7 +334,8 @@ public class ClaudeEnvioExtractionService {
               los usan.
             """;
 
-    private static final String MENSAJE_USUARIO = """
+    /** Package-private: lo copia también la guía de uso manual en claude.ai. */
+    static final String MENSAJE_USUARIO = """
             Transcribe al JSON descrito el packing list de estos documentos. Todas \
             las hojas son del MISMO envío y van en orden: un bloque puede continuar \
             en la hoja siguiente. Antes de responder, comprueba caja por caja que no \
