@@ -11,6 +11,10 @@ bloquear).
 ```json
 {
   "cliente": "<clave del catálogo de application.yml>",
+  "avisos": ["<opcional: dudas de lectura de la extracción por imágenes>"],
+  "resumenPalets": [
+    { "destino": "WHOLESALE", "palets": 5 }   // opcional: recuentos declarados en las hojas
+  ],
   "destinos": [
     {
       "destino": "<nombre del destino>",
@@ -61,6 +65,18 @@ Una misma caja física puede aparecer en VARIAS entradas de `referencias`
 tallas, canales distintos de APC. Solo se avisa como posible error si se
 repite la combinación completa referencia+color+talla+canal.
 
+`avisos` y `resumenPalets` los rellena la **extracción por imágenes** (un JSON
+pegado a mano no suele traerlos). `avisos` son dudas de lectura y llegan a la
+revisión con el prefijo "Lectura de las hojas:". `resumenPalets` son los
+recuentos de palets que las hojas declaran ("wh. 5 palet") y sirven de
+contraste: si una destinación declarada no tiene hojas de packing, o el nº de
+palets extraído no cuadra con el declarado, la importación **se bloquea en la
+entrada** (única validación bloqueante del proyecto: casi siempre significa
+que falta una hoja en el escaneo, y eso no se arregla en la revisión). Un
+recuento sin reparto de cajas solo avisa: los palets se completan en la
+revisión. La talla manuscrita puede llegar como `t75`/`+75`: el importador la
+normaliza a `75`.
+
 ## AMI (plantilla AMI, un excel por referencia+color)
 
 El tipo de artículo se reconoce por el prefijo de la referencia:
@@ -101,7 +117,7 @@ no sea ni clave ni hija sigue sin generar, con aviso.
 | `modelo` | columna MODÈLE (p. ej. "LE NEIGE") |
 | `livraisonCode` | **se ignora**: lo genera la aplicación (`PUN` + fecha de envío `yyyyMMdd` + abreviatura del padre + contador, p. ej. `PUN20260428WH1`) y se edita en la cabecera de cada destinación de la pantalla de revisión |
 | `pedido` | los **tres últimos dígitos** del pedido; el número entero se busca por referencia en el excel de pedido del cliente que se sube en la entrada. Sin excel o sin fila, se queda como llegó, con aviso. Columna COMMANDE |
-| `referencia` | columna RÉFÉRENCE |
+| `referencia` | puede llegar **incompleta** tal como la escribe el operario (`67043`, `F63023`): es un sufijo del `Article` real y se completa desde el excel de pedido junto con el nº de pedido (fila única, si no: aviso). Columna RÉFÉRENCE |
 | `canal` | columna DESTINATION de la línea (WHOLESALE, RETAIL, AUSTRALIA...). Si falta, se rellena con el nombre de la destinación hija |
 | `color` | columna COLORIS |
 | `talla` | columna SIZE (solo cinturones) |
