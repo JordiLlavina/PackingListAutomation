@@ -12,12 +12,37 @@ public class EnvioInput {
 
     private String cliente;
     private List<DestinoInput> destinos;
+    // Opcionales, los rellena la extracción por imágenes: dudas de lectura
+    // que deben llegar al humano (avisos) y recuentos de palets declarados en
+    // las hojas ("wh. 5 palet"), que sirven para validar que no falta ninguna
+    // hoja antes de pasar a revisión. Un JSON pegado a mano no suele traerlos.
+    private List<String> avisos;
+    private List<ResumenPaletsInput> resumenPalets;
 
     public String getCliente() { return cliente; }
     public void setCliente(String cliente) { this.cliente = cliente; }
 
     public List<DestinoInput> getDestinos() { return destinos; }
     public void setDestinos(List<DestinoInput> destinos) { this.destinos = destinos; }
+
+    public List<String> getAvisos() { return avisos; }
+    public void setAvisos(List<String> avisos) { this.avisos = avisos; }
+
+    public List<ResumenPaletsInput> getResumenPalets() { return resumenPalets; }
+    public void setResumenPalets(List<ResumenPaletsInput> resumenPalets) { this.resumenPalets = resumenPalets; }
+
+    /** Recuento de palets que una hoja declara para una destinación. */
+    public static class ResumenPaletsInput {
+
+        private String destino;
+        private Integer palets;
+
+        public String getDestino() { return destino; }
+        public void setDestino(String destino) { this.destino = destino; }
+
+        public Integer getPalets() { return palets; }
+        public void setPalets(Integer palets) { this.palets = palets; }
+    }
 
     public static class DestinoInput {
 

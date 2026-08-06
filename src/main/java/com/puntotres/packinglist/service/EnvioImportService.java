@@ -28,6 +28,17 @@ public class EnvioImportService {
     public EnvioImportado importar(EnvioInput envio) {
         EnvioImportado resultado = new EnvioImportado();
 
+        // Dudas de lectura de la extracción por imágenes: el modelo tiene
+        // prohibido callarse lo que no lee con seguridad, y este es su cauce
+        // hacia la pantalla de revisión.
+        if (envio.getAvisos() != null) {
+            for (String aviso : envio.getAvisos()) {
+                if (aviso != null && !aviso.isBlank()) {
+                    resultado.getAvisos().add("Lectura de las hojas: " + aviso.trim());
+                }
+            }
+        }
+
         for (EnvioInput.DestinoInput destinoInput : envio.getDestinos()) {
             DestinoData destino = new DestinoData();
             destino.setNombreDestino(destinoInput.getDestino());
@@ -83,7 +94,7 @@ public class EnvioImportService {
         caja.setCodigoColor(referencia.getColor());
         caja.setTamanoCaja(referencia.getMedidaCaja());
         caja.setCantidad(unidades != null ? unidades : 0);
-        caja.setTalla(referencia.getTalla());
+        caja.setTalla(normalizarTalla(referencia.getTalla()));
         caja.setModelo(referencia.getModelo());
         caja.setLivraisonCode(referencia.getLivraisonCode());
         caja.setCanal(referencia.getCanal());
@@ -93,6 +104,24 @@ public class EnvioImportService {
         // (bruto - tara) o el peso tecleado a mano.
         caja.setPesoBrutoKg(pesoBruto);
         return caja;
+    }
+
+    /**
+     * En las hojas manuscritas la talla se escribe "t75" o "+75" (la t de
+     * talla); si la extracción cuela ese prefijo, la búsqueda de EAN en el
+     * excel de pedido de AMI (clave con TAILLE exacta) falla en silencio.
+     * Solo se limpia el prefijo cuando lo que queda son dígitos: una talla
+     * "U" o cualquier valor raro se respeta tal cual.
+     */
+    private static String normalizarTalla(String talla) {
+        if (talla == null) {
+            return null;
+        }
+        String limpia = talla.trim();
+        if (limpia.matches("[tT+]\\d+")) {
+            return limpia.substring(1);
+        }
+        return limpia;
     }
 
     private List<PaletData> mapearPalets(EnvioInput.DestinoInput destinoInput) {

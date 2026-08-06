@@ -154,6 +154,41 @@ class EnvioImportServiceTest {
     }
 
     @Test
+    void laTallaManuscritaConPrefijoDeTallaSeNormalizaADigitos() {
+        // El operario escribe "t75" o "+105" (la t de talla); si se colara,
+        // la búsqueda de EAN por TAILLE exacta fallaría en silencio. Una
+        // talla no numérica ("U") se respeta tal cual.
+        for (String[] caso : new String[][] {
+                {"t75", "75"}, {"T85", "85"}, {"+105", "105"},
+                {" 95 ", "95"}, {"U", "U"}}) {
+            EnvioInput envio = envioConUnaReferencia(referencia -> {
+                referencia.setCantidadTotal(null);
+                referencia.setTalla(caso[0]);
+                referencia.setCajas(List.of(cajaSuelta(1, 50)));
+            });
+            assertEquals(caso[1], service.importar(envio)
+                    .getDestinos().get(0).getDestino().getCajas().get(0).getTalla(),
+                    "talla escrita: '" + caso[0] + "'");
+        }
+    }
+
+    @Test
+    void losAvisosDeLaExtraccionLleganComoAvisosDeImportacion() {
+        EnvioInput envio = envioConUnaReferencia(referencia -> {
+            referencia.setCantidadTotal(null);
+            referencia.setCajas(List.of(cajaSuelta(1, 50)));
+        });
+        envio.setAvisos(List.of("La caja 6 trae dos pesos", "  ", "El 44 está corregido"));
+
+        EnvioImportado importado = service.importar(envio);
+
+        // Los vacíos se descartan; los demás llegan con su prefijo.
+        assertEquals(List.of("Lectura de las hojas: La caja 6 trae dos pesos",
+                        "Lectura de las hojas: El 44 está corregido"),
+                importado.getAvisos());
+    }
+
+    @Test
     void propagaElPesoBrutoDelJsonYLoDejaANullCuandoFalta() {
         EnvioInput.CajaRangoInput sueltaConPeso = cajaSuelta(1, 50);
         sueltaConPeso.setPesoBruto(12.5);
