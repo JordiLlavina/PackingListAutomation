@@ -23,10 +23,11 @@ import com.anthropic.models.messages.ImageBlockParam;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
 import com.anthropic.models.messages.Model;
+import com.anthropic.models.messages.OutputConfig;
 import com.anthropic.models.messages.RawMessageStreamEvent;
 import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.TextBlockParam;
-import com.anthropic.models.messages.ThinkingConfigEnabled;
+import com.anthropic.models.messages.ThinkingConfigAdaptive;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.TipoPlantilla;
@@ -70,13 +71,21 @@ public class ClaudeEnvioExtractionService {
     /**
      * El razonamiento y el JSON de salida comparten el techo de {@code
      * max_tokens}: descifrar siete páginas de caligrafía consume MUCHO
-     * razonamiento, y con presupuesto adaptativo se comía el techo entero y
-     * la respuesta llegaba cortada ("se ha cortado por longitud"), sin JSON.
-     * Por eso el presupuesto de razonamiento es explícito y el techo es la
-     * suma: así la salida tiene sitio garantizado pase lo que pase.
+     * razonamiento, y con el techo de 16.000 que había antes se lo comía
+     * entero y la respuesta llegaba cortada ("se ha cortado por longitud"),
+     * sin JSON. La solución NO es fijar un presupuesto de razonamiento:
+     * Opus 4.8 solo admite {@code thinking.adaptive} y rechaza
+     * {@code thinking.enabled} con un 400. Se controla con
+     * {@code output_config.effort} y se le da techo de sobra.
      */
-    private static final long TOKENS_RAZONAMIENTO = 16_000L;
-    private static final long TOKENS_SALIDA = 16_000L;
+    private static final long TOKENS_MAXIMOS = 32_000L;
+
+    /**
+     * Cuánto razona el modelo. HIGH y no MAX porque esto es transcripción
+     * cuidadosa, no un problema abierto: subirlo más solo gastaría techo en
+     * releer la misma caligrafía.
+     */
+    private static final OutputConfig.Effort ESFUERZO = OutputConfig.Effort.HIGH;
 
     /**
      * Una extracción larga puede tardar varios minutos. Se pide en streaming
@@ -389,9 +398,9 @@ public class ClaudeEnvioExtractionService {
                 .text(MENSAJE_USUARIO).build()));
         return MessageCreateParams.builder()
                 .model(Model.CLAUDE_OPUS_4_8)
-                .maxTokens(TOKENS_RAZONAMIENTO + TOKENS_SALIDA)
-                .thinking(ThinkingConfigEnabled.builder()
-                        .budgetTokens(TOKENS_RAZONAMIENTO).build())
+                .maxTokens(TOKENS_MAXIMOS)
+                .thinking(ThinkingConfigAdaptive.builder().build())
+                .outputConfig(OutputConfig.builder().effort(ESFUERZO).build())
                 .system(promptPara(plantilla))
                 .addUserMessageOfBlockParams(bloques)
                 .build();

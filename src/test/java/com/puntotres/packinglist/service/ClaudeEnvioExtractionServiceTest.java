@@ -72,21 +72,27 @@ class ClaudeEnvioExtractionServiceTest {
     }
 
     @Test
-    void elRazonamientoTieneSuPropioPresupuestoYDejaSitioALaSalida() {
-        // El razonamiento y el JSON comparten el techo de max_tokens: con
-        // presupuesto adaptativo, descifrar 7 páginas de caligrafía se comía
-        // el techo entero y la respuesta llegaba cortada, sin JSON. El
-        // presupuesto explícito garantiza sitio para la salida.
+    void elRazonamientoEsAdaptativoConEsfuerzoYTechoDeSobra() {
+        // El razonamiento y el JSON comparten el techo de max_tokens, y
+        // descifrar 7 páginas de caligrafía consume mucho razonamiento: con
+        // el techo de 16.000 que había antes, la respuesta llegaba cortada
+        // sin JSON. El techo tiene que ser holgado.
+        //
+        // Y el razonamiento se controla con output_config.effort, NUNCA con
+        // thinking.enabled/budgetTokens: Opus 4.8 lo rechaza con un 400
+        // ("thinking.type.enabled is not supported for this model"), que es
+        // un fallo en tiempo de ejecución que ningún test de dominio ve.
         MessageCreateParams peticion = ClaudeEnvioExtractionService.peticionPara(
                 List.of(new ClaudeEnvioExtractionService.Adjunto(
                         "application/pdf", new byte[] {1})),
                 TipoPlantilla.APC);
 
-        long razonamiento = peticion.thinking().orElseThrow().asEnabled().budgetTokens();
-        assertTrue(peticion.maxTokens() > razonamiento,
-                "sin margen sobre el razonamiento, la salida se corta");
-        assertTrue(peticion.maxTokens() - razonamiento >= 8000,
-                "el JSON de un envío entero necesita sitio de sobra");
+        assertTrue(peticion.thinking().orElseThrow().isAdaptive(),
+                "Opus 4.8 solo admite thinking adaptativo");
+        assertTrue(peticion.outputConfig().orElseThrow().effort().isPresent(),
+                "sin effort no hay forma de acotar cuánto razona");
+        assertTrue(peticion.maxTokens() >= 24000,
+                "con el techo justo, el razonamiento se come el JSON");
     }
 
     @Test
