@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,6 +60,39 @@ class WeightInferenceServiceTest {
         // Ya no falla en silencio: el tamaño sin tara se reporta.
         assertEquals(1, resultado.getAvisos().size());
         assertTrue(resultado.getAvisos().get(0).contains("50x30x20"));
+    }
+
+    /**
+     * Una caja SIN medida no es una caja con un tamaño que no está en la
+     * tabla: no se arregla en application.yml sino en la columna TAMAÑO de
+     * la revisión, así que el aviso tiene que decir eso y no mandar al
+     * usuario a tocar la configuración. Y es un aviso de inferencia (no de
+     * importación) a propósito: la revisión los recalcula tras cada edición,
+     * así que desaparece en cuanto se elige la medida.
+     */
+    @Test
+    void unaCajaSinMedidaAvisaDeLaColumnaTamanoNoDeLaConfiguracion() {
+        CajaData sinMedida = caja(null, 10, 9.0);
+        sinMedida.setNumeroCaja(7);
+
+        ResultadoInferencia resultado = service.inferirPesos(List.of(sinMedida));
+
+        assertEquals(1, resultado.getAvisos().size());
+        String aviso = resultado.getAvisos().get(0);
+        assertTrue(aviso.contains("7"), aviso);
+        assertTrue(aviso.contains("TAMAÑO"), aviso);
+        assertFalse(aviso.contains("application.yml"), aviso);
+    }
+
+    /** Sin medida no hay tara, así que tampoco se puede derivar el neto. */
+    @Test
+    void unaCajaSinMedidaNoInventaPesos() {
+        CajaData sinMedida = caja(null, 10, 9.0);
+
+        service.inferirPesos(List.of(sinMedida));
+
+        assertNull(sinMedida.getPesoNetoKg());
+        assertEquals(9.0, sinMedida.getPesoBrutoKg());
     }
 
     @Test

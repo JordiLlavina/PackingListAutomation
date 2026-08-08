@@ -255,24 +255,13 @@ public class AmiExcelBuilder {
     }
 
     /**
-     * Suma del volumen de cada caja en m3: las dimensiones llegan en cm
-     * ("LxWxH", p. ej. "60x40x30"), se pasan a metros y se multiplican.
+     * Suma del volumen de cada caja en m3, con el mismo criterio que APC y
+     * la genérica (ver {@link VolumenUtil#volumenTotalM3}): las cajas cuya
+     * medida falta no suman, y una medida mal formada sí lanza.
      */
     private double calcularVolumenTotalM3(List<PackingListData.Caja> cajas) {
-        double total = 0;
-        for (PackingListData.Caja caja : cajas) {
-            String[] dimensiones = caja.getTamanoCaja().split("[xX]");
-            if (dimensiones.length != 3) {
-                throw new IllegalArgumentException(
-                        "tamanoCaja debe tener formato LxWxH en cm, recibido: " + caja.getTamanoCaja());
-            }
-            double volumen = 1;
-            for (String dimension : dimensiones) {
-                volumen *= Double.parseDouble(dimension.trim()) / 100.0;
-            }
-            total += volumen;
-        }
-        return total;
+        return VolumenUtil.volumenTotalM3(
+                cajas.stream().map(PackingListData.Caja::getTamanoCaja).toList());
     }
 
     // --- Helpers de celdas: escriben el valor sin tocar el estilo existente ---

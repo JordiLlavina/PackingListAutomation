@@ -30,12 +30,26 @@ class PackingListApplicationTest {
     @Autowired
     private ClientesProperties clientes;
 
+    /**
+     * Las taras son DATOS DEL ALMACÉN: entran tamaños de caja nuevos y los
+     * pesos se van corrigiendo según se pesa cada cartón. Este test comprueba
+     * que el yml se enlaza y que las claves se normalizan, nunca cuánto pesa
+     * un cartón concreto: fijar aquí un número convierte pesar una caja en un
+     * cambio de código, que es justo lo que la tabla de taras evita.
+     */
     @Test
     void cargaLasTarasDesdeApplicationYml() {
-        assertEquals(Optional.of(0.6), taras.taraPara("60X40X40"));
-        assertEquals(Optional.of(0.2), taras.taraPara(" 60x40x30 "));
-        assertEquals(Optional.of(0.2), taras.taraPara("40x30x20"));
-        assertTrue(taras.taraPara("99x99x99").isEmpty());
+        assertFalse(taras.getTaras().isEmpty(), "application.yml debe traer la tabla de taras");
+
+        String tamano = taras.tamanosDeMayorAMenor().get(0);
+        Optional<Double> tara = taras.taraPara(tamano);
+        assertTrue(tara.isPresent(), "todo tamaño del catálogo tiene su tara");
+
+        // Normalización de claves: un tamaño leído de las hojas llega con
+        // mayúsculas y espacios ("60X40X40 ") y tiene que casar igual.
+        assertEquals(tara, taras.taraPara(" " + tamano.toUpperCase() + " "));
+
+        assertTrue(taras.taraPara("99x99x99").isEmpty(), "un tamaño que no está no se inventa");
     }
 
     @Test

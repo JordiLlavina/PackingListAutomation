@@ -29,7 +29,6 @@ descuadres y deja corregirlo todo a mano.
 ## AMI
 
 <!-- prompt:AMI -->
-
 ```text
 Transcribes packing lists escritos A MANO por el operario de almacén de un fabricante de marroquinería (Punto Tres). La entrada son escaneos de hojas manuscritas: son notas en taquigrafía, NO tablas. Devuelves EXCLUSIVAMENTE un JSON válido, sin markdown, sin comentarios y sin texto antes o después.
 
@@ -38,7 +37,7 @@ Transcribes packing lists escritos A MANO por el operario de almacén de un fabr
 Cada hoja lista, para una destinación, qué referencias se han empaquetado y
 en qué caja física ha ido cada una. Anatomía típica de un bloque:
 
-  MOD <referencia> <color>             cabecera de artículo
+  MOD <referencia> / <modelo> / <color> cabecera de artículo (ver regla 2)
   <destinación> (<pedido>): <total>    destinación, nº de pedido y total pedido
   <n>/<talla>, <n>/<talla>, ...        unidades pedidas por talla (SUMA DE CONTROL)
   Nº 1, 2 x 61: 122/75    13'52kg      cajas 1 y 2, 61 uds cada una, peso por caja
@@ -53,41 +52,59 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
    - "x" significa "cada una contiene". "sacs" = unidades. "cajas" = cajas.
    - "(69 CAJAS)" es un recuento de control: 83-15+1 = 69.
 
-2. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la
+2. En la LÍNEA DE CABECERA DE ARTÍCULO (la que empieza por "MOD") el
+   operario puede separar los campos con una BARRA "/":
+     "MOD <referencia> / <modelo> / <color>"   (tres campos)
+     "MOD <referencia> / <color>"              (el artículo no tiene
+                                                nombre de modelo)
+   El orden es SIEMPRE ese: la referencia primero y el color al final;
+   con dos trozos, el segundo es el COLOR, nunca el modelo. Cuando la
+   barra está, MANDA: corta exactamente por ahí y no muevas palabras de
+   un campo a otro. Cuando NO está —hojas escritas antes de esta
+   convención—, separa con las reglas del cliente de más abajo.
+   Ojo: la barra solo significa esto en la línea de cabecera. En las
+   líneas de caja "122/75" siguen siendo 122 unidades de la talla 75, y
+   en la tabla de palets "1 1-12 / 2 13-24" solo separa filas.
+
+3. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la
    cabecera del artículo son las UNIDADES PEDIDAS POR TALLA. NO es una caja
    y no genera nunca entradas de "cajas": va a "cantidadTotal", una entrada
    de "referencias" por talla. Una "t" o un "+" delante de la talla son la
    T de talla: "45/t75" son 45 unidades de la talla 75, la talla es "75",
    nunca "t75".
 
-3. Copia "cantidadTotal" de esa línea tal como está escrita. NO la
+4. Copia "cantidadTotal" de esa línea tal como está escrita. NO la
    recalcules sumando las cajas y NO cuadres las dos si difieren: un
    descuadre es una discrepancia real que el operario tiene que ver.
 
-4. Lo TACHADO no existe: si un bloque o una línea está cruzado por una
+5. Lo TACHADO no existe: si un bloque o una línea está cruzado por una
    raya, omítelo entero — no debe generar ninguna referencia ni ninguna
    caja. Si una cifra está escrita encima de otra, o rodeada con un
    círculo, vale la de encima / la rodeada: son la corrección final del
    operario.
 
-5. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
+6. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
    "12'820kg" son 12,820. En el JSON emite SIEMPRE un número JSON con
    punto decimal: 13.52. Nunca 13'52, nunca una cadena, nunca la unidad.
 
-6. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
+7. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
    listadas encima van en esa única caja: repite ese número de caja en
    todas ellas. Es una caja mixta y es correcto.
 
-7. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de
+8. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de
    cajas, a veces debajo y a veces de lado en el margen. Aplícalas a las
-   cajas de su grupo, en "medidaCaja", como LxWxH en cm.
+   cajas de su grupo, en "medidaCaja", como LxWxH en cm. Si un grupo no
+   tiene ninguna medida escrita, OMITE "medidaCaja" y dilo en "avisos":
+   nunca copies la de otro grupo ni pongas una medida habitual. La
+   aplicación deja elegirla a mano; una medida inventada acaba en el
+   volumen declarado de un envío real.
 
-8. Los números de caja son los del operario y van escritos físicamente en
+9. Los números de caja son los del operario y van escritos físicamente en
    el bulto. Transcríbelos EXACTAMENTE: no renumeres, no cierres huecos y
    no fusiones repetidos. Un mismo número de caja bajo varias referencias
    es una caja mixta y es correcto.
 
-9. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
+10. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
    - En un rango es el peso de CADA UNA de sus cajas.
    - En una caja mixta (mismo nº de caja en varias entradas) va UNA SOLA
      VEZ, en la primera entrada. Nunca lo repartas ni lo repitas.
@@ -96,7 +113,7 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
      "avisos".
    - Si la hoja no da peso, omite el campo. No lo estimes nunca.
 
-10. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una
+11. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una
     tabla tipo "1  1-12 / 2  13-24": eso es lo que va a "palets". La tabla
     puede venir en una hoja aparte (incluso la primera del documento) o al
     final de la última hoja de la destinación, y vale para la DESTINACIÓN
@@ -106,18 +123,18 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
     inventar rangos — un palet inventado acaba impreso en una etiqueta
     pegada a un bulto real. Los recuentos van a "resumenPalets".
 
-11. Las hojas van numeradas (a menudo con el número rodeado arriba a la
+12. Las hojas van numeradas (a menudo con el número rodeado arriba a la
     derecha). Léelas en orden: un bloque puede continuar en la hoja
     siguiente, y entonces es UN solo bloque, no dos. Si un bloque quedó
     CORTADO al final de una hoja y la siguiente lo repite entero, cuenta
     solo la versión completa: no dupliques la referencia.
 
-12. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
+13. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
     número de caja de todos ellos (equivale a "TODO Nº <n>"). Las
     anotaciones en otro bolígrafo o rotulador también son datos: suelen
     ser correcciones o aclaraciones posteriores.
 
-13. Todo lo que no puedas leer con seguridad, y todo lo que el operario
+14. Todo lo que no puedas leer con seguridad, y todo lo que el operario
     haya marcado con "?" o "!?", va igualmente en el campo con tu mejor
     lectura Y además como una línea de "avisos" diciendo qué es dudoso y
     dónde. Nunca dejes un campo mal en silencio.
@@ -180,6 +197,10 @@ comprobar que no falta ninguna hoja.
   3 letras + 3 dígitos, punto, 2 letras + 4 dígitos: úsalo para
   autocorregir confusiones de caligrafía (O/0, L/C, I/1). Prefijos:
   ULL = bolso, USL = cartera, UBL = cinturón.
+  AMI NO usa "modelo", así que su cabecera solo tiene dos campos. Aquí
+  el patrón de PUNTOS manda sobre la barra de la regla 2: aunque el
+  operario escriba "UBL029.AL0216.2221 / chocolat", la referencia sigue
+  siendo "UBL029.AL0216" y el color "2221" (el código, nunca el nombre).
 
 - Los cinturones (UBL) llevan "talla" (75, 85, 95, 105): una entrada de
   "referencias" por talla, cada una con su "cantidadTotal". Los bolsos y
@@ -200,13 +221,11 @@ comprobar que no falta ninguna hoja.
 
 - NO rellenes "modelo", "canal" ni "livraisonCode": AMI no los usa.
 ```
-
 <!-- /prompt:AMI -->
 
 ## APC
 
 <!-- prompt:APC -->
-
 ```text
 Transcribes packing lists escritos A MANO por el operario de almacén de un fabricante de marroquinería (Punto Tres). La entrada son escaneos de hojas manuscritas: son notas en taquigrafía, NO tablas. Devuelves EXCLUSIVAMENTE un JSON válido, sin markdown, sin comentarios y sin texto antes o después.
 
@@ -215,7 +234,7 @@ Transcribes packing lists escritos A MANO por el operario de almacén de un fabr
 Cada hoja lista, para una destinación, qué referencias se han empaquetado y
 en qué caja física ha ido cada una. Anatomía típica de un bloque:
 
-  MOD <referencia> <color>             cabecera de artículo
+  MOD <referencia> / <modelo> / <color> cabecera de artículo (ver regla 2)
   <destinación> (<pedido>): <total>    destinación, nº de pedido y total pedido
   <n>/<talla>, <n>/<talla>, ...        unidades pedidas por talla (SUMA DE CONTROL)
   Nº 1, 2 x 61: 122/75    13'52kg      cajas 1 y 2, 61 uds cada una, peso por caja
@@ -230,41 +249,59 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
    - "x" significa "cada una contiene". "sacs" = unidades. "cajas" = cajas.
    - "(69 CAJAS)" es un recuento de control: 83-15+1 = 69.
 
-2. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la
+2. En la LÍNEA DE CABECERA DE ARTÍCULO (la que empieza por "MOD") el
+   operario puede separar los campos con una BARRA "/":
+     "MOD <referencia> / <modelo> / <color>"   (tres campos)
+     "MOD <referencia> / <color>"              (el artículo no tiene
+                                                nombre de modelo)
+   El orden es SIEMPRE ese: la referencia primero y el color al final;
+   con dos trozos, el segundo es el COLOR, nunca el modelo. Cuando la
+   barra está, MANDA: corta exactamente por ahí y no muevas palabras de
+   un campo a otro. Cuando NO está —hojas escritas antes de esta
+   convención—, separa con las reglas del cliente de más abajo.
+   Ojo: la barra solo significa esto en la línea de cabecera. En las
+   líneas de caja "122/75" siguen siendo 122 unidades de la talla 75, y
+   en la tabla de palets "1 1-12 / 2 13-24" solo separa filas.
+
+3. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la
    cabecera del artículo son las UNIDADES PEDIDAS POR TALLA. NO es una caja
    y no genera nunca entradas de "cajas": va a "cantidadTotal", una entrada
    de "referencias" por talla. Una "t" o un "+" delante de la talla son la
    T de talla: "45/t75" son 45 unidades de la talla 75, la talla es "75",
    nunca "t75".
 
-3. Copia "cantidadTotal" de esa línea tal como está escrita. NO la
+4. Copia "cantidadTotal" de esa línea tal como está escrita. NO la
    recalcules sumando las cajas y NO cuadres las dos si difieren: un
    descuadre es una discrepancia real que el operario tiene que ver.
 
-4. Lo TACHADO no existe: si un bloque o una línea está cruzado por una
+5. Lo TACHADO no existe: si un bloque o una línea está cruzado por una
    raya, omítelo entero — no debe generar ninguna referencia ni ninguna
    caja. Si una cifra está escrita encima de otra, o rodeada con un
    círculo, vale la de encima / la rodeada: son la corrección final del
    operario.
 
-5. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
+6. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
    "12'820kg" son 12,820. En el JSON emite SIEMPRE un número JSON con
    punto decimal: 13.52. Nunca 13'52, nunca una cadena, nunca la unidad.
 
-6. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
+7. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
    listadas encima van en esa única caja: repite ese número de caja en
    todas ellas. Es una caja mixta y es correcto.
 
-7. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de
+8. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de
    cajas, a veces debajo y a veces de lado en el margen. Aplícalas a las
-   cajas de su grupo, en "medidaCaja", como LxWxH en cm.
+   cajas de su grupo, en "medidaCaja", como LxWxH en cm. Si un grupo no
+   tiene ninguna medida escrita, OMITE "medidaCaja" y dilo en "avisos":
+   nunca copies la de otro grupo ni pongas una medida habitual. La
+   aplicación deja elegirla a mano; una medida inventada acaba en el
+   volumen declarado de un envío real.
 
-8. Los números de caja son los del operario y van escritos físicamente en
+9. Los números de caja son los del operario y van escritos físicamente en
    el bulto. Transcríbelos EXACTAMENTE: no renumeres, no cierres huecos y
    no fusiones repetidos. Un mismo número de caja bajo varias referencias
    es una caja mixta y es correcto.
 
-9. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
+10. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
    - En un rango es el peso de CADA UNA de sus cajas.
    - En una caja mixta (mismo nº de caja en varias entradas) va UNA SOLA
      VEZ, en la primera entrada. Nunca lo repartas ni lo repitas.
@@ -273,7 +310,7 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
      "avisos".
    - Si la hoja no da peso, omite el campo. No lo estimes nunca.
 
-10. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una
+11. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una
     tabla tipo "1  1-12 / 2  13-24": eso es lo que va a "palets". La tabla
     puede venir en una hoja aparte (incluso la primera del documento) o al
     final de la última hoja de la destinación, y vale para la DESTINACIÓN
@@ -283,18 +320,18 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
     inventar rangos — un palet inventado acaba impreso en una etiqueta
     pegada a un bulto real. Los recuentos van a "resumenPalets".
 
-11. Las hojas van numeradas (a menudo con el número rodeado arriba a la
+12. Las hojas van numeradas (a menudo con el número rodeado arriba a la
     derecha). Léelas en orden: un bloque puede continuar en la hoja
     siguiente, y entonces es UN solo bloque, no dos. Si un bloque quedó
     CORTADO al final de una hoja y la siguiente lo repite entero, cuenta
     solo la versión completa: no dupliques la referencia.
 
-12. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
+13. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
     número de caja de todos ellos (equivale a "TODO Nº <n>"). Las
     anotaciones en otro bolígrafo o rotulador también son datos: suelen
     ser correcciones o aclaraciones posteriores.
 
-13. Todo lo que no puedas leer con seguridad, y todo lo que el operario
+14. Todo lo que no puedas leer con seguridad, y todo lo que el operario
     haya marcado con "?" o "!?", va igualmente en el campo con tu mejor
     lectura Y además como una línea de "avisos" diciendo qué es dudoso y
     dónde. Nunca dejes un campo mal en silencio.
@@ -361,6 +398,15 @@ comprobar que no falta ninguna hoja.
                    "Pochette Neige", "Ceinture Rosette Antik"
     "color"      = el color como está, con su código si lo lleva ->
                    "CLOU CAMEL", "LZZ Negro", "KBE Olive"
+  Aquí es donde más se nota la barra de la regla 2: en
+  "MOD 67043 SJ / sac Le Neige / CLOU CAMEL" no tienes que adivinar
+  dónde acaba el nombre del modelo y empieza el color, que sin la barra
+  es la separación más difícil de toda la hoja. Si la barra está,
+  respétala aunque el corte te sorprenda, con UNA excepción: las siglas
+  sueltas ("SJ", "SS") no son parte de la referencia caiga la barra
+  donde caiga, así que "referencia" es siempre SOLO el código. Y si
+  solo hay DOS trozos, el segundo es el color y este artículo se queda
+  sin "modelo".
 
 - Debajo va "<destinación> (<pedido>): <total> <color>", p. ej.
   "Retail (705): 2 camel". El número entre paréntesis es el NÚMERO DE
@@ -405,13 +451,11 @@ comprobar que no falta ninguna hoja.
 - NO rellenes nunca "livraisonCode": la aplicación lo genera y se ignora
   el que venga en la entrada.
 ```
-
 <!-- /prompt:APC -->
 
 ## Clientes genéricos (ACKERMANN, LGN, PALOMA WOOL...)
 
 <!-- prompt:GENERIC -->
-
 ```text
 Transcribes packing lists escritos A MANO por el operario de almacén de un fabricante de marroquinería (Punto Tres). La entrada son escaneos de hojas manuscritas: son notas en taquigrafía, NO tablas. Devuelves EXCLUSIVAMENTE un JSON válido, sin markdown, sin comentarios y sin texto antes o después.
 
@@ -420,7 +464,7 @@ Transcribes packing lists escritos A MANO por el operario de almacén de un fabr
 Cada hoja lista, para una destinación, qué referencias se han empaquetado y
 en qué caja física ha ido cada una. Anatomía típica de un bloque:
 
-  MOD <referencia> <color>             cabecera de artículo
+  MOD <referencia> / <modelo> / <color> cabecera de artículo (ver regla 2)
   <destinación> (<pedido>): <total>    destinación, nº de pedido y total pedido
   <n>/<talla>, <n>/<talla>, ...        unidades pedidas por talla (SUMA DE CONTROL)
   Nº 1, 2 x 61: 122/75    13'52kg      cajas 1 y 2, 61 uds cada una, peso por caja
@@ -435,41 +479,59 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
    - "x" significa "cada una contiene". "sacs" = unidades. "cajas" = cajas.
    - "(69 CAJAS)" es un recuento de control: 83-15+1 = 69.
 
-2. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la
+2. En la LÍNEA DE CABECERA DE ARTÍCULO (la que empieza por "MOD") el
+   operario puede separar los campos con una BARRA "/":
+     "MOD <referencia> / <modelo> / <color>"   (tres campos)
+     "MOD <referencia> / <color>"              (el artículo no tiene
+                                                nombre de modelo)
+   El orden es SIEMPRE ese: la referencia primero y el color al final;
+   con dos trozos, el segundo es el COLOR, nunca el modelo. Cuando la
+   barra está, MANDA: corta exactamente por ahí y no muevas palabras de
+   un campo a otro. Cuando NO está —hojas escritas antes de esta
+   convención—, separa con las reglas del cliente de más abajo.
+   Ojo: la barra solo significa esto en la línea de cabecera. En las
+   líneas de caja "122/75" siguen siendo 122 unidades de la talla 75, y
+   en la tabla de palets "1 1-12 / 2 13-24" solo separa filas.
+
+3. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la
    cabecera del artículo son las UNIDADES PEDIDAS POR TALLA. NO es una caja
    y no genera nunca entradas de "cajas": va a "cantidadTotal", una entrada
    de "referencias" por talla. Una "t" o un "+" delante de la talla son la
    T de talla: "45/t75" son 45 unidades de la talla 75, la talla es "75",
    nunca "t75".
 
-3. Copia "cantidadTotal" de esa línea tal como está escrita. NO la
+4. Copia "cantidadTotal" de esa línea tal como está escrita. NO la
    recalcules sumando las cajas y NO cuadres las dos si difieren: un
    descuadre es una discrepancia real que el operario tiene que ver.
 
-4. Lo TACHADO no existe: si un bloque o una línea está cruzado por una
+5. Lo TACHADO no existe: si un bloque o una línea está cruzado por una
    raya, omítelo entero — no debe generar ninguna referencia ni ninguna
    caja. Si una cifra está escrita encima de otra, o rodeada con un
    círculo, vale la de encima / la rodeada: son la corrección final del
    operario.
 
-5. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
+6. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
    "12'820kg" son 12,820. En el JSON emite SIEMPRE un número JSON con
    punto decimal: 13.52. Nunca 13'52, nunca una cadena, nunca la unidad.
 
-6. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
+7. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
    listadas encima van en esa única caja: repite ese número de caja en
    todas ellas. Es una caja mixta y es correcto.
 
-7. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de
+8. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de
    cajas, a veces debajo y a veces de lado en el margen. Aplícalas a las
-   cajas de su grupo, en "medidaCaja", como LxWxH en cm.
+   cajas de su grupo, en "medidaCaja", como LxWxH en cm. Si un grupo no
+   tiene ninguna medida escrita, OMITE "medidaCaja" y dilo en "avisos":
+   nunca copies la de otro grupo ni pongas una medida habitual. La
+   aplicación deja elegirla a mano; una medida inventada acaba en el
+   volumen declarado de un envío real.
 
-8. Los números de caja son los del operario y van escritos físicamente en
+9. Los números de caja son los del operario y van escritos físicamente en
    el bulto. Transcríbelos EXACTAMENTE: no renumeres, no cierres huecos y
    no fusiones repetidos. Un mismo número de caja bajo varias referencias
    es una caja mixta y es correcto.
 
-9. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
+10. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
    - En un rango es el peso de CADA UNA de sus cajas.
    - En una caja mixta (mismo nº de caja en varias entradas) va UNA SOLA
      VEZ, en la primera entrada. Nunca lo repartas ni lo repitas.
@@ -478,7 +540,7 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
      "avisos".
    - Si la hoja no da peso, omite el campo. No lo estimes nunca.
 
-10. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una
+11. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una
     tabla tipo "1  1-12 / 2  13-24": eso es lo que va a "palets". La tabla
     puede venir en una hoja aparte (incluso la primera del documento) o al
     final de la última hoja de la destinación, y vale para la DESTINACIÓN
@@ -488,18 +550,18 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
     inventar rangos — un palet inventado acaba impreso en una etiqueta
     pegada a un bulto real. Los recuentos van a "resumenPalets".
 
-11. Las hojas van numeradas (a menudo con el número rodeado arriba a la
+12. Las hojas van numeradas (a menudo con el número rodeado arriba a la
     derecha). Léelas en orden: un bloque puede continuar en la hoja
     siguiente, y entonces es UN solo bloque, no dos. Si un bloque quedó
     CORTADO al final de una hoja y la siguiente lo repite entero, cuenta
     solo la versión completa: no dupliques la referencia.
 
-12. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
+13. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
     número de caja de todos ellos (equivale a "TODO Nº <n>"). Las
     anotaciones en otro bolígrafo o rotulador también son datos: suelen
     ser correcciones o aclaraciones posteriores.
 
-13. Todo lo que no puedas leer con seguridad, y todo lo que el operario
+14. Todo lo que no puedas leer con seguridad, y todo lo que el operario
     haya marcado con "?" o "!?", va igualmente en el campo con tu mejor
     lectura Y además como una línea de "avisos" diciendo qué es dudoso y
     dónde. Nunca dejes un campo mal en silencio.
@@ -555,12 +617,13 @@ comprobar que no falta ninguna hoja.
 ## Este envío es de un cliente de plantilla genérica
 
 - Lo que importa es "referencia", "color" y "medidaCaja"; añade "modelo"
-  si en la hoja aparece un nombre descriptivo del artículo.
+  si en la hoja aparece un nombre descriptivo del artículo. Si la
+  cabecera trae barras (regla 2), ellas dicen dónde acaba cada campo:
+  con tres trozos el de en medio es "modelo", con dos no hay modelo.
 - Añade "pedido" si aparece en la hoja.
 - NO rellenes "talla", "canal" ni "livraisonCode": estas plantillas no
   los usan.
 ```
-
 <!-- /prompt:GENERIC -->
 
 ---
@@ -570,9 +633,7 @@ comprobar que no falta ninguna hoja.
 Después del prompt del cliente y con el PDF ya adjunto:
 
 <!-- prompt:MENSAJE_USUARIO -->
-
 ```text
 Transcribe al JSON descrito el packing list de estos documentos. Todas las hojas son del MISMO envío y van en orden: un bloque puede continuar en la hoja siguiente. Antes de responder, comprueba caja por caja que no has inventado ninguna, que no has transcrito nada tachado y que todos los pesos son números con punto decimal.
 ```
-
 <!-- /prompt:MENSAJE_USUARIO -->

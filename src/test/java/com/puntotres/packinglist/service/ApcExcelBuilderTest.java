@@ -204,6 +204,30 @@ class ApcExcelBuilderTest {
     }
 
     /**
+     * La medida de caja se escribe una sola vez para un grupo entero y a
+     * veces de lado en el margen: la extracción por hojas no siempre la
+     * encuentra. Que falte no puede tumbar la generación —es un dato que se
+     * completa en la revisión— así que el excel sale igual: la caja se
+     * cuenta como cartón, no suma volumen, y el desglose lo dice con "?" en
+     * vez de callarlo o de inventar una medida.
+     */
+    @Test
+    void unaCajaSinMedidaSaleEnElExcelSinVolumenEnVezDeReventar() throws Exception {
+        DestinoData destino = destinoIvry();
+        destino.getCajas().get(1).setTamanoCaja(null); // la caja 2
+
+        List<ExcelGenerado> excels = builder.generar(destino, palets(), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            // Solo las dos cajas medidas suman: 2 * 0.096 = 0.192 m3.
+            assertTrue(hoja.getRow(28).getCell(3).getStringCellValue().contains("0,192 M3"));
+            assertEquals("3 CARTONS 2*60x40x40cm+1*?cm",
+                    hoja.getRow(29).getCell(3).getStringCellValue());
+        }
+    }
+
+    /**
      * El peso es de la caja física y viene UNA sola vez, en su primera
      * línea: las demás líneas de una caja mixta no aportan peso ni cuentan
      * como pendientes.

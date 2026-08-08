@@ -380,7 +380,9 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
     private static String desgloseMedidas(List<String> medidas) {
         Map<String, Integer> conteo = new LinkedHashMap<>();
         for (String medida : medidas) {
-            conteo.merge(medida, 1, Integer::sum);
+            // Una medida que falta se rotula "?": la caja se cuenta igual
+            // (existe y va en el bulto), pero la celda no puede decir "null".
+            conteo.merge(VolumenUtil.etiqueta(medida), 1, Integer::sum);
         }
         if (conteo.size() == 1) {
             return conteo.keySet().iterator().next().replace("x", " x ") + " cm";

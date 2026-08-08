@@ -40,8 +40,18 @@ import com.puntotres.packinglist.testutil.PedidoAmiExcel;
  * Tests del asistente web con los beans reales (los servicios de dominio no
  * tienen dependencias externas y la plantilla AMI está en el classpath).
  * Usa el mismo JSON de fixture que EnvioImportServiceTest.
+ *
+ * Las taras van FIJADAS aquí y no se leen de application.yml: varios de
+ * estos tests comprueban la aritmética de la inferencia (neto = bruto −
+ * tara) y con las del yml el número esperado cambiaría cada vez que en el
+ * almacén se pesa un cartón. La tabla de taras es un dato del negocio, no
+ * una constante del programa; que se enlaza bien lo comprueba
+ * PackingListApplicationTest. Los demás tamaños del yml siguen ahí: esto
+ * solo sobrescribe el peso de estos dos, y "99x99x99" sigue sin tara.
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        "packing-list.taras.[60x40x40]=0.6",
+        "packing-list.taras.[60x40x30]=0.2"})
 @AutoConfigureMockMvc
 class PackingListControllerTest {
 
@@ -728,6 +738,46 @@ class PackingListControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("99x99x99")))
                 .andExpect(content().string(containsString("Sin tara configurada")));
+    }
+
+    /**
+     * Regresión del flujo real: la extracción por hojas puede no encontrar la
+     * medida de un grupo de cajas (se escribe una sola vez, a veces de lado en
+     * el margen) y el JSON llega sin "medidaCaja". Eso reventaba la generación
+     * con un NullPointerException al sumar el volumen del resumen, y el
+     * usuario solo veía "No se pudieron generar los excels" desde la revisión.
+     * Es un dato que se completa en pantalla: tiene que avisar y generar.
+     */
+    @Test
+    void unEnvioConUnaCajaSinMedidaAvisaEnLaRevisionPeroGeneraIgual() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        String json = """
+                {"cliente": "AMI", "destinos": [{"destino": "PARIS",
+                  "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 2}],
+                  "referencias": [
+                    {"referencia": "R1", "color": "NOIR", "medidaCaja": "60x40x40",
+                     "pedido": "P1", "cajas": [{"caja": 1, "unidades": 10, "pesoBruto": 9.0}]},
+                    {"referencia": "R1", "color": "NOIR", "pedido": "P1",
+                     "cajas": [{"caja": 2, "unidades": 10, "pesoBruto": 9.0}]}]}]}
+                """;
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI")
+                        .param("json", json)
+                        .param("temporada", "H26")
+                        .param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Cajas sin medida")))
+                .andExpect(content().string(containsString("TAMAÑO")));
+
+        // Y generar NO falla: se va a resultados, no de vuelta con un error.
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"))
+                .andExpect(flash().attribute("error", (Object) null));
     }
 
     @Test

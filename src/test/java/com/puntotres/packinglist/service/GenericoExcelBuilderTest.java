@@ -134,6 +134,29 @@ class GenericoExcelBuilderTest {
         }
     }
 
+    /**
+     * La medida de caja puede faltar (la extracción por hojas no siempre la
+     * encuentra escrita): es un dato que se completa en la revisión y no
+     * puede tumbar la generación. La caja cuenta como cartón, no suma
+     * volumen y el desglose lo marca con "?" en vez de callarlo.
+     */
+    @Test
+    void unaCajaSinMedidaSaleEnElExcelSinVolumenEnVezDeReventar() throws Exception {
+        DestinoData destino = destino();
+        destino.getCajas().get(2).setTamanoCaja(null); // la caja 3
+
+        List<ExcelGenerado> excels = builder.generar(destino, palets(), envio(), ackermann());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            // Solo las dos cajas medidas suman: 2 * 0.096 = 0.192 m3.
+            assertEquals("0.19 m3", hoja.getRow(13).getCell(8).getStringCellValue());
+            assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());
+            assertEquals("3 (2*60x40x40cm+1*?cm)",
+                    hoja.getRow(16).getCell(8).getStringCellValue());
+        }
+    }
+
     /** Caja 3 partida en dos tallas: el peso de la caja vive en su líder. */
     private static DestinoData destinoConCajaMixta(Double brutoLider) {
         DestinoData destino = destino();

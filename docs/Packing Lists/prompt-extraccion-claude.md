@@ -113,6 +113,32 @@ talla**, una suma de control. El prompt no la menciona. Es el origen natural de
 (clave `ARTICLE`+`COLORIS`+`TAILLE`+PO) falla y las etiquetas salen sin EAN. En
 las hojas aparece indistintamente `/75`, `/t75` y `/+75`.
 
+### 🟠 5b. La cabecera de artículo no tiene separadores (APC)
+
+`MOD 67043 SJ sac Le Neige CLOU CAMEL` son tres campos escritos seguidos:
+referencia (`67043`), modelo (`sac Le Neige`) y color (`CLOU CAMEL`). **Dónde
+acaba el nombre del modelo y empieza el color solo se sabe conociendo el
+catálogo de colores del cliente**, así que es la separación más difícil de toda
+la hoja y ninguna regla la resuelve del todo. En AMI el problema es menor: los
+puntos de la referencia marcan el corte.
+
+**Arreglo por el lado del operario** (decidido 2026-08-07): una **barra `/`
+entre los campos** de esa línea — `MOD 67043 SJ / sac Le Neige / CLOU CAMEL`.
+Es un trazo por artículo y elimina la ambigüedad entera. Reglas para que no
+cree fallos nuevos:
+
+- **Solo en la línea de cabecera.** La barra ya significa otra cosa en el resto
+  de la hoja: `122/75` son 122 unidades de la talla 75 y la tabla de palets usa
+  `1 1-12 / 2 13-24`. El prompt lo acota explícitamente.
+- **Orden fijo** referencia → modelo → color, y con dos trozos el segundo es el
+  color: si no, `A / B` sería ambiguo.
+- **La barra no es obligatoria.** Las hojas ya escritas no la llevan, así que el
+  prompt la trata como autoritativa *cuando está* y cae a las reglas de cliente
+  cuando no. Exigirla habría roto la extracción de todo lo anterior.
+- En **AMI** el patrón de puntos sigue mandando sobre la barra: con
+  `UBL029.AL0216.2221 / chocolat`, el color es `2221` (el código), no
+  `chocolat`.
+
 ### 🟠 6. AMI: referencia y color van pegados
 
 `UBL029.AL0216.2221 chocolat`. Sin instrucción, lo más probable es
@@ -152,6 +178,13 @@ trabajo perdido y sugiere que el dato de la imagen importa.
 `60x40x40` aparece suelta debajo de un grupo de cajas, y en la hoja de Japan
 incluso **en diagonal en el margen**. Hay que decir que aplica al grupo con el
 que está agrupada.
+
+Y hay grupos donde **no está escrita**. El prompt prohíbe entonces copiar la
+del grupo de al lado o poner la habitual: se omite `medidaCaja` y se avisa. La
+aplicación lo aguanta —la caja sale en el packing list sin sumar volumen, y la
+revisión avisa de qué cajas hay que medir— porque una medida inventada acabaría
+en el volumen declarado de un envío real. Antes de eso, la medida ausente
+reventaba la generación con un `NullPointerException`.
 
 ### 🟡 12. No hay dónde poner las dudas
 

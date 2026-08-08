@@ -46,6 +46,26 @@ class ClaudeEnvioExtractionServiceTest {
         assertFalse(generico.contains("Este envío es de AMI"));
     }
 
+    /**
+     * La barra que separa referencia / modelo / color en la cabecera es una
+     * convención NUEVA del operario, así que el prompt tiene que decir dos
+     * cosas o crea más fallos de los que quita: que solo vale en esa línea
+     * (la barra ya significa "unidades/talla" en las líneas de caja y separa
+     * filas en la tabla de palets) y que sin ella se sigue leyendo con las
+     * reglas de siempre (las hojas ya escritas no la llevan).
+     */
+    @Test
+    void elPromptEnsenaLaBarraDeLaCabeceraSinHacerlaObligatoriaNiGlobal() {
+        for (TipoPlantilla plantilla : TipoPlantilla.values()) {
+            String prompt = ClaudeEnvioExtractionService.promptPara(plantilla);
+            assertTrue(prompt.contains("BARRA"), plantilla + ": no enseña la barra");
+            assertTrue(prompt.contains("122/75"),
+                    plantilla + ": no acota la barra a la línea de cabecera");
+            assertTrue(prompt.contains("Cuando NO está"),
+                    plantilla + ": sin la barra hay que seguir leyendo la cabecera");
+        }
+    }
+
     @Test
     void elPromptDeApcProhibeElLivraisonCodeYMapeaLasAbreviaturas() {
         String apc = ClaudeEnvioExtractionService.promptPara(TipoPlantilla.APC);

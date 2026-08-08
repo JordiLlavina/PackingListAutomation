@@ -26,9 +26,11 @@ spring:
 # entre [] y comillas para que Spring las respete tal cual.
 packing-list:
   taras:
-    "[60x40x40]": 0.6
-    "[60x40x30]": 0.2
-    "[40x30x20]": 0.2
+    "[60x40x51]": 0.01
+    "[60x40x45]": 1.08
+    "[60x40x40]": 1.06
+    "[60x40x30]": 0.01
+    "[40x30x20]": 0.78
 
   # Catálogo de clientes. Añadir un cliente nuevo de plantilla GENERIC =
   # añadir aquí su bloque (nombre-legal + direccion-entrega), sin tocar Java.

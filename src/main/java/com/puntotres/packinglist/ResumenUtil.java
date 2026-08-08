@@ -19,7 +19,9 @@ public final class ResumenUtil {
     public static String resumenConteo(List<String> valores) {
         Map<String, Integer> conteo = new LinkedHashMap<>();
         for (String valor : valores) {
-            conteo.merge(valor, 1, Integer::sum);
+            // Una medida que falta se rotula "?": la caja se cuenta igual
+            // (existe y va en el bulto), pero la celda no puede decir "null".
+            conteo.merge(VolumenUtil.etiqueta(valor), 1, Integer::sum);
         }
         String desglose = (conteo.size() == 1)
                 ? conteo.keySet().iterator().next() + "cm"

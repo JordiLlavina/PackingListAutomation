@@ -143,6 +143,27 @@ class AmiExcelBuilderTest {
         assertThrows(IllegalArgumentException.class, () -> builder.generar(data));
     }
 
+    /**
+     * Una medida que FALTA no es lo mismo que una mal escrita: la primera es
+     * un dato que la revisión completa y no puede tumbar la generación, la
+     * segunda es un valor imposible de interpretar. Sin medida la caja sale
+     * en el packing list igual, con su celda de tamaño vacía y sin aportar
+     * volumen.
+     */
+    @Test
+    void unaCajaSinTamanoNoSumaVolumenEnVezDeReventar() throws Exception {
+        PackingListData data = data(
+                caja(1, "OF-1", "BOLSO", "NAT03", 10, "60x40x30", 8.0, 9.2),
+                caja(2, "OF-1", "BOLSO", "NAT03", 10, null, 8.0, 9.2));
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(builder.generar(data)))) {
+            Sheet hoja = wb.getSheet(NOMBRE_HOJA);
+            assertEquals(CellType.BLANK, hoja.getRow(20).getCell(19).getCellType());
+            // Solo la caja medida suma: 0.6*0.4*0.3 = 0.072 m3.
+            assertEquals(0.072, celda(hoja, 28, COL_PESO_BRUTO).getNumericCellValue(), 0.0001);
+        }
+    }
+
     // --- Cinturones (AmiLayout.BELTS): matriz de tallas 70-110 ---
 
     @Test

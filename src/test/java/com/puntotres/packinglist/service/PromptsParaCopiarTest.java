@@ -22,9 +22,17 @@ class PromptsParaCopiarTest {
 
     private static final Path DOC = Path.of("docs", "Packing Lists", "prompts-para-copiar.md");
 
+    /**
+     * El documento se lee normalizando los saltos de línea: en Windows, con
+     * core.autocrlf=true (lo normal), git deja los .md en CRLF al clonar,
+     * mientras que el prompt del código es un text block de Java y siempre
+     * lleva LF. Sin normalizar, este test pasa en la máquina donde se
+     * escribió el documento y falla en cualquier clon nuevo, señalando una
+     * deriva que no existe.
+     */
     private static String documento() throws IOException {
         assertTrue(Files.exists(DOC), "falta " + DOC);
-        return Files.readString(DOC);
+        return Files.readString(DOC).replace("\r\n", "\n");
     }
 
     /** El texto entre los marcadores de un bloque, sin la valla ```text. */

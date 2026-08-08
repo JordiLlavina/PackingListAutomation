@@ -2,12 +2,33 @@
 
 Guía para el operario de almacén. Las hojas se escanean y las lee una IA que
 las convierte en el packing list de Excel. La IA lee bien la letra normal:
-**no hace falta cambiar la forma de trabajar**, solo mantener estas costumbres.
-Las tres primeras son las que más importan.
+casi todo es **mantener las costumbres de siempre**. Solo se pide **una cosa
+nueva**, la regla 1, y es un trazo de bolígrafo por artículo.
 
-## Las 3 reglas de oro
+## Las 4 reglas de oro
 
-### 1. Apunta SIEMPRE el reparto de palets, con sus cajas
+### 1. Separa con una barra "/" los campos de la línea del artículo (NUEVO)
+
+En la línea de arriba de cada bloque (la del `MOD`) van juntos la referencia,
+el nombre del artículo y el color. Escritos seguidos, no hay forma de saber
+dónde acaba uno y empieza otro. Una barra entre ellos lo resuelve:
+
+```
+✓  MOD 67043 SJ / sac Le Neige / CLOU CAMEL
+✗  MOD 67043 SJ sac Le Neige CLOU CAMEL
+```
+
+- **El orden es siempre el mismo**: referencia primero, color al final.
+- Si el artículo **no tiene nombre**, dos campos y una sola barra:
+  `MOD 67043 / CLOU CAMEL`.
+- **Solo en esa línea.** En las de cajas la barra sigue significando lo de
+  siempre (`122/75` = 122 unidades de la talla 75) y no hay que cambiar nada.
+- Es lo que más ayuda en **APC**, donde el nombre del artículo y el color son
+  varias palabras seguidas (`sac Le Neige CLOU CAMEL`) y hoy hay que
+  adivinar el corte. En AMI ayuda menos porque los puntos de la referencia ya
+  marcan el final, pero ponerla no molesta.
+
+### 2. Apunta SIEMPRE el reparto de palets, con sus cajas
 
 Al final de la última hoja de cada destinación (o en una hoja aparte),
 la tabla de qué cajas van en cada palet:
@@ -23,7 +44,7 @@ PALETS:
 las etiquetas de palet no se pueden imprimir y hay que teclearlo después a
 mano. Un recuento sí ayuda como comprobación — mejor las dos cosas.
 
-### 2. Un solo peso por caja, con coma
+### 3. Un solo peso por caja, con coma
 
 - El peso es el de la **caja entera ya cerrada** (bruto), una vez por caja.
 - Con **coma o punto** para los decimales, no apóstrofo: ✓ `13,52 kg`
@@ -32,7 +53,7 @@ mano. Un recuento sí ayuda como comprobación — mejor las dos cosas.
 - Si necesitas apuntar dos pesos (neto y bruto), márcalos: `N 12,82  B 13,94`.
   Un número suelto al lado de otro no se sabe cuál es cuál.
 
-### 3. Corrige tachando, no escribiendo encima
+### 4. Corrige tachando, no escribiendo encima
 
 - **Tacha entero** lo que ya no vale y escribe el valor nuevo **al lado**,
   no encima del viejo.
@@ -50,7 +71,8 @@ mano. Un recuento sí ayuda como comprobación — mejor las dos cosas.
   primeros grupos son el modelo y el tercero el color. Mayúscula de imprenta,
   cuidando `O`/`0` y `L`/`C`, que son lo que más se confunde.
 - Las siglas tipo `SJ`/`SS` mejor junto al nombre del artículo, no pegadas al
-  código.
+  código. Con la barra de la regla 1 da igual de qué lado caigan: nunca se
+  cuentan como parte de la referencia.
 
 ## Cajas y cantidades
 
@@ -64,7 +86,9 @@ La notación de siempre funciona — mantenerla tal cual:
 - `TODO Nº 1` debajo de varios artículos → todos van en la caja 1. Funciona;
   también vale poner `Nº 1` delante de cada artículo.
 - La medida de caja (`60x40x40`) escrita una vez por grupo de cajas, debajo
-  del grupo al que aplica.
+  del grupo al que aplica. **Que no falte en ningún grupo**: la IA tiene
+  prohibido copiar la del grupo de al lado (podría no ser la misma), así que
+  un grupo sin medida hay que completarlo a mano en la pantalla de revisión.
 - **No reutilizar números de caja** dentro de una misma destinación (salvo
   cajas mixtas, que repiten número a propósito).
 

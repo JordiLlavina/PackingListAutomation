@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.puntotres.packinglist.VolumenUtil;
 import com.puntotres.packinglist.config.TaraProperties;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
@@ -31,9 +33,14 @@ import com.puntotres.packinglist.model.CajaFisica;
  * mano — neto o bruto — desbloquea el resto de su referencia.
  *
  * Lo que no se puede inferir se queda a null (nunca se inventa un número),
- * pero no en silencio: los tamaños de caja sin tara configurada se devuelven
- * como avisos en {@link ResultadoInferencia} para que la pantalla de
- * revisión los muestre.
+ * pero no en silencio: los tamaños de caja sin tara configurada y las cajas
+ * que llegan SIN medida se devuelven como avisos en
+ * {@link ResultadoInferencia} para que la pantalla de revisión los muestre.
+ * Son dos problemas distintos y se dicen por separado: el primero se arregla
+ * en application.yml y el segundo eligiendo el tamaño en la propia revisión.
+ * Que la caja sin medida se avise desde aquí (y no al importar) es lo que
+ * hace que el aviso desaparezca en cuanto se corrige: la revisión reinfiere
+ * el envío entero tras cada edición, pero no vuelve a importar.
  */
 @Service
 public class WeightInferenceService {
@@ -71,13 +78,23 @@ public class WeightInferenceService {
         // Un mismo tamaño sin tara puede aparecer en varias cajas: el aviso
         // se emite una sola vez.
         Set<String> tamanosSinTara = new LinkedHashSet<>();
+        Set<Integer> cajasSinMedida = new LinkedHashSet<>();
         for (List<CajaData> cajasDestino : cajasPorDestino) {
             for (CajaFisica caja : CajaFisica.agrupar(cajasDestino)) {
+                if (!tieneMedida(caja.lider())) {
+                    cajasSinMedida.add(caja.lider().getNumeroCaja());
+                }
                 completarPesos(caja, unitarioPorReferencia, tamanosSinTara);
             }
         }
 
         ResultadoInferencia resultado = new ResultadoInferencia();
+        if (!cajasSinMedida.isEmpty()) {
+            resultado.getAvisos().add("Cajas sin medida: " + cajasSinMedida.stream()
+                    .map(String::valueOf).collect(Collectors.joining(", "))
+                    + ". Elige su tamaño en la columna TAMAÑO: sin medida no hay tara"
+                    + " para calcular el peso, y esas cajas no suman volumen en el packing list");
+        }
         for (String tamano : tamanosSinTara) {
             resultado.getAvisos().add("Sin tara configurada para el tamaño de caja '" + tamano
                     + "': añádela en application.yml para poder inferir sus pesos");
@@ -101,7 +118,7 @@ public class WeightInferenceService {
                 if (tara.isPresent()) {
                     lider.setPesoNetoKg(redondear2(lider.getPesoBrutoKg() - tara.get()));
                 } else {
-                    tamanosSinTara.add(nombreTamano(lider));
+                    anotarTamanoSinTara(lider, tamanosSinTara);
                 }
             }
             return;
@@ -111,7 +128,7 @@ public class WeightInferenceService {
             if (tara.isPresent()) {
                 lider.setPesoBrutoKg(redondear2(lider.getPesoNetoKg() + tara.get()));
             } else {
-                tamanosSinTara.add(nombreTamano(lider));
+                anotarTamanoSinTara(lider, tamanosSinTara);
             }
             return;
         }
@@ -124,7 +141,7 @@ public class WeightInferenceService {
             return;
         }
         if (tara.isEmpty()) {
-            tamanosSinTara.add(nombreTamano(lider));
+            anotarTamanoSinTara(lider, tamanosSinTara);
             return;
         }
         lider.setPesoNetoKg(redondear2(neto));
@@ -202,8 +219,20 @@ public class WeightInferenceService {
         return tara.map(t -> (caja.pesoBrutoKg() - t) / unidades).orElse(null);
     }
 
-    private static String nombreTamano(CajaData caja) {
-        return caja.getTamanoCaja() == null ? "(sin tamaño)" : caja.getTamanoCaja();
+    private static boolean tieneMedida(CajaData caja) {
+        return VolumenUtil.tieneMedida(caja.getTamanoCaja());
+    }
+
+    /**
+     * Una caja SIN medida no es un problema de configuración: no hay ninguna
+     * tara que añadir al yml, hay una medida que elegir en la revisión, y de
+     * eso avisa su propia línea. Solo se anotan aquí los tamaños que sí están
+     * escritos y no tienen tara.
+     */
+    private static void anotarTamanoSinTara(CajaData lider, Set<String> tamanosSinTara) {
+        if (tieneMedida(lider)) {
+            tamanosSinTara.add(lider.getTamanoCaja());
+        }
     }
 
     private static double redondear2(double valor) {

@@ -92,7 +92,7 @@ public class EnvioImportService {
         caja.setNumeroPedido(referencia.getPedido());
         caja.setReferencia(referencia.getReferencia());
         caja.setCodigoColor(referencia.getColor());
-        caja.setTamanoCaja(referencia.getMedidaCaja());
+        caja.setTamanoCaja(normalizarMedida(referencia.getMedidaCaja()));
         caja.setCantidad(unidades != null ? unidades : 0);
         caja.setTalla(normalizarTalla(referencia.getTalla()));
         caja.setModelo(referencia.getModelo());
@@ -113,6 +113,20 @@ public class EnvioImportService {
      * Solo se limpia el prefijo cuando lo que queda son dígitos: una talla
      * "U" o cualquier valor raro se respeta tal cual.
      */
+    /**
+     * Una medida en blanco es una medida que falta, y se guarda como null
+     * para que lo sea en todo el resto del recorrido: el desplegable TAMAÑO
+     * de la revisión ofrece la opción vacía cuando el valor es null, pero
+     * con "" pintaría una opción propia rotulada "(sin tara)" y ya
+     * seleccionada — una medida vacía disfrazada de medida elegida.
+     */
+    private static String normalizarMedida(String medidaCaja) {
+        if (medidaCaja == null || medidaCaja.isBlank()) {
+            return null;
+        }
+        return medidaCaja.trim();
+    }
+
     private static String normalizarTalla(String talla) {
         if (talla == null) {
             return null;
