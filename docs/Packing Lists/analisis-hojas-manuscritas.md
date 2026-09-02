@@ -1,18 +1,22 @@
-# Prompt de extracción por imágenes — análisis y propuesta
+# Las hojas manuscritas del operario — análisis y catálogo de fallos
 
-Dónde está hoy: [`ClaudeEnvioExtractionService.PROMPT_SISTEMA`](../../src/main/java/com/puntotres/packinglist/service/ClaudeEnvioExtractionService.java)
-(constante `PROMPT_SISTEMA`, y el mensaje de usuario al final de `extraer(...)`).
+Qué son las hojas manuscritas del operario y dónde puede equivocarse la LLM al
+leerlas. **La propuesta de prompt que traía este documento ya está
+implementada**: el apartado 4 dice dónde vive ahora y qué se le añadió después.
 
-Este documento es **una propuesta para validar**, no está implementado.
+El prompt vivo es el del código
+([`ClaudeEnvioExtractionService`](../../src/main/java/com/puntotres/packinglist/service/ClaudeEnvioExtractionService.java):
+`promptPara(plantilla)` = `PROMPT_NUCLEO` + `BLOQUE_<CLIENTE>`). Para
+**copiarlo y pegarlo en claude.ai**, la copia buena es
+[prompts-para-copiar.md](prompts-para-copiar.md), que un test mantiene idéntica
+al código.
 
-**Decisiones ya tomadas** (2026-08-06):
+**Decisiones tomadas el 2026-08-06**, las tres ya implementadas:
 
-- Estructura **núcleo + bloque por cliente** (apartado 4): aprobada.
-- La entrada real serán **PDFs**, no fotos sueltas. Hoy `mediaTypeDe(...)`
-  rechaza `application/pdf`; el SDK 2.49.0 ya trae `DocumentBlockParam` +
-  `Base64PdfSource`, así que aceptar PDF es un cambio pequeño y **obligatorio**
-  para este flujo.
-- Los **palets de AMI ya importan de verdad**: desde las etiquetas de palet de
+- Estructura **núcleo + bloque por cliente** (apartado 4).
+- La entrada real son **PDFs**, no fotos sueltas: `bloquesDe(...)` los manda
+  como `DocumentBlockParam` + `Base64PdfSource`, y sigue aceptando imágenes.
+- Los **palets de AMI importan de verdad**: desde las etiquetas de palet de
   AMI (spec 2026-08-05), una destinación con una sola caja sin palet sale SIN
   hoja de etiquetas de palet. La tabla caja→palet normalmente estará, en hoja
   aparte o al final de una hoja de packing, y puede faltar (se completa en la
@@ -75,7 +79,7 @@ Nº 15 - 83 x 5 sacs   345  (69 CAJAS)    ← RANGO de cajas 15..83, 5 uds cada 
 
 ---
 
-## 2. Los 12 fallos del prompt actual contra estas hojas
+## 2. Los 13 fallos del prompt original contra estas hojas
 
 Ordenados por gravedad. Los tres primeros rompen la importación o falsean cajas.
 
@@ -194,7 +198,7 @@ fallar en silencio*.
 
 ---
 
-## 3. Cambios de código que hacen falta
+## 3. Cambios de código que hicieron falta (todos implementados)
 
 | # | Cambio | Por qué |
 |---|---|---|
@@ -209,269 +213,57 @@ así que (A) es solo pasar el parámetro.
 
 ---
 
-## 4. Prompt propuesto
+## 4. El prompt: dónde está y qué forma tiene
 
-### 4.1 Núcleo (común a los tres clientes)
+**Implementado.** El texto vivo es el del código, no el de este documento:
+`promptPara(plantilla)` concatena el núcleo con el bloque del cliente.
 
-```
-Transcribes packing lists escritos A MANO por el operario de almacén de un
-fabricante de marroquinería (Punto Tres). La entrada son escaneos de hojas
-manuscritas: son notas en taquigrafía, NO tablas. Devuelves EXCLUSIVAMENTE un
-JSON válido, sin markdown, sin comentarios y sin texto antes o después.
+| Pieza | Constante en `ClaudeEnvioExtractionService` | Qué aporta |
+|---|---|---|
+| Núcleo | `PROMPT_NUCLEO` | La taquigrafía del operario: las 14 reglas de lectura y la estructura exacta del JSON. Idéntico para los tres clientes |
+| Bloque AMI | `BLOQUE_AMI` | Referencia partida por puntos, tallas de cinturón, numeración de cajas continua entre hojas |
+| Bloque APC | `BLOQUE_APC` | Referencia y pedido incompletos a propósito, catálogo de destinaciones, numeración que reinicia |
+| Bloque genérico | `BLOQUE_GENERICO` | Lo mínimo: referencia, color, medida y `modelo` si la hoja lo trae |
+| Mensaje de usuario | `MENSAJE_USUARIO` | Va detrás de los documentos adjuntos |
 
-## Cómo se leen estas hojas
+**El texto literal no se copia en este documento, a propósito.** Su copia
+oficial —la que se pega en claude.ai cuando la API falla— es
+[prompts-para-copiar.md](prompts-para-copiar.md), **generada desde el código y
+anclada por `PromptsParaCopiarTest`**: si las dos divergen, el test falla. Aquí
+no hay ancla que valga, así que una tercera copia se quedaría vieja en
+silencio — que es justo lo que le pasó a este apartado entre agosto y
+septiembre de 2026, cuando llegó a describir un prompt de 12 reglas que el
+código ya no mandaba.
 
-Cada hoja lista, para una destinación, qué referencias se han empaquetado y en
-qué caja física ha ido cada una. Anatomía típica de un bloque:
+### 4.1 Qué cambió respecto a la propuesta original
 
-  MOD <referencia> <color>             cabecera de artículo
-  <destinación> (<pedido>): <total>    destinación, nº de pedido y total pedido
-  <n>/<talla>, <n>/<talla>, ...        unidades pedidas por talla (SUMA DE CONTROL)
-  Nº 1, 2 x 61: 122/75    13'52kg      cajas 1 y 2, 61 uds cada una, peso por caja
-  Nº 15 - 83 x 5 sacs  345 (69 CAJAS)  RANGO de cajas 15..83, 5 uds cada una
-  60x40x40                             medida de caja del grupo de arriba
+La propuesta de agosto se implementó casi entera. Lo que se le añadió después,
+todo salido del uso real:
 
-## Reglas de lectura
-
-1. "Nº" introduce SIEMPRE números de caja, nunca cantidades.
-   - "Nº 1, 2 x 61" = cajas 1 y 2, 61 unidades CADA UNA (no 61 repartidas).
-   - "Nº 15 - 83 x 5" = rango de las cajas 15 a 83, 5 unidades cada una.
-   - "x" significa "cada una contiene". "sacs" = unidades. "cajas" = cajas.
-   - "(69 CAJAS)" es un recuento de control: 83-15+1 = 69.
-
-2. La línea "<n>/<talla>, <n>/<talla>, ..." que va justo debajo de la cabecera
-   del artículo son las UNIDADES PEDIDAS POR TALLA. NO es una caja y no genera
-   nunca entradas de "cajas": va a "cantidadTotal", una entrada de "referencias"
-   por talla. Una "t" o un "+" delante de la talla son la T de talla:
-   "45/t75" son 45 unidades de la talla 75, la talla es "75", nunca "t75".
-
-3. Copia "cantidadTotal" de esa línea tal como está escrita. NO la recalcules
-   sumando las cajas y NO cuadres las dos si difieren: un descuadre es una
-   discrepancia real que el operario tiene que ver.
-
-4. Lo TACHADO no existe: si un bloque está cruzado por una raya, omítelo
-   entero. Si una cifra está escrita encima de otra, o rodeada con un círculo,
-   vale la de encima / la rodeada: son la corrección final del operario.
-
-5. Los decimales se escriben con apóstrofo o coma: "13'52kg" son 13,52 y
-   "12'820kg" son 12,820. En el JSON emite SIEMPRE un número JSON con punto
-   decimal: 13.52. Nunca 13'52, nunca una cadena, nunca la unidad.
-
-6. "TODO Nº <n>" (o "todo caja <n>") significa que TODAS las referencias
-   listadas encima van en esa única caja: repite ese número de caja en todas
-   ellas. Es una caja mixta y es correcto.
-
-7. Las medidas de caja ("60x40x40") se escriben una vez para un grupo de cajas,
-   a veces debajo y a veces de lado en el margen. Aplícalas a las cajas de su
-   grupo, en "medidaCaja", como LxWxH en cm.
-
-8. Los números de caja son los del operario y van escritos físicamente en el
-   bulto. Transcríbelos EXACTAMENTE: no renumeres, no cierres huecos y no
-   fusiones repetidos. Un mismo número de caja bajo varias referencias es una
-   caja mixta y es correcto.
-
-9. "pesoBruto" (kg) es el peso de la CAJA FÍSICA ENTERA y es OPCIONAL.
-   - En un rango es el peso de CADA UNA de sus cajas.
-   - En una caja mixta (mismo nº de caja en varias entradas) va UNA SOLA VEZ,
-     en la primera entrada. Nunca lo repartas ni lo repitas.
-   - Si la hoja no da peso, omite el campo. No lo estimes nunca.
-
-10. Lo normal es que las hojas digan QUÉ CAJAS van en cada palet con una tabla
-    tipo "1  1-12 / 2  13-24": eso es lo que esperas encontrar y lo que va a
-    "palets". La tabla puede venir en una hoja aparte (incluso la primera del
-    documento) o al final de la última hoja de la destinación, y vale para la
-    DESTINACIÓN ENTERA, todas sus referencias, no solo para la hoja donde está
-    escrita. Si NO hay reparto escrito, deja "palets" vacío — se completa en
-    la pantalla de revisión. Un simple RECUENTO ("5 palets") NUNCA basta para
-    inventar rangos: un palet inventado acaba impreso en una etiqueta pegada a
-    un bulto real. El recuento va a "resumenPalets" (ver estructura), que la
-    aplicación usa para validar la extracción.
-
-11. Las hojas van numeradas (a menudo con el número rodeado arriba a la
-    derecha). Léelas en orden: un bloque puede continuar en la hoja siguiente,
-    y entonces es UN solo bloque, no dos. Si un bloque quedó CORTADO al final
-    de una hoja y la siguiente lo repite entero, cuenta solo la versión
-    completa: no dupliques la referencia.
-
-11b. Un número rodeado en el MARGEN IZQUIERDO de uno o varios bloques es el
-    número de caja de todos ellos (equivale a "TODO Nº <n>"). Las anotaciones
-    en otro bolígrafo o rotulador también son datos: suelen ser correcciones o
-    aclaraciones posteriores.
-
-12. Todo lo que no puedas leer con seguridad, y todo lo que el operario haya
-    marcado con "?" o "!?", va igualmente en el campo con tu mejor lectura Y
-    además como una línea de "avisos" diciendo qué es dudoso y dónde. Nunca
-    dejes un campo mal en silencio.
-
-## Estructura exacta del JSON
-
-{
-  "cliente": "<clave del cliente si aparece; si no, omítelo>",
-  "avisos": ["<dudas y descuadres, en español>"],
-  "resumenPalets": [
-    { "destino": "<destinación>", "palets": 5 }
-  ],
-  "destinos": [
-    {
-      "destino": "<nombre de la destinación>",
-      "palets": [ { "palet": 1, "cajaInicio": 1, "cajaFin": 12 } ],
-      "referencias": [
-        {
-          "referencia": "...",
-          "color": "...",
-          "medidaCaja": "60x40x40",
-          "pedido": "...",
-          "talla": "<solo si el artículo tiene talla>",
-          "modelo": "<solo si el cliente lo usa>",
-          "cantidadTotal": 150,
-          "cajas": [
-            { "cajaInicio": 1, "cajaFin": 3, "unidadesPorCaja": 50, "pesoBruto": 18.5 },
-            { "caja": 4, "unidades": 45, "pesoBruto": 16.2 }
-          ]
-        }
-      ]
-    }
-  ]
-}
-
-Cada entrada de "cajas" tiene UNA de las dos formas: caja suelta
-{"caja": N, "unidades": U} o rango {"cajaInicio": A, "cajaFin": B,
-"unidadesPorCaja": U}. Un rango implica que TODAS esas cajas llevan las mismas
-unidades; si no, usa cajas sueltas.
-
-Una referencia con varias tallas o colores son varias entradas de
-"referencias", una por combinación, cada una con su "cantidadTotal".
-
-Copia referencias, colores y pedidos EXACTAMENTE como aparecen, respetando
-puntos, ceros a la izquierda y mayúsculas.
-
-"resumenPalets" recoge los RECUENTOS de palets por destinación cuando alguna
-hoja los declara ("Japan -> 1 palet", "wh. 5 palet"): una entrada por
-destinación mencionada, aunque no tengas su reparto de cajas. Si ninguna hoja
-da recuentos, omite el campo. La aplicación lo usa para comprobar que no
-falta ninguna hoja.
-```
-
-### 4.2 Bloque AMI
-
-```
-## Este envío es de AMI
-
-- Cabecera de artículo: "MOD ULL163.AL0052.221 DARK COFFEE". Sepárala así:
-    "referencia" = los DOS primeros grupos de puntos -> "ULL163.AL0052"
-    "color"      = el TERCER grupo, solo el código numérico -> "221"
-  Las palabras finales ("DARK COFFEE") son el nombre del color: NO van a
-  ningún campo. Prefijos: ULL = bolso, USL = cartera, UBL = cinturón.
-
-- Los cinturones (UBL) llevan "talla" (75, 85, 95, 105): una entrada de
-  "referencias" por talla, cada una con su "cantidadTotal". Los bolsos y
-  carteras no llevan talla: omite el campo.
-
-- La destinación y el pedido van juntos: "PARIS 07672:" es destino PARIS y
-  pedido "07672". Respeta los ceros a la izquierda.
-
-- Los números de caja son CONTINUOS entre las hojas y las referencias de una
-  misma destinación (si la hoja 1 acaba en la caja 11, la hoja 2 empieza en la
-  12 aunque cambie de artículo). No reinicies en 1 por hoja ni por referencia.
-
-- La tabla caja→palet ("1  1-12 / 2  13-24 ...") suele venir al final de la
-  última hoja de la destinación, y cubre TODAS sus cajas, de todas las
-  referencias. Transcríbela entera en "palets". Puede llevar anotaciones
-  encima (tachones, letras en rotulador): apúntalas en "avisos".
-
-- NO rellenes "modelo", "canal" ni "livraisonCode": AMI no los usa.
-```
-
-### 4.3 Bloque APC
-
-```
-## Este envío es de APC
-
-- Cabecera de artículo: "MOD 67043 SJ sac Le Neige CLOU CAMEL". Sepárala así:
-    "referencia" = el código tal cual está escrito -> "67043", "F63023", "63024"
-                   Está INCOMPLETO a propósito: NO lo amplíes ni le añadas
-                   prefijos, lo completa la aplicación. Las siglas sueltas
-                   detrás del código ("SJ", "SS") NO son parte de la
-                   referencia: déjalas fuera y, si dudas de qué son, una
-                   línea en "avisos".
-    "modelo"     = el nombre descriptivo -> "sac Le Neige", "Pochette Neige",
-                   "Ceinture Rosette Antik"
-    "color"      = el color como está, con su código si lo lleva ->
-                   "CLOU CAMEL", "LZZ Negro", "KBE Olive"
-
-- Debajo va "<destinación> (<pedido>): <total> <color>", p. ej.
-  "Retail (705): 2 camel". El número entre paréntesis es el NÚMERO DE PEDIDO y
-  normalmente son solo sus TRES ÚLTIMOS DÍGITOS (705, 682, 860). Transcribe
-  esos tres dígitos EXACTAMENTE: no los rellenes, no inventes el resto; la
-  aplicación completa el número desde el excel de pedido del cliente. Si el
-  operario lo escribe entero (4100128715), cópialo entero.
-
-- Destinación: hay UNA HOJA POR DESTINACIÓN, titulada arriba ("APC Japan",
-  "APC Korea", "APC Retail", "APC Douanes USA"). Usa el nombre del catálogo:
-    Japan -> JAPAN
-    Korea -> KOREA
-    Douanes USA / D. USA -> D. USA
-    Ivry -> IVRY
-    Retail -> RETAIL
-    Wholesale concess -> WHOLESALE CONCESS
-    Wh. / Wholesale -> WHOLESALE
-    Australia -> AUSTRALIA
-    Chine franch -> CHINE FRANCH
-  Desarrolla las abreviaturas ("wh." es WHOLESALE). Si la hoja dice una
-  destinación que no está en esta lista, cópiala tal cual Y añade una línea a
-  "avisos".
-
-- "canal": solo si una línea concreta marca un canal distinto del de la hoja.
-  Si no, omítelo: lo rellena la aplicación.
-
-- Los cinturones llevan "talla" de 5 en 5 (75, 80, 85, 90, 95, 100): una
-  entrada de "referencias" por talla.
-
-- Los números de caja REINICIAN EN 1 en cada destinación.
-
-- El número de pedido puede repetirse entre paréntesis en las líneas de caja
-  ("Nº 4 x 25 Liquen (682) Japan"): ahí es el MISMO pedido, no una cantidad.
-
-- El reparto de palets puede venir en una hoja resumen APARTE, incluso la
-  primera del documento, con una línea por destinación ("Japan -> 1 palet
-  1-6", "wh. 5 palet"). Aplica la regla 10 del núcleo destinación a
-  destinación: rango de cajas escrito -> a "palets"; solo un recuento ->
-  "palets" vacío y el recuento a "resumenPalets".
-
-- NO rellenes nunca "livraisonCode": la aplicación lo genera y se ignora el que
-  venga en la entrada.
-```
-
-### 4.4 Bloque genérico
-
-```
-## Este envío es de un cliente de plantilla genérica
-
-- Lo que importa es "referencia", "color" y "medidaCaja"; añade "modelo" si en
-  la hoja aparece un nombre descriptivo del artículo.
-- Añade "pedido" si aparece en la hoja.
-- NO rellenes "talla", "canal" ni "livraisonCode": estas plantillas no los usan.
-```
-
-### 4.5 Mensaje de usuario (tras los documentos)
-
-Sustituye al actual («Transcribe el packing list de estas imágenes…»):
-
-```
-Transcribe al JSON descrito el packing list de estas <N> hojas. Son hojas del
-MISMO envío y van en orden: un bloque puede continuar en la hoja siguiente.
-Antes de responder, comprueba caja por caja que no has inventado ninguna, que
-no has transcrito nada tachado y que todos los pesos son números con punto
-decimal.
-```
+- **Regla 2, la barra `/` de la cabecera**: el operario puede separar
+  `referencia / modelo / color` con barras, y donde estén, mandan. No existía
+  en la propuesta; ver el fallo 🟠 5b.
+- **Regla 8, medida de caja ausente**: la propuesta decía dónde buscarla, pero
+  no qué hacer cuando no está en ninguna parte. Ahora el prompt manda **omitir**
+  `medidaCaja` y avisar, en vez de copiar la del grupo vecino; ver el fallo
+  🟡 11.
+- **Regla 10, dos pesos en la misma línea**: gana el que lleva `kg`; si los dos
+  o ninguno lo llevan, el mayor, y a `avisos`.
+- **Regla 5, tachados**: de «un bloque» a «un bloque **o una línea**», y con la
+  consecuencia explícita de que no genere ni referencia ni caja.
+- **Bloque AMI**: el patrón `3 letras + 3 dígitos . 2 letras + 4 dígitos` se usa
+  para autocorregir caligrafía (`O`/`0`, `L`/`C`, `I`/`1`), y se dice
+  explícitamente que AMI no usa `modelo`.
+- **Mensaje de usuario**: habla de «documentos», no de «\<N\> hojas», porque la
+  entrada real acabó siendo PDFs.
 
 ---
 
 ## 5. Qué queda por decidir
 
 1. ~~¿Prompt por cliente?~~ **Decidido: núcleo + bloque por cliente.**
-2. **¿Campo `avisos`?** Da salida a las dudas del operario (`!?`, `??`). Cuesta
-   un campo en `EnvioInput` y tres líneas en el importador. Recomendado.
+2. ~~¿Campo `avisos`?~~ **Decidido: sí.** Da salida a las dudas del operario
+   (`!?`, `??`) y llega a la revisión con el prefijo «Lectura de las hojas:».
 3. **`cantidadTotal` cuando el operario corrige.** En la hoja 2 de AMI la
    cabecera dice `45/t75` pero la caja 12 acaba en 44 (corregido y rodeado). La
    propuesta transcribe el 45 de la cabecera, lo que **dispara un aviso de
@@ -558,12 +350,23 @@ cambiar el **operario** al escribir (barato, sin cambiar su forma de trabajar).
 | F2 | `PARIS` en AMI tomado por destino desconocido | AMI 1-3 | Transcribir tal cual | **Ya resuelto**: `AmiNombreFichero` y `AmiEtiquetasGenerador` mapean PARIS → FR/FRANCE | — |
 | F3 | Cliente deducido de las hojas distinto del seleccionado | ambos | `cliente` opcional | El controlador ya avisa sin bloquear si difieren | — |
 
-### Los tres cambios de escritura del operario que más rinden
+### Los cambios de escritura del operario que más rinden
 
-1. **Tabla caja→palet siempre**, por destinación (como AMI hoja 3). Sin ella,
+Son las reglas de oro de
+[guia-operario-packing-manuscrito.md](guia-operario-packing-manuscrito.md), que
+es el documento que se le da a quien escribe las hojas (hay una versión `.docx`
+al lado, para imprimir).
+
+1. **La barra `/` en la cabecera del artículo**
+   (`MOD 67043 SJ / sac Le Neige / CLOU CAMEL`). Es el único hábito nuevo que
+   se pide y quita de golpe la separación más difícil de la hoja; ver el
+   fallo 🟠 5b.
+2. **Tabla caja→palet siempre**, por destinación (como AMI hoja 3). Sin ella,
    AMI se queda sin etiquetas de palet y APC obliga a teclear el reparto a mano.
-2. **Un solo peso por caja, con coma decimal** (`13,52`), y si apunta dos,
+3. **Un solo peso por caja, con coma decimal** (`13,52`), y si apunta dos,
    etiquetados (`B:`/`N:`).
-3. **Referencia APC con su código completo** del pedido impreso (o mínimo con
+4. **Referencia APC con su código completo** del pedido impreso (o mínimo con
    la letra: `F67043`), y las correcciones tachando y reescribiendo al lado,
    con el valor final rodeado.
+5. **La medida de caja en todos los grupos**: sin ella la caja no suma volumen
+   y hay que elegir el tamaño a mano en la revisión; ver el fallo 🟡 11.

@@ -47,7 +47,7 @@ import com.puntotres.packinglist.model.EnvioInput;
  * numeración continua) no tiene nada que ver con una de APC (referencia
  * parcial, pedido de tres dígitos, hoja por destinación). Las hojas de
  * ejemplo reales están en docs/Packing Lists/*IMAGENES.pdf y el análisis en
- * docs/Packing Lists/prompt-extraccion-claude.md.
+ * docs/Packing Lists/analisis-hojas-manuscritas.md.
  *
  * El cliente HTTP se crea perezosamente en el primer uso: así la aplicación
  * arranca (y los otros modos funcionan) aunque no esté configurada la

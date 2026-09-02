@@ -1,35 +1,117 @@
 # Packing List Automation
 
-Generador de packing lists en Excel para clientes (actualmente AMI bolsos), a partir de datos en JSON, usando Java 17 + Spring Boot + Apache POI. Rellena la plantilla real del cliente respetando estilos, fórmulas y estructura.
+Generador de packing lists en Excel para los clientes de Punto Tres (proveedor de marroquinería). A partir de un **JSON de envío** — pegado a mano o **extraído de fotos/PDFs de las hojas manuscritas del almacén** con la API de Anthropic — asigna palets, infiere los pesos que faltan y genera un `.xlsx` por grupo rellenando la **plantilla real de cada cliente** con Apache POI.
+
+Alrededor de ese flujo central hay tres salidas más:
+
+- **Volcado de albarán para el ERP** (un excel con las líneas del envío).
+- **Etiquetas de caja y de palet** (AMI y APC), con códigos de barras EAN-13 y Code 128.
+- Dos flujos independientes del envío: **etiquetas de artículo** (desde el excel de pedido del cliente) y **procesado de escandallos ICSUITE** (excels del ERP → un libro con una hoja por escandallo).
+
+Todo se maneja desde un asistente web (Spring Boot + Thymeleaf). Código y documentación en **español** (nombres de clases en inglés; javadoc, comentarios y UI en español).
 
 ## Requisitos
 
 - **Java 17** (probado con Temurin 17)
 - **Maven 3.9+**
+- *(Opcional)* Variable de entorno `ANTHROPIC_API_KEY` — solo para el modo CLAUDE de la pantalla de entrada (extracción desde fotos/PDFs). Sin ella la aplicación arranca igual y el resto de modos funciona.
 
-Comprueba que los tienes:
+Dependencias clave (las versiones las gestiona el parent de Spring Boot salvo donde se indica, ver [pom.xml](pom.xml)):
 
+| Dependencia | Para qué |
+|---|---|
+| Spring Boot 3.5 (web, thymeleaf, validation) | Asistente web y formularios |
+| Apache POI 5.4 (`poi-ooxml`) | Leer/escribir los `.xlsx` |
+| Jackson | Parseo del JSON de envío |
+| SDK Java de Anthropic | Extracción desde fotos/PDFs |
+| Barcode4J | Códigos de barras de las etiquetas |
+
+## Puesta en marcha en local desde cero
+
+```bash
+# 1. Clonar
+git clone git@github.com:JordiLlavina/PackingListAutomation.git
+cd PackingListAutomation
+
+# 2. Comprobar el entorno
+java -version    # debe ser 17
+mvn -version     # 3.9+
+
+# 3. Compilar y pasar la suite de tests
+mvn test
+
+# 4. Levantar el asistente web
+mvn spring-boot:run
 ```
-java -version
-mvn -version
+
+Con el servidor levantado, abrir **http://localhost:8080** (redirige al menú `/menu`). Desde ahí:
+
+- `/packing-list` — asistente de packing lists en 3 pantallas: **entrada** (pegar JSON o subir fotos/PDFs) → **revisión** (avisos y tabla editable) → **resultados** (descarga individual, ZIP, volcado ERP y etiquetas de caja).
+- `/etiquetas-articulo` — etiquetas de artículo a partir del excel de pedido (sin envío).
+- `/escandallos` — procesado de escandallos ICSUITE (sin envío ni cliente).
+
+Para usar el **modo CLAUDE** (fotos/PDFs → JSON) hay que exportar la clave antes de arrancar. En PowerShell:
+
+```powershell
+$env:ANTHROPIC_API_KEY = "sk-ant-..."   # solo esta sesión de terminal
+mvn spring-boot:run
 ```
 
-## Cómo probar rápido (el `Main`)
+(`setx ANTHROPIC_API_KEY "sk-ant-..."` la deja persistente para terminales nuevos.)
 
-Desde la raíz del proyecto:
+> ⚠️ **Windows**: matar `mvn spring-boot:run` con Ctrl+C no siempre mata el proceso `java` hijo y el puerto 8080 queda ocupado. Liberarlo: `netstat -ano | findstr :8080` y `taskkill /F /PID <pid>`.
 
-```
+### Prueba manual sin web
+
+```bash
 mvn -q compile exec:java
 ```
 
-Esto compila y ejecuta [`Main.java`](src/main/java/com/puntotres/packinglist/Main.java), que corre el **flujo completo** con el JSON de prueba real [`client-packinglist/packing_list_ami_test.json`](src/main/resources/client-packinglist/packing_list_ami_test.json):
+Ejecuta [Main.java](src/main/java/com/puntotres/packinglist/Main.java) con el JSON de prueba [packing_list_ami_test.json](src/main/resources/client-packinglist/packing_list_ami_test.json) y deja los excels en `target/`. Se mantiene a propósito como prueba manual rápida del pipeline.
 
-1. Importa el envío (expande los rangos de cajas y valida `cantidadTotal`).
-2. Asigna palets a cada caja según los rangos.
-3. Intenta inferir los pesos que faltan (con las taras de `application.yml`).
-4. Genera **un excel por destinación + referencia + color** en `target\`. Los de AMI se nombran con el formato que pide el cliente: `<fecha de envío yyyy.MM.dd>_PUN_<product order>_<referencia>.<color>_<temporada>_<destinación abreviada>.xlsx` (p.ej. `2026.05.21_PUN_07705_ULL027.AL0103.001_H26_CHINA.xlsx`); los de APC y los genéricos siguen con `PKL_*.xlsx`.
+### Tests
 
-Por consola salen los avisos de validación, las cajas sin palet y los excels con pesos pendientes. Para probar con otros datos, edita ese JSON (o apunta `JSON_PRUEBA` en `Main.java` a otro fichero) y relanza el comando. Formato del JSON de envío:
+```bash
+mvn test                                          # toda la suite
+mvn test -Dtest=PackingListGenerationServiceTest  # una clase
+```
+
+El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual, y `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx`.
+
+## Estructura del proyecto
+
+```
+src/main/java/com/puntotres/packinglist/
+    Main.java                        Prueba manual: JSON de envío → excels en target/
+    PackingListApplication.java      Arranque Spring Boot
+    PackingListData.java             Vocabulario de la plantilla Excel de un cliente
+    AmiExcelBuilder.java, AmiLayout.java   Builder de la plantilla AMI (formato propio del cliente)
+    model/                           Dominio: EnvioInput (calco del JSON), CajaData/CajaFisica,
+                                     DestinoData, PaletData, DatosEnvio, VolcadoErpData...
+    service/                         Pipeline del envío: importación, destinos padre de APC,
+                                     asignación de palets, completado de pedido APC, inferencia
+                                     de pesos, generación de excels (AMI/APC/genérico), Livraison
+                                     code, volcado ERP, extracción con Claude y su validación
+    service/etiquetas/               Etiquetas de caja y de palet (AMI y APC) + códigos de barras
+                                     y piezas compartidas con las etiquetas de artículo
+    service/etiquetasarticulo/       Etiquetas de artículo (flujo independiente; solo AMI)
+    service/escandallos/             Escandallos ICSUITE (flujo totalmente independiente)
+    web/                             Asistente de 3 pantallas; estado del envío en sesión HTTP
+                                     (EnvioEnCurso), tabla de revisión compactada
+    config/                          Taras, catálogo de clientes (ClientesProperties),
+                                     TipoPlantilla (AMI, APC, GENERIC)
+
+src/main/resources/
+    application.yml                  Taras por tamaño de caja + catálogo de clientes + límites
+                                     de subida + hash de estáticos
+    client-packinglist/              Plantillas Excel de packing list (AMI bags/belts, APC, genérica)
+    client-labels/                   Plantillas de etiquetas de caja (AMI y las 5 de APC)
+    templates/, static/              Vistas Thymeleaf y CSS
+```
+
+**Multi-cliente**: `GeneradorPackingListCliente` es la interfaz; `AmiExcelBuilder`, `ApcExcelBuilder` y `GenericoExcelBuilder` la implementan y `PackingListGenerationService` despacha según la plantilla del cliente. **Añadir un cliente de plantilla GENERIC es solo configuración** en `application.yml` (nombre-legal + direccion-entrega), sin tocar Java.
+
+## Formato del JSON de envío
 
 ```json
 {
@@ -54,98 +136,36 @@ Por consola salen los avisos de validación, las cajas sin palet y los excels co
 ```
 
 - Las cajas admiten dos formas: rango (`cajaInicio`/`cajaFin`/`unidadesPorCaja`) o caja suelta (`caja`/`unidades`).
-- `medidaCaja` en formato `LxWxH` en **centímetros**; los pesos no vienen en el JSON (se infieren o quedan pendientes).
-- Alternativa desde VS Code: con el *Extension Pack for Java*, pulsa el botón **Run** que aparece sobre el método `main`.
+- `medidaCaja` en formato `LxWxH` en **centímetros**. Puede faltar (no bloquea: la caja no suma volumen y el desglose la rotula `?`).
+- Los pesos normalmente **no vienen en el JSON** y se infieren con las taras de `application.yml`. Una caja puede traer `pesoBruto` (kg) opcional cuando la hoja lo indica; el neto nunca viene.
+- El JSON extraído por Claude añade dos campos que el pegado a mano no suele traer: `avisos` (dudas de lectura) y `resumenPalets` (recuentos declarados en la hoja, que se contrastan con lo extraído).
 
-## Ejecutar los tests
+El detalle de qué campos usa cada cliente está en [docs/Packing Lists/campos-json-por-cliente.md](docs/Packing%20Lists/campos-json-por-cliente.md).
 
-```
-mvn test
-```
+## Configuración (`application.yml`)
 
-Corre toda la suite (importación del JSON de envío, asignación de palets, inferencia de pesos, generación por modelo+color y carga de configuración). El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja además excels reales en `target\` generados con el flujo completo.
+- **Taras por tamaño de caja** (`packing-list.taras`): kg del embalaje vacío por clave `LxWxH`. **Un tamaño de caja nuevo es una línea aquí**, sin tocar código. Las claves se normalizan (`"60X40X40 "` casa con `"60x40x40"`). Es un dato del almacén, no una constante: los tamaños aún sin pesar están puestos a `0.01`.
+- **Catálogo de clientes** (`packing-list.clientes`): nombre, plantilla (AMI/APC/GENERIC), y por cliente lo suyo — si sube excel de pedido (`pedido-cliente`), las destinaciones de APC con sus direcciones, abreviaturas del Livraison code y destinos hijo.
+- Límites de subida multipart (las fotos del móvil superan el 1MB por defecto de Spring) y hash del contenido en los nombres de los estáticos (sin él, el navegador reutiliza el CSS viejo tras cada cambio).
 
-Un solo test:
+La única variable de entorno es `ANTHROPIC_API_KEY` (opcional, ver arriba).
 
-```
-mvn test -Dtest=PackingListGenerationServiceTest
-```
+## Los JSON de ejemplo son inventados
 
-### Los JSON de ejemplo son inventados
+Los `envio-*.json` de [src/test/resources/ejemplos/](src/test/resources/ejemplos/README.md), el `packing_list_ami_test.json` del `Main` y los JSON recortados en los documentos de `docs/` son **fixtures generados por IA**: envíos escritos a ojo, sin conocer la realidad del almacén, para ejercitar el flujo y hacer pruebas visuales. **No son datos de ningún cliente** y no hay que deducir de ellos cómo son los datos reales.
 
-Los `envio-*.json` de [`src/test/resources/ejemplos/`](src/test/resources/ejemplos/README.md),
-el `packing_list_ami_test.json` del `Main` y los JSON recortados que aparecen en
-los documentos de `docs/` son **fixtures generados por IA**: envíos escritos a
-ojo, sin conocer la realidad del almacén, para ejercitar el flujo y hacer
-pruebas visuales. Cajas, unidades, pesos y palets **no son datos de ningún
-cliente** y no describen qué colores tiene una referencia ni qué pedidos usa una
-destinación.
-
-Los únicos **datos reales** de cliente son los dos excels de pedido:
-`docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI) y
-`docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC). De los demás `.xlsx` de
-[`docs/`](docs/) lo real es la maquetación, no el contenido. Detalle en
-[`src/test/resources/ejemplos/README.md`](src/test/resources/ejemplos/README.md).
-
-## Estructura del proyecto
-
-```
-src/main/resources/
-    application.yml                  Configuración (tabla de taras por tamaño de caja)
-    client-packinglist/              Plantillas Excel de cliente (AMI bags/belts, ACKERMANN, APC)
-src/main/java/com/puntotres/packinglist/
-    Main.java                        Prueba manual: JSON de envío -> excels en target/
-    PackingListApplication.java      Arranque Spring Boot (sin web todavía)
-    PackingListData.java             Datos de UN packing list (entrada del builder)
-    AmiExcelBuilder.java             Rellena la plantilla AMI bags con POI
-    model/
-        EnvioInput.java              Estructura del JSON de entrada (envío completo)
-        DestinoData.java             Todas las cajas de una destinación
-        CajaData.java                Una caja (pesos nullable, palet asignable)
-        PaletData.java               Un palet con su rango de cajas
-        DatosEnvio.java              Cabecera que no sale de las imágenes (factura, fechas...)
-    service/
-        EnvioImportService.java      JSON de envío -> dominio (expande rangos, valida)
-        PaletAssignmentService.java  Cruza cajas con rangos de palet
-        WeightInferenceService.java  Infiere pesos que faltan (taras del application.yml)
-        PackingListGenerationService.java  Un excel por referencia+color, con AmiExcelBuilder
-    config/
-        TaraProperties.java          Tabla de taras cargada desde application.yml
-```
-
-## Flujo de datos (visión general)
-
-1. **Entrada**: imágenes de distribución de palets + detalle por destinación, convertidas a un JSON de envío (`EnvioInput`) por un modelo de visión.
-2. **`EnvioImportService`**: expande los rangos de cajas a una `CajaData` por caja física y valida (suma de unidades vs `cantidadTotal`, cajas duplicadas) devolviendo avisos, sin bloquear.
-3. **`PaletAssignmentService`**: asigna a cada caja su palet según el rango de números. Cajas fuera de rango quedan marcadas como *sin palet* (nunca falla en silencio).
-4. **`WeightInferenceService`**: para cada referencia, calcula el peso por unidad a partir de las cajas con peso bruto conocido (`(bruto − tara) / cantidad`, promediado) y completa las cajas sin peso. Sin tara o sin cajas conocidas → pesos a `null`, pendientes de revisión.
-5. **`PackingListGenerationService`**: agrupa las cajas por **referencia (modelo) + color** y genera un excel por grupo con `AmiExcelBuilder`. Las cajas con pesos pendientes no bloquean: el excel sale con esas celdas vacías y se devuelven listadas para la revisión.
-
-## Configuración: taras por tamaño de caja
-
-En [`application.yml`](src/main/resources/application.yml):
-
-```yaml
-packing-list:
-  taras:
-    "[60x40x40]": 1.6
-    "[60x40x30]": 1.2
-```
-
-**Para soportar un tamaño de caja nuevo basta con añadir una línea aquí** (clave entre `[]` y comillas, valor = kg del embalaje vacío). No hay que tocar código. Las claves se normalizan: `"60X40X40 "` de una imagen casa con `"60x40x40"`.
+Los únicos **datos reales** de cliente son los dos excels de pedido: `docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI) y `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC), ambos copiados a `src/test/resources/ejemplos/`. De los demás `.xlsx` de [docs/](docs/) lo real es la **maquetación**, no el contenido.
 
 ## Plantillas de cliente
 
-Las plantillas viven en `src/main/resources/client-packinglist/`. El builder actual usa **`ami-bags-packing-list-template.xlsx`** (hoja `STANDARD PKL H26`): cabecera fija, leyenda de tallas (filas 14–18), encabezados (fila 19), fila modelo con estilos (fila 20), totales (fila 21) y bloque SUM UP (filas 23–28). El builder clona la fila modelo por cada caja, desplaza totales/resumen hacia abajo y reescribe las fórmulas `SUM` sobre el rango real.
+Las plantillas de packing list viven en `src/main/resources/client-packinglist/` y las de etiquetas en `src/main/resources/client-labels/`. Todas tienen filas modelo y coordenadas de las que dependen sus builders:
 
-> ⚠️ No borres ni edites la fila modelo ni los encabezados de la plantilla: el builder depende de esas posiciones. Si el cliente cambia la plantilla, hay que revisar las coordenadas en `AmiExcelBuilder`.
+> ⚠️ **No editar la fila modelo ni los encabezados de una plantilla sin revisar su builder** (`AmiExcelBuilder`/`AmiLayout`, `ApcExcelBuilder`, `GenericoExcelBuilder`; para etiquetas `AmiEtiquetaLayout` y `ApcEtiquetaLayout`, con tests que anclan las coordenadas).
 
-El resto de plantillas (AMI belts, ACKERMANN, APC) son de clientes futuros, aún sin builder.
+## Documentación relacionada
 
-## Estado y próximos pasos
-
-- ✅ Generación AMI bags validada contra la plantilla real (fórmulas, estilos, fechas Excel, volumen).
-- ✅ Asignación de palets, inferencia de pesos y generación multi-pedido, con tests.
-- ⬜ Endpoint REST para recibir los JSON (Spring Web).
-- ⬜ Pantalla de revisión (pesos pendientes, cajas sin palet) antes de generar. Debe mostrar como popup/alerta los avisos de `EnvioImportado.avisos` y `ResultadoAsignacion.avisos` (buscar `TODO(web-ui)` en el código).
-- ⬜ Builders para el resto de clientes (belts, ACKERMANN, APC) — se generalizará con una interfaz común cuando haya detalle de cada cliente.
+- [CLAUDE.md](CLAUDE.md) — **la referencia más completa y al día** del proyecto: arquitectura, decisiones y trampas conocidas.
+- [ARCHITECTURE.md](ARCHITECTURE.md) — recorrido interno del pipeline de dominio. ⚠️ Parcialmente desactualizado (no cuenta la web, la extracción ni los builders nuevos; lo que cuenta del pipeline sigue siendo válido).
+- [ESTADO_ANTES_VACACIONES.md](ESTADO_ANTES_VACACIONES.md) — foto del estado del proyecto a 2026-08-08.
+- [TODO](TODO) — pendientes (lo mantiene Jordi).
+- [docs/](docs/) — ejemplos de plantillas por cliente, análisis de las hojas manuscritas y prompts de extracción.
