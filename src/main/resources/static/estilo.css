@@ -343,6 +343,36 @@ section.destino td input[type="text"] {
     padding-bottom: calc(0.25rem - 2px);
 }
 
+/* Banda de color por palet: cada palet de la destinación tiñe sus filas con un
+   matiz distinto para que el cambio de palet se vea sin ir leyendo la columna.
+
+   Los quince tonos son una rueda de matices a claridad y saturación
+   constantes (OKLCH L=0.972 C=0.024, un giro de 24º entre uno y el
+   siguiente): cambia el color, NO la luminosidad, así que ninguna fila parece
+   más apagada o más resaltada que otra. Como referencia de escala, el amarillo
+   de aviso tiñe algo más fuerte que esto (C=0.031).
+
+   Van ANTES de tr.pendiente: las dos reglas tienen la misma especificidad, así
+   que solo el orden asegura que una fila pendiente siga amarilla. Y la celda
+   del triángulo no se tiñe porque su fondo tiene más especificidad que esto.
+
+   Quince tonos y quince bandas: AgrupadorFilasRevision.BANDAS_PALET. */
+tr.palet-0 td  { background: #eaf8ff; }
+tr.palet-1 td  { background: #f0f5ff; }
+tr.palet-2 td  { background: #f7f3ff; }
+tr.palet-3 td  { background: #fef1ff; }
+tr.palet-4 td  { background: #fff0f9; }
+tr.palet-5 td  { background: #fff0f2; }
+tr.palet-6 td  { background: #fff0eb; }
+tr.palet-7 td  { background: #fff2e6; }
+tr.palet-8 td  { background: #fef5e4; }
+tr.palet-9 td  { background: #f7f7e5; }
+tr.palet-10 td { background: #f0f9e9; }
+tr.palet-11 td { background: #eafbef; }
+tr.palet-12 td { background: #e6fbf6; }
+tr.palet-13 td { background: #e4fbfd; }
+tr.palet-14 td { background: #e6faff; }
+
 tr.pendiente td { background: var(--aviso-fondo); }
 
 .badge {

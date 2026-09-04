@@ -1260,4 +1260,28 @@ class PackingListControllerTest {
 
         assertFalse(revision(sesion).contains("livraisonCode"));
     }
+
+    /**
+     * La banda de color por palet se comprueba sobre el HTML renderizado
+     * porque es donde vive: el agrupador decide el número de banda y la
+     * plantilla lo convierte en clase. PARIS tiene tres palets en el fixture,
+     * así que sus filas tienen que traer tres matices distintos, y la banda
+     * tiene que convivir con el marcador de pendiente en vez de desplazarlo.
+     */
+    @Test
+    void laRevisionPintaCadaPaletDeUnaDestinacionConSuPropiaBandaDeColor() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<tr class=\"palet-0")))
+                .andExpect(content().string(containsString("<tr class=\"palet-1")))
+                .andExpect(content().string(containsString("<tr class=\"palet-2")))
+                // La banda no desplaza al amarillo de pendiente: conviven en
+                // la misma fila y es el orden del CSS el que decide cuál gana.
+                .andExpect(content().string(containsString("class=\"palet-0 pendiente\"")))
+                // Y una caja sin palet no se tiñe: sale sin clase ninguna.
+                .andExpect(content().string(containsString("<tr>")));
+    }
 }

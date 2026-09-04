@@ -25,6 +25,13 @@ import com.puntotres.packinglist.model.CajaData;
  */
 public final class AgrupadorFilasRevision {
 
+    /**
+     * Cuántos matices de fondo tiene la paleta de palets del CSS. El número
+     * vive aquí y en las reglas {@code tr.palet-N} de estilo.css: si crece uno
+     * hay que ampliar el otro, o las últimas bandas se quedarían sin color.
+     */
+    public static final int BANDAS_PALET = 15;
+
     private AgrupadorFilasRevision() {
     }
 
@@ -59,6 +66,8 @@ public final class AgrupadorFilasRevision {
             liderPorCaja.putIfAbsent(caja.getNumeroCaja(), caja);
             lineasPorCaja.merge(caja.getNumeroCaja(), 1, Integer::sum);
         }
+
+        Map<Integer, Integer> bandaPorPalet = bandasPorPalet(cajas);
 
         List<FilaCaja> filas = new ArrayList<>();
         int indiceGlobal = primerIndiceGlobal;
@@ -99,7 +108,8 @@ public final class AgrupadorFilasRevision {
                     CajaData suelta = cajas.get(indices.get(k));
                     filas.add(new FilaCaja(indiceGlobal++,
                             String.valueOf(suelta.getNumeroCaja()), List.of(indices.get(k)),
-                            suelta, true, false, !suelta.tienePesosCompletos(), k == 0, true));
+                            suelta, true, false, !suelta.tienePesosCompletos(), k == 0, true,
+                            banda(suelta, bandaPorPalet)));
                 }
                 continue;
             }
@@ -108,11 +118,40 @@ public final class AgrupadorFilasRevision {
             filas.add(new FilaCaja(indiceGlobal++,
                     rango(primera.getNumeroCaja(), ultimoNumero), indices, primera,
                     lider == primera, !esDeUnaSolaLinea(primera, lineasPorCaja),
-                    !lider.tienePesosCompletos(), grupo, false));
+                    !lider.tienePesosCompletos(), grupo, false,
+                    banda(primera, bandaPorPalet)));
         }
         return filas;
     }
 
+
+    /**
+     * Qué banda de color le toca a cada valor de palet de la destinación: la
+     * primera al palet que aparece antes, la siguiente al segundo, y así en
+     * ciclo sobre la paleta. Cada destinación arranca por la primera banda.
+     *
+     * Va por ORDEN DE APARICIÓN y no por el número de palet a propósito: con
+     * el número crudo, dos palets separados por un múltiplo del tamaño de la
+     * paleta (1 y 16) caerían en el mismo matiz y el cambio de palet dejaría
+     * de verse justo donde el usuario lo está buscando. Ligarla al valor —y no
+     * a la posición de la fila— hace que un palet que reaparece más abajo
+     * recupere su color.
+     */
+    private static Map<Integer, Integer> bandasPorPalet(List<CajaData> cajas) {
+        Map<Integer, Integer> bandas = new HashMap<>();
+        for (CajaData caja : cajas) {
+            Integer palet = caja.getNumeroPalet();
+            if (palet != null && !bandas.containsKey(palet)) {
+                bandas.put(palet, bandas.size() % BANDAS_PALET);
+            }
+        }
+        return bandas;
+    }
+
+    private static int banda(CajaData caja, Map<Integer, Integer> bandaPorPalet) {
+        Integer palet = caja.getNumeroPalet();
+        return palet == null ? FilaCaja.SIN_BANDA : bandaPorPalet.get(palet);
+    }
     private static boolean esDeUnaSolaLinea(CajaData caja, Map<Integer, Integer> lineasPorCaja) {
         return lineasPorCaja.get(caja.getNumeroCaja()) == 1;
     }

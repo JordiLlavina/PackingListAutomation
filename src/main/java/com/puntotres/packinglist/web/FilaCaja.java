@@ -33,11 +33,27 @@ import com.puntotres.packinglist.model.CajaData;
  *     {@code indicesEnDestino.get(0)}.</li>
  * <li>{@code desplegada}: la fila viene de un grupo desplegado, o sea que el
  *     triángulo mira hacia abajo y pulsarlo vuelve a plegar.</li>
+ * <li>{@code bandaPalet}: qué matiz de fondo le toca a la fila para que
+ *     el cambio de palet se vea sin leer la columna. Es el orden de aparición
+ *     del valor de palet en la destinación, cíclico sobre la paleta del CSS;
+ *     {@link #SIN_BANDA} cuando la caja no trae palet.</li>
  * </ul>
  */
 public record FilaCaja(int indiceGlobal, String rangoCajas, List<Integer> indicesEnDestino,
                        CajaData caja, boolean esLider, boolean bultoMixto, boolean cajaPendiente,
-                       boolean alternable, boolean desplegada) {
+                       boolean alternable, boolean desplegada, int bandaPalet) {
+
+    /** Una caja sin palet no se tiñe: su hueco vacío ya se señala aparte. */
+    public static final int SIN_BANDA = -1;
+
+    /**
+     * La clase CSS que pinta el fondo de la fila ({@code palet-3}), o cadena
+     * vacía si la caja no trae palet. El color concreto vive en el CSS: aquí
+     * solo se decide QUÉ filas comparten matiz.
+     */
+    public String claseBandaPalet() {
+        return bandaPalet == SIN_BANDA ? "" : "palet-" + bandaPalet;
+    }
 
     /**
      * El número de caja solo se edita cuando la fila representa UNA caja: en un

@@ -62,8 +62,14 @@
                      fila: la POSICIÓN de cada una en su destinación, nunca su
                      número (se repite en cajas mixtas). Una fila compactada
                      manda un índice por caja del tramo. -->
+                <!-- Dos clases al fondo de la fila: la banda de color de su
+                     palet —los palets de la destinación van rotando la paleta,
+                     así el cambio de palet se ve sin leer la columna— y, si la
+                     caja no tiene los dos pesos, el amarillo de pendiente, que
+                     el CSS pinta encima de la banda. -->
                 <tr th:each="fila : ${destino.filas}"
-                    th:classappend="${fila.cajaPendiente} ? 'pendiente'">
+                    th:classappend="${fila.claseBandaPalet}
+                                    + (${fila.cajaPendiente} ? ' pendiente' : '')">
                     <!-- El triángulo va fuera de la tabla de datos, en su
                          propia columna: ▶ despliega el tramo compactado en sus
                          cajas, ▼ lo vuelve a plegar. Es un submit del mismo

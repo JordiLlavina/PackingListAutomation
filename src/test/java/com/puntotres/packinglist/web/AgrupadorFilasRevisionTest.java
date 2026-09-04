@@ -305,4 +305,86 @@ class AgrupadorFilasRevisionTest {
 
         assertEquals(List.of(7, 8), filas.stream().map(FilaCaja::indiceGlobal).toList());
     }
+
+    /**
+     * Banda de color por palet: la tabla pinta cada palet con un matiz distinto
+     * para que el cambio de palet se vea sin leer la columna. Los tests anclan
+     * el criterio, no los colores (esos viven en el CSS).
+     */
+    @Test
+    void cadaPaletNuevoEstrenaLaSiguienteBandaYLaDestinacionArrancaEnLaPrimera() {
+        List<CajaData> cajas = List.of(
+                caja(1, "ULL163", "NOIR", "PO1", 5, "60x40x40", 1, 5.0, 5.6),
+                caja(2, "ULL163", "NOIR", "PO1", 5, "60x40x40", 2, 5.0, 5.6),
+                caja(3, "ULL163", "NOIR", "PO1", 5, "60x40x40", 3, 5.0, 5.6));
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertEquals(List.of(0, 1, 2), filas.stream().map(FilaCaja::bandaPalet).toList());
+    }
+
+    @Test
+    void laBandaVaConElValorDelPaletYNoConLaPosicionDeLaFila() {
+        // El palet 4 reaparece más abajo: recupera su banda en vez de estrenar
+        // una nueva, porque el color identifica al palet, no al tramo.
+        List<CajaData> cajas = List.of(
+                caja(1, "ULL163", "NOIR", "PO1", 5, "60x40x40", 4, 5.0, 5.6),
+                caja(2, "ULL163", "NOIR", "PO1", 5, "60x40x40", 7, 5.0, 5.6),
+                caja(3, "ULL163", "NOIR", "PO1", 5, "60x40x40", 4, 5.0, 5.6));
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertEquals(List.of(0, 1, 0), filas.stream().map(FilaCaja::bandaPalet).toList());
+    }
+
+    @Test
+    void unNumeroDePaletConHuecosNoSaltaBandas() {
+        // Los palets 1 y 16 son consecutivos en la hoja aunque no en número: con
+        // el número crudo módulo la paleta les tocaría el MISMO color y la banda
+        // no se vería justo donde hace falta.
+        List<CajaData> cajas = List.of(
+                caja(1, "ULL163", "NOIR", "PO1", 5, "60x40x40", 1, 5.0, 5.6),
+                caja(2, "ULL163", "NOIR", "PO1", 5, "60x40x40", 16, 5.0, 5.6));
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertEquals(List.of(0, 1), filas.stream().map(FilaCaja::bandaPalet).toList());
+    }
+
+    @Test
+    void lasBandasCiclanCuandoSeAgotaLaPaleta() {
+        List<CajaData> cajas = new java.util.ArrayList<>();
+        for (int palet = 1; palet <= AgrupadorFilasRevision.BANDAS_PALET + 1; palet++) {
+            cajas.add(caja(palet, "ULL163", "NOIR", "PO1", 5, "60x40x40", palet, 5.0, 5.6));
+        }
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertEquals(AgrupadorFilasRevision.BANDAS_PALET - 1,
+                filas.get(AgrupadorFilasRevision.BANDAS_PALET - 1).bandaPalet());
+        assertEquals(0, filas.get(AgrupadorFilasRevision.BANDAS_PALET).bandaPalet());
+    }
+
+    @Test
+    void unaCajaSinPaletNoRecibeBandaNiClaseDeColor() {
+        List<CajaData> cajas = List.of(
+                caja(1, "ULL163", "NOIR", "PO1", 5, "60x40x40", null, 5.0, 5.6),
+                caja(2, "ULL163", "NOIR", "PO1", 5, "60x40x40", 1, 5.0, 5.6));
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertEquals(FilaCaja.SIN_BANDA, filas.get(0).bandaPalet());
+        assertEquals("", filas.get(0).claseBandaPalet());
+        // La primera banda es para el primer palet que aparece, no para el hueco.
+        assertEquals(0, filas.get(1).bandaPalet());
+        assertEquals("palet-0", filas.get(1).claseBandaPalet());
+    }
+
+    @Test
+    void lasFilasDeUnGrupoDesplegadoConservanLaBandaDeSuPalet() {
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas4a8(), 0, Set.of(0));
+
+        assertEquals(5, filas.size());
+        assertTrue(filas.stream().allMatch(fila -> fila.bandaPalet() == 0));
+    }
 }
