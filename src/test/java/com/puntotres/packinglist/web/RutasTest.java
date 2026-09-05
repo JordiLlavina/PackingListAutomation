@@ -58,6 +58,27 @@ class RutasTest {
     }
 
     @Test
+    void laPantallaDeTarasResponde() throws Exception {
+        mvc.perform(get("/taras"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("taras"));
+    }
+
+    @Test
+    void elMenuEnlazaLasTaras() throws Exception {
+        mvc.perform(get("/menu"))
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("href=\"/taras\"")));
+    }
+
+    @Test
+    void elAjusteDelTallerSinEntregaEnCursoDevuelveALaEntrada() throws Exception {
+        mvc.perform(get("/packing-list/taller/ajuste"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/packing-list"));
+    }
+
+    @Test
     void sinEnvioEnCursoLaRevisionVuelveAlPasoUno() throws Exception {
         mvc.perform(get("/revision"))
                 .andExpect(status().is3xxRedirection())

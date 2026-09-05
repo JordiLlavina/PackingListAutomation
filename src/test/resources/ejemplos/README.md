@@ -52,3 +52,14 @@ Lo mismo con el de APC:
        "src/test/resources/ejemplos/APC_PEDIDO_FALL26.xlsx"
 
 `escandallos/` son también copias de escandallos reales del ERP.
+
+`taller/Packing List Taller Exemple.xlsx` es el **template** que usa el taller
+para mandar su packing list. De él lo real es la **maquetación**, no los
+valores: la cabecera en la fila 9 con membrete y leyenda encima, el título de
+`QTITE / COLIS` partido en dos líneas dentro de la celda, los totales de bultos
+y peso debajo de la última fila, y una fila de otro cliente entre las de AMI.
+Todo eso es lo que `TallerColisExcelTest` ancla, y nada de ello lo habría
+traído un fixture inventado. Las referencias y las cantidades son de relleno.
+
+    cp "docs/Packing Lists/Packing List Taller/Packing List Taller Exemple.xlsx" \
+       "src/test/resources/ejemplos/taller/Packing List Taller Exemple.xlsx"
