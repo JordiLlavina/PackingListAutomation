@@ -45,6 +45,51 @@ packing-list:
     "[60x40x30]": 0.01
     "[40x30x20]": 0.78
 
+  # Reglas de la entrada por packing list de taller: cómo se reparte lo que
+  # llega y cómo se llenan cajas y palets. El packing del taller no se
+  # respeta; se regenera con esto.
+  #
+  # prioridad: número menor = se sirve antes cuando falta género. Empate =
+  #   mismo escalón, y entonces el reparto es proporcional al objetivo.
+  # mezcla: NINGUNA (una referencia y un color por caja), MISMO_PEDIDO (solo
+  #   entre artículos del mismo pedido) o LIBRE.
+  # altura-max-cm: la de la destinación. Una hija que no la declare hereda la
+  #   de su padre, y si tampoco, altura-palet-por-defecto-cm. Por eso
+  #   CHINE FRANCH no la lleva: viaja al almacén de WHOLESALE.
+  # numeracion-cajas: CONTINUA numera seguido entre destinaciones (AMI);
+  #   POR_DESTINACION reinicia en cada una (APC y el resto).
+  #
+  # Añadir una destinación es una línea aquí. Un cliente sin bloque propio
+  # tiene destino único, mezcla LIBRE y la altura que teclee el usuario.
+  taller:
+    altura-palet-por-defecto-cm: 168
+    altura-propia-palet-cm: 11
+    posiciones-palet: 4
+    medida-caja-por-defecto: 60x40x40
+    clientes:
+      "[AMI]":
+        numeracion-cajas: CONTINUA
+        # El PO del pedido de AMI lleva la destinación pegada como sufijo
+        # ("07704 CH"). Un sufijo que no esté aquí no se adivina: se avisa y
+        # no se deja generar.
+        sufijos-po:
+          "[CH]": CHINA
+          "[JP]": JAPAN
+        destino-sin-sufijo: PARIS
+        destinos:
+          "[CHINA]": { altura-max-cm: 158, prioridad: 1, mezcla: NINGUNA }
+          "[JAPAN]": { altura-max-cm: 158, prioridad: 1, mezcla: NINGUNA }
+          "[PARIS]": { altura-max-cm: 168, prioridad: 2, mezcla: MISMO_PEDIDO }
+      "[APC]":
+        numeracion-cajas: POR_DESTINACION
+        destinos:
+          "[CHINE FRANCH]": { prioridad: 1, mezcla: LIBRE }
+          "[JAPAN]":        { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
+          "[KOREA]":        { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
+          "[D. USA]":       { altura-max-cm: 155, prioridad: 2, mezcla: LIBRE }
+          "[RETAIL]":       { altura-max-cm: 168, prioridad: 3, mezcla: LIBRE }
+          "[WHOLESALE]":    { altura-max-cm: 168, prioridad: 4, mezcla: LIBRE }
+
   # Catálogo de clientes. Añadir un cliente nuevo de plantilla GENERIC =
   # añadir aquí su bloque (nombre-legal + direccion-entrega), sin tocar Java.
   # El orden de este bloque es el orden del desplegable de la web.
