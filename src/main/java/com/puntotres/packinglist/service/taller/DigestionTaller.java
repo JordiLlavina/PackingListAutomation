@@ -1,7 +1,10 @@
 package com.puntotres.packinglist.service.taller;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Lo que se enseña en la pantalla de ajuste: las referencias que ha mandado el
@@ -15,8 +18,17 @@ public class DigestionTaller {
 
     private final List<GrupoReferencia> grupos = new ArrayList<>();
     private final List<String> destinosActivos = new ArrayList<>();
-    private final List<String> avisos = new ArrayList<>();
-    private final List<String> bloqueos = new ArrayList<>();
+
+    /**
+     * Avisos y bloqueos SIN repetidos, y en el orden en que aparecen.
+     *
+     * Una referencia puede ocupar seis filas de la hoja del taller, y sin esto
+     * su aviso saldría seis veces: la lista se vuelve ilegible justo cuando
+     * más hay que leerla, y quien la mira acaba dándola por ruido. El mismo
+     * mensaje dos veces no añade nada.
+     */
+    private final Set<String> avisos = new LinkedHashSet<>();
+    private final Set<String> bloqueos = new LinkedHashSet<>();
 
     public List<GrupoReferencia> getGrupos() {
         return grupos;
@@ -27,11 +39,11 @@ public class DigestionTaller {
         return destinosActivos;
     }
 
-    public List<String> getAvisos() {
+    public Collection<String> getAvisos() {
         return avisos;
     }
 
-    public List<String> getBloqueos() {
+    public Collection<String> getBloqueos() {
         return bloqueos;
     }
 

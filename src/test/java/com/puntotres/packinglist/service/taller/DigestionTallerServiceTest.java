@@ -148,6 +148,22 @@ class DigestionTallerServiceTest {
     }
 
     @Test
+    void elMismoAvisoNoSeRepiteUnaVezPorFila() throws Exception {
+        // Una referencia ocupa varias filas del packing del taller (un tramo
+        // de cajas por destinación). Sin deduplicar, su aviso salía seis veces
+        // y la lista se volvía ilegible justo cuando hay que leerla.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "REPETIDA", "NOIR", 10).conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("AMI", "REPETIDA", "NOIR", 10).conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("AMI", "REPETIDA", "NOIR", 10).conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("OTRA", "NOIR", 20));
+
+        assertEquals(1, resultado.getAvisos().stream()
+                .filter(aviso -> aviso.contains("REPETIDA")).count());
+    }
+
+    @Test
     void laDestinacionDelTallerQueNoCuadraConElPedidoSoloAvisa() throws Exception {
         // El taller apunta "JA" y el pedido manda a CHINA: manda el pedido.
         byte[] taller = PackingTallerExcel.crear(
