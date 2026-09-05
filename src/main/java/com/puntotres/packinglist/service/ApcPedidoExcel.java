@@ -50,16 +50,36 @@ public final class ApcPedidoExcel {
     private static final String CABECERA_DESTINO = "NOTRE R";
     private static final int DIGITOS_PARCIALES = 3;
 
+    private static final String CABECERA_CANTIDAD = "QUANTIT";
+
     /** Una fila del excel: referencia (Article) y pedido completos. */
     public record FilaPedido(String referencia, String pedido) {
     }
 
+    /**
+     * Lo que hay detrás de un número de pedido: a dónde va y cuántas unidades
+     * son en total.
+     *
+     * En el fichero real un "Document d'achat" es UNA destinación, UN artículo
+     * y UN color, con una fila por talla. Por eso la cantidad se suma —las
+     * tallas de un mismo bolso van al mismo sitio y al mismo bulto— y la
+     * destinación es una sola. Y por eso el código de tres dígitos que escribe
+     * el taller basta para saber a dónde va la mercancía, sin cruzar por color
+     * (que en el pedido viene como código, "LZZ", y en la hoja del taller como
+     * nombre, "CAMEL").
+     */
+    public record Comanda(String pedido, String destino, int cantidad) {
+    }
+
     /** Filas únicas (referencia + pedido), en el orden del fichero. */
     private final List<FilaPedido> filas;
+    private final Map<String, Comanda> comandas;
     private final List<String> avisos;
 
-    private ApcPedidoExcel(List<FilaPedido> filas, List<String> avisos) {
+    private ApcPedidoExcel(List<FilaPedido> filas, Map<String, Comanda> comandas,
+                           List<String> avisos) {
         this.filas = List.copyOf(filas);
+        this.comandas = Map.copyOf(comandas);
         this.avisos = List.copyOf(avisos);
     }
 
@@ -69,11 +89,17 @@ public final class ApcPedidoExcel {
             Row cabecera = hoja.getRow(hoja.getFirstRowNum());
             int colArticulo = columna(cabecera, CABECERA_ARTICULO);
             int colPedido = columna(cabecera, CABECERA_PEDIDO);
+            // Solo las usa la entrada por taller. Opcionales para no romper la
+            // lectura de un fichero de una temporada anterior que no las traiga.
+            int colDestino = columnaOpcional(cabecera, CABECERA_DESTINO);
+            int colCantidad = columnaOpcional(cabecera, CABECERA_CANTIDAD);
 
             List<FilaPedido> filas = new ArrayList<>();
             Set<FilaPedido> vistas = new LinkedHashSet<>();
             Map<String, String> pedidoPorClave = new LinkedHashMap<>();
             Set<String> ambiguas = new LinkedHashSet<>();
+            Map<String, Comanda> comandas = new LinkedHashMap<>();
+            Set<String> destinosMezclados = new LinkedHashSet<>();
             for (int fila = hoja.getFirstRowNum() + 1; fila <= hoja.getLastRowNum(); fila++) {
                 String referencia = texto(hoja, fila, colArticulo);
                 String pedido = texto(hoja, fila, colPedido);
@@ -84,6 +110,9 @@ public final class ApcPedidoExcel {
                 if (vistas.add(entrada)) {
                     filas.add(entrada);
                 }
+                acumularComanda(comandas, destinosMezclados, entrada.pedido(),
+                        colDestino < 0 ? "" : texto(hoja, fila, colDestino),
+                        colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)));
                 // El aviso de clave ambigua se calcula al cargar, una vez,
                 // para que la revisión lo enseñe aunque nadie busque esa clave.
                 String clave = clave(referencia, pedido);
@@ -98,7 +127,15 @@ public final class ApcPedidoExcel {
                 avisos.add("En el excel de pedido, " + clave.replace("|", " + ")
                         + " apunta a más de un pedido: esas líneas se quedan como llegaron");
             }
-            return new ApcPedidoExcel(filas, avisos);
+            for (String pedido : destinosMezclados) {
+                avisos.add("En el excel de pedido, el pedido " + pedido + " aparece con más de "
+                        + "una destinación: se toma la primera, pero conviene revisarlo");
+            }
+            if (colCantidad < 0) {
+                avisos.add("El excel de pedido no tiene la columna 'Quantité échéancée': "
+                        + "las cantidades a enviar hay que teclearlas a mano");
+            }
+            return new ApcPedidoExcel(filas, comandas, avisos);
         }
     }
 
@@ -145,9 +182,57 @@ public final class ApcPedidoExcel {
                 : Optional.empty();
     }
 
+    /**
+     * La destinación y la cantidad total de un número de pedido, o vacío si
+     * ese pedido no está en el fichero. La entrada por taller lo usa para
+     * saber a dónde va y cuánto se envía de lo que ha llegado.
+     */
+    public Optional<Comanda> comandaDe(String pedido) {
+        if (pedido == null || pedido.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(comandas.get(pedido.trim()));
+    }
+
     /** Avisos de nivel de fichero (claves ambiguas). Nunca null. */
     public List<String> avisos() {
         return avisos;
+    }
+
+    /**
+     * Suma las unidades de las filas de un mismo pedido —una por talla— y se
+     * queda con su destinación. Un pedido con dos destinaciones distintas no
+     * debería existir; si aparece, se anota para avisar y se respeta la
+     * primera, que es la que ya tiene cantidad acumulada.
+     */
+    private static void acumularComanda(Map<String, Comanda> comandas, Set<String> mezclados,
+                                        String pedido, String destino, int cantidad) {
+        String limpio = destino.trim();
+        Comanda previa = comandas.get(pedido);
+        if (previa == null) {
+            comandas.put(pedido, new Comanda(pedido, limpio, cantidad));
+            return;
+        }
+        if (!limpio.isEmpty() && !previa.destino().isEmpty()
+                && !previa.destino().equalsIgnoreCase(limpio)) {
+            mezclados.add(pedido);
+        }
+        comandas.put(pedido, new Comanda(pedido,
+                previa.destino().isEmpty() ? limpio : previa.destino(),
+                previa.cantidad() + cantidad));
+    }
+
+    /** Cantidad de una celda; lo que no se entienda cuenta como cero. */
+    private static int entero(String crudo) {
+        String limpio = crudo.trim();
+        if (limpio.isEmpty()) {
+            return 0;
+        }
+        try {
+            return new java.math.BigDecimal(limpio).intValue();
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private static String clave(String referencia, String pedido) {
