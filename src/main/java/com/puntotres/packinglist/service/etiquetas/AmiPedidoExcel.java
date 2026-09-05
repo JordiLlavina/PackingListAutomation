@@ -2,8 +2,10 @@ package com.puntotres.packinglist.service.etiquetas;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -58,7 +60,16 @@ public class AmiPedidoExcel {
 
     private record FilaCruda(String madeIn, String article, String coloris, String libelle,
                              String taille, String poNumerico, String poSufijo,
-                             String ean13, String ean128) {
+                             String ean13, String ean128, int commande) {
+    }
+
+    /**
+     * Una línea de pedido vista desde la entrada por taller: cuántas unidades
+     * se han pedido de un artículo y para qué pedido. El sufijo del PO es la
+     * destinación ("CH", "JP", o null para la de por defecto), pero traducirlo
+     * a un nombre no es cosa de este lector: eso lo dice la configuración.
+     */
+    public record Comanda(String poNumerico, String poSufijo, int cantidad) {
     }
 
     private final List<FilaCruda> filas;
@@ -79,6 +90,9 @@ public class AmiPedidoExcel {
             int colMadeIn = hoja.columnaOpcional("MADE IN");
             int colEan13 = hoja.columnaOpcional("EAN13");
             int colEan128 = hoja.columnaOpcional("EAN128");
+            // Solo la usa la entrada por taller, para saber cuánto pide el
+            // cliente de cada cosa. Las etiquetas nunca la han necesitado.
+            int colCommande = hoja.columnaOpcional("COMMAND");
 
             List<String> avisos = new ArrayList<>();
             if (colEan13 < 0) {
@@ -115,7 +129,8 @@ public class AmiPedidoExcel {
                         String.format("%05d", Long.parseLong(numerico)),
                         sufijo.isBlank() ? null : sufijo,
                         textoDe(hoja, i, colEan13),
-                        textoDe(hoja, i, colEan128)));
+                        textoDe(hoja, i, colEan128),
+                        enteroDe(hoja, i, colCommande)));
             }
             return new AmiPedidoExcel(filas, avisos);
         }
@@ -124,6 +139,58 @@ public class AmiPedidoExcel {
     /** Avisos de nivel de libro: columnas de las que se ha prescindido. */
     public List<String> avisos() {
         return avisos;
+    }
+
+    /**
+     * Lo que el cliente ha pedido de un artículo, agrupado por número de
+     * pedido: una entrada por PO, con sus unidades sumadas.
+     *
+     * Las tallas NO se suman entre sí: cada talla de un cinturón es un
+     * artículo distinto con su propio código de barras, y sumarlas mandaría
+     * al almacén una cantidad que no corresponde a nada. Sí se suman varias
+     * líneas de pedido del mismo artículo y el mismo PO, que es como el ERP
+     * parte una entrega en varias fechas.
+     *
+     * La lista sale en el orden en que los pedidos aparecen en el fichero,
+     * para que el resultado sea siempre el mismo.
+     */
+    public List<Comanda> comandasDe(String referencia, String codigoColor, String talla) {
+        String ref = referencia == null ? "" : referencia.trim().toUpperCase(Locale.ROOT);
+        String color = codigoColor == null ? "" : codigoColor.trim();
+        String tallaBuscada = talla == null || talla.isBlank() ? TALLA_UNICA : talla.trim();
+
+        Map<String, Comanda> porPedido = new LinkedHashMap<>();
+        for (FilaCruda fila : filas) {
+            if (!fila.article().equals(ref)
+                    || !fila.coloris().equalsIgnoreCase(color)
+                    || !fila.taille().equalsIgnoreCase(tallaBuscada)) {
+                continue;
+            }
+            porPedido.merge(fila.poNumerico(),
+                    new Comanda(fila.poNumerico(), fila.poSufijo(), fila.commande()),
+                    (previa, nueva) -> new Comanda(previa.poNumerico(), previa.poSufijo(),
+                            previa.cantidad() + nueva.cantidad()));
+        }
+        return List.copyOf(porPedido.values());
+    }
+
+    /** Todas las comandas del fichero, sin filtrar. Para diagnóstico y tests. */
+    public List<Comanda> comandasTodas() {
+        return filas.stream()
+                .map(fila -> new Comanda(fila.poNumerico(), fila.poSufijo(), fila.commande()))
+                .toList();
+    }
+
+    /**
+     * Los sufijos de PO distintos que aparecen en el fichero, sin el vacío.
+     * Sirven para saber a qué destinaciones va esta temporada.
+     */
+    public List<String> sufijosPo() {
+        return filas.stream()
+                .map(FilaCruda::poSufijo)
+                .filter(sufijo -> sufijo != null && !sufijo.isBlank())
+                .distinct()
+                .toList();
     }
 
     /**
@@ -221,5 +288,22 @@ public class AmiPedidoExcel {
     /** Texto de una celda cuya columna puede no existir (-1 = "" sin leer). */
     private static String textoDe(HojaEan hoja, int fila, int columna) {
         return columna < 0 ? "" : hoja.texto(fila, columna).trim();
+    }
+
+    /**
+     * Cantidad de una celda numérica. Sin columna o sin valor legible, cero:
+     * una cantidad que no se entiende no se inventa, y quien la pida verá que
+     * ese artículo no tiene pedido.
+     */
+    private static int enteroDe(HojaEan hoja, int fila, int columna) {
+        String crudo = textoDe(hoja, fila, columna);
+        if (crudo.isEmpty()) {
+            return 0;
+        }
+        try {
+            return new java.math.BigDecimal(crudo).intValue();
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 }

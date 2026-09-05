@@ -23,18 +23,34 @@ public final class PedidoAmiExcel {
      * ean13/ean128: null para los tests que no los necesitan.
      */
     public record Fila(String madeIn, String article, String coloris, String libelle,
-                       String taille, Object po, String ean13, String ean128) {
+                       String taille, Object po, String ean13, String ean128,
+                       Integer commande) {
 
         /** Sin EAN: firma que ya usaban los tests de etiquetas de caja. */
         public Fila(String madeIn, String article, String coloris,
                     String libelle, String taille, Object po) {
-            this(madeIn, article, coloris, libelle, taille, po, null, null);
+            this(madeIn, article, coloris, libelle, taille, po, null, null, null);
         }
 
         /** Solo con EAN13: firma que ya usaban los tests de etiquetas de artículo. */
         public Fila(String madeIn, String article, String coloris, String libelle,
                     String taille, Object po, String ean13) {
-            this(madeIn, article, coloris, libelle, taille, po, ean13, null);
+            this(madeIn, article, coloris, libelle, taille, po, ean13, null, null);
+        }
+
+        /** Con los dos EAN: firma que ya usaban los tests de códigos de barras. */
+        public Fila(String madeIn, String article, String coloris, String libelle,
+                    String taille, Object po, String ean13, String ean128) {
+            this(madeIn, article, coloris, libelle, taille, po, ean13, ean128, null);
+        }
+
+        /**
+         * Con cantidad pedida y sin EAN: lo que necesitan los tests de la
+         * entrada por taller, donde lo que importa es "Commandé".
+         */
+        public static Fila pedida(String article, String coloris, String taille,
+                                  Object po, int commande) {
+            return new Fila("SPAIN", article, coloris, "", taille, po, null, null, commande);
         }
     }
 
@@ -73,6 +89,9 @@ public final class PedidoAmiExcel {
                     f.createCell(6).setCellValue(n.doubleValue());
                 } else {
                     f.createCell(6).setCellValue((String) fila.po());
+                }
+                if (numColumnas > 7 && fila.commande() != null) {
+                    f.createCell(7).setCellValue(fila.commande());
                 }
                 if (numColumnas > 8 && fila.ean13() != null) {
                     f.createCell(8).setCellValue(fila.ean13());
