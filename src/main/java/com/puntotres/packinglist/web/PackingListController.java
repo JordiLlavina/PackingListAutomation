@@ -32,26 +32,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.CatalogoTaras;
-import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
-import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.PackingListGenerationService;
-import com.puntotres.packinglist.service.PaletAssignmentService;
-import com.puntotres.packinglist.service.PedidoCompletionService;
 import com.puntotres.packinglist.service.ValidadorResumenExtraccion;
-import com.puntotres.packinglist.service.ResolutorDestinosPadre;
-import com.puntotres.packinglist.service.ResultadoAsignacion;
-import com.puntotres.packinglist.service.ResultadoDestinos;
 import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
 import com.puntotres.packinglist.service.VolcadoErpGenerationService;
-import com.puntotres.packinglist.service.WeightInferenceService;
 import com.puntotres.packinglist.service.etiquetas.CampoEtiquetas;
 import com.puntotres.packinglist.service.etiquetas.EtiquetasGenerationService;
 import com.puntotres.packinglist.service.etiquetas.GeneradorEtiquetasCliente;
@@ -80,13 +72,9 @@ public class PackingListController {
     private static final MediaType TIPO_XLSX =
             MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-    private final EnvioImportService importador;
+    private final PreparacionRevisionService preparacion;
     private final ClaudeEnvioExtractionService extractorClaude;
     private final ValidadorResumenExtraccion validadorResumen;
-    private final PaletAssignmentService asignadorPalets;
-    private final WeightInferenceService inferidorPesos;
-    private final ResolutorDestinosPadre resolutorDestinos;
-    private final PedidoCompletionService completadorPedidos;
     private final PackingListGenerationService generador;
     private final VolcadoErpGenerationService generadorVolcado;
     private final VolcadoErpExcelBuilder constructorVolcado;
@@ -96,13 +84,9 @@ public class PackingListController {
     private final ObjectMapper mapper;
     private final EnvioEnCurso envioEnCurso;
 
-    public PackingListController(EnvioImportService importador,
+    public PackingListController(PreparacionRevisionService preparacion,
                                  ClaudeEnvioExtractionService extractorClaude,
                                  ValidadorResumenExtraccion validadorResumen,
-                                 PaletAssignmentService asignadorPalets,
-                                 WeightInferenceService inferidorPesos,
-                                 ResolutorDestinosPadre resolutorDestinos,
-                                 PedidoCompletionService completadorPedidos,
                                  PackingListGenerationService generador,
                                  VolcadoErpGenerationService generadorVolcado,
                                  VolcadoErpExcelBuilder constructorVolcado,
@@ -111,13 +95,9 @@ public class PackingListController {
                                  CatalogoTaras catalogoTaras,
                                  ObjectMapper mapper,
                                  EnvioEnCurso envioEnCurso) {
-        this.importador = importador;
+        this.preparacion = preparacion;
         this.extractorClaude = extractorClaude;
         this.validadorResumen = validadorResumen;
-        this.asignadorPalets = asignadorPalets;
-        this.inferidorPesos = inferidorPesos;
-        this.resolutorDestinos = resolutorDestinos;
-        this.completadorPedidos = completadorPedidos;
         this.generador = generador;
         this.generadorVolcado = generadorVolcado;
         this.constructorVolcado = constructorVolcado;
@@ -237,68 +217,34 @@ public class PackingListController {
         cabecera.setCiudadProveedor(envioForm.getCiudadProveedor());
         cabecera.setPaisProveedor(envioForm.getPaisProveedor());
 
-        // Mismo encadenado que Main.java: importar -> asignar -> inferir.
-        EnvioImportado importado = importador.importar(envio);
-
-        importado.getAvisos().addAll(0, resumen.avisos());
+        // La cadena que va del JSON a la pantalla de revisión —importar,
+        // resolver destinaciones, completar pedidos, asignar palets, inferir
+        // pesos— la comparten las cuatro vías de entrada: vive en
+        // PreparacionRevisionService.
+        List<String> avisosPrevios = new ArrayList<>(resumen.avisos());
         if (modoClaude) {
-            importado.getAvisos().add(0, "Datos extraídos por Claude a partir de "
+            avisosPrevios.add(0, "Datos extraídos por Claude a partir de "
                     + imagenesDe(envioForm).size()
                     + " documento(s): revisa referencias, tallas y cantidades antes de generar");
         }
 
-        // El "cliente" del JSON es informativo (viene de las imágenes); si no
-        // coincide con el seleccionado en el desplegable, se avisa mas no
-        // bloquea: el desplegable manda.
-        if (envio.getCliente() != null && !envio.getCliente().isBlank()
-                && clientesProperties.clientePara(envio.getCliente())
-                        .map(c -> c != cliente).orElse(true)) {
-            importado.getAvisos().add("Los datos de entrada indican que el cliente es '"
-                    + envio.getCliente() + "' pero has seleccionado '" + cliente.getNombre() + "'");
-        }
-
-        envioEnCurso.reiniciar();
-        envioEnCurso.setCabecera(cabecera);
-        envioEnCurso.setImportado(importado);
-
         // El excel de pedido se guarda aunque el cliente no lo use en el
         // packing list: AMI lo necesita para sus etiquetas de caja.
         byte[] excelPedido = null;
+        String nombreExcelPedido = null;
         MultipartFile pedidoSubido = envioForm.getPedidoCliente();
         if (pedidoSubido != null && !pedidoSubido.isEmpty()) {
             try {
                 excelPedido = pedidoSubido.getBytes();
-                envioEnCurso.setExcelPedidoCliente(excelPedido, pedidoSubido.getOriginalFilename());
+                nombreExcelPedido = pedidoSubido.getOriginalFilename();
             } catch (IOException e) {
-                importado.getAvisos().add("No se ha podido leer el excel de pedido subido: "
+                avisosPrevios.add("No se ha podido leer el excel de pedido subido: "
                         + e.getMessage());
             }
         }
 
-        // Las destinaciones hijas se resuelven a su padre ANTES de asignar
-        // palets, para que la asignación y la inferencia trabajen ya sobre
-        // las destinaciones definitivas.
-        ResultadoDestinos resueltos = resolutorDestinos.resolver(
-                importado.getDestinos(), cliente, cabecera.getFechaEnvio());
-        importado.getDestinos().clear();
-        importado.getDestinos().addAll(resueltos.getDestinos());
-        importado.getAvisos().addAll(resueltos.getAvisos());
-
-        // Solo APC completa el pedido: es el único con un excel de pedido del
-        // que sacar el número entero a partir de la referencia. Corre aquí y
-        // no en los recálculos de la revisión, que pisarían lo tecleado.
-        if (cliente.getPlantilla() == TipoPlantilla.APC) {
-            importado.getAvisos().addAll(
-                    completadorPedidos.completar(importado.getDestinos(), excelPedido).getAvisos());
-        }
-
-        for (EnvioImportado.DestinoImportado destino : importado.getDestinos()) {
-            ResultadoAsignacion asignacion =
-                    asignadorPalets.asignar(destino.getDestino(), destino.getPalets());
-            envioEnCurso.getAvisosPalets().addAll(asignacion.getAvisos());
-            envioEnCurso.getCajasSinPalet().addAll(asignacion.getCajasSinPalet());
-        }
-        reinferirTodoElEnvio();
+        preparacion.preparar(envio, cabecera, cliente, excelPedido, nombreExcelPedido,
+                avisosPrevios, envioEnCurso);
         return "redirect:/revision";
     }
 
@@ -703,13 +649,7 @@ public class PackingListController {
      * esté en el palet o la destinación que esté, no solo en la suya.
      */
     private void reinferirTodoElEnvio() {
-        List<List<CajaData>> cajasPorDestino = new ArrayList<>();
-        for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
-            cajasPorDestino.add(destino.getDestino().getCajas());
-        }
-        envioEnCurso.getAvisosInferencia().clear();
-        envioEnCurso.getAvisosInferencia().addAll(
-                inferidorPesos.inferirPesosDelEnvio(cajasPorDestino).getAvisos());
+        preparacion.reinferir(envioEnCurso);
     }
 
     /**
