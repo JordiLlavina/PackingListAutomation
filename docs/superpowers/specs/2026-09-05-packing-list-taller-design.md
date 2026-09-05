@@ -27,7 +27,7 @@ contradicen la primera redacción de la petición.
 | D1 | La **altura es la última** dimensión: `60x40x45` mide 45 cm de alto | Corrige la petición original, que la ponía en medio. Coincide con `TaraProperties` y con el catálogo de taras del yml |
 | D2 | La cantidad objetivo de AMI sale de la columna **`Commandé`** del excel de pedido de AMI | Columna H de `EAN PUNTOTRES H26.xlsx`, que hoy no se lee |
 | D3 | La destinación de AMI sale del **sufijo del PO**: `CH`→CHINA, `JP`→JAPAN, sin sufijo→PARIS | Mapa en `application.yml`. Sufijo desconocido = aviso bloqueante |
-| D4 | En el excel de taller **manda la cabecera**, no los valores de ejemplo | El template de `docs/` está desalineado (ver §3.4) |
+| D4 | En el excel de taller **manda la cabecera**: cada columna se identifica por su título, nunca deduciéndola de lo que haya escrito debajo | Adivinar por el contenido daría un packing plausible y equivocado (ver §3.4) |
 | D5 | Persistencia: H2 en fichero + JPA, con **las dos** tablas (memoria de referencias y taras) | Incluye pantalla de edición de taras |
 | D6 | En APC **el `CODE` manda**: una fila de taller = un pedido = una destinación | El reparto por prioridad solo actúa entre filas del mismo material |
 | D7 | Si el taller manda de más, **se envía el objetivo** y el sobrante se queda, con aviso no bloqueante | Nunca se manda al cliente más de lo que pidió |
@@ -144,21 +144,33 @@ CLIENT         ~ CLIENTE
 Todos los campos de texto se leen en **mayúsculas y con trim**; los numéricos no
 se transforman.
 
-### 3.4 Nota sobre el fichero de ejemplo
+### 3.4 El fichero de ejemplo
 
 `docs/Packing Lists/Packing List Taller/Packing List Taller Exemple.xlsx` es un
-template, no datos reales, y su cabecera está desalineada respecto a lo que
-quiere ser: `F9` contiene `U` cuando debería decir `TAILLE` (la palabra está
-suelta en `M6`), y la columna `J`, titulada `Nº EXPEDITION PUNTOTRES`, contiene
-unidades por caja en las filas de ejemplo.
+template del taller: la maquetación es real, los valores no. Se copia a
+`src/test/resources/ejemplos/taller/` y el test del lector se ancla contra él,
+como `ApcPedidoExcelTest` contra el pedido de APC.
 
-Se aplica **D4**: manda la cabecera. Consecuencia práctica: con este template no
-hay columna `QTITE / COLIS`, así que las unidades por caja saldrán de memoria o
-quedarán a `null` (bloqueando la generación), que es la cascada prevista.
+Lo que aporta y ningún fixture inventado habría aportado:
 
-El fichero se copia a `src/test/resources/ejemplos/taller/` y el test del lector
-se ancla contra él, como `ApcPedidoExcelTest` contra el pedido real. Cuando el
-template se corrija, se actualizan copia y aserciones.
+- La cabecera está en la **fila 9**, con el membrete del taller, la factura, la
+  fecha y una leyenda de campos obligatorios encima.
+- El título de `QTITE / COLIS` viene **partido en dos líneas** dentro de la
+  celda (`"QTITE /\nCOLIS"`), para que quepa en el ancho de columna. La
+  normalización tiene que colapsar ese salto de línea o la columna no aparece.
+- Debajo de la última fila hay **totales con contenido** (`Soit : 40 colis`,
+  `Poids Brut`, `Poids Net`) que no son artículos, y una fila en blanco antes.
+- La hoja **mezcla dos clientes**: catorce filas de `AMI` y una de
+  `PALOMA WOOL`. El lector no la filtra; es la digestión la que bloquea.
+- Varias filas comparten el mismo `N° DE COLIS` (la caja 40): así anota el
+  taller un bulto mixto. Da igual, porque su packing se descarta entero.
+
+**Sobre D4.** Cada columna se identifica por su título y nunca por lo que haya
+escrito debajo. Es tentador hacer lo contrario cuando un título parece no cuadrar
+con sus datos —a mí me pasó leyendo este fichero a mano—, pero deducir la columna
+del contenido produce un packing con números plausibles y equivocados, y eso no
+lo detecta nadie hasta el almacén. Si un taller titula mal una columna, la
+respuesta es un sinónimo nuevo en el lector, no una heurística.
 
 ## 4. Entrada B: excel de pedido de cliente
 

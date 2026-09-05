@@ -109,7 +109,7 @@ En `PackingListController`: el campo `taraProperties` pasa a `CatalogoTaras tara
 Run: `mvn test`
 Expected: PASS. Es un refactor puro; ningún test debería cambiar de resultado.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/puntotres/packinglist/config/ src/main/java/com/puntotres/packinglist/service/WeightInferenceService.java src/main/java/com/puntotres/packinglist/web/PackingListController.java src/test/java/com/puntotres/packinglist/config/CatalogoTarasTest.java
@@ -1023,7 +1023,7 @@ Expected: PASS
 Run: `mvn test -Dtest=AmiPedidoRealTest,AmiEtiquetasGeneradorTest`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/main/java/com/puntotres/packinglist/service/etiquetas/AmiPedidoExcel.java src/main/java/com/puntotres/packinglist/service/taller/ src/test/java/com/puntotres/packinglist/service/taller/ObjetivosPedidoAmiTest.java
@@ -2198,18 +2198,14 @@ Sección nueva **"Entrada por packing list de taller"** con lo que no se deduce 
 
 - [ ] **Step 4: Actualizar `README.md` y el README de ejemplos**
 
-En `README.md`, la cuarta vía de entrada y la pantalla `/taras`. En `src/test/resources/ejemplos/README.md`, que el `.xlsx` de taller es un **template del taller sin datos utilizables** y que su cabecera está desalineada (`F9` dice `U` donde debería decir `TAILLE`), para que nadie deduzca de él cómo son los datos reales.
+En `README.md`, la cuarta vía de entrada y la pantalla `/taras`. En `src/test/resources/ejemplos/README.md`, que del `.xlsx` de taller lo real es **la maquetación, no los valores**: la cabecera en la fila 9, el título partido en dos líneas, los totales de abajo y la fila de otro cliente son datos de verdad sobre cómo es el fichero; las referencias y las cantidades no.
 
-- [ ] **Step 5: Anotar el pendiente del template**
-
-En `TODO`, una línea: `- [ ] Corregir el template de packing list de taller (TAILLE en F9, borrar M6) y actualizar la copia de src/test/resources/ejemplos/taller/ con sus aserciones.`
-
-- [ ] **Step 6: Toda la suite en verde**
+- [ ] **Step 5: Toda la suite en verde**
 
 Run: `mvn test`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add CLAUDE.md README.md TODO src/test/resources/ejemplos/README.md src/test/java/com/puntotres/packinglist/web/RutasTest.java
