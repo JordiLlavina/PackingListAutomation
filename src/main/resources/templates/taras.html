@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Taras')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· Taras de los cartones')}"></header>
+<main>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <p class="ayuda">
+            La tara es el peso del cartón vacío. Se usa para calcular el peso bruto de cada
+            caja a partir del neto, y al revés. Un cartón que todavía no se haya pesado se
+            puede dejar en 0,01: el programa funciona igual, pero los pesos que salgan de
+            ahí no valdrán.
+        </p>
+        <p class="ayuda">
+            La medida se escribe <strong>largo x ancho x alto</strong>, en centímetros y con
+            la altura al final. De ese último número salen las pilas del palet.
+        </p>
+
+        <table class="tabla-taras">
+            <thead>
+            <tr>
+                <th>Medida del cartón</th>
+                <th>Tara (kg)</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="tara : ${taras}">
+                <td th:text="${tara.medida}">60x40x40</td>
+                <td>
+                    <form th:action="@{/taras}" method="post" class="form-tara">
+                        <input type="hidden" name="medida" th:value="${tara.medida}">
+                        <input type="number" name="taraKg" step="0.01" min="0"
+                               th:value="${tara.taraKg}">
+                        <button type="submit" class="mini">Guardar</button>
+                    </form>
+                </td>
+                <td class="fecha-tara" th:text="${#temporals.format(tara.fechaActualizacion, 'dd/MM/yyyy')}"></td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Añadir un cartón</h3>
+        <form th:action="@{/taras}" method="post" class="form-tara">
+            <label for="medidaNueva">Medida
+                <input type="text" id="medidaNueva" name="medida" placeholder="60x40x45" required>
+            </label>
+            <label for="taraNueva">Tara kg
+                <input type="number" id="taraNueva" name="taraKg" step="0.01" min="0"
+                       placeholder="0.01" required>
+            </label>
+            <button type="submit">Añadir</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

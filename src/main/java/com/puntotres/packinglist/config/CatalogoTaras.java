@@ -5,6 +5,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+import com.puntotres.packinglist.model.MedidaCaja;
+
 /**
  * Tabla de taras (peso del cartón vacío en kg) por tamaño de caja.
  *
@@ -52,20 +54,8 @@ public interface CatalogoTaras {
                 .toList();
     }
 
-    /** Volumen en cm³ de un "LxAxH", o 0 si no se puede leer así. */
+    /** Volumen en cm³ de un "LxAnchoxAlto", o 0 si no se puede leer así. */
     private static long volumen(String tamano) {
-        String[] partes = tamano.split("x");
-        if (partes.length != 3) {
-            return 0;
-        }
-        long total = 1;
-        for (String parte : partes) {
-            try {
-                total *= Long.parseLong(parte.trim());
-            } catch (NumberFormatException e) {
-                return 0;
-            }
-        }
-        return total;
+        return MedidaCaja.parse(tamano).map(MedidaCaja::volumen).orElse(0L);
     }
 }

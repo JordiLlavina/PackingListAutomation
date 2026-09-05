@@ -646,3 +646,26 @@ header.cabecera .enlace-menu:hover {
     font-size: 0.9rem;
     line-height: 1.7;
 }
+
+/* --- Pantalla de taras --------------------------------------------------
+   La tabla hereda los estilos generales de `table`; aquí solo va lo suyo:
+   el formulario en linea de cada fila y la fecha del ultimo pesaje. */
+
+.titulo-seccion { margin: 0 0 0.6rem; font-size: 1.05rem; }
+
+.form-tara {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.form-tara input[type="number"] { width: 7rem; }
+
+.fecha-tara { color: #5a6673; font-size: 0.8rem; white-space: nowrap; }
+
+.menu-ajustes {
+    margin-top: 1.5rem;
+    font-size: 0.9rem;
+    color: #5a6673;
+}
