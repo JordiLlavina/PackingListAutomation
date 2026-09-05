@@ -6,6 +6,14 @@
 <main>
     <div class="alerta error" th:if="${error}" th:text="${error}"></div>
 
+    <!-- Solo cuando el envío viene de una entrega de taller: los dos excels
+         siguen en sesión, así que se puede corregir un cartón y regenerar
+         sin volver a subir nada. -->
+    <p class="volver-taller" th:if="${vieneDeTaller}">
+        <a th:href="@{/packing-list/taller/ajuste}">← Volver al ajuste de la entrega del taller</a>
+        — para cambiar un cartón, las unidades por caja o lo que se envía a cada destinación.
+    </p>
+
     <section th:if="${!avisosImportacion.isEmpty() or !avisosPalets.isEmpty()
                      or !avisosInferencia.isEmpty() or !cajasSinPalet.isEmpty()}">
         <h2>Avisos</h2>

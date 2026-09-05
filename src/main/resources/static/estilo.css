@@ -669,3 +669,37 @@ header.cabecera .enlace-menu:hover {
     font-size: 0.9rem;
     color: #5a6673;
 }
+
+/* --- Ajuste de la entrega del taller ------------------------------------
+   El carton y las unidades por caja van en la cabecera del grupo, no en
+   cada fila de color: son datos de la referencia. */
+
+.grupo-referencia .cabecera-grupo {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.3rem;
+}
+
+.grupo-referencia .cabecera-grupo .titulo-seccion { margin: 0; }
+.grupo-referencia .uds-por-caja { width: 6rem; }
+
+.origen-dato { font-size: 0.8rem; color: #5a6673; }
+.origen-dato .pendiente { color: #a35c00; font-weight: 600; }
+
+/* Una referencia sin unidades por caja, y una fila que no esta en el pedido
+   del cliente: las dos hay que mirarlas antes de generar. */
+.fila-bloqueada { border-left: 4px solid var(--acento); }
+tr.sin-pedido td { background: #fff8e1; }
+
+.acciones-ajuste {
+    display: flex;
+    gap: 0.8rem;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.lista-avisos { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.6; }
+
+.volver-taller { font-size: 0.9rem; color: #5a6673; margin-bottom: 0.8rem; }

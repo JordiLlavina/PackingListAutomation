@@ -83,6 +83,7 @@ public class PackingListController {
     private final CatalogoTaras catalogoTaras;
     private final ObjectMapper mapper;
     private final EnvioEnCurso envioEnCurso;
+    private final TallerEnCurso tallerEnCurso;
 
     public PackingListController(PreparacionRevisionService preparacion,
                                  ClaudeEnvioExtractionService extractorClaude,
@@ -94,7 +95,8 @@ public class PackingListController {
                                  ClientesProperties clientesProperties,
                                  CatalogoTaras catalogoTaras,
                                  ObjectMapper mapper,
-                                 EnvioEnCurso envioEnCurso) {
+                                 EnvioEnCurso envioEnCurso,
+                                 TallerEnCurso tallerEnCurso) {
         this.preparacion = preparacion;
         this.extractorClaude = extractorClaude;
         this.validadorResumen = validadorResumen;
@@ -106,6 +108,7 @@ public class PackingListController {
         this.catalogoTaras = catalogoTaras;
         this.mapper = mapper;
         this.envioEnCurso = envioEnCurso;
+        this.tallerEnCurso = tallerEnCurso;
     }
 
     // --- Paso 1: entrada ---
@@ -243,6 +246,10 @@ public class PackingListController {
             }
         }
 
+        // Este envío no viene de un taller: si quedaba una entrega a medias en
+        // sesión, el enlace de "volver al ajuste" llevaría a datos de otro
+        // envío.
+        tallerEnCurso.reiniciar();
         preparacion.preparar(envio, cabecera, cliente, excelPedido, nombreExcelPedido,
                 avisosPrevios, envioEnCurso);
         return "redirect:/revision";
@@ -263,6 +270,9 @@ public class PackingListController {
         // Tamaños con tara conocida para el desplegable de la columna TAMAÑO,
         // de la caja más grande a la más pequeña.
         model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
+        // Si el envío viene de una entrega de taller se puede volver a su
+        // pantalla de ajuste sin resubir los excels.
+        model.addAttribute("vieneDeTaller", !tallerEnCurso.estaVacio());
         return "revision";
     }
 

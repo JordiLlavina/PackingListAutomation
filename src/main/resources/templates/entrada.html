@@ -12,10 +12,13 @@
         <button type="button" id="botonModoJSON" data-modo="JSON">JSON</button>
         <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CLAUDE</button>
         <button type="button" id="botonModoFORMULARIO" data-modo="FORMULARIO">FORMULARIO</button>
+        <button type="button" id="botonModoTALLER" data-modo="TALLER">PACKING LIST TALLER</button>
     </div>
 
     <form id="formEntrada" class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
-          method="post" enctype="multipart/form-data">
+          method="post" enctype="multipart/form-data"
+          th:data-accion-importar="@{/importar}"
+          th:data-accion-taller="@{/packing-list/taller/digerir}">
         <input type="hidden" id="modo" th:field="*{modo}">
         <div>
             <label for="cliente">Cliente</label>
@@ -64,6 +67,36 @@
             <input type="file" id="imagenes" name="imagenes" multiple
                    accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
             <p class="error-campo" th:errors="*{imagenes}"></p>
+        </div>
+
+        <div id="bloqueTaller" style="display: none">
+            <label for="excelTaller">Packing list del taller</label>
+            <p class="ayuda">
+                El excel que manda el taller con el material (hoja "LISTE DE COLIS"). Se aprovecha
+                su información de artículo —cliente, motivo, referencia, color, talla y
+                cantidades—, pero <strong>su reparto en cajas no se respeta</strong>: el programa
+                lo regenera con las normas del cliente.
+            </p>
+            <input type="file" id="excelTaller" name="excelTaller" accept=".xlsx">
+            <p class="error-campo" th:errors="*{excelTaller}"></p>
+
+            <div th:if="${hojasDelTaller != null}">
+                <label for="hojaTaller">¿En qué hoja está el packing?</label>
+                <p class="ayuda">No hay ninguna hoja "LISTE DE COLIS" en ese libro. Elige la
+                    buena y vuelve a darle a digerir; el fichero ya está subido.</p>
+                <select id="hojaTaller" th:field="*{hojaTaller}">
+                    <option th:each="hoja : ${hojasDelTaller}"
+                            th:value="${hoja}" th:text="${hoja}"></option>
+                </select>
+            </div>
+
+            <div id="bloqueAlturaPalet">
+                <label for="alturaMaximaPaletCm">Altura máxima de palet (cm)</label>
+                <p class="ayuda">Incluido el propio palet. Solo para clientes sin norma propia:
+                    AMI y APC tienen una altura por destinación y no se puede cambiar aquí.</p>
+                <input type="number" id="alturaMaximaPaletCm" min="20" max="300"
+                       th:field="*{alturaMaximaPaletCm}" placeholder="168">
+            </div>
         </div>
 
         <div id="bloqueFormulario" style="display: none">
@@ -231,8 +264,16 @@
             const esAmi = config && config.plantilla === 'AMI';
             camposAmi.style.display = esAmi ? '' : 'none';
 
-            document.getElementById('bloquePedidoCliente').style.display =
-                (config && config.pedidoCliente === 'true') ? '' : 'none';
+            const usaPedido = config && config.pedidoCliente === 'true';
+            document.getElementById('bloquePedidoCliente').style.display = usaPedido ? '' : 'none';
+
+            // La altura de palet solo la elige el usuario en los clientes sin
+            // norma propia; AMI y APC la tienen por destinación en el yml y
+            // enseñar el campo haría creer que se puede cambiar.
+            const bloqueAltura = document.getElementById('bloqueAlturaPalet');
+            if (bloqueAltura) {
+                bloqueAltura.style.display = usaPedido ? 'none' : '';
+            }
 
             if (config && config.placeholderTemporada) {
                 temporada.placeholder = config.placeholderTemporada;
@@ -253,11 +294,22 @@
             document.getElementById('bloqueClaude').style.display = modo === 'CLAUDE' ? '' : 'none';
             document.getElementById('bloqueFormulario').style.display =
                 modo === 'FORMULARIO' ? '' : 'none';
+            document.getElementById('bloqueTaller').style.display = modo === 'TALLER' ? '' : 'none';
             document.querySelectorAll('.selector-modo button').forEach(function (boton) {
                 boton.classList.toggle('activo', boton.dataset.modo === modo);
             });
+
+            // El modo TALLER va a su propio flujo: digiere los dos excels y
+            // lleva a la pantalla de ajuste, no directo a la revisión.
+            const form = document.getElementById('formEntrada');
+            form.action = modo === 'TALLER'
+                ? form.dataset.accionTaller
+                : form.dataset.accionImportar;
             document.getElementById('botonImportar').textContent =
-                modo === 'CLAUDE' ? 'Extraer con Claude y revisar' : 'Importar y revisar';
+                modo === 'CLAUDE' ? 'Extraer con Claude y revisar'
+                    : modo === 'TALLER' ? 'Digerir Datos Taller'
+                    : 'Importar y revisar';
+            actualizarCamposCliente();
         }
 
         document.querySelectorAll('.selector-modo button:not([disabled])')

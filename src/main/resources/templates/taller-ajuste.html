@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Ajuste del taller')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· 1b. Ajuste de la entrega del taller')}"></header>
+<main>
+    <p class="ayuda">
+        Entrega de <strong th:text="${cliente}">Cliente</strong>, leída de
+        <strong th:text="${nombreExcelTaller}">packing del taller</strong>. El packing del taller
+        no se respeta: las cajas y los palets los reparte el programa con las normas del cliente.
+        Aquí solo hay que decir en qué cartón va cada referencia, cuántas unidades le caben y
+        cuánto se envía a cada destinación.
+    </p>
+
+    <section class="tarjeta alerta error" th:if="${!bloqueos.isEmpty()}">
+        <h3 class="titulo-seccion">Falta esto para poder generar</h3>
+        <ul>
+            <li th:each="bloqueo : ${bloqueos}" th:text="${bloqueo}"></li>
+        </ul>
+    </section>
+
+    <section class="tarjeta" th:if="${!avisos.isEmpty()}">
+        <h3 class="titulo-seccion">⚠️ Para tener en cuenta</h3>
+        <ul class="lista-avisos">
+            <li th:each="aviso : ${avisos}" th:text="${aviso}"></li>
+        </ul>
+    </section>
+
+    <section class="tarjeta" th:if="${resumen != null}">
+        <h3 class="titulo-seccion">Cómo quedaría el envío</h3>
+        <table>
+            <thead>
+            <tr>
+                <th>Destinación</th><th>Unidades</th><th>Cajas</th><th>Palets</th>
+                <th>Último palet</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="linea : ${resumen}">
+                <td th:text="${linea.destino}">PARIS</td>
+                <td th:text="${linea.unidades}">240</td>
+                <td th:text="${linea.cajas}">24</td>
+                <td th:text="${linea.palets}">2</td>
+                <td th:text="|${linea.alturaUltimoPaletCm} cm de ${linea.alturaUtilCm}|">92 cm de 157</td>
+            </tr>
+            </tbody>
+        </table>
+        <ul class="lista-avisos" th:if="${avisosPacking != null and !avisosPacking.isEmpty()}">
+            <li th:each="aviso : ${avisosPacking}" th:text="${aviso}"></li>
+        </ul>
+    </section>
+
+    <form id="formAjuste" th:action="@{/packing-list/taller/generar}" method="post">
+        <section class="tarjeta grupo-referencia"
+                 th:each="grupo, iterGrupo : ${digestion.grupos}"
+                 th:classappend="${grupo.estaPendiente()} ? 'fila-bloqueada' : ''">
+            <div class="cabecera-grupo">
+                <h3 class="titulo-seccion" th:text="${grupo.referencia}">ULL164.AL0052</h3>
+                <label>Cartón
+                    <select th:name="|grupos[${iterGrupo.index}].medidaCaja|">
+                        <option th:each="tamano : ${tamanosCaja}"
+                                th:value="${tamano}" th:text="${tamano}"
+                                th:selected="${tamano == grupo.medidaCaja}"></option>
+                    </select>
+                </label>
+                <label>Unidades por caja
+                    <input type="number" min="1" class="uds-por-caja"
+                           th:name="|grupos[${iterGrupo.index}].unidadesPorCaja|"
+                           th:value="${grupo.unidadesPorCaja}">
+                </label>
+                <span class="origen-dato" th:switch="${grupo.origen.name()}">
+                    <span th:case="'MEMORIA'" title="Lo que se usó la última vez">de memoria</span>
+                    <span th:case="'TALLER'" title="Lo que sugiere la hoja del taller">del taller</span>
+                    <span th:case="'POR_DEFECTO'" class="pendiente"
+                          title="Nadie lo ha dicho todavía">sin decidir</span>
+                </span>
+            </div>
+            <p class="ayuda">
+                El cartón y las unidades por caja son de la referencia: valen para todos sus colores.
+            </p>
+
+            <table>
+                <thead>
+                <tr>
+                    <th>Color</th>
+                    <th>Talla</th>
+                    <th>Recibido</th>
+                    <th th:each="destino : ${destinos}" th:text="${destino}">CHINA</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="fila, iterFila : ${grupo.filas}"
+                    th:classappend="${fila.sinPedido} ? 'sin-pedido' : ''">
+                    <td th:text="${fila.color}">KAKI</td>
+                    <td th:text="${fila.talla}">U</td>
+                    <td th:text="${fila.recibido}">31</td>
+                    <td th:each="destino : ${destinos}">
+                        <input type="number" min="0"
+                               th:name="|grupos[${iterGrupo.index}].filas[${iterFila.index}].objetivos[${destino}]|"
+                               th:value="${fila.cantidadPara(destino)}">
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <div class="acciones-ajuste">
+            <button type="submit" class="secundario"
+                    th:formaction="@{/packing-list/taller/previsualizar}">Previsualizar</button>
+            <button type="submit" id="botonGenerar"
+                    th:disabled="${!bloqueos.isEmpty()}">Generar Packing</button>
+        </div>
+    </form>
+</main>
+</body>
+</html>

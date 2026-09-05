@@ -42,6 +42,23 @@ public class EnvioForm {
      */
     private MultipartFile pedidoCliente;
 
+    /**
+     * Packing list que manda el taller con el material, para el modo TALLER.
+     * De él solo se aprovecha la información de artículo: su numeración de
+     * cajas y su reparto en bultos se descartan y se regeneran.
+     */
+    private MultipartFile excelTaller;
+
+    /**
+     * Altura máxima de palet en cm, solo para clientes que no tienen norma
+     * propia. Los que la tienen (AMI, APC) ni ven el campo: su altura la
+     * decide la destinación.
+     */
+    private Integer alturaMaximaPaletCm;
+
+    /** Hoja elegida a mano cuando el libro del taller no trae "LISTE DE COLIS". */
+    private String hojaTaller;
+
     @NotBlank(message = "La temporada es obligatoria")
     private String temporada;
 
@@ -79,6 +96,17 @@ public class EnvioForm {
 
     public MultipartFile getPedidoCliente() { return pedidoCliente; }
     public void setPedidoCliente(MultipartFile pedidoCliente) { this.pedidoCliente = pedidoCliente; }
+
+    public MultipartFile getExcelTaller() { return excelTaller; }
+    public void setExcelTaller(MultipartFile excelTaller) { this.excelTaller = excelTaller; }
+
+    public Integer getAlturaMaximaPaletCm() { return alturaMaximaPaletCm; }
+    public void setAlturaMaximaPaletCm(Integer alturaMaximaPaletCm) {
+        this.alturaMaximaPaletCm = alturaMaximaPaletCm;
+    }
+
+    public String getHojaTaller() { return hojaTaller; }
+    public void setHojaTaller(String hojaTaller) { this.hojaTaller = hojaTaller; }
 
     public String getCiudadProveedor() { return ciudadProveedor; }
     public void setCiudadProveedor(String ciudadProveedor) { this.ciudadProveedor = ciudadProveedor; }
