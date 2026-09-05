@@ -11,14 +11,15 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.VolumenUtil;
-import com.puntotres.packinglist.config.TaraProperties;
+import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
 
 /**
  * Completa los pesos que faltan a partir de las cajas con algún peso
  * conocido de la misma referencia y de la tabla de taras por tamaño de caja
- * ({@link TaraProperties}, ampliable desde application.yml).
+ * ({@link CatalogoTaras}: el yml siembra la tabla y la pantalla /taras la
+ * corrige a medida que se pesa cada cartón).
  *
  * La unidad de peso es la CAJA FÍSICA ({@link CajaFisica}): una caja puede
  * ocupar varias líneas (tallas, colores, referencias) pero se pesa una sola
@@ -45,9 +46,9 @@ import com.puntotres.packinglist.model.CajaFisica;
 @Service
 public class WeightInferenceService {
 
-    private final TaraProperties taras;
+    private final CatalogoTaras taras;
 
-    public WeightInferenceService(TaraProperties taras) {
+    public WeightInferenceService(CatalogoTaras taras) {
         this.taras = taras;
     }
 

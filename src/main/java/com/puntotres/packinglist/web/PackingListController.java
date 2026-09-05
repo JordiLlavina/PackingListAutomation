@@ -31,7 +31,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
-import com.puntotres.packinglist.config.TaraProperties;
+import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
@@ -92,7 +92,7 @@ public class PackingListController {
     private final VolcadoErpExcelBuilder constructorVolcado;
     private final EtiquetasGenerationService etiquetasService;
     private final ClientesProperties clientesProperties;
-    private final TaraProperties taraProperties;
+    private final CatalogoTaras catalogoTaras;
     private final ObjectMapper mapper;
     private final EnvioEnCurso envioEnCurso;
 
@@ -108,7 +108,7 @@ public class PackingListController {
                                  VolcadoErpExcelBuilder constructorVolcado,
                                  EtiquetasGenerationService etiquetasService,
                                  ClientesProperties clientesProperties,
-                                 TaraProperties taraProperties,
+                                 CatalogoTaras catalogoTaras,
                                  ObjectMapper mapper,
                                  EnvioEnCurso envioEnCurso) {
         this.importador = importador;
@@ -123,7 +123,7 @@ public class PackingListController {
         this.constructorVolcado = constructorVolcado;
         this.etiquetasService = etiquetasService;
         this.clientesProperties = clientesProperties;
-        this.taraProperties = taraProperties;
+        this.catalogoTaras = catalogoTaras;
         this.mapper = mapper;
         this.envioEnCurso = envioEnCurso;
     }
@@ -316,7 +316,7 @@ public class PackingListController {
         model.addAttribute("cajasSinPalet", envioEnCurso.getCajasSinPalet());
         // Tamaños con tara conocida para el desplegable de la columna TAMAÑO,
         // de la caja más grande a la más pequeña.
-        model.addAttribute("tamanosCaja", taraProperties.tamanosDeMayorAMenor());
+        model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
         return "revision";
     }
 
@@ -583,7 +583,7 @@ public class PackingListController {
         model.addAttribute("clientes", clientesProperties.getClientes());
         // Tamaños de caja con tara conocida, para el datalist del modo
         // FORMULARIO (evita teclear un tamaño que luego no tendría tara).
-        model.addAttribute("tamanosCaja", taraProperties.tamanosDeMayorAMenor());
+        model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
         Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
         clientesProperties.getClientes().forEach((clave, config) -> {
             Map<String, String> datos = new LinkedHashMap<>();

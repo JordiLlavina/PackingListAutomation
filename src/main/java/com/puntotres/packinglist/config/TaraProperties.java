@@ -24,7 +24,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * "60X40X40 " de una imagen case con "60x40x40" de la configuración.
  */
 @ConfigurationProperties(prefix = "packing-list")
-public class TaraProperties {
+public class TaraProperties implements CatalogoTaras {
 
     private Map<String, Double> taras = new HashMap<>();
 
@@ -37,7 +37,7 @@ public class TaraProperties {
         taras.forEach((tamano, tara) -> this.taras.put(normalizar(tamano), tara));
     }
 
-    /** Tara del tamaño de caja indicado, o vacío si no está en la tabla. */
+    @Override
     public Optional<Double> taraPara(String tamanoCaja) {
         if (tamanoCaja == null) {
             return Optional.empty();
@@ -46,13 +46,11 @@ public class TaraProperties {
     }
 
     /**
-     * Los tamaños configurados, de la caja más grande a la más pequeña, para
-     * los desplegables de la web. El orden es por VOLUMEN y no alfabético:
-     * "100x40x40" es la caja más grande y como texto iría antes que
-     * "40x30x20". Un tamaño que no siga el patrón LxAxH no rompe el orden: se
-     * va al final, y los empates se deshacen por nombre para que la lista sea
-     * siempre la misma.
+     * Un tamaño que no siga el patrón LxAxH no rompe el orden: se va al final,
+     * y los empates se deshacen por nombre para que la lista sea siempre la
+     * misma.
      */
+    @Override
     public List<String> tamanosDeMayorAMenor() {
         return taras.keySet().stream()
                 .sorted(Comparator.comparingLong(TaraProperties::volumen).reversed()
