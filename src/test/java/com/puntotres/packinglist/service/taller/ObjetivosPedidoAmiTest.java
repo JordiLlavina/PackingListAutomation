@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.config.NumeracionCajas;
 import com.puntotres.packinglist.config.ReglaClienteTaller;
+import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.service.etiquetas.AmiPedidoExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 
@@ -31,12 +32,15 @@ class ObjetivosPedidoAmiTest {
     }
 
     /** Las reglas de AMI, montadas a mano para no depender del yml. */
-    private static ReglaClienteTaller reglasDeAmi() {
-        ReglaClienteTaller regla = new ReglaClienteTaller();
-        regla.setNumeracionCajas(NumeracionCajas.CONTINUA);
-        regla.setSufijosPo(java.util.Map.of("CH", "CHINA", "JP", "JAPAN"));
-        regla.setDestinoSinSufijo("PARIS");
-        return regla;
+    private static ReglasTallerProperties reglasDeAmi() {
+        ReglaClienteTaller ami = new ReglaClienteTaller();
+        ami.setNumeracionCajas(NumeracionCajas.CONTINUA);
+        ami.setSufijosPo(java.util.Map.of("CH", "CHINA", "JP", "JAPAN"));
+        ami.setDestinoSinSufijo("PARIS");
+
+        ReglasTallerProperties reglas = new ReglasTallerProperties();
+        reglas.setClientes(java.util.Map.of("AMI", ami));
+        return reglas;
     }
 
     private static LineaTaller linea(String referencia, String color, String talla) {

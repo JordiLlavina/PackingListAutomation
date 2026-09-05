@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.stereotype.Service;
+
 import com.puntotres.packinglist.config.ReglaClienteTaller;
+import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.service.etiquetas.AmiPedidoExcel;
 
 /**
@@ -26,14 +29,25 @@ import com.puntotres.packinglist.service.etiquetas.AmiPedidoExcel;
  * que no aparece en el pedido, en cambio, es solo un aviso: el usuario teclea
  * la cantidad y sigue.
  */
+@Service
 public class ObjetivosPedidoAmi implements ObjetivosPedido {
 
     public static final String CLIENTE = "AMI";
 
-    private final ReglaClienteTaller reglas;
+    private final ReglasTallerProperties reglas;
 
-    public ObjetivosPedidoAmi(ReglaClienteTaller reglas) {
+    public ObjetivosPedidoAmi(ReglasTallerProperties reglas) {
         this.reglas = reglas;
+    }
+
+    /**
+     * Las normas de AMI. Se resuelven en cada llamada y no en el constructor
+     * porque un cliente sin bloque en el yml no es un error de arranque: se
+     * queda sin traducción de sufijos y cada pedido acaba como bloqueo, que es
+     * un mensaje que el usuario entiende.
+     */
+    private ReglaClienteTaller reglasDeAmi() {
+        return reglas.clienteTaller(CLIENTE).orElseGet(ReglaClienteTaller::new);
     }
 
     @Override
@@ -67,7 +81,7 @@ public class ObjetivosPedidoAmi implements ObjetivosPedido {
                 continue;
             }
             for (AmiPedidoExcel.Comanda comanda : comandas) {
-                Optional<String> destino = reglas.destinoDeSufijo(comanda.poSufijo());
+                Optional<String> destino = reglasDeAmi().destinoDeSufijo(comanda.poSufijo());
                 if (destino.isEmpty()) {
                     if (sufijosAvisados.add(String.valueOf(comanda.poSufijo()))) {
                         resultado.getBloqueos().add(sinDestinacion(comanda));
