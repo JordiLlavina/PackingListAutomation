@@ -19,6 +19,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Base de datos embebida: lo que el programa ha aprendido de cada referencia
+# y la tabla de taras. Es dato del almacen de cada maquina, no del proyecto.
+datos/
+
 # Excel lock files (created while a workbook is open)
 .~lock.*#
 ~$*.xlsx

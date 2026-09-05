@@ -1,0 +1,9 @@
+# Perfil de los tests que necesitan base de datos: en memoria y recreada en
+# cada arranque, para que la suite no toque el fichero real del almacén ni
+# dependa de lo que haya aprendido el programa en esta máquina.
+spring:
+  datasource:
+    url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1
+  jpa:
+    hibernate:
+      ddl-auto: create-drop

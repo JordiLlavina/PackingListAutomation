@@ -8,6 +8,19 @@ spring:
       max-file-size: 20MB
       max-request-size: 60MB
 
+  # Base de datos embebida en fichero: la memoria de referencias y la tabla
+  # de taras tienen que sobrevivir al reinicio. El fichero vive junto al
+  # ejecutable y no se versiona; borrarlo solo pierde lo aprendido, no rompe
+  # nada, porque las taras se resiembran del bloque packing-list.taras.
+  datasource:
+    url: jdbc:h2:file:./datos/packinglist;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
   # El CSS y el JS se sirven con un hash del contenido en el nombre
   # (/estilo-a1b2c3.css): sin esto el navegador se queda con la copia vieja
   # tras cada cambio de estilos y hay que vaciar la caché a mano.
