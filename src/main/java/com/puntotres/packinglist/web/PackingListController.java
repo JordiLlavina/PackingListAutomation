@@ -44,6 +44,7 @@ import com.puntotres.packinglist.service.PackingListGenerationService;
 import com.puntotres.packinglist.service.ValidadorResumenExtraccion;
 import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
 import com.puntotres.packinglist.service.VolcadoErpGenerationService;
+import com.puntotres.packinglist.service.etiquetas.AvisoEtiqueta;
 import com.puntotres.packinglist.service.etiquetas.CampoEtiquetas;
 import com.puntotres.packinglist.service.etiquetas.EtiquetasGenerationService;
 import com.puntotres.packinglist.service.etiquetas.GeneradorEtiquetasCliente;
@@ -383,8 +384,9 @@ public class PackingListController {
             byte[] contenido = campo.esPedidoCliente()
                     ? envioEnCurso.getExcelPedidoCliente() : null;
             if (contenido == null) {
-                envioEnCurso.getAvisosEtiquetas().add(
-                        "Falta el " + campo.titulo() + ". No se generan las etiquetas de caja");
+                envioEnCurso.getAvisosEtiquetas().add(AvisoEtiqueta.deFichero(
+                        "Falta el " + campo.titulo(),
+                        "No se generan las etiquetas de caja"));
             } else {
                 archivos.put(campo.nombre(), contenido);
             }
@@ -396,10 +398,10 @@ public class PackingListController {
             ResultadoEtiquetas resultado = generadorEtiquetas.generar(
                     envioEnCurso.getImportado().getDestinos(), envioEnCurso.getCabecera(), archivos);
             envioEnCurso.getEtiquetas().addAll(resultado.getExcels());
-            envioEnCurso.getAvisosEtiquetas().addAll(resultado.getAvisos());
+            envioEnCurso.getAvisosEtiquetas().addAll(resultado.getDetalle());
         } catch (IOException | RuntimeException e) {
-            envioEnCurso.getAvisosEtiquetas().add(
-                    "No se pudieron generar las etiquetas de caja: " + e.getMessage());
+            envioEnCurso.getAvisosEtiquetas().add(AvisoEtiqueta.deFichero(
+                    "No se pudieron generar las etiquetas de caja: " + e.getMessage(), null));
         }
     }
 
@@ -418,7 +420,10 @@ public class PackingListController {
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
         model.addAttribute("volcadoErp", envioEnCurso.getVolcadoErp());
         model.addAttribute("etiquetas", envioEnCurso.getEtiquetas());
-        model.addAttribute("avisosEtiquetas", envioEnCurso.getAvisosEtiquetas());
+        // Agrupados por destinación: el generador emite un aviso por caja y
+        // leerlos así, uno a uno, tapa los que de verdad hay que atender.
+        model.addAttribute("avisosEtiquetas",
+                AgrupadorAvisosEtiquetas.agrupar(envioEnCurso.getAvisosEtiquetas()));
         // Ya no hay pantalla que confirme qué excel de pedido se subió, así
         // que la tarjeta de etiquetas nombra el que las ha generado.
         model.addAttribute("nombrePedidoCliente", envioEnCurso.getNombreExcelPedidoCliente());

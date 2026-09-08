@@ -9,6 +9,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.puntotres.packinglist.service.ApcPedidoExcel;
+
 /**
  * En APC el código de tres dígitos que escribe el taller ya identifica un
  * "Document d'achat", y un Document d'achat es una destinación, un artículo y
@@ -123,5 +125,45 @@ class ObjetivosPedidoApcTest {
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(a -> a.toLowerCase().contains("pedido")));
         assertTrue(resultado.getBloqueos().isEmpty());
+    }
+
+    // --- APC NO propaga el número de pedido entre colores ---
+
+    @Test
+    void enApcUnaDestinacionRecibeMuchosDocumentDAchat() throws IOException {
+        // Lo contrario que en AMI, donde el PO es de la referencia y la
+        // destinación. Aquí un Document d'achat es una destinación, un
+        // artículo Y UN COLOR, así que una destinación acumula decenas.
+        // Este test existe para que nadie copie a APC el relleno automático
+        // de PO de AMI: pondría en el packing list un pedido ajeno.
+        // Ver la sección de números de pedido de CLAUDE.md.
+        ApcPedidoExcel pedido = ApcPedidoExcel.desdeBytes(pedidoReal());
+
+        java.util.Map<String, java.util.Set<String>> porDestino =
+                new java.util.LinkedHashMap<>();
+        for (String documento : java.util.List.of("4100128863", "4100128721")) {
+            pedido.comandaDe(documento).ifPresent(comanda -> porDestino
+                    .computeIfAbsent(comanda.destino(), clave -> new java.util.HashSet<>())
+                    .add(comanda.pedido()));
+        }
+        assertTrue(!porDestino.isEmpty(), "los dos documentos del fichero real se leen");
+    }
+
+    @Test
+    void unaFilaSinCodeNoHeredaElPedidoDeOtraFila() throws IOException {
+        // La misma referencia con otro color va con OTRO Document d'achat.
+        // Sin su CODE no se puede saber cuál, y adivinarlo copiando el de la
+        // fila de al lado metería un pedido que no es el suyo.
+        LineaTaller conCode = linea("PXCBC-F67008", "863");
+        LineaTaller sinCode = new LineaTaller(11, "APC", "PROD", "PXCBC-F67008",
+                "OTRO-COLOR", "U", "", "", "", 8, 50);
+
+        ResultadoObjetivos resultado = new ObjetivosPedidoApc()
+                .objetivosPara(List.of(conCode, sinCode), pedidoReal());
+
+        assertTrue(resultado.objetivosDe(sinCode).isEmpty(),
+                "en APC el pedido NO se hereda entre colores de una referencia");
+        assertTrue(!resultado.objetivosDe(conCode).isEmpty(),
+                "la que sí trae su CODE se resuelve con normalidad");
     }
 }

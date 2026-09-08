@@ -38,7 +38,10 @@ import com.puntotres.packinglist.model.CajaFisica;
  * que llegan SIN medida se devuelven como avisos en
  * {@link ResultadoInferencia} para que la pantalla de revisión los muestre.
  * Son dos problemas distintos y se dicen por separado: el primero se arregla
- * en application.yml y el segundo eligiendo el tamaño en la propia revisión.
+ * pesando el cartón en la pantalla /taras y el segundo eligiendo el tamaño en
+ * la propia revisión. Los dos se resuelven tecleando, ninguno editando un
+ * fichero: mandar a alguien a un yml por un dato del almacén es peor que no
+ * avisar.
  * Que la caja sin medida se avise desde aquí (y no al importar) es lo que
  * hace que el aviso desaparezca en cuanto se corrige: la revisión reinfiere
  * el envío entero tras cada edición, pero no vuelve a importar.
@@ -97,8 +100,8 @@ public class WeightInferenceService {
                     + " para calcular el peso, y esas cajas no suman volumen en el packing list");
         }
         for (String tamano : tamanosSinTara) {
-            resultado.getAvisos().add("Sin tara configurada para el tamaño de caja '" + tamano
-                    + "': añádela en application.yml para poder inferir sus pesos");
+            resultado.getAvisos().add("No se sabe lo que pesa el cartón '" + tamano
+                    + "' vacío: pésalo en la pantalla de taras para poder inferir sus pesos");
         }
         return resultado;
     }

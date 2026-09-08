@@ -75,19 +75,19 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             Optional<ApcEtiquetaLayout> layout =
                     ApcEtiquetaLayout.paraDestino(destino.getNombreDestino());
             if (layout.isEmpty()) {
-                resultado.getAvisos().add(AvisoEtiquetas.deDestino(destino.getNombreDestino(),
-                        "sin etiquetas de APC implementadas. Se omite"));
+                resultado.getDetalle().add(AvisoEtiqueta.deDestino(destino.getNombreDestino(),
+                        "sin etiquetas de APC implementadas", "Se omite"));
                 continue;
             }
             resultado.getExcels().add(generarDestino(destino, importado.getPalets(),
-                    layout.get(), envio, resultado.getAvisos()));
+                    layout.get(), envio, resultado.getDetalle()));
         }
         return resultado;
     }
 
     private ExcelGenerado generarDestino(DestinoData destino, List<PaletData> palets,
                                          ApcEtiquetaLayout layout, DatosEnvio envio,
-                                         List<String> avisos) throws IOException {
+                                         List<AvisoEtiqueta> avisos) throws IOException {
         // Una caja física por numeroCaja, en orden ascendente.
         List<CajaFisica> cajasFisicas = CajaFisica.agrupar(destino.getCajas().stream()
                 .sorted(Comparator.comparingInt(CajaData::getNumeroCaja))
@@ -107,8 +107,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 etiquetasDePalet(cajasFisicas, destino.getNombreDestino(), palets, avisos);
 
         if (destino.getCajas().stream().anyMatch(caja -> caja.getNumeroPalet() == null)) {
-            avisos.add(AvisoEtiquetas.deDestino(destino.getNombreDestino(),
-                    "hay cajas sin palet asignado. No salen en ninguna etiqueta de palet"));
+            avisos.add(AvisoEtiqueta.deDestino(destino.getNombreDestino(),
+                    "hay cajas sin palet asignado", "No salen en ninguna etiqueta de palet"));
         }
 
         String nombreFichero = ("Etiquetas_APC_" + destino.getNombreDestino() + "_"
@@ -119,7 +119,7 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
     }
 
     private EtiquetaCajaApc etiquetaDe(CajaFisica caja, int posicion, int total,
-                                       String nombreDestino, List<String> avisos,
+                                       String nombreDestino, List<AvisoEtiqueta> avisos,
                                        List<CajaData> cajasPendientes) {
         List<CajaData> lineas = caja.lineas();
         CajaData lider = caja.lider();
@@ -147,9 +147,10 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             refsColores.add(claveRefColor(linea));
         }
         if (refsColores.size() > 1 && cinturones) {
-            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, lider.getNumeroCaja(),
-                    "Mezcla de referencias/colores. La etiqueta lleva "
-                    + lider.getReferencia() + " " + lider.getCodigoColor()));
+            avisos.add(AvisoEtiqueta.deCaja(nombreDestino, lider.getNumeroCaja(),
+                    "Mezcla de referencias/colores",
+                    "La etiqueta lleva " + lider.getReferencia()
+                    + " " + lider.getCodigoColor()));
         }
 
         String size;
@@ -206,10 +207,10 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
     private List<EtiquetaPaletApc> etiquetasDePalet(List<CajaFisica> cajasFisicas,
                                                     String nombreDestino,
                                                     List<PaletData> palets,
-                                                    List<String> avisos) {
+                                                    List<AvisoEtiqueta> avisos) {
         if (palets.isEmpty()) {
-            avisos.add(AvisoEtiquetas.deDestino(nombreDestino,
-                    "sin palets. La hoja de etiquetas de palet sale en blanco"));
+            avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
+                    "sin palets", "La hoja de etiquetas de palet sale en blanco"));
             return List.of();
         }
         List<EtiquetaPaletApc> etiquetas = new ArrayList<>();
@@ -229,8 +230,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 }
             }
             if (!completo || peso == null) {
-                avisos.add(AvisoEtiquetas.deDestino(nombreDestino, "Palet "
-                        + palet.getNumeroPalet() + " con cajas sin peso. Etiqueta de palet sin peso"));
+                avisos.add(AvisoEtiqueta.dePalet(nombreDestino, palet.getNumeroPalet(),
+                        "con cajas sin peso", "Etiqueta de palet sin peso"));
                 peso = null;
             } else {
                 peso += palet.getTara() != null ? palet.getTara() : TARA_PALET_KG_DEFECTO;

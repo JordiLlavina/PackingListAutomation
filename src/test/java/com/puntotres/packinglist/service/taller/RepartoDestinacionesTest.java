@@ -181,6 +181,43 @@ class RepartoDestinacionesTest {
     }
 
     @Test
+    void dosPedidosALaMismaDestinacionNoDuplicanElGenero() {
+        // Un artículo puede estar pedido dos veces para el mismo sitio en dos
+        // PO distintos. Si lo asignado se llevara por nombre de destinación,
+        // los dos objetivos leerían la suma y cada uno se la llevaría entera:
+        // se empaquetaría el doble de lo que ha llegado, y ningún aviso
+        // saltaría porque "servido >= pedido" se cumpliría de sobra.
+        FilaAjustada fila = fila("BAG-A", "NOIR", 20,
+                new ObjetivoDestino("CHINA", 10, "07704"),
+                new ObjetivoDestino("CHINA", 10, "07710"));
+
+        ResultadoReparto reparto = new RepartoDestinaciones(reglas())
+                .repartir("AMI", List.of(fila));
+
+        assertEquals(20, reparto.getArticulos().stream()
+                .mapToInt(ArticuloDestinado::cantidad).sum(), "nunca más de lo que ha llegado");
+        assertEquals(List.of("07704", "07710"), reparto.getArticulos().stream()
+                .map(ArticuloDestinado::pedido).toList(), "cada PO se lleva lo suyo");
+    }
+
+    @Test
+    void conDosPedidosCortosCadaUnoSeQuedaCortoPorSuCuenta() {
+        // Llegan 10 para dos pedidos de 10 al mismo sitio: la mitad cada uno,
+        // y dos avisos distinguibles por número de pedido.
+        FilaAjustada fila = fila("BAG-A", "NOIR", 10,
+                new ObjetivoDestino("CHINA", 10, "07704"),
+                new ObjetivoDestino("CHINA", 10, "07710"));
+
+        ResultadoReparto reparto = new RepartoDestinaciones(reglas())
+                .repartir("AMI", List.of(fila));
+
+        assertEquals(10, reparto.getArticulos().stream()
+                .mapToInt(ArticuloDestinado::cantidad).sum());
+        assertTrue(reparto.getAvisos().stream().anyMatch(a -> a.contains("07704")));
+        assertTrue(reparto.getAvisos().stream().anyMatch(a -> a.contains("07710")));
+    }
+
+    @Test
     void cadaArticuloSeRepartePorSuCuenta() {
         // Que a una referencia le falte género no le quita nada a la otra.
         FilaAjustada corta = fila("BAG-A", "NOIR", 5, objetivo("CHINA", 20), objetivo("PARIS", 20));

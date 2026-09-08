@@ -30,8 +30,27 @@ public class ClienteConfig {
      */
     private boolean pedidoCliente;
 
+    /**
+     * Cómo llama ESTE cliente a su número de pedido, para rotular el campo en
+     * la pantalla de ajuste del taller.
+     *
+     * No es cosmético: AMI escribe un PO de cinco dígitos (`07704`) y APC un
+     * `Document d'achat` de diez (`4100000001`), y quien teclea tiene delante
+     * el documento del cliente, no el vocabulario del programa. Un cliente que
+     * no lo declare usa el rótulo genérico.
+     */
+    private String etiquetaPedido = "Nº pedido";
+
     public String getNombre() {
         return nombre;
+    }
+
+    public String getEtiquetaPedido() {
+        return etiquetaPedido;
+    }
+
+    public void setEtiquetaPedido(String etiquetaPedido) {
+        this.etiquetaPedido = etiquetaPedido;
     }
 
     public void setNombre(String nombre) {

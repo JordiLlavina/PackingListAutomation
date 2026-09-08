@@ -92,18 +92,19 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
         ResultadoEtiquetas resultado = new ResultadoEtiquetas();
         // Avisos de nivel de fichero (columnas ausentes) antes que los de caja.
-        resultado.getAvisos().addAll(pedido.avisos());
+        pedido.avisos().forEach(aviso ->
+                resultado.getDetalle().add(AvisoEtiqueta.deFichero(aviso, null)));
         for (EnvioImportado.DestinoImportado importado : destinos) {
             DestinoData destino = importado.getDestino();
             AmiEtiquetaLayout layout =
                     LAYOUT_POR_DESTINO.get(normalizar(destino.getNombreDestino()));
             if (layout == null) {
-                resultado.getAvisos().add(AvisoEtiquetas.deDestino(destino.getNombreDestino(),
-                        "sin etiquetas de AMI implementadas. Se omite"));
+                resultado.getDetalle().add(AvisoEtiqueta.deDestino(destino.getNombreDestino(),
+                        "sin etiquetas de AMI implementadas", "Se omite"));
                 continue;
             }
             resultado.getExcels().add(generarDestino(destino, importado.getPalets(),
-                    layout, pedido, envio, resultado.getAvisos()));
+                    layout, pedido, envio, resultado.getDetalle()));
         }
         deduplicarAvisos(resultado);
         return resultado;
@@ -121,15 +122,15 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
      * que el dedup no les afecta.
      */
     private static void deduplicarAvisos(ResultadoEtiquetas resultado) {
-        List<String> unicos = resultado.getAvisos().stream().distinct().toList();
-        resultado.getAvisos().clear();
-        resultado.getAvisos().addAll(unicos);
+        List<AvisoEtiqueta> unicos = resultado.getDetalle().stream().distinct().toList();
+        resultado.getDetalle().clear();
+        resultado.getDetalle().addAll(unicos);
     }
 
     private ExcelGenerado generarDestino(DestinoData destino, List<PaletData> palets,
                                          AmiEtiquetaLayout layout,
                                          AmiPedidoExcel pedido, DatosEnvio envio,
-                                         List<String> avisos) throws IOException {
+                                         List<AvisoEtiqueta> avisos) throws IOException {
         // Una caja física por numeroCaja, en orden ascendente.
         List<CajaFisica> cajasFisicas = CajaFisica.agrupar(destino.getCajas().stream()
                 .sorted(Comparator.comparingInt(CajaData::getNumeroCaja))
@@ -173,14 +174,14 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
     private List<EtiquetaPaletAmi> etiquetasDePalet(List<CajaFisica> cajasFisicas,
                                                     DestinoData destino,
                                                     List<PaletData> palets,
-                                                    List<String> avisos) {
+                                                    List<AvisoEtiqueta> avisos) {
         String nombreDestino = destino.getNombreDestino();
         boolean algunaSinPalet = destino.getCajas().stream()
                 .anyMatch(caja -> caja.getNumeroPalet() == null);
         if (palets.isEmpty() || algunaSinPalet) {
-            avisos.add(AvisoEtiquetas.deDestino(nombreDestino,
-                    (palets.isEmpty() ? "sin datos de palet" : "hay cajas sin palet asignado")
-                    + ". El excel sale sin hoja de etiquetas de palet"));
+            avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
+                    palets.isEmpty() ? "sin datos de palet" : "hay cajas sin palet asignado",
+                    "El excel sale sin hoja de etiquetas de palet"));
             return List.of();
         }
         List<EtiquetaPaletAmi> etiquetas = new ArrayList<>();
@@ -191,14 +192,14 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                             .equals(caja.numeroPalet()))
                     .toList();
             if (suyas.isEmpty()) {
-                avisos.add(AvisoEtiquetas.deDestino(nombreDestino, "Palet "
-                        + palet.getNumeroPalet() + " sin cajas asignadas. No se le genera etiqueta"));
+                avisos.add(AvisoEtiqueta.dePalet(nombreDestino, palet.getNumeroPalet(),
+                        "sin cajas asignadas", "No se le genera etiqueta"));
                 continue;
             }
             Double peso = pesoDelPalet(suyas, palet);
             if (peso == null) {
-                avisos.add(AvisoEtiquetas.deDestino(nombreDestino, "Palet "
-                        + palet.getNumeroPalet() + " con cajas sin peso. Etiqueta de palet sin peso"));
+                avisos.add(AvisoEtiqueta.dePalet(nombreDestino, palet.getNumeroPalet(),
+                        "con cajas sin peso", "Etiqueta de palet sin peso"));
             }
             etiquetas.add(new EtiquetaPaletAmi(
                     "Nº " + suyas.stream().mapToInt(CajaFisica::numeroCaja).min().getAsInt()
@@ -244,7 +245,7 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
     private EtiquetaCaja etiquetaDe(CajaFisica caja, int posicion, int total,
                                     AmiEtiquetaLayout layout, AmiPedidoExcel pedido,
                                     DatosEnvio envio, String nombreDestino,
-                                    List<String> avisos, List<CajaData> cajasPendientes,
+                                    List<AvisoEtiqueta> avisos, List<CajaData> cajasPendientes,
                                     List<FilaCodigoBarrasExtra> filasExtra) {
         List<CajaData> lineas = caja.lineas();
         CajaData lider = caja.lider();
@@ -264,9 +265,9 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         String orderNumber = pedidoJson.isBlank()
                 ? null : String.format("%05d", Long.parseLong(pedidoJson));
         if (orderNumber == null) {
-            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, lider.getNumeroCaja(),
-                    "Sin número de pedido en la entrada. "
-                    + "Etiqueta sin order number ni código de barras"));
+            avisos.add(AvisoEtiqueta.deCaja(nombreDestino, lider.getNumeroCaja(),
+                    "Sin número de pedido en la entrada",
+                    "Etiqueta sin order number ni código de barras"));
         }
 
         // Un artículo por referencia+color (bolsos) o +talla (cinturones), y
@@ -286,11 +287,11 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         }
         if (resueltos.size() > 1) {
             // El usuario tiene que saber que ese excel trae una hoja más.
-            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, lider.getNumeroCaja(),
-                    (refsColores.size() > 1
+            avisos.add(AvisoEtiqueta.deCaja(nombreDestino, lider.getNumeroCaja(),
+                    refsColores.size() > 1
                             ? "Mezcla de referencias/colores"
-                            : "Lleva varias tallas")
-                    + ". Se generan códigos de barra aparte"));
+                            : "Lleva varias tallas",
+                    "Se generan códigos de barra aparte"));
         }
 
         String referencia;
@@ -346,7 +347,7 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
     private ArticuloResuelto resolver(ArticuloEtiqueta articulo, AmiEtiquetaLayout layout,
                                       AmiPedidoExcel pedido, String orderNumber,
                                       int numeroCaja, String nombreDestino,
-                                      List<String> avisos) {
+                                      List<AvisoEtiqueta> avisos) {
         // La talla solo entra en la clave de los cinturones: los bolsos van
         // como talla única ("U") en el excel de pedido.
         Optional<AmiPedidoExcel.FilaPedido> fila = pedido.buscar(articulo.referencia(),
@@ -359,21 +360,23 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             // distinguible de la misma referencia fallando en otra caja, y
             // el dedup de generar() colapsa las repeticiones dentro de la
             // misma caja porque son, de verdad, el mismo hecho.
-            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, numeroCaja, "Referencia '"
-                    + articulo.referencia() + "' no encontrada en el excel de pedido. El"
-                    + " color code sale de la entrada y la etiqueta va sin EAN13 ni EAN128"));
+            avisos.add(AvisoEtiqueta.deCaja(nombreDestino, numeroCaja,
+                    "Referencia '" + articulo.referencia()
+                    + "' no encontrada en el excel de pedido",
+                    "El color code sale de la entrada y la etiqueta va sin EAN13 ni EAN128"));
             return new ArticuloResuelto(articulo, articulo.codigoColor(),
                     articulo.codigoColor(), null, null, null);
         }
-        for (String aviso : fila.get().avisosEan()) {
-            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, numeroCaja, aviso));
+        for (AvisoEtiqueta aviso : fila.get().avisosEan()) {
+            avisos.add(aviso.enCaja(nombreDestino, numeroCaja));
         }
         if (orderNumber != null
                 && Long.parseLong(fila.get().orderNumber()) != Long.parseLong(orderNumber)) {
-            avisos.add(AvisoEtiquetas.deCaja(nombreDestino, numeroCaja,
+            avisos.add(AvisoEtiqueta.deCaja(nombreDestino, numeroCaja,
                     "el pedido de entrada (" + orderNumber
                     + ") no coincide con el PO del excel de pedido ("
-                    + fila.get().orderNumber() + "); la etiqueta lleva el de la entrada"));
+                    + fila.get().orderNumber() + ")",
+                    "la etiqueta lleva el de la entrada"));
         }
         return new ArticuloResuelto(articulo, fila.get().colorCode(),
                 fila.get().colorCompleto(), fila.get().orderNumber(),

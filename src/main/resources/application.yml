@@ -101,6 +101,9 @@ packing-list:
       # AMI no usa el pedido para el packing list, pero subirlo aquí evita
       # que el Paso 2 de etiquetas lo vuelva a pedir.
       pedido-cliente: true
+      # Como llama AMI a su número de pedido. Es el rótulo que ve quien
+      # teclea, así que va entero y no abreviado.
+      etiqueta-pedido: "PO - Orden de Producto"
       # Destinos habituales (informativo, la plantilla los escribe tal cual
       # llegan del JSON): PARIS, CHINA, JAPAN, HONG KONG. Pueden llegar más.
 
@@ -111,6 +114,8 @@ packing-list:
       # APC manda su excel de pedido de la temporada: de ahí sale el número
       # de pedido completo (ver PedidoCompletionService).
       pedido-cliente: true
+      # APC lo llama así en su excel de pedido, y es de diez dígitos.
+      etiqueta-pedido: "Document d'achat"
       # abreviatura: la que APC usa en su Livraison code (columna
       #   "Catégorie de stock" de su excel de pedido).
       # destinos-hijo: destinaciones que viajan bajo este destino y se tratan

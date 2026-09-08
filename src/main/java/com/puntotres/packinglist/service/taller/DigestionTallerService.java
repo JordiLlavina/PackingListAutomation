@@ -12,6 +12,9 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
+import com.puntotres.packinglist.config.CatalogoTaras;
+import com.puntotres.packinglist.config.ClienteConfig;
+import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.persistence.MemoriaReferencias;
 
@@ -37,13 +40,20 @@ public class DigestionTallerService {
     private final List<ObjetivosPedido> objetivosPorCliente;
     private final MemoriaReferencias memoria;
     private final ReglasTallerProperties reglas;
+    private final ClientesProperties clientes;
+    /** Para pasar de peso bruto (lo que se teclea) a neto (lo que se recuerda). */
+    private final CatalogoTaras taras;
 
     public DigestionTallerService(List<ObjetivosPedido> objetivosPorCliente,
                                   MemoriaReferencias memoria,
-                                  ReglasTallerProperties reglas) {
+                                  ReglasTallerProperties reglas,
+                                  ClientesProperties clientes,
+                                  CatalogoTaras taras) {
         this.objetivosPorCliente = objetivosPorCliente;
         this.memoria = memoria;
         this.reglas = reglas;
+        this.clientes = clientes;
+        this.taras = taras;
     }
 
     /**
@@ -62,8 +72,7 @@ public class DigestionTallerService {
         DigestionTaller digestion = new DigestionTaller();
         digestion.getAvisos().addAll(taller.avisos());
 
-        List<LineaTaller> lineas = taller.lineas();
-        comprobarQueTodoEsDelMismoCliente(clienteClave, lineas, digestion);
+        List<LineaTaller> lineas = soloLasDelCliente(clienteClave, taller.lineas(), digestion);
 
         ResultadoObjetivos objetivos = objetivosDe(clienteClave, lineas, excelPedido);
         digestion.getAvisos().addAll(objetivos.getAvisos());
@@ -74,25 +83,55 @@ public class DigestionTallerService {
     }
 
     /**
-     * Una hoja con dos clientes distintos casi siempre es un escaneo de más o
-     * un cliente mal elegido. Generar con ella mandaría bolsos de un cliente
-     * en el packing list de otro, así que para el envío.
+     * Solo las filas del cliente elegido.
+     *
+     * El taller trabaja para varios y manda una sola hoja con todos
+     * mezclados, así que encontrar otros nombres es lo NORMAL: las de los
+     * demás se apartan sin decir nada. Antes se avisaba, y como saltaba en
+     * todas las entregas el aviso no informaba de nada —solo empujaba hacia
+     * abajo los que sí hay que leer.
+     *
+     * Lo que sí para el envío es que no quede ninguna fila: ahí el cliente
+     * elegido no es el de la hoja, y generar un packing vacío sería peor que
+     * decirlo.
      */
-    private static void comprobarQueTodoEsDelMismoCliente(String clienteClave,
-                                                          List<LineaTaller> lineas,
-                                                          DigestionTaller digestion) {
-        Set<String> otros = new LinkedHashSet<>();
+    private List<LineaTaller> soloLasDelCliente(String clienteClave, List<LineaTaller> lineas,
+                                                DigestionTaller digestion) {
+        List<LineaTaller> suyas = new ArrayList<>();
         for (LineaTaller linea : lineas) {
-            if (!linea.cliente().isBlank()
-                    && !linea.cliente().equalsIgnoreCase(clienteClave.trim())) {
-                otros.add(linea.cliente());
+            if (esDelCliente(clienteClave, linea)) {
+                suyas.add(linea);
             }
         }
-        if (!otros.isEmpty()) {
-            digestion.getBloqueos().add("La hoja del taller trae filas de "
-                    + String.join(", ", otros) + " y has elegido " + clienteClave
-                    + ". Quita esas filas del fichero o elige el cliente correcto");
+        if (suyas.isEmpty() && !lineas.isEmpty()) {
+            digestion.getBloqueos().add("En la hoja del taller no hay ninguna fila de "
+                    + clienteClave + ". Revisa el cliente elegido o el fichero subido");
         }
+        return suyas;
+    }
+
+    /** Una fila sin cliente escrito se da por del cliente elegido. */
+    private boolean esDelCliente(String clienteClave, LineaTaller linea) {
+        if (linea.cliente().isBlank()) {
+            return true;
+        }
+        String suyo = canonico(linea.cliente());
+        return suyo.equals(canonico(clienteClave)) || suyo.equals(canonico(nombreDe(clienteClave)));
+    }
+
+    /**
+     * Nombre de cliente comparable: solo letras y dígitos, en mayúsculas. El
+     * taller escribe "A.P.C." donde el catálogo dice "APC", y comparando al
+     * pie de la letra el envío entero se quedaría fuera.
+     */
+    private static String canonico(String nombre) {
+        return nombre == null ? "" : nombre.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    }
+
+    private String nombreDe(String clienteClave) {
+        return clientes.clientePara(clienteClave)
+                .map(ClienteConfig::getNombre)
+                .orElse(clienteClave);
     }
 
     /**
@@ -120,13 +159,33 @@ public class DigestionTallerService {
                     + ": la cantidad a enviar de cada cosa es la que ha llegado del taller, "
                     + "y hay que revisarla");
         }
+        // Lo que ha llegado de cada artículo y destinación, ya sumado entre
+        // filas repetidas. Se suma AQUÍ y no al fusionar las filas porque el
+        // objetivo tiene que ser una propiedad del artículo y la destinación
+        // —como en los clientes que sí traen pedido—, no de cada apunte del
+        // taller: así fusionar dos filas nunca duplica lo que se envía.
+        Map<String, Integer> llegado = new LinkedHashMap<>();
         for (LineaTaller linea : lineas) {
-            String destino = linea.destinoTaller().isBlank()
-                    ? clienteClave.toUpperCase(Locale.ROOT)
-                    : linea.destinoTaller();
-            resultado.anadir(linea, new ObjetivoDestino(destino, linea.cantidad(), null));
+            llegado.merge(claveArticuloDestino(clienteClave, linea), linea.cantidad(),
+                    Integer::sum);
+        }
+        for (LineaTaller linea : lineas) {
+            resultado.anadir(linea, new ObjetivoDestino(destinoDelTaller(clienteClave, linea),
+                    llegado.get(claveArticuloDestino(clienteClave, linea)), null));
         }
         return resultado;
+    }
+
+    /** Un cliente de destino único no escribe destinación: es su propio nombre. */
+    private static String destinoDelTaller(String clienteClave, LineaTaller linea) {
+        return linea.destinoTaller().isBlank()
+                ? clienteClave.toUpperCase(Locale.ROOT)
+                : linea.destinoTaller();
+    }
+
+    private static String claveArticuloDestino(String clienteClave, LineaTaller linea) {
+        return String.join("|", linea.referencia(), linea.color(), linea.talla(),
+                destinoDelTaller(clienteClave, linea));
     }
 
     // --- Montaje de la tabla ---
@@ -143,12 +202,57 @@ public class DigestionTallerService {
 
             GrupoReferencia grupo = grupos.computeIfAbsent(linea.referencia(),
                     referencia -> nuevoGrupo(clienteClave, referencia, linea));
-            grupo.getFilas().add(new FilaDigerida(linea.color(), linea.talla(),
-                    linea.cantidad(), suyos, suyos.isEmpty()));
+            // "Sin pedido" lo dice el lector, no el que la fila tenga o no
+            // objetivos: en AMI una fila que el pedido no reconoce recibe el PO
+            // de sus hermanas de referencia con cantidad cero, así que TIENE
+            // objetivos y sigue siendo una fila sin pedido que hay que mirar.
+            boolean sinPedido = !objetivos.estaEnElPedido(linea);
+            // El mismo artículo escrito en varias filas del taller es UNA fila
+            // aquí: una por destinación suya, o dos entregas del mismo color.
+            FilaDigerida yaEsta = filaDe(grupo, linea.color(), linea.talla());
+            if (yaEsta != null) {
+                yaEsta.fusionar(linea.cantidad(), suyos, sinPedido);
+            } else {
+                grupo.getFilas().add(new FilaDigerida(linea.color(), linea.talla(),
+                        linea.cantidad(), suyos, sinPedido));
+            }
         }
 
+        if (destinos.isEmpty()) {
+            // Ninguna fila ha casado con el pedido. Sin columnas no habría
+            // dónde teclear a mano cuánto va a cada sitio, y la pantalla de
+            // ajuste se quedaría sin salida: se ofrecen las destinaciones que
+            // el cliente tiene declaradas.
+            destinos.addAll(destinacionesDeclaradasDe(clienteClave));
+        }
         digestion.getGrupos().addAll(grupos.values());
         digestion.getDestinosActivos().addAll(destinos);
+    }
+
+    /**
+     * La fila del grupo que ya lleva ese color y esa talla, o null.
+     *
+     * La talla separa a propósito: cada talla de un cinturón es un artículo
+     * con su propio EAN y su propia línea de pedido, así que fusionarlas
+     * perdería el dato.
+     */
+    private static FilaDigerida filaDe(GrupoReferencia grupo, String color, String talla) {
+        return grupo.getFilas().stream()
+                .filter(fila -> fila.getColor().equals(color) && fila.getTalla().equals(talla))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * Las destinaciones del bloque de normas del cliente. Un cliente sin
+     * bloque es de destino único y ese destino es su propio nombre, que es lo
+     * que ya hace {@code objetivosDelPropioTaller}.
+     */
+    private List<String> destinacionesDeclaradasDe(String clienteClave) {
+        return reglas.clienteTaller(clienteClave)
+                .map(regla -> List.copyOf(regla.getDestinos().keySet()))
+                .filter(declaradas -> !declaradas.isEmpty())
+                .orElseGet(() -> List.of(clienteClave.toUpperCase(Locale.ROOT)));
     }
 
     /**
@@ -160,7 +264,9 @@ public class DigestionTallerService {
                 memoria.buscar(clienteClave, referencia);
         if (recordado.isPresent()) {
             return new GrupoReferencia(referencia, recordado.get().medidaCaja(),
-                    recordado.get().unidadesPorCaja(), OrigenDato.MEMORIA);
+                    recordado.get().unidadesPorCaja(),
+                    brutoDe(recordado.get().pesoNetoKg(), recordado.get().medidaCaja()),
+                    OrigenDato.MEMORIA);
         }
         if (linea.unidadesPorCajaTaller() != null && linea.unidadesPorCajaTaller() > 0) {
             return new GrupoReferencia(referencia, reglas.getMedidaCajaPorDefecto(),
@@ -193,12 +299,53 @@ public class DigestionTallerService {
         }
     }
 
-    /** Guarda lo aprendido de cada referencia, solo si está completo. */
+    /**
+     * Guarda lo aprendido de cada referencia, solo si está completo.
+     *
+     * Del peso se guarda el NETO, no el bruto que se teclea: el neto es de la
+     * mercancía y no cambia, mientras que el bruto lleva dentro la tara del
+     * cartón, que se corrige cada vez que se vuelve a pesar y que cambia
+     * entera si la referencia pasa a otra caja. Sin tara conocida no hay forma
+     * de separarlos, y entonces no se guarda peso: mejor pedirlo otra vez que
+     * recordar un número que no es el que se cree.
+     */
     public void memorizar(String clienteClave, DigestionTaller digestion) {
         for (GrupoReferencia grupo : digestion.getGrupos()) {
-            memoria.recordar(clienteClave, grupo.getReferencia(),
-                    grupo.getMedidaCaja(), grupo.getUnidadesPorCaja());
+            memoria.recordar(clienteClave, grupo.getReferencia(), grupo.getMedidaCaja(),
+                    grupo.getUnidadesPorCaja(),
+                    netoDe(grupo.getPesoBrutoKg(), grupo.getMedidaCaja()));
         }
+    }
+
+    /** Lo que pesa la mercancía de una caja llena, quitándole el cartón. */
+    private Double netoDe(Double pesoBrutoKg, String medidaCaja) {
+        return conTara(medidaCaja, pesoBrutoKg, (peso, tara) -> peso - tara);
+    }
+
+    /** Lo contrario: el bruto que se enseña en pantalla, con el cartón puesto. */
+    private Double brutoDe(Double pesoNetoKg, String medidaCaja) {
+        return conTara(medidaCaja, pesoNetoKg, (peso, tara) -> peso + tara);
+    }
+
+    /**
+     * Aplica la tara del cartón a un peso, o devuelve null si falta alguno de
+     * los dos o si la cuenta no da un peso positivo. Un cero o un negativo
+     * significa que el peso tecleado no llega ni a lo que pesa el cartón
+     * vacío, o sea que está mal: no se guarda ni se enseña.
+     */
+    private Double conTara(String medidaCaja, Double peso,
+                           java.util.function.DoubleBinaryOperator operacion) {
+        if (peso == null || medidaCaja == null) {
+            return null;
+        }
+        Optional<Double> tara = taras.taraPara(medidaCaja);
+        if (tara.isEmpty()) {
+            return null;
+        }
+        double resultado = operacion.applyAsDouble(peso, tara.get());
+        // Dos decimales: es lo que admite la pantalla y lo que se escribe en
+        // el packing list; más cifras solo serían ruido de coma flotante.
+        return resultado > 0 ? Math.round(resultado * 100.0) / 100.0 : null;
     }
 
     /** Para poder ofrecer al usuario elegir la hoja cuando no se encuentra. */

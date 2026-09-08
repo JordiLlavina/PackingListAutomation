@@ -88,7 +88,7 @@ class AmiPedidoRealTest {
 
         assertNull(fila.ean13());
         assertNull(fila.ean128());
-        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("105")));
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("105")));
         // La talla 95 de la misma caja sí existe.
         assertNotNull(pedido.buscar("UBL029.AL0104", "0014", "95", "JP").orElseThrow().ean13());
     }
@@ -100,14 +100,14 @@ class AmiPedidoRealTest {
         AmiPedidoExcel.FilaPedido paisRaro =
                 pedido.buscar("USL728.AL0217", "001", null, null).orElseThrow();
         assertTrue(paisRaro.ean128().endsWith("ES"), paisRaro.ean128());
-        assertTrue(paisRaro.avisosEan().stream().anyMatch(a -> a.contains("EAN128")));
+        assertTrue(paisRaro.avisosEan().stream().anyMatch(a -> a.texto().contains("EAN128")));
 
         // Fila 83: ULL027.AL0103 / 718 con 07691 JP lleva dentro el PO 07705.
         AmiPedidoExcel.FilaPedido poIntercambiado =
                 pedido.buscar("ULL027.AL0103", "718", null, "JP").orElseThrow();
         assertEquals("07691", poIntercambiado.orderNumber());
         assertTrue(poIntercambiado.ean128().contains("00007705"), poIntercambiado.ean128());
-        assertTrue(poIntercambiado.avisosEan().stream().anyMatch(a -> a.contains("EAN128")));
+        assertTrue(poIntercambiado.avisosEan().stream().anyMatch(a -> a.texto().contains("EAN128")));
     }
 
     @Test

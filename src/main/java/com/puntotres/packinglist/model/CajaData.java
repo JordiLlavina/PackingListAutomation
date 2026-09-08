@@ -88,6 +88,18 @@ public class CajaData {
     public void setCanal(String canal) { this.canal = canal; }
 
     public boolean esCinturon() {
+        return esCinturon(referencia);
+    }
+
+    /**
+     * Lo mismo cuando solo se tiene la referencia suelta, sin caja montada.
+     *
+     * Vive aquí y no duplicado en cada servicio porque "qué es un cinturón" es
+     * una sola decisión: el generador de AMI elige con ella la plantilla de
+     * matriz de tallas, y el agrupador de cajas de la entrada por taller
+     * decide con ella que un cinturón no puede compartir bulto con un bolso.
+     */
+    public static boolean esCinturon(String referencia) {
         return referencia != null && referencia.startsWith(PREFIJO_CINTURON);
     }
 

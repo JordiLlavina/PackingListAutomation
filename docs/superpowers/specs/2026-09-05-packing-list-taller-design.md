@@ -35,6 +35,25 @@ contradicen la primera redacción de la petición.
 | D9 | Mezclar en una caja exige **la misma `medidaCaja`** | Decisión de diseño, ver §7.3 |
 | D10 | Se mezcla **solo si ahorra una caja** | Decisión de diseño, ver §7.3 |
 
+Añadidas el **2026-09-06**, tras auditar el algoritmo contra las normas de cada
+cliente:
+
+| # | Decisión | Nota |
+|---|---|---|
+| D11 | Un **bolso y un cinturón nunca comparten caja**, ni con `LIBRE` | No es cuestión de hueco: el almacén los prepara por separado. Se reconoce con `CajaData.esCinturon` (prefijo `UBL`), el mismo estático que usa `AmiGenerador` |
+| D12 | **La talla no separa cajas**: las tallas de una referencia y color comparten bulto, y deben hacerlo si ahorra un cartón | Corrige el diseño original, que le daba caja propia a cada talla y dejaba media caja vacía por talla en cinturones |
+| D13 | El recuento de la mezcla es una **cota**: se comprueba contra el llenado real y, si no ahorra, se vuelve a cajas puras | Con capacidades distintas el voraz no siempre alcanza la cota; sin comprobarlo se decidía con un número y se entregaba otro |
+| D14 | Una hoja con **varios clientes no bloquea**: las filas de los demás se apartan (desde D21, en silencio) | El taller trabaja para todos y manda una sola hoja.| El taller trabaja para todos y manda una sola hoja. Bloquea solo si no queda ninguna fila del cliente elegido |
+| D15 | La **cantidad para cliente es editable siempre**, esté la fila en el excel de pedido o no | Antes una referencia que el pedido no reconocía aceptaba lo tecleado y no lo aplicaba: no había forma de enviarla |
+| D16 | Dos destinaciones **hijas del mismo padre no comparten ni caja ni palet** | Mismo excel, misma hoja, misma dirección y numeración seguida, pero bultos y palets separados: en el almacén se reciben por separado. Cuesta cartones y palets, y se acepta |
+| D17 | El **número de pedido se ve y se edita por destinación** en el paso 1b, rotulado con el vocabulario de cada cliente (`etiqueta-pedido`) | Los dos clientes ya lo extraían —el PO de AMI, el `Document d'achat` de APC— y no se enseñaba en ninguna parte: no había forma de corregirlo ni de ponerlo donde el pedido no lo trae |
+| D18 | El amarillo de "faltan pesos" tiñe **solo las celdas de peso**, no la fila entera | Teñir la fila tapaba la banda de color del palet, y en un envío del taller —que llega sin ningún peso a propósito— la tapaba en todas |
+| D19 | El **peso bruto** del paso 1b es el de una **caja llena**, y las cajas a medias lo **escalan solo en la mercancía** (`tara + (declarado − tara) × unidades / unidadesPorCaja`) | Con reparto equitativo casi ninguna caja sale llena (25 de a 10 son 9+8+8): copiarlo mentiría en las tres y aplicarlo solo a las llenas no lo pondría en ninguna. Bulto mixto o cartón sin tara: sin peso y con aviso, nunca un número inventado |
+| D20 | La memoria de referencias guarda el peso **neto**, no el bruto que se teclea | El neto es del artículo y no cambia; el bruto lleva dentro la tara, que se corrige al volver a pesar el cartón y cambia entera si la referencia pasa a otra caja. Sin tara no se guarda peso, y un peso vacío no borra el que había |
+| D21 | Se **retiran** los avisos de "la hoja trae otro cliente" y de "el cliente de los datos no es el del desplegable" | Saltaban en todas las ejecuciones y no había nada que hacer con ellos: solo empujaban hacia abajo los avisos que sí hay que leer. Sigue bloqueando que no quede ninguna fila del cliente elegido |
+| D22 | En la revisión los avisos de importación van **sin prefijo**, y el del sobrante dice *"han llegado 200 y solo se utilizan 60. Sobran 140"* | Quien lee la pantalla no sabe qué es "la importación"; y el texto viejo ("el pedido cubre el resto") obligaba a restar mentalmente para saber cuánto se envía |
+| D23 | En **AMI** el PO de una fila que el pedido no reconoce se rellena con el de otra fila de su misma referencia, con cantidad cero. En **APC** eso NO se hace | En AMI el número es de `referencia + destinación` y no depende del color; en APC es de `referencia + color + destinación`, así que copiarlo entre colores metería un pedido ajeno. Verificado contra los dos ficheros reales: ver la sección de números de pedido de CLAUDE.md |
+
 ## 2. Flujo de usuario
 
 Se mantienen las tres etapas de `/packing-list`. La novedad vive en la etapa de
@@ -161,7 +180,8 @@ Lo que aporta y ningún fixture inventado habría aportado:
 - Debajo de la última fila hay **totales con contenido** (`Soit : 40 colis`,
   `Poids Brut`, `Poids Net`) que no son artículos, y una fila en blanco antes.
 - La hoja **mezcla dos clientes**: catorce filas de `AMI` y una de
-  `PALOMA WOOL`. El lector no la filtra; es la digestión la que bloquea.
+  `PALOMA WOOL`. El lector no la filtra; es la digestión la que se queda solo
+  con las del cliente elegido y avisa de las demás (**D14**).
 - Varias filas comparten el mismo `N° DE COLIS` (la caja 40): así anota el
   taller un bulto mixto. Da igual, porque su packing se descarta entero.
 
@@ -343,8 +363,14 @@ packing-list:
   cuatro pilas pueden acabar con alturas distintas.
 - El **peso no es restricción**. El máximo de 18 kg por caja de AMI se valida en
   la revisión, no aquí.
-- Un palet **nunca** mezcla destinaciones. Se acepta el último palet a media
-  altura y con pilas incompletas.
+- Un palet **nunca** mezcla destinaciones, y eso incluye las **hijas**
+  (**D16**): `WHOLESALE` y `CHINE FRANCH` salen en el mismo excel y con
+  numeración seguida, pero en palets distintos, porque en el almacén se
+  reciben por separado. Cada hija se apila con **su** altura útil: al no
+  compartir palet, lo que aguante una no limita a la otra.
+- Se acepta el último palet a media altura y con pilas incompletas. Con hijas,
+  eso pasa una vez por hija en vez de una por destinación padre: es el precio
+  de la regla anterior.
 
 ### 7.2 Pasos
 
@@ -359,29 +385,55 @@ packing-list:
 El **artículo** es la unidad indivisible: referencia + color + talla, con su
 `medidaCaja` y `unidadesPorCaja` (por referencia, §8).
 
-**Grupo de mezcla** = artículos de la misma destinación que además comparten:
+> **Revisión de 2026-09-06.** Esta sección se reescribió tras auditar el
+> algoritmo contra las normas de cada cliente. Cambian tres cosas: los
+> cinturones no comparten caja con los bolsos (**D11**), la talla deja de
+> separar cajas (**D12**), y el recuento de la mezcla pasa a tratarse como una
+> cota que hay que comprobar (**D13**).
 
-- la **misma `medidaCaja`** (**D9**) — la caja *es* un cartón concreto: dos
-  referencias con cartón distinto no pueden compartir bulto, permita o no
-  mezclar el cliente;
+**Grupo de mezcla** = artículos que comparten las tres cosas que separan
+siempre —**destinación**, **`medidaCaja`** (**D9**) y **tipo de artículo**
+(bolso o cinturón, **D11**)— y además:
+
 - el **mismo pedido**, si la regla es `MISMO_PEDIDO`;
 - **nada más**, si la regla es `LIBRE`;
-- y con `NINGUNA`, cada artículo es su propio grupo.
+- y con `NINGUNA`, la misma **referencia y color** — pero **no** la misma talla
+  (**D12**): las tallas de un color comparten bulto y deben hacerlo cuando eso
+  ahorra un cartón, que es el caso normal en cinturones.
 
-Orden dentro del grupo: por referencia en orden de aparición, y dentro de cada
-referencia por color. Así se agotan primero los colores de una referencia y solo
-se pasa a otra referencia si queda hueco, que es lo que pide la petición.
+Ni el cartón ni el tipo de artículo los levanta ninguna norma comercial: un
+cinturón no viaja con un bolso ni con `LIBRE`, porque el almacén los prepara por
+separado. El tipo se reconoce con `CajaData.esCinturon(referencia)` (prefijo
+`UBL`), el mismo estático con el que `AmiGenerador` elige plantilla.
+
+Orden dentro de un grupo que se mezcla: **por unidad más voluminosa primero**
+(la de menor `unidadesPorCaja`), con orden **estable**. Es la regla clásica de
+empaquetado —colocar primero lo que peor encaja— y sin ella el número de cajas
+dependía del orden en que llegaran las filas. Como el orden es estable, los
+artículos que ocupan lo mismo conservan el suyo: referencia en orden de
+aparición y, dentro de cada una, color, de modo que se siguen agotando los
+colores de una referencia antes de pasar a otra.
 
 **Cuándo se mezcla de verdad (D10).** Se comparan dos recuentos:
 
 ```
-cajasPuras     = suma de ceil(cantidad_i / capacidad_i)   por artículo
-cajasMezcladas = ceil( suma de (cantidad_i / capacidad_i) )
+cajasPuras = suma de ceil(cantidad_i / capacidad_i)   por artículo
+cota       = ceil( suma de (cantidad_i / capacidad_i) )
 ```
 
-Si `cajasMezcladas < cajasPuras`, se mezcla; si empatan, cada artículo va en sus
-propias cajas. Mezclar complica la etiqueta y el packing list, así que solo se
-hace cuando ahorra un bulto de verdad.
+Si `cota >= cajasPuras` no se mezcla: en empate cada artículo va en sus propias
+cajas, porque mezclar complica la etiqueta y el packing list y solo compensa si
+ahorra un bulto de verdad.
+
+**La cota no es una promesa (D13).** Dice cuántas cajas harían falta si el
+contenido se pudiera trocear a voluntad, y con capacidades distintas el llenado
+real no siempre la alcanza: ocho unidades de a `1/10` no rellenan el hueco que
+deja una de `1/3`. Por eso, tras empaquetar, **se cuenta lo que ha salido** y si
+no ha bajado de `cajasPuras` se descarta y se vuelve a cajas puras. Sin esa
+comprobación se decidía con un número y se entregaba otro: mismo número de
+cajas y encima mixtas, incumpliendo D10 sin que nada avisara. Medido sobre
+grupos aleatorios, la vuelta atrás actúa en ~2,4% de los casos en que la cota
+prometía ahorro.
 
 **Reparto dentro de las cajas resultantes.** `nCajas` es el recuento ganador y la
 cantidad se reparte lo más uniformemente posible **sin superar la capacidad**:
@@ -394,10 +446,20 @@ resto = cantidad % nCajas
 
 31 unidades con 10 por caja → 4 cajas de 8, 8, 8, 7. Nunca 10, 10, 10, 1.
 
+Importante: **la equidad nunca añade cajas**. Primero se fija el número mínimo
+de cajas y solo después se reparte dentro de ese número, así que repartir
+equitativamente no puede hacer que haga falta un cartón más.
+
 En un grupo mezclado, cada unidad del artículo *i* ocupa `1/capacidad_i` de caja;
 se rellenan las cajas en el orden del grupo hasta el llenado objetivo
 (`ocupaciónTotal / nCajas`), de modo que los artículos salen contiguos y solo se
 mezclan en las fronteras. Ninguna caja pasa de ocupación 1.
+
+Si el llenado voraz no alcanza la cota y salen más cajas de las previstas, se
+**reparte otra vez sobre las cajas que de verdad han hecho falta**. Con el
+objetivo calculado para menos cajas, las primeras salen llenas y el sobrante se
+queda en una última caja casi vacía; recalculando, el mismo número de bultos
+queda equilibrado. Es la misma razón por la que 31 unidades salen 8+8+8+7.
 
 El reparto es **por destinación**: no se equilibran cajas de destinaciones
 distintas.
@@ -449,10 +511,20 @@ Base de datos embebida en fichero, `./datos/packinglist.mv.db`, con
 | `referencia` | Parte de la clave |
 | `medida_caja` | Ej. `60x40x40` |
 | `unidades_por_caja` | Entero > 0 |
+| `peso_neto_kg` | **D20**. Lo que pesa la MERCANCÍA de una caja llena, sin el cartón. Nullable: hasta que alguien pesa una caja no se sabe |
 | `fecha_actualizacion` | La última ejecución gana |
 
 Clave = **cliente + referencia**. El color **no** forma parte: todos los colores
 de una referencia comparten cartón y unidades por caja.
+
+El peso se guarda en **neto** aunque en pantalla se teclee el **bruto**
+(**D20**): el neto es del artículo y no cambia, mientras que el bruto lleva
+dentro la tara, que se corrige cada vez que se vuelve a pesar el cartón y que
+cambia entera si la referencia pasa a otra caja. Al digerir se recompone
+sumándole la tara del momento. Dos reglas más: sin tara conocida **no se
+guarda** peso —antes que guardar un neto que en realidad es un bruto—, y un
+peso vacío **no borra** el que hubiera, porque pesar una caja cuesta bajarla a
+la báscula (el cartón y las unidades sí se sustituyen).
 
 **Cascada de resolución al digerir:**
 
@@ -499,14 +571,24 @@ tests que necesitan una tara concreta la siembran ellos.
 Tabla agrupada por **referencia**, con los dos campos que son *por referencia* a
 nivel de grupo y no repetidos por color:
 
+Estado a 2026-09-06 (**D17**, **D19**): el indicador de origen del dato se
+retiró —lo que falta ya lo dicen la lista de bloqueos y el borde de la
+tarjeta—, la cabecera del grupo gana el **peso bruto**, la columna `RECIBIDO`
+pasa a llamarse `CANTIDAD TALLER`, y bajo cada destinación va también su
+**número de pedido**. El texto de ayuda vive una sola vez arriba de la página
+y no repetido encima de cada tabla.
+
 ```
-┌ ULL164.AL0052 ──────────────────────────────────────────────┐
-│  Medida de caja [60x40x40 v]  Uds/caja [ 8 ]   (de memoria) │
-├─────────────┬────────┬──────────┬────────┬────────┬─────────┤
-│ COLOR       │ TALLA  │ RECIBIDO │ CHINA  │ JAPAN  │ PARIS   │
-│ KAKI        │ U      │      165 │ [ 64 ] │ [ 29 ] │ [ 72 ]  │
-│ NOIR        │ U      │       40 │ [ 20 ] │ [  0 ] │ [ 20 ]  │
-└─────────────┴────────┴──────────┴────────┴────────┴─────────┘
+┌ ULL164.AL0052 ──────────────────────────────────────────────────────┐
+│  Cartón [60x40x40 v]   Uds/caja [ 8 ]   Peso bruto (kg) [ 12,50 ]   │
+├─────────────┬───────┬──────────┬───────────────────────────────────-┤
+│             │       │ CANTIDAD │       Cantidad para Cliente        │
+│ COLOR       │ TALLA │  TALLER  │  CHINA   │  JAPAN   │  PARIS       │
+│ KAKI        │ U     │      165 │ [   64 ] │ [   29 ] │ [   72 ]     │
+│             │       │          │ [07704 ] │ [07705 ] │ [07706 ]     │
+│ NOIR        │ U     │       40 │ [   20 ] │ [    0 ] │ [   20 ]     │
+│             │       │          │ [07704 ] │ [      ] │ [07706 ]     │
+└─────────────┴───────┴──────────┴──────────┴──────────┴──────────────┘
 ```
 
 - **Medida y unidades por caja se editan una vez por referencia** y aplican a
@@ -528,7 +610,9 @@ nivel de grupo y no repetidos por color:
   pedido, discrepancia entre la destinación del taller y la del pedido, columnas
   opcionales ausentes, sobrantes, cliente de la columna `CLIENT` distinto del
   seleccionado.
-- **Varios clientes distintos** en la columna `CLIENT`: bloqueante.
+- **Varios clientes distintos** en la columna `CLIENT`: aviso, no bloqueo. Las
+  filas de los demás se apartan y no entran en el packing (**D14**). Bloquea
+  solo si no queda ninguna fila del cliente elegido.
 - Los avisos usan el vocabulario del almacén, no el del programa: "la entrada",
   nunca "el JSON". Se reutiliza el estilo de `AvisoEtiquetas`.
 

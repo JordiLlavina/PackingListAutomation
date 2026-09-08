@@ -259,7 +259,7 @@ class AmiEtiquetasGeneradorTest {
 
         assertTrue(resultado.getAvisos().contains(
                         "PARIS: Caja 1. el pedido de entrada (07666) no coincide con el PO"
-                        + " del excel de pedido (07665); la etiqueta lleva el de la entrada"),
+                        + " del excel de pedido (07665). la etiqueta lleva el de la entrada"),
                 resultado.getAvisos().toString());
         try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
             assertEquals("07666", texto(libro.getSheetAt(0),

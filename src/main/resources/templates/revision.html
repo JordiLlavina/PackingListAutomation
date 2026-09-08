@@ -17,8 +17,12 @@
     <section th:if="${!avisosImportacion.isEmpty() or !avisosPalets.isEmpty()
                      or !avisosInferencia.isEmpty() or !cajasSinPalet.isEmpty()}">
         <h2>Avisos</h2>
-        <div class="alerta" th:each="aviso : ${avisosImportacion}"
-             th:text="|Importación: ${aviso}|"></div>
+        <!-- Sin prefijo: quien lee la pantalla no sabe qué es "la importación"
+             ni le sirve de nada saberlo, y con diez avisos la palabra repetida
+             diez veces se come el principio de cada línea. Los de palets y
+             pesos sí lo llevan, porque ahí el prefijo dice a qué columna hay
+             que ir a mirar. -->
+        <div class="alerta" th:each="aviso : ${avisosImportacion}" th:text="${aviso}"></div>
         <div class="alerta" th:each="aviso : ${avisosPalets}"
              th:text="|Palets: ${aviso}|"></div>
         <div class="alerta error" th:each="aviso : ${avisosInferencia}"
@@ -147,12 +151,17 @@
                     <!-- El peso es de la caja física entera: solo su primera
                          línea (esLider) muestra campos; las demás líneas de la
                          misma caja los dejan en blanco. -->
-                    <td>
+                    <!-- celda-peso: es lo que el CSS tiñe de amarillo cuando a
+                         la caja le faltan pesos. Va en la celda y no en la
+                         fila entera porque un envío recién generado llega sin
+                         ningún peso, y teñir la fila entera borraría la banda
+                         de color del palet en todas. -->
+                    <td class="celda-peso">
                         <input th:if="${fila.esLider}" type="number" step="0.01" min="0" class="c-peso"
                                th:name="|cajas[${fila.indiceGlobal}].pesoBrutoKg|"
                                th:value="${fila.caja.pesoBrutoKg}">
                     </td>
-                    <td>
+                    <td class="celda-peso">
                         <input th:if="${fila.esLider}" type="number" step="0.01" min="0" class="c-peso"
                                th:name="|cajas[${fila.indiceGlobal}].pesoNetoKg|"
                                th:value="${fila.caja.pesoNetoKg}">

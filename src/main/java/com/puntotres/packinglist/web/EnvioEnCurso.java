@@ -14,6 +14,7 @@ import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
+import com.puntotres.packinglist.service.etiquetas.AvisoEtiqueta;
 
 /**
  * Estado del asistente entre pantallas (una sesión = un envío en curso).
@@ -35,7 +36,7 @@ public class EnvioEnCurso {
     private final List<String> avisosGeneracion = new ArrayList<>();
     private VolcadoErpData volcadoErp;
     private final List<ExcelGenerado> etiquetas = new ArrayList<>();
-    private final List<String> avisosEtiquetas = new ArrayList<>();
+    private final List<AvisoEtiqueta> avisosEtiquetas = new ArrayList<>();
     private final Set<ClaveFila> filasDesplegadas = new HashSet<>();
     private byte[] excelPedidoCliente;
     private String nombreExcelPedidoCliente;
@@ -102,7 +103,7 @@ public class EnvioEnCurso {
     public void setVolcadoErp(VolcadoErpData volcadoErp) { this.volcadoErp = volcadoErp; }
 
     public List<ExcelGenerado> getEtiquetas() { return etiquetas; }
-    public List<String> getAvisosEtiquetas() { return avisosEtiquetas; }
+    public List<AvisoEtiqueta> getAvisosEtiquetas() { return avisosEtiquetas; }
 
     public byte[] getExcelPedidoCliente() { return excelPedidoCliente; }
     public String getNombreExcelPedidoCliente() { return nombreExcelPedidoCliente; }

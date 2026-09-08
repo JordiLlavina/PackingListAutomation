@@ -138,7 +138,7 @@ class AmiPedidoExcelTest {
         assertEquals("07672", fila.orderNumber());
         assertNull(fila.ean13());
         assertNull(fila.ean128());
-        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("105")));
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("105")));
     }
 
     @Test
@@ -150,7 +150,7 @@ class AmiPedidoExcelTest {
         assertEquals("221 BLACK", fila.colorCompleto());
         assertNull(fila.ean13());
         assertNull(fila.ean128());
-        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("999")));
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("999")));
     }
 
     @Test
@@ -163,7 +163,7 @@ class AmiPedidoExcelTest {
 
         // 3666598354770: dígito de control incorrecto (el bueno es 1).
         assertNull(fila.ean13());
-        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("3666598354770")));
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("3666598354770")));
         // El EAN128 no depende del EAN13 y se sigue dando.
         assertEquals(ean128("3666598354770", 7665, "ES"), fila.ean128());
     }
@@ -178,7 +178,7 @@ class AmiPedidoExcelTest {
                 .buscar("USL728.AL0217", "001", null, null).orElseThrow();
 
         assertEquals(ean128("3666598897124", 7685, "ES"), fila.ean128());
-        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("EAN128")));
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("EAN128")));
     }
 
     @Test
@@ -191,7 +191,7 @@ class AmiPedidoExcelTest {
                 .buscar("ULL027.AL0103", "718", null, "JP").orElseThrow();
 
         assertEquals(ean128("3666598886005", 7705, "ES"), fila.ean128());
-        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.contains("EAN128")));
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("EAN128")));
     }
 
     @Test
@@ -229,5 +229,61 @@ class AmiPedidoExcelTest {
                 .buscar("ULL163.AL0052", "221", "U", null).orElseThrow();
         assertEquals("221", fila.colorCode());
         assertEquals("221", fila.colorCompleto());
+    }
+
+    // --- El color del taller viene como venga: código, nombre o los dos ---
+
+    @Test
+    void elColorSeReconocePorSuNombreYNoSoloPorSuCodigo() throws IOException {
+        // La hoja del taller escribe "DARK COFFEE", no "001": quien la rellena
+        // tiene delante la pieza, no el catálogo de códigos del cliente.
+        AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoTipico());
+
+        AmiPedidoExcel.FilaPedido fila =
+                pedido.buscar("ULL163.AL0052", "DARK COFFEE", "U", null).orElseThrow();
+
+        assertEquals("001", fila.colorCode());
+        assertEquals("3666598313495", fila.ean13());
+    }
+
+    @Test
+    void elNombreDelColorNoArrastraLaFilaDelOtroColorDeLaMismaReferencia() throws IOException {
+        // Las dos filas de ULL163.AL0052 comparten PO de France. Buscar por
+        // nombre tiene que seguir distinguiéndolas o la etiqueta saldría con
+        // el EAN del color de al lado, que es peor que salir sin EAN.
+        AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoTipico());
+
+        assertEquals("3666598354771",
+                pedido.buscar("ULL163.AL0052", "BLACK", "U", null).orElseThrow().ean13());
+        assertEquals("3666598313495",
+                pedido.buscar("ULL163.AL0052", "DARK COFFEE", "U", null).orElseThrow().ean13());
+    }
+
+    @Test
+    void elCodigoYElNombreJuntosTambienValen() throws IOException {
+        // "221 BLACK" es como sale el color completo en la propia etiqueta, así
+        // que es la forma que el taller acaba copiando.
+        AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoTipico());
+
+        AmiPedidoExcel.FilaPedido fila =
+                pedido.buscar("ULL163.AL0052", "221 BLACK", "U", null).orElseThrow();
+
+        assertEquals("221", fila.colorCode());
+        assertEquals("3666598354771", fila.ean13());
+    }
+
+    @Test
+    void elCodigoYElNombrePegadosNoValen() throws IOException {
+        // "221BLACK" no se parte: hay códigos que son letras y números
+        // ("A237 MOCHA"), así que decidir dónde acaba el código exige adivinar.
+        // Antes que estampar el EAN de otro artículo, sin EAN y con aviso.
+        AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoTipico());
+
+        AmiPedidoExcel.FilaPedido fila =
+                pedido.buscar("ULL163.AL0052", "221BLACK", "U", null).orElseThrow();
+
+        assertNull(fila.ean13());
+        assertTrue(fila.avisosEan().stream()
+                .anyMatch(a -> a.texto().contains("no tiene fila")));
     }
 }

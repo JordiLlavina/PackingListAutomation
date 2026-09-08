@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.persistence;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,42 @@ class MemoriaReferenciasTest {
         MemoriaReferencias.DatosCaja datos = memoria.buscar("AMI", "ULL700.AL0052").orElseThrow();
         assertEquals("60x40x30", datos.medidaCaja());
         assertEquals(4, datos.unidadesPorCaja());
+    }
+
+    @Test
+    void elPesoNetoSeGuardaYSeRecupera() {
+        memoria.recordar("AMI", "CON-PESO", "60x40x40", 8, 11.4);
+
+        assertEquals(11.4, memoria.buscar("AMI", "CON-PESO").orElseThrow().pesoNetoKg());
+    }
+
+    @Test
+    void unaReferenciaSinPesarNoTienePeso() {
+        memoria.recordar("AMI", "SIN-PESO", "60x40x40", 8);
+
+        assertNull(memoria.buscar("AMI", "SIN-PESO").orElseThrow().pesoNetoKg());
+    }
+
+    @Test
+    void guardarSinPesoNoBorraElPesoQueYaHabia() {
+        // Pesar una caja cuesta bajarla a la báscula. Perder ese dato porque
+        // la entrega siguiente se generó con la casilla vacía sería tirar el
+        // trabajo de alguien; el cartón y las unidades sí se sustituyen.
+        memoria.recordar("AMI", "PESADA-UNA-VEZ", "60x40x40", 8, 11.4);
+
+        memoria.recordar("AMI", "PESADA-UNA-VEZ", "60x40x30", 6);
+
+        MemoriaReferencias.DatosCaja datos =
+                memoria.buscar("AMI", "PESADA-UNA-VEZ").orElseThrow();
+        assertEquals(11.4, datos.pesoNetoKg(), "el peso sobrevive");
+        assertEquals("60x40x30", datos.medidaCaja(), "el cartón sí se sustituye");
+    }
+
+    @Test
+    void unPesoQueNoSeaPositivoSeIgnoraComoUnCampoVacio() {
+        memoria.recordar("AMI", "PESO-CERO", "60x40x40", 8, 0.0);
+
+        assertNull(memoria.buscar("AMI", "PESO-CERO").orElseThrow().pesoNetoKg());
     }
 
     @Test

@@ -16,7 +16,16 @@ public record ArticuloDestinado(
         String pedido,
         int cantidad,
         String medidaCaja,
-        int unidadesPorCaja) {
+        int unidadesPorCaja,
+        Double pesoBrutoKg) {
+
+    /** Sin peso bruto declarado: los pesos se rellenan en la revisión. */
+    public ArticuloDestinado(String destino, String referencia, String color, String talla,
+                             String pedido, int cantidad, String medidaCaja,
+                             int unidadesPorCaja) {
+        this(destino, referencia, color, talla, pedido, cantidad, medidaCaja,
+                unidadesPorCaja, null);
+    }
 
     public String descripcion() {
         return referencia + " " + color + ("U".equals(talla) ? "" : " talla " + talla);

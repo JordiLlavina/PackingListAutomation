@@ -6,7 +6,6 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
@@ -47,20 +46,17 @@ public class PreparacionRevisionService {
     private final PedidoCompletionService completadorPedidos;
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
-    private final ClientesProperties clientesProperties;
 
     public PreparacionRevisionService(EnvioImportService importador,
                                       ResolutorDestinosPadre resolutorDestinos,
                                       PedidoCompletionService completadorPedidos,
                                       PaletAssignmentService asignadorPalets,
-                                      WeightInferenceService inferidorPesos,
-                                      ClientesProperties clientesProperties) {
+                                      WeightInferenceService inferidorPesos) {
         this.importador = importador;
         this.resolutorDestinos = resolutorDestinos;
         this.completadorPedidos = completadorPedidos;
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
-        this.clientesProperties = clientesProperties;
     }
 
     /**
@@ -78,7 +74,6 @@ public class PreparacionRevisionService {
                          List<String> avisosPrevios, EnvioEnCurso envioEnCurso) {
         EnvioImportado importado = importador.importar(envio);
         importado.getAvisos().addAll(0, avisosPrevios);
-        avisarSiElClienteNoCuadra(envio, cliente, importado);
 
         envioEnCurso.reiniciar();
         envioEnCurso.setCabecera(cabecera);
@@ -125,22 +120,4 @@ public class PreparacionRevisionService {
                 inferidorPesos.inferirPesosDelEnvio(cajasPorDestino).getAvisos());
     }
 
-    /**
-     * El cliente que traen los datos de entrada es informativo —de las fotos
-     * sale lo que ponga el papel—; si no coincide con el del desplegable se
-     * avisa pero no se bloquea, porque el desplegable manda.
-     */
-    private void avisarSiElClienteNoCuadra(EnvioInput envio, ClienteConfig cliente,
-                                           EnvioImportado importado) {
-        if (envio.getCliente() == null || envio.getCliente().isBlank()) {
-            return;
-        }
-        boolean distinto = clientesProperties.clientePara(envio.getCliente())
-                .map(otro -> otro != cliente)
-                .orElse(true);
-        if (distinto) {
-            importado.getAvisos().add("Los datos de entrada indican que el cliente es '"
-                    + envio.getCliente() + "' pero has seleccionado '" + cliente.getNombre() + "'");
-        }
-    }
 }

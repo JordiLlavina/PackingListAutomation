@@ -79,9 +79,39 @@
     <section class="tarjeta seccion-salida" th:if="${hayGeneradorEtiquetas}">
         <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
 
-        <div th:if="${!avisosEtiquetas.isEmpty()}">
-            <div class="alerta" th:each="aviso : ${avisosEtiquetas}"
-                 th:text="${aviso}"></div>
+        <!-- Un aviso por caja se lee fatal repetido nueve veces, así que a la
+             vista queda el recuento y la CONSECUENCIA (lo que el usuario
+             busca) y el hecho largo que la causó se pliega. Con <details>
+             nativo: no hay formulario en esta pantalla, así que abrir y
+             cerrar no puede pisar nada tecleado. -->
+        <div th:unless="${avisosEtiquetas.vacio()}" class="avisos-etiquetas">
+            <div class="alerta" th:each="linea : ${avisosEtiquetas.generales}">
+                <span th:text="${linea.hecho}">Falta el excel de pedido</span><th:block
+                        th:if="${linea.consecuencia != null}">. <strong
+                        th:text="${linea.consecuencia}">consecuencia</strong></th:block>
+            </div>
+
+            <details class="bloque-avisos" th:each="bloque : ${avisosEtiquetas.bloques}">
+                <summary>
+                    <span class="destino-avisos" th:text="${bloque.destino}">CHINA</span>
+                    <span class="resumen-aviso" th:each="r : ${bloque.resumen}"
+                          th:classappend="${r.palet} ? ' palet' : ''">
+                        <span class="recuento" th:unless="${r.recuento.isEmpty()}"
+                              th:text="${r.recuento}">3 cajas</span><strong
+                              th:text="${r.consecuencia}">etiqueta sin EAN13 ni EAN128</strong>
+                    </span>
+                </summary>
+                <div class="detalle-avisos">
+                    <p class="linea-detalle" th:each="l : ${bloque.detalle}"
+                       th:classappend="${l.palet} ? ' palet' : ''">
+                        <span class="rotulo-caja" th:unless="${l.rotulo.isEmpty()}"
+                              th:text="${l.rotulo}">Cajas 1-3</span><span
+                              th:text="${l.hecho}">el pedido no tiene fila de…</span><th:block
+                              th:if="${l.consecuencia != null}">. <strong
+                              th:text="${l.consecuencia}">consecuencia</strong></th:block>
+                    </p>
+                </div>
+            </details>
         </div>
 
         <p th:if="${etiquetas.isEmpty()}">

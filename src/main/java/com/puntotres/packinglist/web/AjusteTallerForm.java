@@ -20,6 +20,8 @@ public class AjusteTallerForm {
 
         private String medidaCaja;
         private Integer unidadesPorCaja;
+        /** Lo que pesa una caja LLENA de esta referencia, si se ha pesado. */
+        private Double pesoBrutoKg;
         /** Las cantidades objetivo de cada fila de color, por destinación. */
         private List<FilaEditada> filas = new ArrayList<>();
 
@@ -31,17 +33,29 @@ public class AjusteTallerForm {
             this.unidadesPorCaja = unidadesPorCaja;
         }
 
+        public Double getPesoBrutoKg() { return pesoBrutoKg; }
+        public void setPesoBrutoKg(Double pesoBrutoKg) { this.pesoBrutoKg = pesoBrutoKg; }
+
         public List<FilaEditada> getFilas() { return filas; }
         public void setFilas(List<FilaEditada> filas) { this.filas = filas; }
     }
 
-    /** Las cantidades objetivo de una fila, por nombre de destinación. */
+    /**
+     * Lo que se envía a cada destinación en una fila: cuánto y con qué número
+     * de pedido. Los dos mapas van por nombre de destinación y en paralelo,
+     * porque son dos campos del mismo dato y la pantalla los pinta juntos.
+     */
     public static class FilaEditada {
 
         private Map<String, Integer> objetivos = new LinkedHashMap<>();
+        /** El PO de AMI, el {@code Document d'achat} de APC. */
+        private Map<String, String> pedidos = new LinkedHashMap<>();
 
         public Map<String, Integer> getObjetivos() { return objetivos; }
         public void setObjetivos(Map<String, Integer> objetivos) { this.objetivos = objetivos; }
+
+        public Map<String, String> getPedidos() { return pedidos; }
+        public void setPedidos(Map<String, String> pedidos) { this.pedidos = pedidos; }
     }
 
     private List<GrupoEditado> grupos = new ArrayList<>();

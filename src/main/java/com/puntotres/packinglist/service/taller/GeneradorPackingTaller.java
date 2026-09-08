@@ -4,10 +4,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.NumeracionCajas;
@@ -25,15 +27,21 @@ import com.puntotres.packinglist.model.EnvioInput;
  * vienen de un taller.
  *
  * <b>Hijas y padres.</b> El reparto y la prioridad trabajan sobre la
- * destinación HIJA (CHINE FRANCH se sirve de las primeras), pero las cajas,
- * los palets y la numeración van por destinación PADRE (WHOLESALE), que es la
- * que acaba en el packing list y cuyo almacén recibe el bulto. Un palet nunca
- * mezcla destinaciones, y dos hijas del mismo padre van al mismo sitio.
+ * destinación HIJA (CHINE FRANCH se sirve de las primeras). El fichero, la
+ * hoja, la dirección y la numeración van por destinación PADRE (WHOLESALE),
+ * que es la que acaba en el packing list. Pero las CAJAS y los PALETS van por
+ * hija: dos hijas del mismo padre viajan al mismo almacén y salen en el mismo
+ * excel, y aun así no comparten ni bulto ni palet, porque allí se reciben por
+ * separado y un palet mixto habría que deshacerlo al llegar.
  *
  * <b>La numeración es lo último.</b> Se numera palet a palet, y dentro de cada
  * palet pila a pila, de modo que cada palet ocupa un rango contiguo de números
  * por construcción. Sin eso, {@code PaletAssignmentService} no podría volver a
- * asignar los palets al importar el JSON generado.
+ * asignar los palets al importar el JSON generado. La numeración CONTINUA
+ * afecta a cajas Y palets: con las cajas seguidas entre destinaciones, dos
+ * palets llamados "1" serían dos bultos físicos con el mismo número en el
+ * mismo envío. Con POR_DESTINACION reinician los dos, porque cada destinación
+ * es una entrega aparte.
  */
 @Service
 public class GeneradorPackingTaller {
@@ -43,15 +51,18 @@ public class GeneradorPackingTaller {
     private final RepartoDestinaciones reparto;
     private final AgrupadorCajas agrupador;
     private final ApiladorPalets apilador;
+    /** Para repartir el peso declarado entre cartón y mercancía. */
+    private final CatalogoTaras taras;
 
     public GeneradorPackingTaller(ReglasTallerProperties reglas, ClientesProperties clientes,
                                   RepartoDestinaciones reparto, AgrupadorCajas agrupador,
-                                  ApiladorPalets apilador) {
+                                  ApiladorPalets apilador, CatalogoTaras taras) {
         this.reglas = reglas;
         this.clientes = clientes;
         this.reparto = reparto;
         this.agrupador = agrupador;
         this.apilador = apilador;
+        this.taras = taras;
     }
 
     /**
@@ -75,31 +86,37 @@ public class GeneradorPackingTaller {
         Map<String, List<ArticuloDestinado>> porPadre =
                 agruparPorDestinoPadre(clienteClave, repartido.getArticulos());
 
+        // La numeración continua vale para las cajas Y para los palets: con
+        // las cajas seguidas entre destinaciones, dos palets llamados "1"
+        // serían dos bultos físicos con el mismo número en el mismo envío.
         int contadorCajas = 1;
+        int contadorPalets = 1;
         boolean numeracionContinua = numeracionContinua(clienteClave);
 
         for (Map.Entry<String, List<ArticuloDestinado>> entrada : porPadre.entrySet()) {
             String padre = entrada.getKey();
             List<ArticuloDestinado> articulos = entrada.getValue();
-            int alturaUtil = alturaUtilDe(clienteClave, padre, articulos, alturaTecleadaCm);
 
             List<CajaGenerada> cajas = agrupador.agrupar(
                     articulos, reglas.mezclaDe(clienteClave, padre));
-            ResultadoApilado apilado = apilador.apilar(
-                    cajas, alturaUtil, reglas.getPosicionesPalet());
+            ResultadoApilado apilado = apilarPorDestinoHijo(
+                    clienteClave, padre, cajas, alturaTecleadaCm);
             resultado.getBloqueos().addAll(apilado.getBloqueos());
             if (!resultado.sePuedeGenerar()) {
                 continue;
             }
 
             int primeraCaja = numeracionContinua ? contadorCajas : 1;
-            EnvioInput.DestinoInput destino = montarDestino(
-                    padre, articulos, apilado.getPalets(), primeraCaja);
+            int primerPalet = numeracionContinua ? contadorPalets : 1;
+            EnvioInput.DestinoInput destino = montarDestino(padre, articulos,
+                    apilado.getPalets(), primeraCaja, primerPalet, resultado.getAvisos());
             envio.getDestinos().add(destino);
-            resultado.getResumen().add(resumenDe(padre, articulos, apilado, alturaUtil));
+            resultado.getResumen().add(resumenDe(padre, articulos, apilado,
+                    alturaUtilDe(clienteClave, padre, articulos, alturaTecleadaCm)));
 
             contadorCajas = primeraCaja + apilado.getPalets().stream()
                     .mapToInt(palet -> palet.cajas().size()).sum();
+            contadorPalets = primerPalet + apilado.getPalets().size();
         }
 
         if (!resultado.sePuedeGenerar()) {
@@ -134,9 +151,50 @@ public class GeneradorPackingTaller {
     }
 
     /**
-     * La altura útil de un palet de esa destinación. Si dos hijas del mismo
-     * padre declararan alturas distintas, manda la más baja: sus cajas van a
-     * compartir palet y el palet no puede pasarse de la más restrictiva.
+     * Apila las cajas del padre, pero <b>un palet por destinación hija</b>.
+     *
+     * Las hijas comparten fichero, hoja y dirección —por eso van juntas en el
+     * packing list—, pero no comparten bulto ni palet: el almacén las recibe
+     * por separado y un palet mixto habría que deshacerlo al llegar. Cuesta
+     * palets (dos hijas con tres cajas cada una llenan dos palets donde cabría
+     * uno) y es a propósito.
+     *
+     * Cada hija se apila con SU altura útil y no con la más baja de todas: al
+     * no compartir palet, lo que aguante una no limita a la otra.
+     *
+     * Los palets salen en el orden en que aparecen las hijas, así que cada
+     * hija ocupa palets consecutivos y, con ellos, un rango de números de caja
+     * contiguo: es lo que después permite a {@code PaletAssignmentService}
+     * reasignar los palets al importar el JSON generado.
+     */
+    private ResultadoApilado apilarPorDestinoHijo(String clienteClave, String padre,
+                                                  List<CajaGenerada> cajas,
+                                                  Integer alturaTecleadaCm) {
+        ResultadoApilado total = new ResultadoApilado();
+        for (Map.Entry<String, List<CajaGenerada>> hija : porDestinoHijo(cajas).entrySet()) {
+            ResultadoApilado suyo = apilador.apilar(hija.getValue(),
+                    reglas.alturaUtilCm(clienteClave, hija.getKey(), padre, alturaTecleadaCm),
+                    reglas.getPosicionesPalet());
+            total.getPalets().addAll(suyo.getPalets());
+            total.getBloqueos().addAll(suyo.getBloqueos());
+        }
+        return total;
+    }
+
+    /** Las cajas por destinación hija, en orden de primera aparición. */
+    private static Map<String, List<CajaGenerada>> porDestinoHijo(List<CajaGenerada> cajas) {
+        Map<String, List<CajaGenerada>> porHija = new LinkedHashMap<>();
+        for (CajaGenerada caja : cajas) {
+            porHija.computeIfAbsent(caja.destino(), clave -> new ArrayList<>()).add(caja);
+        }
+        return porHija;
+    }
+
+    /**
+     * La altura útil que se enseña en el resumen, que tiene una sola línea por
+     * destinación padre. Es la más baja de sus hijas: cada una se apila con la
+     * suya, así que la más restrictiva es la única que se puede afirmar de la
+     * destinación entera sin engañar a nadie.
      */
     private int alturaUtilDe(String clienteClave, String padre, List<ArticuloDestinado> articulos,
                              Integer alturaTecleadaCm) {
@@ -150,27 +208,36 @@ public class GeneradorPackingTaller {
 
     // --- Montaje del EnvioInput ---
 
+    /**
+     * Una caja concreta en la que va un artículo: su número, cuántas unidades
+     * de ese artículo lleva y si el bulto es SOLO suyo. Lo último decide si se
+     * le puede poner el peso bruto declarado de la referencia.
+     */
+    private record CajaDeArticulo(int numero, int unidades, boolean pura) {
+    }
+
     private EnvioInput.DestinoInput montarDestino(String padre, List<ArticuloDestinado> articulos,
-                                                  List<PaletGenerado> palets, int primeraCaja) {
+                                                  List<PaletGenerado> palets, int primeraCaja,
+                                                  int primerPalet, List<String> avisos) {
         EnvioInput.DestinoInput destino = new EnvioInput.DestinoInput();
         destino.setDestino(padre);
         destino.setPalets(new ArrayList<>());
 
-        // Una entrada por artículo y caja: (clave del artículo) -> (nº caja, unidades).
-        Map<String, List<int[]>> cajasPorArticulo = new LinkedHashMap<>();
+        Map<String, List<CajaDeArticulo>> cajasPorArticulo = new LinkedHashMap<>();
         int numero = primeraCaja;
-        int numeroPalet = 1;
+        int numeroPalet = primerPalet;
 
         for (PaletGenerado palet : palets) {
             EnvioInput.PaletInput paletInput = new EnvioInput.PaletInput();
             paletInput.setPalet(numeroPalet++);
             paletInput.setCajaInicio(numero);
             for (CajaGenerada caja : palet.cajas()) {
+                boolean pura = caja.contenido().size() == 1;
                 for (ContenidoCaja contenido : caja.contenido()) {
                     cajasPorArticulo
                             .computeIfAbsent(claveArticulo(caja.destino(), contenido),
                                     clave -> new ArrayList<>())
-                            .add(new int[] {numero, contenido.unidades()});
+                            .add(new CajaDeArticulo(numero, contenido.unidades(), pura));
                 }
                 numero++;
             }
@@ -178,13 +245,72 @@ public class GeneradorPackingTaller {
             destino.getPalets().add(paletInput);
         }
 
-        destino.setReferencias(montarReferencias(padre, articulos, cajasPorArticulo));
+        destino.setReferencias(montarReferencias(padre, articulos, cajasPorArticulo, avisos));
         return destino;
+    }
+
+    /**
+     * El peso bruto que le toca a una caja, o null.
+     *
+     * Lo que se teclea en la pantalla de ajuste es lo que pesa <em>una caja
+     * llena</em>. Una caja llena se lo lleva tal cual; una que va a medias se
+     * calcula escalando <b>solo la mercancía</b>, porque el cartón pesa igual
+     * vaya lleno o a medias:
+     *
+     * <pre>peso = tara + (pesoDeclarado − tara) × unidades / unidadesPorCaja</pre>
+     *
+     * Hay que escalar, no copiar: con el reparto equitativo casi ninguna caja
+     * sale llena —25 unidades de a 10 por caja son 9+8+8—, así que copiar el
+     * peso declarado lo pondría igual en las tres y aplicarlo solo a las
+     * llenas no lo pondría en ninguna. Es la misma cuenta que haría después
+     * {@code WeightInferenceService} si tuviera una caja llena de la que
+     * aprender; aquí se hace antes porque no la hay.
+     *
+     * Dos casos se quedan sin peso, y ninguno se inventa un número: un bulto
+     * <b>mixto</b> (el peso declarado es de un solo artículo y ahí van varios)
+     * y un cartón <b>sin tara conocida</b> (sin ella no se puede separar lo
+     * que pesa el cartón de lo que pesa la mercancía).
+     */
+    private Double pesoBrutoDe(ArticuloDestinado articulo, CajaDeArticulo caja) {
+        if (articulo.pesoBrutoKg() == null || !caja.pura()) {
+            return null;
+        }
+        if (caja.unidades() == articulo.unidadesPorCaja()) {
+            return articulo.pesoBrutoKg();
+        }
+        Optional<Double> tara = taras.taraPara(articulo.medidaCaja());
+        if (tara.isEmpty() || articulo.pesoBrutoKg() <= tara.get()) {
+            return null;
+        }
+        double mercanciaLlena = articulo.pesoBrutoKg() - tara.get();
+        double peso = tara.get()
+                + mercanciaLlena * caja.unidades() / articulo.unidadesPorCaja();
+        // Dos decimales: es lo que admite la revisión y lo que se escribe en
+        // el packing list; más cifras solo serían ruido de coma flotante.
+        return Math.round(peso * 100.0) / 100.0;
+    }
+
+    /**
+     * Un peso tecleado que no ha acabado en ninguna caja. Pasa cuando de esa
+     * referencia no sale ni una caja llena —lo que ha llegado no da para
+     * una— o cuando todas van mezcladas con otro artículo. Callarlo dejaría al
+     * usuario creyendo que ya ha pesado ese material.
+     */
+    private void avisarSiElPesoNoSeHaPodidoUsar(ArticuloDestinado articulo,
+                                                       List<CajaDeArticulo> cajas,
+                                                       List<String> avisos) {
+        if (articulo.pesoBrutoKg() == null
+                || cajas.stream().anyMatch(caja -> pesoBrutoDe(articulo, caja) != null)) {
+            return;
+        }
+        avisos.add(articulo.destino() + ": de " + articulo.descripcion()
+                + " no sale ninguna caja llena y solo suya, así que el peso bruto que has puesto "
+                + "no se ha podido usar. Los pesos se rellenan en la revisión");
     }
 
     private List<EnvioInput.ReferenciaInput> montarReferencias(
             String padre, List<ArticuloDestinado> articulos,
-            Map<String, List<int[]>> cajasPorArticulo) {
+            Map<String, List<CajaDeArticulo>> cajasPorArticulo, List<String> avisos) {
         Map<String, ArticuloDestinado> porClave = new LinkedHashMap<>();
         for (ArticuloDestinado articulo : articulos) {
             porClave.putIfAbsent(claveArticulo(articulo), articulo);
@@ -192,7 +318,7 @@ public class GeneradorPackingTaller {
 
         List<EnvioInput.ReferenciaInput> referencias = new ArrayList<>();
         for (Map.Entry<String, ArticuloDestinado> entrada : porClave.entrySet()) {
-            List<int[]> cajas = cajasPorArticulo.get(entrada.getKey());
+            List<CajaDeArticulo> cajas = cajasPorArticulo.get(entrada.getKey());
             if (cajas == null || cajas.isEmpty()) {
                 continue;
             }
@@ -208,8 +334,9 @@ public class GeneradorPackingTaller {
             if (!articulo.destino().equals(padre)) {
                 referencia.setCanal(articulo.destino());
             }
-            referencia.setCantidadTotal(cajas.stream().mapToInt(caja -> caja[1]).sum());
-            referencia.setCajas(comprimirEnRangos(cajas));
+            referencia.setCantidadTotal(cajas.stream().mapToInt(CajaDeArticulo::unidades).sum());
+            referencia.setCajas(comprimirEnRangos(cajas, articulo));
+            avisarSiElPesoNoSeHaPodidoUsar(articulo, cajas, avisos);
             referencias.add(referencia);
         }
         return referencias;
@@ -219,26 +346,34 @@ public class GeneradorPackingTaller {
      * Cajas consecutivas con las mismas unidades se escriben como un rango, y
      * el resto como cajas sueltas: es el mismo formato que escribiría una
      * persona a mano, y el importador ya sabe leerlo.
+     *
+     * El peso bruto también tiene que coincidir para poder comprimir. En un
+     * rango el importador se lo pone a TODAS sus cajas, así que juntar una
+     * llena con una a medias le daría a la de a medias un peso que no es suyo.
      */
-    private static List<EnvioInput.CajaRangoInput> comprimirEnRangos(List<int[]> cajas) {
+    private List<EnvioInput.CajaRangoInput> comprimirEnRangos(
+            List<CajaDeArticulo> cajas, ArticuloDestinado articulo) {
         List<EnvioInput.CajaRangoInput> entradas = new ArrayList<>();
         int i = 0;
         while (i < cajas.size()) {
             int inicio = i;
             while (i + 1 < cajas.size()
-                    && cajas.get(i + 1)[0] == cajas.get(i)[0] + 1
-                    && cajas.get(i + 1)[1] == cajas.get(inicio)[1]) {
+                    && cajas.get(i + 1).numero() == cajas.get(i).numero() + 1
+                    && cajas.get(i + 1).unidades() == cajas.get(inicio).unidades()
+                    && Objects.equals(pesoBrutoDe(articulo, cajas.get(i + 1)),
+                            pesoBrutoDe(articulo, cajas.get(inicio)))) {
                 i++;
             }
             EnvioInput.CajaRangoInput entrada = new EnvioInput.CajaRangoInput();
             if (inicio == i) {
-                entrada.setCaja(cajas.get(inicio)[0]);
-                entrada.setUnidades(cajas.get(inicio)[1]);
+                entrada.setCaja(cajas.get(inicio).numero());
+                entrada.setUnidades(cajas.get(inicio).unidades());
             } else {
-                entrada.setCajaInicio(cajas.get(inicio)[0]);
-                entrada.setCajaFin(cajas.get(i)[0]);
-                entrada.setUnidadesPorCaja(cajas.get(inicio)[1]);
+                entrada.setCajaInicio(cajas.get(inicio).numero());
+                entrada.setCajaFin(cajas.get(i).numero());
+                entrada.setUnidadesPorCaja(cajas.get(inicio).unidades());
             }
+            entrada.setPesoBruto(pesoBrutoDe(articulo, cajas.get(inicio)));
             entradas.add(entrada);
             i++;
         }

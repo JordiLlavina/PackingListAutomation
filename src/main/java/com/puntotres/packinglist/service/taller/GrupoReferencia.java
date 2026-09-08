@@ -21,14 +21,26 @@ public class GrupoReferencia {
     private final String referencia;
     private String medidaCaja;
     private Integer unidadesPorCaja;
+    /**
+     * Peso bruto (kg) de una caja LLENA de esta referencia, o null si no se ha
+     * pesado. Es opcional: sin él los pesos se quedan en blanco y se rellenan
+     * en la revisión, como en cualquier otra vía de entrada.
+     */
+    private Double pesoBrutoKg;
     private OrigenDato origen;
     private final List<FilaDigerida> filas = new ArrayList<>();
 
     public GrupoReferencia(String referencia, String medidaCaja,
                            Integer unidadesPorCaja, OrigenDato origen) {
+        this(referencia, medidaCaja, unidadesPorCaja, null, origen);
+    }
+
+    public GrupoReferencia(String referencia, String medidaCaja, Integer unidadesPorCaja,
+                           Double pesoBrutoKg, OrigenDato origen) {
         this.referencia = referencia;
         this.medidaCaja = medidaCaja;
         this.unidadesPorCaja = unidadesPorCaja;
+        this.pesoBrutoKg = pesoBrutoKg;
         this.origen = origen;
     }
 
@@ -42,6 +54,10 @@ public class GrupoReferencia {
 
     public Integer getUnidadesPorCaja() {
         return unidadesPorCaja;
+    }
+
+    public Double getPesoBrutoKg() {
+        return pesoBrutoKg;
     }
 
     public OrigenDato getOrigen() {
@@ -63,11 +79,24 @@ public class GrupoReferencia {
      * defecto, que es lo que decide si se memoriza al generar.
      */
     public void corregir(String medidaCaja, Integer unidadesPorCaja) {
+        corregir(medidaCaja, unidadesPorCaja, null);
+    }
+
+    /**
+     * Lo mismo, con el peso bruto de una caja llena. Un peso de cero o
+     * negativo se ignora igual que un campo vacío: es lo que llega de una
+     * casilla que nadie ha rellenado, y darlo por bueno pondría un cero en el
+     * packing list que lee el cliente.
+     */
+    public void corregir(String medidaCaja, Integer unidadesPorCaja, Double pesoBrutoKg) {
         if (medidaCaja != null && !medidaCaja.isBlank()) {
             this.medidaCaja = medidaCaja.trim();
         }
         if (unidadesPorCaja != null && unidadesPorCaja > 0) {
             this.unidadesPorCaja = unidadesPorCaja;
+        }
+        if (pesoBrutoKg != null && pesoBrutoKg > 0) {
+            this.pesoBrutoKg = pesoBrutoKg;
         }
         this.origen = OrigenDato.TALLER;
     }

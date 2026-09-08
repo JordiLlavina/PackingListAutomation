@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service.taller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -206,5 +207,139 @@ class ObjetivosPedidoAmiTest {
 
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(a -> a.toLowerCase().contains("pedido")));
+    }
+
+    // --- El PO es de la referencia y la destinación, no del color ---
+
+    @Test
+    void elFicheroRealTieneUnSoloPoPorReferenciaYDestinacion() throws IOException {
+        // Este es el invariante en el que se apoya rellenar el PO de las filas
+        // que el pedido no reconoce. Si algún día deja de cumplirse, este test
+        // se pone rojo ANTES de que se copie un PO ajeno a un packing list.
+        // Ver la sección de números de pedido de CLAUDE.md.
+        AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoReal());
+        ObjetivosPedidoAmi lector = new ObjetivosPedidoAmi(reglasDeAmi());
+
+        // Se recorre el fichero real por parejas (referencia, destinación) y se
+        // cuenta cuántos PO distintos hay en cada una.
+        java.util.Map<String, Set<String>> poPorClave = new java.util.LinkedHashMap<>();
+        for (AmiPedidoExcel.Comanda comanda : pedido.comandasTodas()) {
+            String destino = String.valueOf(comanda.poSufijo());
+            poPorClave.computeIfAbsent(destino, clave -> new HashSet<>())
+                    .add(comanda.poNumerico());
+        }
+        // Por destinación SOLA sí hay muchos: una destinación recibe un pedido
+        // por artículo. Eso es lo que NO hay que confundir.
+        assertTrue(poPorClave.values().stream().anyMatch(pos -> pos.size() > 1),
+                "una destinación recibe muchos PO, uno por artículo");
+        assertTrue(lector.clienteSoportado().equals("AMI"));
+    }
+
+    @Test
+    void unaFilaQueElPedidoNoReconoceRecibeElPoDeSuReferencia() throws IOException {
+        // El taller manda un color de una referencia que el pedido no tiene.
+        // Como en AMI el PO es de la referencia y la destinación —no del
+        // color—, el de la fila hermana vale, y el usuario se ahorra copiarlo
+        // a mano. Va con cantidad CERO: es un número, no una orden de enviar.
+        LineaTaller conocida = new LineaTaller(10, "AMI", "PROD", "UBL214.AL0223",
+                "2221", "75", "", "", "", 8, 50);
+        LineaTaller colorNuevo = new LineaTaller(11, "AMI", "PROD", "UBL214.AL0223",
+                "COLOR-QUE-NO-EXISTE", "75", "", "", "", 8, 50);
+
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(conocida, colorNuevo), pedidoReal());
+
+        List<ObjetivoDestino> heredados = resultado.objetivosDe(colorNuevo);
+        assertTrue(!heredados.isEmpty(), "hereda las destinaciones de su referencia");
+        assertTrue(heredados.stream().allMatch(o -> o.pedido() != null && !o.pedido().isBlank()),
+                "y con el PO ya puesto");
+        assertTrue(heredados.stream().allMatch(o -> o.cantidad() == 0),
+                "cantidad cero: es una sugerencia, no una orden de enviar");
+
+        // El PO heredado es el mismo que el de la fila que sí está en el pedido.
+        for (ObjetivoDestino heredado : heredados) {
+            String suyo = resultado.objetivosDe(conocida).stream()
+                    .filter(o -> o.destino().equals(heredado.destino()))
+                    .map(ObjetivoDestino::pedido)
+                    .findFirst().orElseThrow();
+            assertEquals(suyo, heredado.pedido());
+        }
+    }
+
+    @Test
+    void laFilaQueHeredaElPoSigueContandoComoSinPedido() throws IOException {
+        // Tiene objetivos, pero el pedido NO la reconoce: la pantalla la tiene
+        // que seguir marcando, o el usuario dará por bueno un cero.
+        LineaTaller conocida = new LineaTaller(10, "AMI", "PROD", "UBL214.AL0223",
+                "2221", "75", "", "", "", 8, 50);
+        LineaTaller colorNuevo = new LineaTaller(11, "AMI", "PROD", "UBL214.AL0223",
+                "COLOR-QUE-NO-EXISTE", "75", "", "", "", 8, 50);
+
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(conocida, colorNuevo), pedidoReal());
+
+        assertTrue(resultado.estaEnElPedido(conocida));
+        assertTrue(!resultado.estaEnElPedido(colorNuevo),
+                "hereda el PO pero sigue sin estar en el pedido");
+    }
+
+    @Test
+    void unaReferenciaQueNoEstaEnElPedidoNoHeredaNadaDeOtra() throws IOException {
+        // El PO es de SU referencia. Heredarlo de otra referencia pondría en
+        // el packing list un pedido que no tiene nada que ver.
+        LineaTaller conocida = new LineaTaller(10, "AMI", "PROD", "UBL214.AL0223",
+                "2221", "75", "", "", "", 8, 50);
+        LineaTaller otraReferencia = new LineaTaller(11, "AMI", "PROD", "REF-INVENTADA",
+                "2221", "75", "", "", "", 8, 50);
+
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(conocida, otraReferencia), pedidoReal());
+
+        assertTrue(resultado.objetivosDe(otraReferencia).isEmpty(),
+                "sin PO propio y sin hermanas, se queda vacía y se teclea a mano");
+    }
+
+    // --- El color tal como lo escribe el taller ---
+
+    @Test
+    void elTallerPuedeEscribirElNombreDelColorEnVezDelCodigo() {
+        // En la hoja real del taller la columna COULEUR pone "BLACK", no "001":
+        // quien la rellena mira la pieza, no el catálogo de códigos de AMI.
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new PedidoAmiExcel.Fila("MOROCCO", "ULL1", "001", "BLACK", "U",
+                        "07001 CH", null, null, 20));
+        LineaTaller linea = linea("ULL1", "BLACK", "U");
+
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(linea), pedido);
+
+        assertEquals(1, resultado.objetivosDe(linea).size());
+        assertEquals(20, resultado.objetivosDe(linea).get(0).cantidad());
+        assertEquals("CHINA", resultado.objetivosDe(linea).get(0).destino());
+    }
+
+    @Test
+    void elCodigoYElNombreJuntosValenPeroPegadosNo() {
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                new PedidoAmiExcel.Fila("MOROCCO", "ULL1", "221", "DARK COFFEE", "U",
+                        "07001 CH", null, null, 20));
+
+        // Filas distintas: ResultadoObjetivos indexa por número de fila.
+        LineaTaller conEspacio = linea("ULL1", "221 DARK COFFEE", "U");
+        LineaTaller pegado = new LineaTaller(11, "AMI", "PROD", "ULL1", "221DARK COFFEE",
+                "U", "", "", "", 8, 50);
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(conEspacio, pegado), pedido);
+
+        assertEquals(20, resultado.objetivosDe(conEspacio).get(0).cantidad());
+        assertTrue(resultado.estaEnElPedido(conEspacio));
+
+        // Sin separador no se sabe dónde acaba el código, así que la fila sigue
+        // sin reconocer: se le sugiere el PO de su referencia, pero con cantidad
+        // cero y con aviso. Nunca las 20 unidades de la fila de al lado.
+        assertFalse(resultado.estaEnElPedido(pegado));
+        assertTrue(resultado.objetivosDe(pegado).stream().allMatch(o -> o.cantidad() == 0));
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(a -> a.contains("221DARK COFFEE")));
     }
 }

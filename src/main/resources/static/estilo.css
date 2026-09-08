@@ -352,9 +352,7 @@ section.destino td input[type="text"] {
    más apagada o más resaltada que otra. Como referencia de escala, el amarillo
    de aviso tiñe algo más fuerte que esto (C=0.031).
 
-   Van ANTES de tr.pendiente: las dos reglas tienen la misma especificidad, así
-   que solo el orden asegura que una fila pendiente siga amarilla. Y la celda
-   del triángulo no se tiñe porque su fondo tiene más especificidad que esto.
+   La celda del triángulo no se tiñe porque su fondo tiene más especificidad.
 
    Quince tonos y quince bandas: AgrupadorFilasRevision.BANDAS_PALET. */
 tr.palet-0 td  { background: #eaf8ff; }
@@ -373,7 +371,18 @@ tr.palet-12 td { background: #e6fbf6; }
 tr.palet-13 td { background: #e4fbfd; }
 tr.palet-14 td { background: #e6faff; }
 
-tr.pendiente td { background: var(--aviso-fondo); }
+/* El amarillo de "le faltan pesos" tiñe SOLO las dos celdas de peso, no la
+   fila entera.
+
+   Antes lavaba la fila completa y, teniendo la misma especificidad que la
+   banda del palet y yendo después, la borraba. En un envío recién generado
+   desde el packing del taller eso pasaba en TODAS las filas —ese flujo deja
+   los pesos en blanco a propósito, para que los infiera el paso de siempre—,
+   así que la banda estaba en el HTML y no se veía ni una.
+
+   Teñir solo la celda que falta además señala mejor: dice QUÉ hay que
+   rellenar, en vez de marcar la fila entera y dejar que la busques. */
+tr.pendiente td.celda-peso { background: var(--aviso-fondo); }
 
 .badge {
     display: inline-block;
@@ -682,11 +691,61 @@ header.cabecera .enlace-menu:hover {
     margin-bottom: 0.3rem;
 }
 
+/* Titulo del paso 1b. El nombre del fichero va pegado y en gris: dice cual de
+   los dos excels se ha digerido, que en una pantalla donde se decide que se
+   envia importa, pero no compite con el titulo. */
+.titulo-entrega { margin: 0.2rem 0 0.4rem; }
+.titulo-entrega .fichero-entrega {
+    font-size: 0.85rem;
+    font-weight: 400;
+    color: #5a6673;
+    margin-left: 0.5rem;
+}
+
+.lista-ayuda { margin: 0 0 1rem; padding-left: 1.2rem; line-height: 1.6; }
+
 .grupo-referencia .cabecera-grupo .titulo-seccion { margin: 0; }
 .grupo-referencia .uds-por-caja { width: 6rem; }
+.grupo-referencia .peso-bruto-grupo { width: 7rem; }
 
-.origen-dato { font-size: 0.8rem; color: #5a6673; }
-.origen-dato .pendiente { color: #a35c00; font-weight: 600; }
+/* El indicador de origen ("de memoria" / "del taller" / "sin decidir") se
+   retiro de la pantalla: lo que falta ya lo dice la lista de bloqueos y el
+   borde de la tarjeta, y repetido en cada referencia era ruido. OrigenDato
+   sigue existiendo en el dominio, que es donde importa. */
+
+/* Todas las tablas del ajuste llevan las mismas columnas, asi que tienen que
+   salir con las mismas anchuras: con el reparto automatico del navegador cada
+   tabla se ajustaba al color mas largo de SU referencia y las columnas
+   quedaban descuadradas de una a otra, que es justo lo que impide leerlas en
+   vertical. table-layout: fixed manda sobre el contenido, y las columnas de
+   destinacion se reparten a partes iguales lo que sobra. */
+.tabla-articulos { table-layout: fixed; width: 100%; }
+.tabla-articulos col.col-color { width: 22%; }
+.tabla-articulos col.col-talla { width: 8%; }
+.tabla-articulos col.col-cantidad-taller { width: 12%; }
+
+/* La cabecera que abarca las columnas de destinacion: dice de donde sale ese
+   bloque de numeros, que no es lo mismo que "Recibido". */
+.tabla-articulos th.grupo-cantidad {
+    text-align: center;
+    border-bottom: 1px solid var(--borde);
+}
+.tabla-articulos th.destino-cantidad { font-weight: 500; font-size: 0.85rem; }
+
+/* Los inputs ocupan su celda: con anchura fija se salian de las columnas
+   estrechas cuando hay cinco o seis destinaciones. */
+.tabla-articulos td input { width: 100%; box-sizing: border-box; }
+
+/* El numero de pedido va debajo de la cantidad y mas discreto: es un dato de
+   apoyo que casi siempre viene bien del excel, mientras que la cantidad es la
+   que se revisa fila a fila. */
+.tabla-articulos td input.c-pedido-destino {
+    margin-top: 0.2rem;
+    padding-top: 0.1rem;
+    padding-bottom: 0.1rem;
+    font-size: 0.8rem;
+    color: #5a6673;
+}
 
 /* Una referencia sin unidades por caja, y una fila que no esta en el pedido
    del cliente: las dos hay que mirarlas antes de generar. */
@@ -703,3 +762,81 @@ tr.sin-pedido td { background: #fff8e1; }
 .lista-avisos { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.6; }
 
 .volver-taller { font-size: 0.9rem; color: #5a6673; margin-bottom: 0.8rem; }
+
+/* --- Avisos de etiquetas de caja (pantalla de resultados) ---------------
+   El generador emite un aviso por caja y eso llenaba la tarjeta de frases
+   largas casi idénticas. Aquí cada destinación es un bloque con separación
+   propia: a la vista, el recuento y la consecuencia; el hecho que la causó
+   se pliega con <details>. */
+
+.avisos-etiquetas {
+    margin-bottom: 0.9rem;
+}
+
+.bloque-avisos {
+    border: 1px solid var(--aviso-borde);
+    border-left-width: 4px;
+    background: var(--aviso-fondo);
+    border-radius: 4px;
+    padding: 0.45rem 0.75rem;
+    /* La separación entre destinaciones es lo que desenreda el bloque:
+       sin ella todo se lee como una sola lista larga. */
+    margin: 0.55rem 0;
+}
+
+.bloque-avisos > summary {
+    cursor: pointer;
+    line-height: 1.4;
+}
+
+.bloque-avisos > summary::marker {
+    color: #8a6d1f;
+}
+
+.destino-avisos {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+/* Cada consecuencia en su línea: son cortas, y apiladas se comparan de un
+   vistazo mejor que separadas por puntos en un párrafo. */
+.resumen-aviso {
+    display: block;
+    margin-left: 1.1rem;
+}
+
+.resumen-aviso .recuento {
+    display: inline-block;
+    min-width: 5.5rem;
+    opacity: 0.8;
+}
+
+.detalle-avisos {
+    margin: 0.4rem 0 0.15rem 1.1rem;
+    padding-top: 0.35rem;
+    border-top: 1px dashed var(--aviso-borde);
+}
+
+.linea-detalle {
+    margin: 0.2rem 0;
+    line-height: 1.35;
+    font-size: 0.92rem;
+}
+
+.rotulo-caja {
+    display: inline-block;
+    min-width: 6.5rem;
+    font-weight: 600;
+}
+
+/* Los de palet, en otro matiz: el usuario los mira en otro momento (cuando
+   ya está montando el bulto) y mezclados con los de caja se pierden. */
+.resumen-aviso.palet,
+.linea-detalle.palet {
+    color: #4a4382;
+}
+
+.resumen-aviso.palet strong,
+.linea-detalle.palet strong {
+    color: #372f77;
+}

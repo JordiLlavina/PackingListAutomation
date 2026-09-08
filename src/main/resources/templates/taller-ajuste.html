@@ -4,13 +4,20 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('· 1b. Ajuste de la entrega del taller')}"></header>
 <main>
-    <p class="ayuda">
-        Entrega de <strong th:text="${cliente}">Cliente</strong>, leída de
-        <strong th:text="${nombreExcelTaller}">packing del taller</strong>. El packing del taller
-        no se respeta: las cajas y los palets los reparte el programa con las normas del cliente.
-        Aquí solo hay que decir en qué cartón va cada referencia, cuántas unidades le caben y
-        cuánto se envía a cada destinación.
-    </p>
+    <!-- La ayuda va aquí arriba una sola vez y en tres puntos. Repetida encima
+         de cada tabla se leía como parte de esa referencia, y con veinte
+         referencias en pantalla eran veinte párrafos idénticos que nadie
+         acababa leyendo. -->
+    <h2 class="titulo-entrega">
+        Entrega de <span th:text="${cliente}">Cliente</span>
+        <span class="fichero-entrega" th:text="${nombreExcelTaller}">packing del taller</span>
+    </h2>
+    <ul class="ayuda lista-ayuda">
+        <li>El <strong>peso bruto</strong> es opcional y es el de una caja llena, con el cartón:
+            las cajas a medias se calculan a partir de él.</li>
+        <li><strong>Cantidad taller</strong> es lo que ha mandado el taller y no se usa.</li>
+        <li><strong>Cantidad para Cliente</strong> es lo que se usa para generar el packing.</li>
+    </ul>
 
     <section class="tarjeta alerta error" th:if="${!bloqueos.isEmpty()}">
         <h3 class="titulo-seccion">Falta esto para poder generar</h3>
@@ -68,24 +75,41 @@
                            th:name="|grupos[${iterGrupo.index}].unidadesPorCaja|"
                            th:value="${grupo.unidadesPorCaja}">
                 </label>
-                <span class="origen-dato" th:switch="${grupo.origen.name()}">
-                    <span th:case="'MEMORIA'" title="Lo que se usó la última vez">de memoria</span>
-                    <span th:case="'TALLER'" title="Lo que sugiere la hoja del taller">del taller</span>
-                    <span th:case="'POR_DEFECTO'" class="pendiente"
-                          title="Nadie lo ha dicho todavía">sin decidir</span>
-                </span>
+                <!-- Opcional: si se ha pesado una caja llena se escribe aquí y
+                     el envío llega a la revisión con los pesos puestos. Sin
+                     él, los pesos se rellenan allí como en cualquier otra vía
+                     de entrada. -->
+                <label>Peso bruto (kg)
+                    <input type="number" min="0" step="0.01" class="peso-bruto-grupo"
+                           th:name="|grupos[${iterGrupo.index}].pesoBrutoKg|"
+                           th:value="${grupo.pesoBrutoKg}"
+                           title="Lo que pesa UNA caja llena de esta referencia, con el cartón. Las cajas que van a medias se calculan a partir de él, escalando solo la mercancía">
+                </label>
             </div>
-            <p class="ayuda">
-                El cartón y las unidades por caja son de la referencia: valen para todos sus colores.
-            </p>
 
-            <table>
+            <!-- Las columnas van con anchura fija y en el mismo orden en todas
+                 las tablas: son la misma información en todas, y con anchura
+                 automática cada tabla la colocaba en un sitio distinto según
+                 lo largo que fuera el nombre del color de esa referencia. -->
+            <table class="tabla-articulos">
+                <colgroup>
+                    <col class="col-color">
+                    <col class="col-talla">
+                    <col class="col-cantidad-taller">
+                    <col th:each="destino : ${destinos}">
+                </colgroup>
                 <thead>
                 <tr>
-                    <th>Color</th>
-                    <th>Talla</th>
-                    <th>Recibido</th>
-                    <th th:each="destino : ${destinos}" th:text="${destino}">CHINA</th>
+                    <th rowspan="2">Color</th>
+                    <th rowspan="2">Talla</th>
+                    <th rowspan="2">Cantidad taller</th>
+                    <th class="grupo-cantidad" th:colspan="${#lists.size(destinos)}">
+                        Cantidad para Cliente
+                    </th>
+                </tr>
+                <tr>
+                    <th class="destino-cantidad" th:each="destino : ${destinos}"
+                        th:text="${destino}">CHINA</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -94,10 +118,24 @@
                     <td th:text="${fila.color}">KAKI</td>
                     <td th:text="${fila.talla}">U</td>
                     <td th:text="${fila.recibido}">31</td>
+                    <!-- Dos datos por destinación, apilados: cuánto se envía y
+                         con qué número de pedido. Apilados y no en dos
+                         columnas porque duplicar columnas dejaría la tabla
+                         ilegible con las seis destinaciones de APC.
+
+                         Editables siempre, esté la fila en el excel de pedido
+                         o no: una referencia que el pedido no reconoce se veía
+                         en pantalla, aceptaba lo tecleado y no lo aplicaba. -->
                     <td th:each="destino : ${destinos}">
-                        <input type="number" min="0"
+                        <input type="number" min="0" class="c-cantidad-destino"
                                th:name="|grupos[${iterGrupo.index}].filas[${iterFila.index}].objetivos[${destino}]|"
-                               th:value="${fila.cantidadPara(destino)}">
+                               th:value="${fila.cantidadPara(destino)}"
+                               th:title="|Unidades de esta fila que se envían a ${destino}|">
+                        <input type="text" class="c-pedido-destino"
+                               th:name="|grupos[${iterGrupo.index}].filas[${iterFila.index}].pedidos[${destino}]|"
+                               th:value="${fila.pedidoPara(destino)}"
+                               th:placeholder="${etiquetaPedido}"
+                               th:title="|${etiquetaPedido} con el que va esta fila a ${destino}. Sale del excel de pedido; corrígelo si hace falta|">
                     </td>
                 </tr>
                 </tbody>
@@ -107,8 +145,11 @@
         <div class="acciones-ajuste">
             <button type="submit" class="secundario"
                     th:formaction="@{/packing-list/taller/previsualizar}">Previsualizar</button>
+            <!-- Repartir de más NO apaga el botón: se corrige aquí mismo y
+                 hay que poder volver a darle. Lo apagan solo los bloqueos que
+                 no se arreglan tecleando cantidades. -->
             <button type="submit" id="botonGenerar"
-                    th:disabled="${!bloqueos.isEmpty()}">Generar Packing</button>
+                    th:disabled="${!puedeIntentarGenerar}">Generar Packing</button>
         </div>
     </form>
 </main>

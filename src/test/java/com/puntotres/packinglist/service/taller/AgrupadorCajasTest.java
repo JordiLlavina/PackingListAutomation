@@ -23,6 +23,13 @@ class AgrupadorCajasTest {
                 cantidad, medida, unidadesPorCaja);
     }
 
+    /** Un cinturón se reconoce por el prefijo UBL de la referencia, y lleva talla. */
+    private static ArticuloDestinado cinturon(String destino, String referencia, String color,
+                                              String talla, int cantidad) {
+        return new ArticuloDestinado(destino, referencia, color, talla, "07001",
+                cantidad, "60x40x40", 10);
+    }
+
     private static ArticuloDestinado conPedido(String destino, String referencia, String color,
                                                int cantidad, String pedido) {
         return new ArticuloDestinado(destino, referencia, color, "U", pedido,
@@ -225,17 +232,117 @@ class AgrupadorCajasTest {
         assertEquals(45, caja.alturaCm());
     }
 
+    // --- Tipo de artículo y tallas ---
+
     @Test
-    void lasTallasDeUnCinturonSonArticulosDistintos() {
-        // Aunque compartan referencia y color: cada talla es un SKU con su
-        // propio código de barras.
+    void lasTallasDeUnCinturonCompartenCajaSiAsiSeAhorraUnBulto() {
+        // Cada talla es un artículo con su propio código de barras, pero eso
+        // no obliga a darle un cartón propio: cuatro y cuatro de a diez por
+        // caja caben juntas, y separarlas dejaría dos cajas a medio llenar.
         List<CajaGenerada> cajas = new AgrupadorCajas().agrupar(
-                List.of(new ArticuloDestinado("CHINA", "UBL1", "2221", "75", "07001",
-                                4, "60x40x40", 10),
-                        new ArticuloDestinado("CHINA", "UBL1", "2221", "85", "07001",
-                                4, "60x40x40", 10)),
+                List.of(cinturon("CHINA", "UBL1", "2221", "75", 4),
+                        cinturon("CHINA", "UBL1", "2221", "85", 4)),
+                TipoMezcla.NINGUNA);
+
+        assertEquals(1, cajas.size());
+        assertEquals(8, cajas.get(0).unidades());
+        assertEquals(List.of("75", "85"),
+                cajas.get(0).contenido().stream().map(ContenidoCaja::talla).toList());
+    }
+
+    @Test
+    void unaTallaQueNoCabeSigueYendoASuPropiaCaja() {
+        // La mezcla no puede pasarse de la capacidad del cartón: 8 + 6 de a
+        // diez por caja son dos bultos, mezclados pero llenos.
+        List<CajaGenerada> cajas = new AgrupadorCajas().agrupar(
+                List.of(cinturon("CHINA", "UBL1", "2221", "75", 8),
+                        cinturon("CHINA", "UBL1", "2221", "85", 6)),
                 TipoMezcla.NINGUNA);
 
         assertEquals(2, cajas.size());
+        assertEquals(14, cajas.stream().mapToInt(CajaGenerada::unidades).sum());
+        assertTrue(cajas.stream().allMatch(caja -> caja.unidades() <= 10));
+    }
+
+    @Test
+    void unBolsoYUnCinturonNuncaCompartenCajaAunqueQuepan() {
+        // No es cuestión de hueco: son artículos de naturaleza distinta y el
+        // almacén los prepara por separado. Manda sobre LIBRE.
+        List<CajaGenerada> cajas = new AgrupadorCajas().agrupar(
+                List.of(articulo("PARIS", "ULL164", "NOIR", 4, "60x40x40", 10),
+                        cinturon("PARIS", "UBL029", "2221", "75", 4)),
+                TipoMezcla.LIBRE);
+
+        assertEquals(2, cajas.size());
+        assertTrue(cajas.stream().noneMatch(CajaGenerada::esMixta));
+    }
+
+    @Test
+    void doceCinturonesDeTresTallasCabenEnDosCajasYNoEnTres() {
+        List<CajaGenerada> cajas = new AgrupadorCajas().agrupar(
+                List.of(cinturon("CHINA", "UBL1", "2221", "75", 5),
+                        cinturon("CHINA", "UBL1", "2221", "85", 4),
+                        cinturon("CHINA", "UBL1", "2221", "95", 3)),
+                TipoMezcla.NINGUNA);
+
+        assertEquals(2, cajas.size());
+        assertEquals(12, cajas.stream().mapToInt(CajaGenerada::unidades).sum());
+    }
+
+    // --- Que la mezcla no salga cara ---
+
+    @Test
+    void siElLlenadoRealNoAhorraUnBultoSeVuelveACajasPuras() {
+        // El recuento de la mezcla es una COTA (aquí 6 contra 7 puras), y con
+        // artículos que no ocupan lo mismo el llenado real no siempre la
+        // alcanza. Cuando no la alcanza, mezclar no ahorra nada y solo deja
+        // bultos mixtos: se vuelve atrás.
+        List<CajaGenerada> cajas = new AgrupadorCajas().agrupar(
+                List.of(articulo("PARIS", "BAG-A", "NOIR", 3, "60x40x40", 2),
+                        articulo("PARIS", "BAG-B", "NOIR", 3, "60x40x40", 3),
+                        articulo("PARIS", "BAG-C", "NOIR", 5, "60x40x40", 3),
+                        articulo("PARIS", "BAG-D", "NOIR", 8, "60x40x40", 10),
+                        articulo("PARIS", "BAG-E", "NOIR", 2, "60x40x40", 2)),
+                TipoMezcla.LIBRE);
+
+        assertEquals(7, cajas.size());
+        assertTrue(cajas.stream().noneMatch(CajaGenerada::esMixta),
+                "si no ahorra un bulto, mejor puras: la etiqueta y el packing list son más simples");
+    }
+
+    @Test
+    void elOrdenEnQueLleganLosArticulosNoCambiaElNumeroDeCajas() {
+        // Se empaqueta primero lo que peor encaja. Sin ese criterio, las
+        // unidades menudas llenan las cajas, la grande ya no cabe en ninguna
+        // y hace falta un cartón más solo por el orden de las filas.
+        List<ArticuloDestinado> grande = articulos(2, 3, 1, 2, 2, 3);
+        List<ArticuloDestinado> alReves = articulos(2, 3, 2, 3, 1, 2);
+
+        assertEquals(2, new AgrupadorCajas().agrupar(grande, TipoMezcla.LIBRE).size());
+        assertEquals(2, new AgrupadorCajas().agrupar(alReves, TipoMezcla.LIBRE).size());
+    }
+
+    @Test
+    void elSobranteDeUnaMezclaNoSeQuedaEnUnaCajaCasiVacia() {
+        // Cuatro cajas hacen falta; lo que no vale es tres llenas y una al
+        // diez por ciento, que es lo que sale de llenar a tope desde el
+        // principio. Una caja casi vacía se aplasta con el peso de las de
+        // encima, igual que en el reparto de un artículo solo.
+        List<CajaGenerada> cajas = new AgrupadorCajas().agrupar(
+                articulos(4, 6, 5, 8, 3, 8, 6, 10, 7, 10), TipoMezcla.LIBRE);
+
+        assertEquals(4, cajas.size());
+        assertTrue(cajas.stream().allMatch(caja -> caja.unidades() >= 5),
+                "ninguna caja se queda con las sobras de las demás");
+    }
+
+    /** Artículos de un mismo destino y cartón, en pares cantidad/capacidad. */
+    private static List<ArticuloDestinado> articulos(int... cantidadYCapacidad) {
+        List<ArticuloDestinado> articulos = new java.util.ArrayList<>();
+        for (int i = 0; i < cantidadYCapacidad.length; i += 2) {
+            articulos.add(articulo("PARIS", "BAG-" + (i / 2), "NOIR",
+                    cantidadYCapacidad[i], "60x40x40", cantidadYCapacidad[i + 1]));
+        }
+        return articulos;
     }
 }

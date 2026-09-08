@@ -34,6 +34,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.service.etiquetas.AvisoEtiqueta;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 
 /**
@@ -162,9 +163,13 @@ class PackingListControllerTest {
     }
 
     @Test
-    void unClienteDistintoAlDelJsonAvisaSinBloquear() throws Exception {
+    void elClienteDelDesplegableMandaYNoSeAvisaDeQueElJsonDigaOtro() throws Exception {
+        // El JSON dice "AMI" pero el desplegable selecciona ACKERMANN, y manda
+        // el desplegable. Antes salía un aviso diciéndolo; se retiró porque el
+        // cliente de los datos de entrada es informativo —de las fotos sale lo
+        // que ponga el papel— y el aviso saltaba sin que hubiera nada que
+        // hacer con él, empujando hacia abajo los que sí hay que leer.
         MockHttpSession sesion = new MockHttpSession();
-        // El JSON dice "AMI" pero el desplegable selecciona ACKERMANN.
         mvc.perform(post("/importar").session(sesion)
                         .param("cliente", "ACKERMANN")
                         .param("json", jsonDePrueba())
@@ -176,7 +181,7 @@ class PackingListControllerTest {
 
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("has seleccionado")));
+                .andExpect(content().string(not(containsString("has seleccionado"))));
     }
 
     @Test
@@ -737,7 +742,10 @@ class PackingListControllerTest {
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("99x99x99")))
-                .andExpect(content().string(containsString("Sin tara configurada")));
+                // El aviso manda a la pantalla de taras, NO a application.yml:
+                // la tabla de taras vive en la base de datos desde que se puede
+                // pesar un cartón sin tocar ficheros ni recompilar.
+                .andExpect(content().string(containsString("pésalo en la pantalla de taras")));
     }
 
     /**
@@ -952,6 +960,56 @@ class PackingListControllerTest {
         mvc.perform(get("/resultados").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("Etiquetas: "))));
+    }
+
+    /**
+     * Los avisos de etiquetas llegan a la pantalla agrupados por destinación,
+     * no como una lista plana de una línea por caja.
+     *
+     * El generador emite un aviso por caja —que es la verdad del envío—, pero
+     * leídos así son la misma frase repetida tantas veces como cajas, y eso
+     * empuja hacia abajo los avisos que sí hay que atender. La agrupación es
+     * de pantalla: el generador y sus tests no se enteran.
+     */
+    @Test
+    void losAvisosDeEtiquetasLleganAgrupadosPorDestinacion() throws Exception {
+        MockHttpSession sesion = sesionConEnvioYPedidoSubido();
+
+        String html = mvc.perform(get("/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(html.contains("<details class=\"bloque-avisos\""),
+                "cada destinación es un bloque con su detalle plegable");
+        assertTrue(html.contains("class=\"destino-avisos\""),
+                "y con su nombre de cabecera, que es lo que las separa");
+        assertTrue(html.contains("class=\"resumen-aviso"),
+                "el resumen se lee sin desplegar nada");
+        assertTrue(html.contains("<strong"),
+                "la consecuencia va resaltada: es lo que se busca de un vistazo");
+    }
+
+    /**
+     * Varias cajas con el mismo problema son UNA línea con su rango, no una
+     * por caja. Es el mismo criterio de la tabla de revisión, y por el mismo
+     * motivo: una lista de veinte frases idénticas no informa de nada.
+     */
+    @Test
+    void lasCajasConElMismoAvisoSeCompactanEnUnRangoEnLaPantalla() throws Exception {
+        List<AvisoEtiqueta> avisos = List.of(
+                AvisoEtiqueta.deCaja("CHINA", 1, "Sin número de pedido en la entrada",
+                        "Etiqueta sin order number ni código de barras"),
+                AvisoEtiqueta.deCaja("CHINA", 2, "Sin número de pedido en la entrada",
+                        "Etiqueta sin order number ni código de barras"),
+                AvisoEtiqueta.deCaja("CHINA", 3, "Sin número de pedido en la entrada",
+                        "Etiqueta sin order number ni código de barras"));
+
+        AgrupadorAvisosEtiquetas.AvisosAgrupados agrupados =
+                AgrupadorAvisosEtiquetas.agrupar(avisos);
+
+        assertEquals(1, agrupados.bloques().get(0).detalle().size());
+        assertEquals("Cajas 1-3", agrupados.bloques().get(0).detalle().get(0).rotulo());
+        assertEquals("3 cajas", agrupados.bloques().get(0).resumen().get(0).recuento());
     }
 
     /** Como sesionConEnvioGenerado, pero con el excel de pedido subido en el paso 1. */

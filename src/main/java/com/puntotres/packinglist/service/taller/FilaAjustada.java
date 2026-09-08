@@ -26,10 +26,18 @@ public record FilaAjustada(
         int recibido,
         String medidaCaja,
         Integer unidadesPorCaja,
+        Double pesoBrutoKg,
         List<ObjetivoDestino> objetivos) {
 
     public FilaAjustada {
         objetivos = List.copyOf(objetivos);
+    }
+
+    /** Sin peso bruto declarado: los pesos se rellenan en la revisión. */
+    public FilaAjustada(String referencia, String color, String talla, int recibido,
+                        String medidaCaja, Integer unidadesPorCaja,
+                        List<ObjetivoDestino> objetivos) {
+        this(referencia, color, talla, recibido, medidaCaja, unidadesPorCaja, null, objetivos);
     }
 
     /** Cómo se nombra este artículo en un aviso dirigido a una persona. */

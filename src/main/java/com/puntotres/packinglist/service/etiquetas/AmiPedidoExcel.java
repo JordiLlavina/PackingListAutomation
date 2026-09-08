@@ -24,12 +24,16 @@ import java.util.Optional;
  * De aquí salen dos cosas con reglas distintas a propósito:
  * <ul>
  * <li><b>order number y color code</b>: filtrando por ARTICLE + sufijo de PO y
- * prefiriendo el COLORIS, con caída a la primera fila candidata. Un color code
+ * prefiriendo el color, con caída a la primera fila candidata. Un color code
  * aproximado es aceptable.</li>
- * <li><b>EAN13 y EAN128</b>: solo con clave EXACTA ARTICLE + COLORIS + TAILLE +
+ * <li><b>EAN13 y EAN128</b>: solo con clave EXACTA ARTICLE + color + TAILLE +
  * sufijo de PO, que en el fichero real identifica una única fila. Imprimir un
  * código de barras equivocado es peor que no imprimirlo.</li>
  * </ul>
+ *
+ * El color con el que se busca lo escribe una persona, así que se reconoce de
+ * tres maneras: el código de COLORIS, el nombre de "Libellé coloris" o los dos
+ * juntos y separados por un espacio. Ver {@link #casaColor}.
  *
  * La lectura de bajo nivel (localizar la hoja, resolver columnas, leer
  * celdas) está en HojaEan, compartida con las etiquetas de artículo. Las
@@ -51,7 +55,7 @@ public class AmiPedidoExcel {
      * contexto de caja ni destinación: lo añade quien llama.
      */
     public record FilaPedido(String orderNumber, String colorCode, String colorCompleto,
-                             String ean13, String ean128, List<String> avisosEan) {
+                             String ean13, String ean128, List<AvisoEtiqueta> avisosEan) {
 
         public FilaPedido {
             avisosEan = List.copyOf(avisosEan);
@@ -142,6 +146,55 @@ public class AmiPedidoExcel {
     }
 
     /**
+     * ¿Es este el color de la fila?
+     *
+     * El color con el que se busca lo ha escrito una persona —la columna
+     * COULEUR de la hoja del taller, o la lectura de una hoja manuscrita—, y
+     * ahí conviven tres maneras de decir lo mismo: el <b>código</b> de la
+     * columna COLORIS ("221"), el <b>nombre</b> de "Libellé coloris"
+     * ("DARK COFFEE") y los <b>dos juntos</b>, que es como sale impreso en la
+     * propia etiqueta ("221 DARK COFFEE"). Las tres valen: quien rellena la
+     * hoja del taller tiene delante la pieza, no el catálogo de códigos de AMI.
+     *
+     * Pegados ("221DARK COFFEE") <b>no</b>, a propósito. Hay códigos de solo
+     * dígitos ("221") y códigos que empiezan por letra ("A237 MOCHA"), así que
+     * sin separador no se sabe dónde acaba el código: habría que adivinarlo. Y
+     * un color mal partido no falla en silencio a medias —casa con otra fila y
+     * estampa el EAN de otro artículo—, que es peor que quedarse sin EAN y
+     * avisar.
+     *
+     * El nombre separa las filas igual de bien que el código: dentro de una
+     * referencia, dos colores no comparten libellé.
+     *
+     * Un color vacío sigue casando solo con COLORIS vacío. Si no, casaría con
+     * el libellé vacío de cualquier fila.
+     */
+    private static boolean casaColor(FilaCruda fila, String color) {
+        if (igualan(fila.coloris(), color)) {
+            return true;
+        }
+        if (color.isBlank()) {
+            return false;
+        }
+        return igualan(fila.libelle(), color)
+                || igualan(fila.coloris() + " " + fila.libelle(), color);
+    }
+
+    private static boolean igualan(String uno, String otro) {
+        return normalizarColor(uno).equals(normalizarColor(otro));
+    }
+
+    /**
+     * Mayúsculas y un solo espacio entre palabras. Dos espacios seguidos son
+     * el mismo color escrito con el dedo torpe, no otro color; lo que no se
+     * toca es la ausencia de espacio, que es justo lo que hay que distinguir.
+     */
+    private static String normalizarColor(String texto) {
+        return texto == null ? ""
+                : texto.trim().replaceAll("\s+", " ").toUpperCase(Locale.ROOT);
+    }
+
+    /**
      * Lo que el cliente ha pedido de un artículo, agrupado por número de
      * pedido: una entrada por PO, con sus unidades sumadas.
      *
@@ -162,7 +215,7 @@ public class AmiPedidoExcel {
         Map<String, Comanda> porPedido = new LinkedHashMap<>();
         for (FilaCruda fila : filas) {
             if (!fila.article().equals(ref)
-                    || !fila.coloris().equalsIgnoreCase(color)
+                    || !casaColor(fila, color)
                     || !fila.taille().equalsIgnoreCase(tallaBuscada)) {
                 continue;
             }
@@ -214,7 +267,7 @@ public class AmiPedidoExcel {
 
         // Order number y color code: como siempre, con caída a la primera.
         FilaCruda elegida = candidatas.stream()
-                .filter(fila -> fila.coloris().equalsIgnoreCase(color))
+                .filter(fila -> casaColor(fila, color))
                 .findFirst()
                 .orElse(candidatas.get(0));
         String colorCode = elegida.coloris();
@@ -225,38 +278,43 @@ public class AmiPedidoExcel {
         // Los EAN, solo con clave exacta.
         String tallaBuscada = talla == null || talla.isBlank() ? TALLA_UNICA : talla.trim();
         List<FilaCruda> exactas = candidatas.stream()
-                .filter(fila -> fila.coloris().equalsIgnoreCase(color))
+                .filter(fila -> casaColor(fila, color))
                 .filter(fila -> fila.taille().equalsIgnoreCase(tallaBuscada))
                 .toList();
 
-        List<String> avisosEan = new ArrayList<>();
+        List<AvisoEtiqueta> avisosEan = new ArrayList<>();
         String ean13 = null;
         String ean128 = null;
         if (exactas.size() == 1) {
             FilaCruda exacta = exactas.get(0);
             ean13 = exacta.ean13().isBlank() ? null : exacta.ean13();
             if (ean13 != null && !CodigoBarrasEan13.esValido(ean13)) {
-                avisosEan.add("el EAN13 '" + ean13 + "' del pedido no es un EAN-13 válido"
-                        + " (13 dígitos con dígito de control): etiqueta sin ese código");
+                avisosEan.add(AvisoEtiqueta.deFichero(
+                        "el EAN13 '" + ean13 + "' del pedido no es un EAN-13 válido"
+                        + " (13 dígitos con dígito de control)",
+                        "etiqueta sin ese código"));
                 ean13 = null;
             }
             ean128 = exacta.ean128().isBlank() ? null : exacta.ean128();
             String esperado = estructuraEsperada(exacta);
             if (ean128 != null && esperado != null && !esperado.equals(ean128)) {
-                avisosEan.add("el EAN128 del pedido (" + ean128 + ") no cuadra con su EAN13,"
-                        + " su PO y su 'Made in' (debería ser " + esperado + "):"
-                        + " se imprime tal cual, pero revisar el fichero con el cliente");
+                avisosEan.add(AvisoEtiqueta.deFichero(
+                        "el EAN128 del pedido (" + ean128 + ") no cuadra con su EAN13,"
+                        + " su PO y su 'Made in' (debería ser " + esperado + ")",
+                        "se imprime tal cual, pero revisar el fichero con el cliente"));
             }
         } else if (exactas.isEmpty()) {
-            avisosEan.add("el pedido no tiene fila de " + ref + " color '" + color
+            avisosEan.add(AvisoEtiqueta.deFichero(
+                    "el pedido no tiene fila de " + ref + " color '" + color
                     + "' talla '" + tallaBuscada + "' para "
-                    + (sufijoPo == null ? "France" : sufijoPo)
-                    + ": etiqueta sin EAN13 ni EAN128");
+                    + (sufijoPo == null ? "France" : sufijoPo),
+                    "etiqueta sin EAN13 ni EAN128"));
         } else {
-            avisosEan.add("el pedido tiene " + exactas.size() + " filas de " + ref + " color '"
+            avisosEan.add(AvisoEtiqueta.deFichero(
+                    "el pedido tiene " + exactas.size() + " filas de " + ref + " color '"
                     + color + "' talla '" + tallaBuscada + "' para "
-                    + (sufijoPo == null ? "France" : sufijoPo)
-                    + ": etiqueta sin EAN13 ni EAN128 para no elegir a ciegas");
+                    + (sufijoPo == null ? "France" : sufijoPo),
+                    "etiqueta sin EAN13 ni EAN128 para no elegir a ciegas"));
         }
         return Optional.of(
                 new FilaPedido(elegida.poNumerico(), colorCode, colorCompleto, ean13, ean128, avisosEan));

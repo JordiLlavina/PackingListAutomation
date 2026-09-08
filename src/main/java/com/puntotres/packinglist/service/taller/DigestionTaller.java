@@ -49,7 +49,8 @@ public class DigestionTaller {
 
     public boolean sePuedeGenerar() {
         return bloqueos.isEmpty()
-                && grupos.stream().noneMatch(GrupoReferencia::estaPendiente);
+                && grupos.stream().noneMatch(GrupoReferencia::estaPendiente)
+                && repartosImposibles().isEmpty();
     }
 
     /** Las referencias a las que todavía les falta el dato que impide generar. */
@@ -60,6 +61,38 @@ public class DigestionTaller {
                 .toList();
     }
 
+    /**
+     * Las filas donde se está repartiendo más género del que ha llegado.
+     *
+     * Bloquea, no avisa: no se puede empaquetar lo que no está en el almacén.
+     * Dejar pasar el envío no lo arreglaría —el reparto recorta por prioridad
+     * y sirve de menos a las destinaciones de abajo—, así que el packing
+     * saldría plausible y con menos unidades de las que dice esta pantalla, y
+     * nadie lo vería hasta comparar los dos documentos.
+     *
+     * Se calcula cada vez y no se guarda en {@code bloqueos} porque depende de
+     * lo que el usuario acaba de teclear: un bloqueo fijo seguiría ahí después
+     * de corregirlo.
+     */
+    public List<String> repartosImposibles() {
+        List<String> imposibles = new ArrayList<>();
+        for (GrupoReferencia grupo : grupos) {
+            for (FilaDigerida fila : grupo.getFilas()) {
+                if (fila.repartoImposible()) {
+                    imposibles.add("De " + grupo.getReferencia() + " " + fila.getColor()
+                            + tallaDe(fila) + " han llegado " + fila.getRecibido()
+                            + " unidades y se están repartiendo " + fila.totalObjetivo()
+                            + ": no se puede enviar más de lo que ha llegado del taller");
+                }
+            }
+        }
+        return imposibles;
+    }
+
+    private static String tallaDe(FilaDigerida fila) {
+        return "U".equals(fila.getTalla()) ? "" : " talla " + fila.getTalla();
+    }
+
     /** Lo que entra en el algoritmo: una fila por artículo, ya ajustada. */
     public List<FilaAjustada> aFilasAjustadas() {
         List<FilaAjustada> filas = new ArrayList<>();
@@ -67,7 +100,8 @@ public class DigestionTaller {
             for (FilaDigerida fila : grupo.getFilas()) {
                 filas.add(new FilaAjustada(grupo.getReferencia(), fila.getColor(),
                         fila.getTalla(), fila.getRecibido(), grupo.getMedidaCaja(),
-                        grupo.getUnidadesPorCaja(), fila.getObjetivos()));
+                        grupo.getUnidadesPorCaja(), grupo.getPesoBrutoKg(),
+                        fila.getObjetivos()));
             }
         }
         return filas;

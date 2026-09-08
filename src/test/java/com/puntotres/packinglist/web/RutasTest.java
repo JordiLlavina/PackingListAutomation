@@ -51,6 +51,46 @@ class RutasTest {
     }
 
     @Test
+    void elAmarilloDeLosPesosQueFaltanNoTineLaFilaEntera() throws Exception {
+        // Si vuelve a ser "tr.pendiente td", tapa la banda de color del palet:
+        // las dos reglas tienen la misma especificidad y esta va después. Y en
+        // un envío recién generado desde el packing del taller, que llega sin
+        // ningún peso, la taparía en TODAS las filas. Desde el código no se ve.
+        String css = new String(new org.springframework.core.io.ClassPathResource(
+                "static/estilo.css").getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.contains("tr.pendiente td.celda-peso"),
+                "el amarillo va en la celda de peso, no en la fila");
+        org.junit.jupiter.api.Assertions.assertFalse(
+                css.contains("tr.pendiente td {"),
+                "teñir la fila entera borra la banda del palet");
+    }
+
+    @Test
+    void losAvisosDePaletDeLasEtiquetasSeTinenAparteDeLosDeCaja() throws Exception {
+        // El usuario los mira en otro momento —cuando ya está montando el
+        // bulto—, así que mezclados con los de caja se pierden. Y cada
+        // destinación necesita margen propio: sin él los bloques se leen como
+        // una sola lista larga, que es de lo que se venía. Desde el código no
+        // se ve ninguna de las dos cosas.
+        String css = new String(new org.springframework.core.io.ClassPathResource(
+                "static/estilo.css").getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.contains(".linea-detalle.palet"),
+                "los avisos de palet llevan su propio matiz");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.contains(".resumen-aviso.palet"),
+                "también en el resumen, que es lo que se lee sin desplegar");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.matches("(?s).*\\.bloque-avisos \\{[^}]*margin:[^}]*\\}.*"),
+                "cada destinación separada de la siguiente");
+    }
+
+    @Test
     void elAsistenteDePackingListViveEnSuPropiaRuta() throws Exception {
         mvc.perform(get("/packing-list"))
                 .andExpect(status().isOk())

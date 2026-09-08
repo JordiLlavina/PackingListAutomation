@@ -10,6 +10,14 @@ import org.junit.jupiter.api.Test;
 
 class ClienteConfigTest {
 
+    @Test
+    void unClienteQueNoDiceComoLlamaASuPedidoUsaElRotuloGenerico() {
+        // Cada cliente lo llama de otra forma (AMI "PO", APC "Document
+        // d'achat"), pero un cliente nuevo de plantilla genérica es solo
+        // configuración: no puede quedarse sin rótulo por no declararlo.
+        assertEquals("Nº pedido", new ClienteConfig().getEtiquetaPedido());
+    }
+
     private static ClienteConfig apc() {
         DestinoClienteConfig wholesale = new DestinoClienteConfig();
         wholesale.setNombreCliente("A.P.C.");

@@ -209,21 +209,38 @@ public class PackingListTallerController {
         List<GrupoReferencia> grupos = tallerEnCurso.getDigestion().getGrupos();
         for (int g = 0; g < grupos.size() && g < form.getGrupos().size(); g++) {
             AjusteTallerForm.GrupoEditado editado = form.getGrupos().get(g);
-            grupos.get(g).corregir(editado.getMedidaCaja(), editado.getUnidadesPorCaja());
+            grupos.get(g).corregir(editado.getMedidaCaja(), editado.getUnidadesPorCaja(),
+                    editado.getPesoBrutoKg());
 
             List<FilaDigerida> filas = grupos.get(g).getFilas();
             for (int f = 0; f < filas.size() && f < editado.getFilas().size(); f++) {
-                Map<String, Integer> objetivos = editado.getFilas().get(f).getObjetivos();
-                if (objetivos == null) {
-                    continue;
-                }
-                for (Map.Entry<String, Integer> entrada : objetivos.entrySet()) {
-                    if (entrada.getValue() != null) {
-                        filas.get(f).corregirCantidad(entrada.getKey(), entrada.getValue());
-                    }
+                AjusteTallerForm.FilaEditada fila = editado.getFilas().get(f);
+                Map<String, Integer> cantidades = fila.getObjetivos();
+                Map<String, String> pedidos = fila.getPedidos();
+                // La unión de las dos claves, no solo las cantidades: se puede
+                // teclear el número de pedido de una destinación sin tocar su
+                // cantidad, y perderlo sería el mismo fallo silencioso que
+                // tenía antes la fila que el pedido no reconocía.
+                for (String destino : destinosEditados(cantidades, pedidos)) {
+                    filas.get(f).corregirObjetivo(destino,
+                            cantidades == null ? null : cantidades.get(destino),
+                            pedidos == null ? null : pedidos.get(destino));
                 }
             }
         }
+    }
+
+    /** Las destinaciones que trae el formulario, por cantidad o por pedido. */
+    private static java.util.Set<String> destinosEditados(Map<String, Integer> cantidades,
+                                                          Map<String, String> pedidos) {
+        java.util.Set<String> destinos = new java.util.LinkedHashSet<>();
+        if (cantidades != null) {
+            destinos.addAll(cantidades.keySet());
+        }
+        if (pedidos != null) {
+            destinos.addAll(pedidos.keySet());
+        }
+        return destinos;
     }
 
     private String pintarAjuste(Model model, ResultadoPackingTaller packing) {
@@ -233,6 +250,11 @@ public class PackingListTallerController {
                 .clientePara(tallerEnCurso.getClaveCliente())
                 .map(ClienteConfig::getNombre).orElse(tallerEnCurso.getClaveCliente()));
         model.addAttribute("nombreExcelTaller", tallerEnCurso.getNombreExcelTaller());
+        // Cada cliente llama a su número de pedido de otra forma, y quien
+        // teclea tiene delante el documento del cliente, no el del programa.
+        model.addAttribute("etiquetaPedido", clientesProperties
+                .clientePara(tallerEnCurso.getClaveCliente())
+                .map(ClienteConfig::getEtiquetaPedido).orElse("Nº pedido"));
         model.addAttribute("destinos", digestion.getDestinosActivos());
         model.addAttribute("tamanosCaja", tamanosParaElDesplegable(digestion));
         model.addAttribute("avisos", digestion.getAvisos());
@@ -246,6 +268,16 @@ public class PackingListTallerController {
             model.addAttribute("resumen", packing.getResumen());
             model.addAttribute("avisosPacking", packing.getAvisos());
         }
+
+        // Repartir más de lo que ha llegado impide pasar a la revisión, pero
+        // NO apaga el botón de generar: se corrige tecleando en esta misma
+        // pantalla, y con el botón apagado el usuario tendría que descubrir
+        // que hay que pasar por Previsualizar para volver a encenderlo. Por
+        // eso se cuenta aparte, y por eso se recalcula al pintar: depende de
+        // lo que se acaba de teclear y desaparece en cuanto se corrige.
+        model.addAttribute("puedeIntentarGenerar", bloqueos.isEmpty());
+        bloqueos.addAll(digestion.repartosImposibles());
+
         model.addAttribute("bloqueos", bloqueos);
         return "taller-ajuste";
     }
