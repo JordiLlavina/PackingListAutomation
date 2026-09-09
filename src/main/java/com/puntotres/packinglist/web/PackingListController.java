@@ -37,6 +37,8 @@ import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.model.VolcadoErpData;
+import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
@@ -83,6 +85,8 @@ public class PackingListController {
     private final ClientesProperties clientesProperties;
     private final CatalogoTaras catalogoTaras;
     private final ObjectMapper mapper;
+    private final ArchivoTemporadas archivoTemporadas;
+    private final AtributosEntrada atributosEntrada;
     private final EnvioEnCurso envioEnCurso;
     private final TallerEnCurso tallerEnCurso;
 
@@ -96,6 +100,8 @@ public class PackingListController {
                                  ClientesProperties clientesProperties,
                                  CatalogoTaras catalogoTaras,
                                  ObjectMapper mapper,
+                                 ArchivoTemporadas archivoTemporadas,
+                                 AtributosEntrada atributosEntrada,
                                  EnvioEnCurso envioEnCurso,
                                  TallerEnCurso tallerEnCurso) {
         this.preparacion = preparacion;
@@ -108,6 +114,8 @@ public class PackingListController {
         this.clientesProperties = clientesProperties;
         this.catalogoTaras = catalogoTaras;
         this.mapper = mapper;
+        this.archivoTemporadas = archivoTemporadas;
+        this.atributosEntrada = atributosEntrada;
         this.envioEnCurso = envioEnCurso;
         this.tallerEnCurso = tallerEnCurso;
     }
@@ -244,6 +252,23 @@ public class PackingListController {
             } catch (IOException e) {
                 avisosPrevios.add("No se ha podido leer el excel de pedido subido: "
                         + e.getMessage());
+            }
+        }
+
+        // Si no se ha subido ninguno, el de la temporada guardada. Es el motivo
+        // de que existan: el pedido de una temporada es el mismo documento
+        // durante meses y buscarlo en el disco en cada envío es trabajo
+        // repetido. Un fichero subido a mano manda sobre el guardado.
+        if (excelPedido == null && envioForm.getTemporadaGuardadaId() != null) {
+            TemporadaGuardada guardada = archivoTemporadas
+                    .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                    .orElse(null);
+            if (guardada != null) {
+                excelPedido = guardada.getExcel();
+                nombreExcelPedido = guardada.getNombreFichero();
+            } else {
+                avisosPrevios.add("La temporada guardada que se eligió ya no está disponible: "
+                        + "el envío va sin excel de pedido");
             }
         }
 
@@ -540,22 +565,9 @@ public class PackingListController {
      * plantilla, placeholder de temporada) para el JS de la pantalla de
      * entrada, que ajusta los campos visibles al cambiar de cliente.
      */
+    /** Los atributos de la pantalla de entrada, los mismos vengan de donde vengan. */
     private void anadirAtributosDeClientes(Model model) {
-        model.addAttribute("clientes", clientesProperties.getClientes());
-        // Tamaños de caja con tara conocida, para el datalist del modo
-        // FORMULARIO (evita teclear un tamaño que luego no tendría tara).
-        model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
-        Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> {
-            Map<String, String> datos = new LinkedHashMap<>();
-            datos.put("plantilla", config.getPlantilla().name());
-            datos.put("placeholderTemporada",
-                    config.getPlaceholderTemporada() != null ? config.getPlaceholderTemporada() : "");
-            // Solo los clientes que trabajan con excel de pedido ven su input.
-            datos.put("pedidoCliente", String.valueOf(config.isPedidoCliente()));
-            clientesJs.put(clave, datos);
-        });
-        model.addAttribute("clientesJs", clientesJs);
+        atributosEntrada.anadir(model);
     }
 
     /**

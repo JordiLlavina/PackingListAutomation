@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Temporadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('· Temporadas y ficheros')}"></header>
+<main>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <p class="ayuda">
+            El excel de pedido de un cliente es el mismo documento durante toda una temporada.
+            Guardándolo aquí una vez, luego se podrán cargar para usarlos en los packing lists.
+        </p>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Temporadas guardadas</h3>
+
+        <p class="ayuda" th:if="${#lists.isEmpty(temporadas)}">
+            Todavía no hay ninguna. Añade la primera aquí abajo.
+        </p>
+
+        <div class="temporada-guardada" th:each="temporada : ${temporadas}">
+            <form th:action="@{/temporadas}" method="post" enctype="multipart/form-data"
+                  class="form-temporada">
+                <input type="hidden" name="id" th:value="${temporada.id}">
+                <label>Cliente
+                    <select name="cliente">
+                        <option th:each="entrada : ${clientes}"
+                                th:value="${entrada.key}" th:text="${entrada.value.nombre}"
+                                th:selected="${entrada.key == temporada.cliente}"></option>
+                    </select>
+                </label>
+                <label>Temporada
+                    <input type="text" name="temporada" th:value="${temporada.temporada}" required>
+                </label>
+                <label>Sustituir
+                    <input type="file" name="pedido" accept=".xlsx">
+                </label>
+                <button type="submit" class="mini">Guardar</button>
+            </form>
+            <form th:action="@{/temporadas/borrar}" method="post" class="form-borrar">
+                <input type="hidden" name="id" th:value="${temporada.id}">
+                <button type="submit" class="mini"
+                        onclick="return confirm('¿Borrar esta temporada? Se borra también su excel de pedido.')">Borrar</button>
+            </form>
+            <!-- Pie de la fila, siempre debajo de los campos: el nombre del excel
+                 mide lo que mide y entre los campos descolocaba todo lo demás.
+                 Se puede descargar para comprobar cuál es el que hay dentro, que
+                 el nombre del fichero no siempre lo dice. -->
+            <p class="ayuda pie-temporada">
+                <span>Última vez: <span th:text="${#temporals.format(temporada.fechaActualizacion, 'dd/MM/yyyy')}"></span></span>
+                <span>Documento usado:
+                    <a class="fichero-guardado"
+                       th:href="@{/temporadas/descargar/{id}(id=${temporada.id})}"
+                       th:text="${temporada.nombreFichero}">pedido.xlsx</a>
+                </span>
+            </p>
+        </div>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Añadir una temporada</h3>
+        <form th:action="@{/temporadas}" method="post" enctype="multipart/form-data"
+              class="form-temporada">
+            <label for="clienteNuevo">Cliente
+                <select id="clienteNuevo" name="cliente">
+                    <option th:each="entrada : ${clientes}"
+                            th:value="${entrada.key}" th:text="${entrada.value.nombre}"></option>
+                </select>
+            </label>
+            <label for="temporadaNueva">Temporada
+                <input type="text" id="temporadaNueva" name="temporada" placeholder="H26" required>
+            </label>
+            <label for="pedidoNuevo">Excel de pedido
+                <input type="file" id="pedidoNuevo" name="pedido" accept=".xlsx" required>
+            </label>
+            <button type="submit">Añadir</button>
+        </form>
+    </section>
+
+    <p class="menu-ajustes">
+        <a th:href="@{/packing-list}">← Volver a la entrada del envío</a>
+    </p>
+</main>
+</body>
+</html>

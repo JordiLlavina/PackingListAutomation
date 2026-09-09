@@ -9,10 +9,9 @@
 
     <!-- Selector del modo de entrada: solo uno activo a la vez. -->
     <div class="selector-modo" role="tablist">
-        <button type="button" id="botonModoJSON" data-modo="JSON">JSON</button>
-        <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CLAUDE</button>
-        <button type="button" id="botonModoFORMULARIO" data-modo="FORMULARIO">FORMULARIO</button>
+        <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CON IMAGEN</button>
         <button type="button" id="botonModoTALLER" data-modo="TALLER">PACKING LIST TALLER</button>
+        <button type="button" id="botonModoJSON" data-modo="JSON">CON TEXTO</button>
     </div>
 
     <form id="formEntrada" class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
@@ -20,14 +19,36 @@
           th:data-accion-importar="@{/importar}"
           th:data-accion-taller="@{/packing-list/taller/digerir}">
         <input type="hidden" id="modo" th:field="*{modo}">
-        <div>
-            <label for="cliente">Cliente</label>
-            <select id="cliente" th:field="*{cliente}">
-                <option value="">-- selecciona un cliente --</option>
-                <option th:each="entrada : ${clientes}"
-                        th:value="${entrada.key}" th:text="${entrada.value.nombre}"></option>
-            </select>
-            <p class="error-campo" th:errors="*{cliente}"></p>
+
+        <!-- Cliente y temporada, juntos y pegados: la temporada es la del
+             cliente que se acaba de elegir, y repartidos por el ancho de la
+             página no se leen como lo que son, un dato y el suyo. -->
+        <div class="fila-cliente">
+            <div>
+                <label for="cliente">Cliente</label>
+                <select id="cliente" th:field="*{cliente}">
+                    <option value="">-- selecciona un cliente --</option>
+                    <option th:each="entrada : ${clientes}"
+                            th:value="${entrada.key}" th:text="${entrada.value.nombre}"></option>
+                </select>
+                <p class="error-campo" th:errors="*{cliente}"></p>
+            </div>
+
+            <!-- Temporadas guardadas del cliente: al elegir una se trabaja con su
+                 excel de pedido sin volver a subirlo. Solo la ven los clientes que
+                 trabajan con excel de pedido; para el resto no habría ningún
+                 fichero que ahorrar. El lápiz lleva a donde se mantienen. -->
+            <div id="bloqueTemporadaGuardada" style="display: none">
+                <label for="temporadaGuardada" class="etiqueta-con-accion">
+                    <span>Temporada</span>
+                    <a class="lapiz" th:href="@{/temporadas}"
+                       title="Añadir, editar o borrar temporadas guardadas"
+                       aria-label="Editar las temporadas guardadas">&#9998;</a>
+                </label>
+                <select id="temporadaGuardada" name="temporadaGuardadaId"
+                        th:attr="data-seleccionada=*{temporadaGuardadaId}"></select>
+                <p class="ayuda" id="ayudaTemporadaGuardada"></p>
+            </div>
         </div>
 
         <div id="camposAmi" class="campos-cabecera">
@@ -43,12 +64,13 @@
 
         <!-- Excel de pedido de la temporada. Solo lo ven los clientes que lo
              declaran (pedido-cliente en application.yml): APC lo usa para
-             completar el nº de pedido, AMI para no repetirlo en etiquetas. -->
+             completar el nº de pedido, AMI para no repetirlo en etiquetas.
+             Con una temporada guardada elegida ya no hace falta subirlo. -->
         <div id="bloquePedidoCliente" style="display: none">
             <label for="pedidoCliente">Excel de pedido del cliente</label>
-            <p class="ayuda">Opcional. En APC se usa para completar el número de pedido
-                (de las fotos solo salen sus tres últimos dígitos). En AMI evita tener que
-                volver a subirlo al generar las etiquetas de caja.</p>
+            <p class="ayuda" id="ayudaPedidoCliente">Opcional. En AMI y APC se usa para completar
+                el número de pedido (para APC necesita los tres últimos dígitos en el packing list
+                del taller)</p>
             <input type="file" id="pedidoCliente" name="pedidoCliente" accept=".xlsx">
         </div>
 
@@ -61,9 +83,7 @@
 
         <div id="bloqueClaude" style="display: none">
             <label for="imagenes">Escaneos del packing list</label>
-            <p class="ayuda">Sube el PDF escaneado o las fotos del packing list (PDF, JPEG,
-                PNG, WebP o GIF). Claude los transcribirá al JSON del envío y pasarás a la
-                revisión como siempre.</p>
+            <p class="ayuda">Sube el PDF escaneado o las fotos del packing list (PDF, JPEG, PNG)</p>
             <input type="file" id="imagenes" name="imagenes" multiple
                    accept="application/pdf,image/jpeg,image/png,image/webp,image/gif">
             <p class="error-campo" th:errors="*{imagenes}"></p>
@@ -72,10 +92,9 @@
         <div id="bloqueTaller" style="display: none">
             <label for="excelTaller">Packing list del taller</label>
             <p class="ayuda">
-                El excel que manda el taller con el material (hoja "LISTE DE COLIS"). Se aprovecha
-                su información de artículo —cliente, motivo, referencia, color, talla y
-                cantidades—, pero <strong>su reparto en cajas no se respeta</strong>: el programa
-                lo regenera con las normas del cliente.
+                Se aprovecha su información de artículo —cliente, motivo, referencia, color, talla y
+                cantidades—, pero <strong>no se usa su packing</strong>, sino que el programa genera
+                con las normas del cliente.
             </p>
             <input type="file" id="excelTaller" name="excelTaller" accept=".xlsx">
             <p class="error-campo" th:errors="*{excelTaller}"></p>
@@ -99,19 +118,11 @@
             </div>
         </div>
 
-        <div id="bloqueFormulario" style="display: none">
-            <label>Packing list</label>
-            <p class="ayuda">Rellena cada destinación con sus palets (opcionales) y sus
-                referencias. Cada fila de cajas es un rango consecutivo con las mismas
-                unidades; para una caja suelta deja el "hasta" vacío.</p>
-            <div id="listaDestinos"></div>
-            <button type="button" id="botonAnadirDestino" class="secundario">+ Añadir destinación</button>
-            <p class="error-campo" id="errorFormulario" style="display: none"></p>
-            <p class="error-campo" th:errors="*{json}"></p>
-        </div>
-
         <div class="campos-cabecera">
-            <div>
+            <!-- La temporada tecleada a mano. Con una temporada guardada elegida
+                 se esconde y la rellena el desplegable: dos campos "Temporada" a
+                 la vez dejarían sin saber cuál de los dos manda. -->
+            <div id="bloqueTemporadaLibre">
                 <label for="temporada">Temporada</label>
                 <input type="text" id="temporada" th:field="*{temporada}" placeholder="H26">
                 <p class="error-campo" th:errors="*{temporada}"></p>
@@ -149,110 +160,72 @@
         no cierres ni recargues la página.
     </p>
 
-    <!-- Piezas del modo FORMULARIO: tamaños de caja con tara conocida y las
-         plantillas que formulario.js clona. Los inputs no llevan "name" a
-         propósito: no viajan en el POST, solo el JSON serializado. -->
-    <datalist id="listaTamanos">
-        <option th:each="tamano : ${tamanosCaja}" th:value="${tamano}"></option>
-    </datalist>
-
-    <template id="plantillaDestino">
-        <fieldset class="f-destino">
-            <div class="f-cabecera-destino">
-                <label>Destinación
-                    <input type="text" data-campo="destino" placeholder="PARIS"></label>
-                <button type="button" class="mini" data-eliminar="destino">✕ Quitar destinación</button>
-            </div>
-            <div class="f-seccion">
-                <h4>Palets <span class="f-nota">(opcional: rangos de cajas por palet)</span></h4>
-                <div data-lista="palets"></div>
-                <button type="button" class="mini" data-anadir="palet">+ Palet</button>
-            </div>
-            <div class="f-seccion">
-                <h4>Referencias</h4>
-                <div data-lista="referencias"></div>
-                <button type="button" class="secundario" data-anadir="referencia">+ Añadir referencia</button>
-            </div>
-        </fieldset>
-    </template>
-
-    <template id="plantillaPalet">
-        <div class="f-fila f-palet">
-            <label>Nº palet
-                <input type="number" inputmode="numeric" min="1" data-campo="palet"></label>
-            <label>Caja desde
-                <input type="number" inputmode="numeric" min="1" data-campo="cajaInicio"></label>
-            <label>Caja hasta
-                <input type="number" inputmode="numeric" min="1" data-campo="cajaFin"></label>
-            <label>Medidas cm (opcional)
-                <input type="text" data-campo="medidas" placeholder="80x120x130"></label>
-            <label>Tara kg (opcional)
-                <input type="number" inputmode="decimal" step="0.1" min="0" data-campo="tara"></label>
-            <button type="button" class="mini" data-eliminar="fila" title="Quitar palet">✕</button>
-        </div>
-    </template>
-
-    <template id="plantillaReferencia">
-        <div class="f-referencia">
-            <div class="f-fila">
-                <label>Referencia
-                    <input type="text" data-campo="referencia" placeholder="USL728.AL217"></label>
-                <label>Color
-                    <input type="text" data-campo="color" placeholder="NOIR"></label>
-                <label>Medida caja cm
-                    <input type="text" data-campo="medidaCaja" list="listaTamanos"
-                           placeholder="60x40x40"></label>
-            </div>
-            <details class="f-opcionales">
-                <summary>Más campos (talla, pedido, modelo, canal, livraison)</summary>
-                <div class="f-fila">
-                    <label>Talla
-                        <input type="text" data-campo="talla"></label>
-                    <label>Pedido
-                        <input type="text" data-campo="pedido"></label>
-                    <label>Modelo
-                        <input type="text" data-campo="modelo"></label>
-                    <label>Canal
-                        <input type="text" data-campo="canal" placeholder="WHOLESALE"></label>
-                    <label>Livraison
-                        <input type="text" data-campo="livraisonCode"></label>
-                </div>
-            </details>
-            <div class="f-cajas">
-                <h5>Cajas</h5>
-                <div data-lista="cajas"></div>
-                <div class="f-pie-cajas">
-                    <button type="button" class="mini" data-anadir="caja">+ Cajas</button>
-                    <span class="f-total" data-total>0 uds en 0 cajas</span>
-                    <label class="f-total-declarado">Total declarado en el papel (opcional)
-                        <input type="number" inputmode="numeric" min="0"
-                               data-campo="cantidadTotal"></label>
-                </div>
-            </div>
-            <div class="f-acciones-referencia">
-                <button type="button" class="mini" data-accion="duplicar">⧉ Duplicar (otro color)</button>
-                <button type="button" class="mini" data-eliminar="referencia">✕ Quitar referencia</button>
-            </div>
-        </div>
-    </template>
-
-    <template id="plantillaCaja">
-        <div class="f-fila f-caja">
-            <label>Caja desde
-                <input type="number" inputmode="numeric" min="1" data-campo="cajaInicio"></label>
-            <label>hasta (vacío = una caja)
-                <input type="number" inputmode="numeric" min="1" data-campo="cajaFin"></label>
-            <label>Uds por caja
-                <input type="number" inputmode="numeric" min="0" data-campo="unidadesPorCaja"></label>
-            <button type="button" class="mini" data-eliminar="fila" title="Quitar fila">✕</button>
-        </div>
-    </template>
-
-    <script th:src="@{/formulario.js}"></script>
     <script th:inline="javascript">
         /*<![CDATA[*/
         const CLIENTES = /*[[${clientesJs}]]*/ {};
+        const TEMPORADAS = /*[[${temporadasJs}]]*/ {};
         /*]]>*/
+
+        const AYUDA_PEDIDO_SUELTO = 'Opcional. En AMI y APC se usa para completar el número de '
+            + 'pedido (para APC necesita los tres últimos dígitos en el packing list del taller)';
+
+        function temporadasDelCliente() {
+            return TEMPORADAS[document.getElementById('cliente').value] || [];
+        }
+
+        // Rellena el desplegable con las temporadas guardadas del cliente
+        // elegido. Conserva lo que hubiera seleccionado si esa temporada sigue
+        // estando: al volver de un error de validación se repinta entero.
+        function rellenarTemporadas() {
+            const select = document.getElementById('temporadaGuardada');
+            const seleccionada = select.value || select.dataset.seleccionada || '';
+            select.innerHTML = '';
+            const suelta = document.createElement('option');
+            suelta.value = '';
+            suelta.textContent = '-- otra temporada --';
+            select.appendChild(suelta);
+            temporadasDelCliente().forEach(function (temporada) {
+                const opcion = document.createElement('option');
+                opcion.value = temporada.id;
+                opcion.textContent = temporada.temporada;
+                select.appendChild(opcion);
+            });
+            select.value = seleccionada;
+            // La que estuviera elegida podía ser de otro cliente: el navegador
+            // deja el select en blanco, pero el valor viejo se enviaría igual.
+            if (select.value !== seleccionada) {
+                select.value = '';
+            }
+        }
+
+        // Aplica la temporada elegida: escribe su nombre en el campo de
+        // temporada (que se esconde, porque ya está decidido) y avisa de que el
+        // excel de pedido sale del guardado.
+        function aplicarTemporadaGuardada() {
+            const select = document.getElementById('temporadaGuardada');
+            const elegida = temporadasDelCliente().filter(function (temporada) {
+                return String(temporada.id) === select.value;
+            })[0];
+            const ayudaTemporada = document.getElementById('ayudaTemporadaGuardada');
+            const ayudaPedido = document.getElementById('ayudaPedidoCliente');
+            const bloqueLibre = document.getElementById('bloqueTemporadaLibre');
+
+            if (elegida) {
+                document.getElementById('temporada').value = elegida.temporada;
+                bloqueLibre.style.display = 'none';
+                ayudaTemporada.textContent = 'Excel de pedido guardado: ' + elegida.fichero;
+                ayudaPedido.textContent = 'Ya hay uno guardado para esta temporada ('
+                    + elegida.fichero + '). Sube otro solo si en este envío quieres usar '
+                    + 'un fichero distinto.';
+            } else {
+                bloqueLibre.style.display = '';
+                // Sin temporada elegida no se dice nada: el desplegable y el
+                // lápiz de al lado ya enseñan lo que hay que hacer, y una línea
+                // de texto bajo el campo movía de sitio todo lo de debajo.
+                ayudaTemporada.textContent = '';
+                ayudaPedido.textContent = AYUDA_PEDIDO_SUELTO;
+            }
+        }
 
         function actualizarCamposCliente() {
             const clienteSelect = document.getElementById('cliente');
@@ -266,6 +239,19 @@
 
             const usaPedido = config && config.pedidoCliente === 'true';
             document.getElementById('bloquePedidoCliente').style.display = usaPedido ? '' : 'none';
+
+            // Una temporada guardada es el excel de pedido de un cliente, así
+            // que solo tiene sentido en los clientes que trabajan con él.
+            document.getElementById('bloqueTemporadaGuardada').style.display =
+                usaPedido ? '' : 'none';
+            if (usaPedido) {
+                rellenarTemporadas();
+            } else {
+                // Sin vaciarlo, cambiar de cliente después de haber elegido
+                // temporada enviaría el id de una que ya ni se ve.
+                document.getElementById('temporadaGuardada').value = '';
+            }
+            aplicarTemporadaGuardada();
 
             // La altura de palet solo la elige el usuario en los clientes sin
             // norma propia; AMI y APC la tienen por destinación en el yml y
@@ -284,16 +270,16 @@
         }
 
         document.getElementById('cliente').addEventListener('change', actualizarCamposCliente);
+        document.getElementById('temporadaGuardada')
+            .addEventListener('change', aplicarTemporadaGuardada);
         actualizarCamposCliente();
 
-        // --- Selector de modo de entrada (JSON / CLAUDE / FORMULARIO) ---
+        // --- Selector de modo de entrada (JSON / CLAUDE / TALLER) ---
 
         function seleccionarModo(modo) {
             document.getElementById('modo').value = modo;
             document.getElementById('bloqueJson').style.display = modo === 'JSON' ? '' : 'none';
             document.getElementById('bloqueClaude').style.display = modo === 'CLAUDE' ? '' : 'none';
-            document.getElementById('bloqueFormulario').style.display =
-                modo === 'FORMULARIO' ? '' : 'none';
             document.getElementById('bloqueTaller').style.display = modo === 'TALLER' ? '' : 'none';
             document.querySelectorAll('.selector-modo button').forEach(function (boton) {
                 boton.classList.toggle('activo', boton.dataset.modo === modo);

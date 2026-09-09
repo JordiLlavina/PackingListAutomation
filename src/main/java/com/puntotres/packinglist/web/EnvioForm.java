@@ -56,6 +56,13 @@ public class EnvioForm {
      */
     private Integer alturaMaximaPaletCm;
 
+    /**
+     * Temporada guardada elegida en el desplegable, si la hay. De ella salen
+     * el nombre de la temporada y el excel de pedido, que así no hay que
+     * volver a subirlo en cada envío. Vacía = temporada tecleada a mano.
+     */
+    private Long temporadaGuardadaId;
+
     /** Hoja elegida a mano cuando el libro del taller no trae "LISTE DE COLIS". */
     private String hojaTaller;
 
@@ -107,6 +114,11 @@ public class EnvioForm {
 
     public String getHojaTaller() { return hojaTaller; }
     public void setHojaTaller(String hojaTaller) { this.hojaTaller = hojaTaller; }
+
+    public Long getTemporadaGuardadaId() { return temporadaGuardadaId; }
+    public void setTemporadaGuardadaId(Long temporadaGuardadaId) {
+        this.temporadaGuardadaId = temporadaGuardadaId;
+    }
 
     public String getCiudadProveedor() { return ciudadProveedor; }
     public void setCiudadProveedor(String ciudadProveedor) { this.ciudadProveedor = ciudadProveedor; }

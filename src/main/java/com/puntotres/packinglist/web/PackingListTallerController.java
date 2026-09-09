@@ -2,7 +2,6 @@ package com.puntotres.packinglist.web;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +18,8 @@ import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.DatosEnvio;
+import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.taller.DigestionTaller;
 import com.puntotres.packinglist.service.taller.DigestionTallerService;
 import com.puntotres.packinglist.service.taller.FilaDigerida;
@@ -56,6 +57,8 @@ public class PackingListTallerController {
     private final PreparacionRevisionService preparacion;
     private final ClientesProperties clientesProperties;
     private final CatalogoTaras catalogoTaras;
+    private final ArchivoTemporadas archivoTemporadas;
+    private final AtributosEntrada atributosEntrada;
     private final TallerEnCurso tallerEnCurso;
     private final EnvioEnCurso envioEnCurso;
 
@@ -64,6 +67,8 @@ public class PackingListTallerController {
                                        PreparacionRevisionService preparacion,
                                        ClientesProperties clientesProperties,
                                        CatalogoTaras catalogoTaras,
+                                       ArchivoTemporadas archivoTemporadas,
+                                       AtributosEntrada atributosEntrada,
                                        TallerEnCurso tallerEnCurso,
                                        EnvioEnCurso envioEnCurso) {
         this.digestionService = digestionService;
@@ -71,6 +76,8 @@ public class PackingListTallerController {
         this.preparacion = preparacion;
         this.clientesProperties = clientesProperties;
         this.catalogoTaras = catalogoTaras;
+        this.archivoTemporadas = archivoTemporadas;
+        this.atributosEntrada = atributosEntrada;
         this.tallerEnCurso = tallerEnCurso;
         this.envioEnCurso = envioEnCurso;
     }
@@ -100,7 +107,22 @@ public class PackingListTallerController {
             return volverALaEntrada(envioForm, model, null);
         }
 
+        // El pedido del cliente puede venir de tres sitios, y en este orden:
+        // subido a mano en este envío, de la temporada guardada que se haya
+        // elegido, o de la sesión si es una vuelta a la entrada. Lo subido a
+        // mano manda sobre lo guardado: es lo que se acaba de elegir.
         byte[] excelPedido = bytesDe(envioForm.getPedidoCliente());
+        String nombrePedido = excelPedido == null ? null
+                : envioForm.getPedidoCliente().getOriginalFilename();
+        if (excelPedido == null) {
+            TemporadaGuardada guardada = archivoTemporadas
+                    .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                    .orElse(null);
+            if (guardada != null) {
+                excelPedido = guardada.getExcel();
+                nombrePedido = guardada.getNombreFichero();
+            }
+        }
         if (excelPedido == null) {
             excelPedido = tallerEnCurso.getExcelPedido();
         }
@@ -118,13 +140,13 @@ public class PackingListTallerController {
         } catch (TallerColisExcel.HojaNoEncontradaException e) {
             // Se guarda el fichero para que el usuario pueda elegir la hoja
             // sin volver a subirlo.
-            guardarFicheros(envioForm, excelTaller, excelPedido);
+            guardarFicheros(envioForm, excelTaller, excelPedido, nombrePedido);
             return volverALaEntrada(envioForm, model, e.getMessage(), e.hojasEncontradas());
         } catch (TallerColisExcel.TallerExcelException | IOException e) {
             return volverALaEntrada(envioForm, model, e.getMessage());
         }
 
-        guardarFicheros(envioForm, excelTaller, excelPedido);
+        guardarFicheros(envioForm, excelTaller, excelPedido, nombrePedido);
         tallerEnCurso.setClaveCliente(envioForm.getCliente());
         tallerEnCurso.setCabecera(cabeceraDe(envioForm));
         tallerEnCurso.setAlturaMaximaPaletCm(envioForm.getAlturaMaximaPaletCm());
@@ -297,17 +319,18 @@ public class PackingListTallerController {
         return tamanos;
     }
 
-    private void guardarFicheros(EnvioForm envioForm, byte[] excelTaller, byte[] excelPedido) {
+    private void guardarFicheros(EnvioForm envioForm, byte[] excelTaller, byte[] excelPedido,
+                                 String nombrePedido) {
         if (envioForm.getExcelTaller() != null && !envioForm.getExcelTaller().isEmpty()) {
             tallerEnCurso.setExcelTaller(excelTaller,
                     envioForm.getExcelTaller().getOriginalFilename());
         } else if (tallerEnCurso.getExcelTaller() == null) {
             tallerEnCurso.setExcelTaller(excelTaller, "packing del taller");
         }
-        if (excelPedido != null && envioForm.getPedidoCliente() != null
-                && !envioForm.getPedidoCliente().isEmpty()) {
-            tallerEnCurso.setExcelPedido(excelPedido,
-                    envioForm.getPedidoCliente().getOriginalFilename());
+        // El nombre solo llega cuando el pedido es nuevo —subido o sacado de
+        // una temporada guardada—; si viene de la sesión ya estaba puesto.
+        if (excelPedido != null && nombrePedido != null) {
+            tallerEnCurso.setExcelPedido(excelPedido, nombrePedido);
         }
     }
 
@@ -336,18 +359,7 @@ public class PackingListTallerController {
 
     /** Los mismos atributos que necesita la pantalla de entrada. */
     private void anadirAtributosDeClientes(Model model) {
-        model.addAttribute("clientes", clientesProperties.getClientes());
-        model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
-        Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> {
-            Map<String, String> datos = new LinkedHashMap<>();
-            datos.put("plantilla", config.getPlantilla().name());
-            datos.put("placeholderTemporada",
-                    config.getPlaceholderTemporada() != null ? config.getPlaceholderTemporada() : "");
-            datos.put("pedidoCliente", String.valueOf(config.isPedidoCliente()));
-            clientesJs.put(clave, datos);
-        });
-        model.addAttribute("clientesJs", clientesJs);
+        atributosEntrada.anadir(model);
     }
 
     private static DatosEnvio cabeceraDe(EnvioForm envioForm) {

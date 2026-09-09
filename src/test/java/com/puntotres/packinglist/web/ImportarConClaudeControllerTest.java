@@ -168,12 +168,12 @@ class ImportarConClaudeControllerTest {
     }
 
     @Test
-    void laEntradaMuestraElSelectorDeModosConFormularioDeshabilitado() throws Exception {
+    void laEntradaMuestraElSelectorDeModos() throws Exception {
         mvc.perform(get("/packing-list"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("botonModoJSON")))
                 .andExpect(content().string(containsString("botonModoCLAUDE")))
-                .andExpect(content().string(containsString("botonModoFORMULARIO")))
+                .andExpect(content().string(containsString("botonModoTALLER")))
                 .andExpect(content().string(containsString("Escaneos del packing list")))
                 .andExpect(content().string(containsString("application/pdf")));
     }
