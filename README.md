@@ -78,6 +78,95 @@ mvn test -Dtest=PackingListGenerationServiceTest  # una clase
 
 El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual, y `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx`.
 
+## Distribuir la aplicación: un `.jar` para otro ordenador
+
+El proyecto empaqueta un **jar ejecutable** con el servidor web embebido, todas las dependencias y todos los recursos dentro (plantillas Excel de packing list y de etiquetas, vistas Thymeleaf, CSS y el propio `application.yml`). En el ordenador de destino **no hace falta Maven, ni el código fuente, ni copiar las plantillas aparte**: solo Java y ese fichero.
+
+### 1. Construirlo (en el ordenador de desarrollo)
+
+```bash
+mvn clean package               # compila, pasa la suite de tests y empaqueta
+mvn clean package -DskipTests   # solo empaquetar, si los tests ya están pasados
+```
+
+Deja dos ficheros en `target/`:
+
+| Fichero | Qué es |
+|---|---|
+| `packing-list-ami-1.0.0-SNAPSHOT.jar` (~69 MB) | **El que hay que copiar**: ejecutable, con las dependencias dentro |
+| `packing-list-ami-1.0.0-SNAPSHOT.jar.original` (~0,6 MB) | El jar "fino" anterior al *repackage* de Spring Boot; **no arranca solo** |
+
+El nombre sale del `artifactId` + `version` del [pom.xml](pom.xml): al cambiar la versión ahí cambia el nombre del fichero.
+
+### 2. Preparar el ordenador de destino
+
+- Instalar **Java 17 o superior** — basta un JRE, no hace falta el JDK ni Maven (probado con Temurin 17). Comprobar con `java -version`.
+- Copiar el `.jar` a una carpeta cualquiera, por ejemplo `C:\PackingList\`.
+
+### 3. Arrancarlo
+
+```powershell
+java -jar packing-list-ami-1.0.0-SNAPSHOT.jar
+```
+
+y abrir **http://localhost:8080**. Variantes habituales:
+
+```powershell
+java -jar packing-list-ami-1.0.0-SNAPSHOT.jar --server.port=8081   # si el 8080 está ocupado
+$env:ANTHROPIC_API_KEY = "sk-ant-..."                              # antes de arrancar, para el modo CLAUDE
+```
+
+Sin `ANTHROPIC_API_KEY` la aplicación arranca igual y todo funciona menos la extracción desde fotos/PDFs.
+
+La ventana de consola tiene que quedarse abierta: cerrarla para el servidor (Ctrl+C también). Para el ordenador del almacén, un `.bat` al lado del jar ahorra teclear:
+
+```bat
+@echo off
+cd /d "%~dp0"
+java -jar packing-list-ami-1.0.0-SNAPSHOT.jar
+pause
+```
+
+No necesita permisos de escritura en disco: los excels generados se sirven al navegador y se descargan a la carpeta de descargas del usuario.
+
+### 4. Cambiar taras o clientes sin recompilar
+
+El `application.yml` **sigue estando dentro del jar** y sigue siendo el que manda por defecto: el jar arranca solo, sin ningún fichero al lado. Lo que hace Spring Boot es leer *además* un `application.yml` que esté **junto al jar** (o en una subcarpeta `config/`) y **fusionar los dos, propiedad a propiedad**, ganando el de fuera. No es "o uno u otro": el de fuera no sustituye al de dentro, solo añade lo que no está y pisa lo que repite.
+
+Así se añade una tara o un cliente en el ordenador donde corre la aplicación sin volver a compilar, con un fichero que solo tenga lo nuevo:
+
+```yaml
+# application.yml junto al jar: solo lo que se añade o se cambia
+packing-list:
+  taras:
+    "[50x40x30]": 0.92
+  clientes:
+    "[CLIENTE NUEVO]":
+      nombre: Cliente Nuevo
+      plantilla: GENERIC
+      nombre-legal: CLIENTE NUEVO SL
+      direccion-entrega: Calle Tal 1; 08000 Barcelona, Spain
+```
+
+Con eso, el desplegable de clientes y el de tamaños salen con los internos **más** los añadidos (los de fuera aparecen primero).
+
+Y para **cambiar** algo que ya existe basta con nombrar el campo concreto: un fichero externo con solo
+
+```yaml
+packing-list:
+  clientes:
+    "[APC]":
+      nombre: A.P.C. (nombre nuevo)
+```
+
+cambia el nombre de APC en el desplegable y le deja intactos su `plantilla`, su `pedido-cliente`, sus destinaciones y sus destinos hijo, que se siguen leyendo de dentro del jar.
+
+> ⚠️ La única excepción son las **listas**: si el fichero externo define una (`destinos-hijo`, las destinaciones de APC...), sustituye a la de dentro **entera**, no se suman los elementos. Si tocas una lista, cópiala completa desde el [application.yml interno](src/main/resources/application.yml).
+
+### Alternativa: no copiar el jar, compartir el que ya está corriendo
+
+El servidor escucha en todas las interfaces de red, así que desde otro ordenador de la misma red se entra en `http://<IP-del-ordenador>:8080` (abriendo antes el puerto 8080 en el firewall de Windows). Ojo: **la aplicación no tiene usuarios ni contraseña**, así que solo dentro de la red de la empresa.
+
 ## Estructura del proyecto
 
 ```
@@ -149,6 +238,8 @@ El detalle de qué campos usa cada cliente está en [docs/Packing Lists/campos-j
 - Límites de subida multipart (las fotos del móvil superan el 1MB por defecto de Spring) y hash del contenido en los nombres de los estáticos (sin él, el navegador reutiliza el CSS viejo tras cada cambio).
 
 La única variable de entorno es `ANTHROPIC_API_KEY` (opcional, ver arriba).
+
+Si la aplicación corre desde un `.jar` en otro ordenador, estos ajustes se pueden cambiar sin recompilar con un `application.yml` junto al jar: ver [Distribuir la aplicación](#distribuir-la-aplicación-un-jar-para-otro-ordenador).
 
 ## Los JSON de ejemplo son inventados
 
