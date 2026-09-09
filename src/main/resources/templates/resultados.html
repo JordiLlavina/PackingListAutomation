@@ -4,10 +4,17 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('· 3. Resultados')}"></header>
 <main>
-    <p class="resumen-envio">
-        Factura <strong th:text="${cabecera.numeroFactura}"></strong> ·
-        temporada <strong th:text="${cabecera.temporada}"></strong>
-    </p>
+    <!-- Ficha del envío: los datos que lo identifican, cada uno con su rótulo.
+         El recuento de packing lists vive aquí y no como frase debajo del
+         título de la sección, donde repetía lo que la tabla ya enseña. -->
+    <ul class="ficha-envio">
+        <li><span class="rotulo">Factura</span>
+            <strong th:text="${cabecera.numeroFactura}"></strong></li>
+        <li><span class="rotulo">Temporada</span>
+            <strong th:text="${cabecera.temporada}"></strong></li>
+        <li><span class="rotulo">Packing lists</span>
+            <strong th:text="${excels.size()}"></strong></li>
+    </ul>
 
     <!-- Sección 1: los packing lists generados -->
     <section class="tarjeta seccion-salida">
@@ -19,9 +26,6 @@
                  th:text="${aviso}"></div>
         </div>
 
-        <p>
-            <span th:text="${excels.size()}"></span> packing lists generados.
-        </p>
         <table>
             <thead>
             <tr>

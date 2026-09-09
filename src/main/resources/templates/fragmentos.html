@@ -6,10 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|${titulo} · Packing Lists|">Packing Lists</title>
     <link rel="stylesheet" th:href="@{/estilo.css}">
+    <!-- Icono de la pestaña. Los dos PNG salen del logo de client-labels/img-web-icon.jpg:
+         cuadrado añadiendo aire (el logo llega a los bordes y recortarlo le cortaría
+         piezas) y sin el fondo blanco, para que se vea igual en pestaña clara u oscura. -->
+    <link rel="icon" type="image/png" sizes="32x32" th:href="@{/icono-web-32.png}">
+    <link rel="icon" type="image/png" sizes="180x180" th:href="@{/icono-web-180.png}">
 </head>
 <body>
 <header class="cabecera" th:fragment="cabecera(paso)">
     <div class="titulo">
+        <!-- La misma marca de la pestaña, que sobre la barra en tinta se lee
+             igual de bien que sobre el blanco de la pestaña. -->
+        <img class="marca" th:src="@{/icono-web-180.png}" alt="" aria-hidden="true">
         <a th:href="@{/menu}" class="enlace-menu">Generador de Packing Lists</a>
         <span class="paso" th:text="${paso}">paso</span>
     </div>

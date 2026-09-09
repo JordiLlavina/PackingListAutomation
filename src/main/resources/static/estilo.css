@@ -5,6 +5,10 @@
     --borde: #d4dae1;
     --fondo-suave: #f5f7f9;
     --acento: #1a6feb;
+    /* El naranja del logo, medido del propio icono. No es un color de acción
+       —eso lo sigue haciendo --acento— sino la marca: la pieza de la cabecera
+       y los iconos de las tarjetas del menú. */
+    --marca: #ff8900;
     --aviso-fondo: #fff7e0;
     --aviso-borde: #e6c34a;
     --error-fondo: #fdecec;
@@ -35,10 +39,21 @@ header.cabecera {
 }
 
 header.cabecera .titulo {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
     max-width: 72rem;
     margin: 0 auto;
     font-size: 1.15rem;
     font-weight: 600;
+}
+
+/* La misma marca de la pestaña: naranja sobre fondo transparente, así que se
+   lee igual sobre la barra oscura que sobre el blanco del navegador. */
+header.cabecera .marca {
+    width: 1.4rem;
+    height: 1.4rem;
+    flex: none;
 }
 
 header.cabecera .paso {
@@ -408,6 +423,34 @@ tr.pendiente td.celda-peso { background: var(--aviso-fondo); }
 
 .resumen-envio { margin: 1.2rem 0 0; }
 
+/* Ficha del envío: pares rótulo/valor separados por un filete, en vez de una
+   frase con puntos medios. Clase propia y no `.resumen-envio` porque esa la
+   usan como párrafo las pantallas de escandallos y etiquetas de artículo, y
+   convertirla en rejilla les partiría la frase en trozos sueltos. */
+.ficha-envio {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.5rem;
+    margin: 1.2rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ficha-envio > li {
+    padding-left: 1.5rem;
+    border-left: 1px solid var(--borde);
+}
+
+.ficha-envio > li:first-child { padding-left: 0; border-left: none; }
+
+.ficha-envio .rotulo {
+    display: block;
+    font-size: 0.8rem;
+    color: #5a6673;
+}
+
+.ficha-envio strong { font-size: 1.05rem; }
+
 .seccion-salida .titulo-seccion { margin: 0 0 0.5rem; font-size: 1.05rem; }
 
 /* Celda de contenido en una sola línea: destino · referencia · color. El
@@ -607,12 +650,8 @@ header.cabecera .enlace-menu:hover {
     text-decoration: underline;
 }
 
-.menu-intro {
-    margin: 1.2rem 0 0;
-    color: #5a6673;
-}
-
 .menu-tarjetas {
+    margin-top: 1.2rem;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
     gap: 1rem;
@@ -631,15 +670,22 @@ header.cabecera .enlace-menu:hover {
 
 .menu-titulo {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.6rem;
     margin: 0 0 0.6rem;
     font-size: 1.3rem;
+    line-height: 1.3;
 }
 
-.menu-icono { font-size: 1.8rem; line-height: 1; }
-
-.menu-descripcion { margin: 0 0 0.8rem; line-height: 1.5; }
+/* Icono dibujado y no emoji: el emoji lo pinta cada sistema a su manera y no
+   se puede teñir. Va en el naranja de la marca, como la pieza de la cabecera. */
+.menu-icono {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    margin-top: 0.05rem;
+    color: var(--marca);
+}
 
 .menu-entrada {
     margin: 0 0 0.8rem;

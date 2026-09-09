@@ -4,64 +4,68 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('')}"></header>
 <main>
-    <p class="menu-intro">
-        Tres cosas distintas que salen de tres documentos distintos. Elige por dónde empezar.
-    </p>
-
+    <!-- Cada tarjeta se presenta con lo que produce. El párrafo que había
+         encima de la lista repetía lo que la lista ya dice, así que se quitó:
+         aquí solo se elige por dónde empezar. -->
     <div class="menu-tarjetas">
         <section class="tarjeta menu-tarjeta">
-            <h2 class="menu-titulo"><span class="menu-icono">📦</span> Packing List y albarán</h2>
-            <p class="menu-descripcion">
-                Del JSON del envío —pegado a mano, rellenado en el formulario o extraído de
-                fotos— a los excels que espera el cliente. Los pesos que falten se infieren
-                y se pueden revisar y corregir antes de generar.
-            </p>
-            <p class="menu-entrada">Necesitas: el packing list del envío.</p>
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/>
+                    <path d="M3 7.5 12 12l9-4.5M12 12v9"/>
+                </svg>
+                Packing list y albarán
+            </h2>
+            <p class="menu-entrada">Necesitas el packing list del envío.</p>
             <ul class="menu-lista">
-                <li>Un packing list por destinación, en la plantilla real del cliente</li>
+                <li>Un packing list por destinación, en la plantilla del cliente</li>
                 <li>Etiquetas de caja y de palet</li>
                 <li>Volcado del albarán para el ERP</li>
             </ul>
-            <a class="boton" th:href="@{/packing-list}">Empezar →</a>
+            <a class="boton" th:href="@{/packing-list}">Empezar</a>
         </section>
 
         <section class="tarjeta menu-tarjeta">
-            <h2 class="menu-titulo"><span class="menu-icono">🏷️</span> Etiquetas de artículo</h2>
-            <p class="menu-descripcion">
-                Del excel de pedido de la temporada a los códigos de barras EAN13 que se
-                enganchan a cada bolso y a cada cinturón. Una hoja por referencia, color,
-                pedido y talla.
-            </p>
-            <p class="menu-entrada">Necesitas: el excel de pedido del cliente.</p>
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 12.5V4a1 1 0 0 1 1-1h8.5L21 11.5 12.5 20z"/>
+                    <circle cx="7.5" cy="7.5" r="1.6"/>
+                </svg>
+                Etiquetas de artículo
+            </h2>
+            <p class="menu-entrada">Necesitas el excel de pedido del cliente.</p>
             <ul class="menu-lista">
                 <li>Un excel de bolsos por país de fabricación</li>
                 <li>Un excel de cinturones</li>
                 <li>40 etiquetas por hoja, ajustadas a un A4</li>
             </ul>
-            <a class="boton" th:href="@{/etiquetas-articulo}">Empezar →</a>
+            <a class="boton" th:href="@{/etiquetas-articulo}">Empezar</a>
         </section>
 
         <section class="tarjeta menu-tarjeta">
-            <h2 class="menu-titulo"><span class="menu-icono">📋</span> Procesado de Escandallos ICSUITE</h2>
-            <p class="menu-descripcion">
-                De los escandallos que imprime el ERP —uno por artículo y color— a un
-                único excel limpio, listo para volcar a otro sistema. Se queda solo con
-                el modelo, la descripción, el color y la tabla de materiales.
-            </p>
-            <p class="menu-entrada">Necesitas: los excels de escandallo del ERP.</p>
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 3h9l5 5v13H5z"/>
+                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
+                </svg>
+                Escandallos ICSUITE
+            </h2>
+            <p class="menu-entrada">Necesitas los excels de escandallo del ERP.</p>
             <ul class="menu-lista">
                 <li>Un solo excel con una hoja por escandallo</li>
-                <li>Cada hoja se llama como su modelo y su color</li>
+                <li>Cada hoja, con el nombre de su modelo y su color</li>
                 <li>Sin precios, sin importes y sin fases</li>
             </ul>
-            <a class="boton" th:href="@{/escandallos}">Empezar →</a>
+            <a class="boton" th:href="@{/escandallos}">Empezar</a>
         </section>
     </div>
 
     <p class="menu-ajustes">
         ⚖️ <a th:href="@{/taras}">Taras de los cartones</a> — el peso de cada caja vacía,
-        que es de donde salen los pesos brutos. Se corrige aquí cada vez que se pesa un
-        cartón nuevo.
+        de donde salen los pesos brutos.
     </p>
 </main>
 </body>

@@ -51,6 +51,23 @@ class RutasTest {
     }
 
     @Test
+    void laPestanaLlevaElIconoYElFicheroExiste() throws Exception {
+        // El <link> y el PNG viven en sitios distintos —plantilla y static/—,
+        // así que borrar uno deja al otro apuntando al vacío y el navegador se
+        // limita a poner el icono en blanco, sin decir nada.
+        mvc.perform(get("/menu"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.matchesPattern(
+                                "(?s).*rel=\"icon\"[^>]*/icono-web-32-[0-9a-f]{32}\\.png\".*")));
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                new org.springframework.core.io.ClassPathResource(
+                        "static/icono-web-180.png").exists(),
+                "el icono grande también, que es el que usan pestaña y marcadores");
+    }
+
+    @Test
     void elAmarilloDeLosPesosQueFaltanNoTineLaFilaEntera() throws Exception {
         // Si vuelve a ser "tr.pendiente td", tapa la banda de color del palet:
         // las dos reglas tienen la misma especificidad y esta va después. Y en
