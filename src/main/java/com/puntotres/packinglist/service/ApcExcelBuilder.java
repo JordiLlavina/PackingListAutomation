@@ -4,12 +4,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -45,7 +45,7 @@ import com.puntotres.packinglist.model.PaletData;
  * del JSON con el mismo número de caja se agrupan aquí.
  *
  * La tara de cada palet viene del JSON (palets[].tara); si falta se asume
- * {@link #TARA_PALET_KG_DEFECTO} (10 kg). Para el TOTAL GROSS VOLUME cada
+ * {@link #TARA_PALET_KG_DEFECTO} (10 kg). Para el GROSS VOLUME del pie cada
  * palet aporta {@link #VOLUMEN_PALET_M3_DEFECTO} (0.168 m3, la base del
  * palet, derivado del ejemplo real: sus "medidas" describen el palet
  * cargado y NO se usan para el volumen).
@@ -57,16 +57,21 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     /** Formato con el que APC escribe la fecha en F12 (texto, no fecha Excel). */
     private static final DateTimeFormatter FORMATO_FECHA_APC = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    /**
+     * Rótulo del bloque de las cajas que van sueltas. En inglés, como el
+     * resto de la plantilla: este excel lo lee el cliente, y un envío de
+     * pocas cajas va sin palet de serie, así que ya no es un caso raro.
+     */
+    private static final String ETIQUETA_SIN_PALET = "NO PALLET";
     private static final double TARA_PALET_KG_DEFECTO = 10.0;
     private static final double VOLUMEN_PALET_M3_DEFECTO = 0.168;
-    private static final Locale LOCALE_ES = Locale.forLanguageTag("es-ES");
 
     // Índices 0-based de fila de la plantilla limpia.
     private static final int IDX_FILA_PALET_MODELO = 16;  // fila 17
     private static final int IDX_FILA_CAJA_MODELO = 17;   // fila 18
     private static final int IDX_FILA_PESO_TOTAL = 18;    // fila 19
     private static final int IDX_FILA_TOTAL = 19;         // fila 20
-    private static final int IDX_RESUMEN_PRIMERA = 21;    // fila 22 (5 líneas)
+    private static final int IDX_RESUMEN_PRIMERA = 21;    // fila 22 (6 líneas)
 
     // Índices 0-based de columna (fusiones B:C, D:E, G:H, I:J, K:L).
     private static final int COL_NUM_CAJA = 1;    // B Nº COLIS / etiqueta PALET
@@ -152,10 +157,18 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
         celda(hoja, 13, 15).setCellValue(envio.getNumeroFactura());         // P14
     }
 
-    /** Un palet y las cajas físicas que lleva encima. */
-    private record Bloque(String etiqueta, double taraKg, List<CajaFisica> cajas) {
+    /**
+     * Un palet y las cajas físicas que lleva encima. medidas es null en el
+     * bloque de las cajas que van sueltas (que no es un palet) y también en
+     * un palet cuyo JSON no las trae.
+     */
+    private record Bloque(String etiqueta, double taraKg, String medidas, List<CajaFisica> cajas) {
         int numeroDeFilas() {
             return 1 + cajas.stream().mapToInt(c -> c.lineas().size()).sum();
+        }
+
+        boolean esPalet() {
+            return !ETIQUETA_SIN_PALET.equals(etiqueta);
         }
     }
 
@@ -168,15 +181,17 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
 
     private List<Bloque> agruparPorPalet(DestinoData destino, List<PaletData> palets) {
         Map<Integer, Double> taraPorPalet = new LinkedHashMap<>();
+        Map<Integer, String> medidasPorPalet = new LinkedHashMap<>();
         for (PaletData palet : palets) {
             taraPorPalet.put(palet.getNumeroPalet(),
                     palet.getTara() != null ? palet.getTara() : TARA_PALET_KG_DEFECTO);
+            medidasPorPalet.put(palet.getNumeroPalet(), palet.getMedidas());
         }
 
         Map<Integer, Map<Integer, List<CajaData>>> porPaletYCaja = new LinkedHashMap<>();
         Map<Integer, List<CajaData>> sinPaletPorCaja = new LinkedHashMap<>();
         for (CajaData caja : destino.getCajas()) {
-            Map<Integer, List<CajaData>> porCaja = (caja.getNumeroPalet() == null)
+            Map<Integer, List<CajaData>> porCaja = CajaData.vaSuelta(caja.getNumeroPalet())
                     ? sinPaletPorCaja
                     : porPaletYCaja.computeIfAbsent(caja.getNumeroPalet(), n -> new LinkedHashMap<>());
             porCaja.computeIfAbsent(caja.getNumeroCaja(), n -> new ArrayList<>()).add(caja);
@@ -186,10 +201,11 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
         porPaletYCaja.forEach((numeroPalet, porCaja) -> bloques.add(new Bloque(
                 "PALET " + numeroPalet,
                 taraPorPalet.getOrDefault(numeroPalet, TARA_PALET_KG_DEFECTO),
+                medidasPorPalet.get(numeroPalet),
                 aCajasFisicas(porCaja))));
         if (!sinPaletPorCaja.isEmpty()) {
             // Sin palet físico no hay tara que sumar.
-            bloques.add(new Bloque("SIN PALET", 0, aCajasFisicas(sinPaletPorCaja)));
+            bloques.add(new Bloque(ETIQUETA_SIN_PALET, 0, null, aCajasFisicas(sinPaletPorCaja)));
         }
         return bloques;
     }
@@ -343,7 +359,17 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
                 "SUM(" + letraCantidad + primeraFilaExcel + ":" + letraCantidad + ultimaFilaExcel + ")");
     }
 
-    /** Las 5 líneas de texto del pie, en el formato del ejemplo real. */
+    /**
+     * Las 6 líneas del pie, en el formato del ejemplo real del cliente
+     * (docs/Packing Lists/apc-bags-and-belts-complete-example.xlsx): rótulo
+     * en la columna D y valor en la E, y los pesos y volúmenes como NÚMEROS,
+     * no como texto con las unidades pegadas. Antes eran 5 frases enteras
+     * metidas en la D.
+     *
+     * "GROSS" es siempre cartones + palets, en peso igual que en volumen: un
+     * envío que va suelto (sin palets) tiene el mismo peso bruto que el de
+     * sus cartones y ninguna tara inventada de por medio.
+     */
     private void escribirResumen(Sheet hoja, ResultadoBloques resultado, DestinoData destino,
                                  List<Bloque> bloques) {
         int desplazamiento = resultado.idxFilaTotal() - IDX_FILA_TOTAL;
@@ -358,15 +384,23 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
         double taras = bloques.stream().mapToDouble(Bloque::taraKg).sum();
         List<String> medidasCajasFisicas = medidasPorCajaFisica(destino);
         double volumenCartones = VolumenUtil.volumenTotalM3(medidasCajasFisicas);
-        long numPalets = bloques.stream().filter(b -> b.etiqueta().startsWith("PALET")).count();
-        double volumenPalets = numPalets * VOLUMEN_PALET_M3_DEFECTO;
+        List<String> medidasPalets = bloques.stream().filter(Bloque::esPalet)
+                .map(Bloque::medidas).toList();
+        double volumenPalets = medidasPalets.size() * VOLUMEN_PALET_M3_DEFECTO;
 
-        celda(hoja, idx, 3).setCellValue("TOTAL WEIGHT");
-        celda(hoja, idx, 4).setCellValue(kg(pesoCartones));
-        celda(hoja, idx + 1, 3).setCellValue("TOTAL GROSS WEIGHT (CARTON + PALET)  " + kg(pesoCartones + taras));
-        celda(hoja, idx + 2, 3).setCellValue("TOTAL VOLUME " + m3(volumenCartones));
-        celda(hoja, idx + 3, 3).setCellValue(medidasCajasFisicas.size() + " CARTONS " + desgloseMedidas(medidasCajasFisicas));
-        celda(hoja, idx + 4, 3).setCellValue("TOTAL GROSS VOLUME (CARTON + PALET) " + m3(volumenCartones + volumenPalets));
+        resumen(hoja, idx, "PALLETS").setCellValue(recuento(medidasPalets, ""));
+        resumen(hoja, idx + 1, "CARTONS").setCellValue(recuento(medidasCajasFisicas, "cm"));
+        resumen(hoja, idx + 2, "CARTON WEIGHT").setCellValue(redondear(pesoCartones, 2));
+        resumen(hoja, idx + 3, "CARTONS VOLUME").setCellValue(redondear(volumenCartones, 3));
+        resumen(hoja, idx + 4, "GROSS WEIGHT").setCellValue(redondear(pesoCartones + taras, 2));
+        resumen(hoja, idx + 5, "GROSS VOLUME")
+                .setCellValue(redondear(volumenCartones + volumenPalets, 3));
+    }
+
+    /** Escribe el rótulo en la D y devuelve la celda de valor (la E). */
+    private Cell resumen(Sheet hoja, int idxFila, String rotulo) {
+        celda(hoja, idxFila, 3).setCellValue(rotulo);
+        return celda(hoja, idxFila, 4);
     }
 
     /** Una medida por caja FÍSICA (no por línea), para contar y sumar volumen. */
@@ -376,28 +410,41 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
                 .toList();
     }
 
-    /** "60 x 40 x 40 cm" si todas iguales; "2*60x40x30cm+22*60x40x40cm" si no. */
-    private static String desgloseMedidas(List<String> medidas) {
+    /**
+     * "53 (60x40x40cm)" cuando todos miden lo mismo; con varias medidas,
+     * "53 (2*60x40x30cm+51*60x40x40cm)". Sin nada que contar, solo "0": un
+     * paréntesis vacío parecería un dato que falta.
+     *
+     * El sufijo lo pone quien llama porque el ejemplo del cliente lo lleva en
+     * los cartones ("60x40x40cm") y no en los palets ("80x120x170").
+     */
+    private static String recuento(List<String> medidas, String sufijo) {
+        if (medidas.isEmpty()) {
+            return "0";
+        }
         Map<String, Integer> conteo = new LinkedHashMap<>();
         for (String medida : medidas) {
-            // Una medida que falta se rotula "?": la caja se cuenta igual
-            // (existe y va en el bulto), pero la celda no puede decir "null".
+            // Una medida que falta se rotula "?": el bulto se cuenta igual
+            // (existe), pero la celda no puede decir "null".
             conteo.merge(VolumenUtil.etiqueta(medida), 1, Integer::sum);
         }
-        if (conteo.size() == 1) {
-            return conteo.keySet().iterator().next().replace("x", " x ") + " cm";
-        }
-        return conteo.entrySet().stream()
-                .map(e -> e.getValue() + "*" + e.getKey() + "cm")
-                .reduce((a, b) -> a + "+" + b).orElse("");
+        String desglose = conteo.size() == 1
+                ? conteo.keySet().iterator().next() + sufijo
+                : conteo.entrySet().stream()
+                        .map(e -> e.getValue() + "*" + e.getKey() + sufijo)
+                        .reduce((a, b) -> a + "+" + b).orElse("");
+        return medidas.size() + " (" + desglose + ")";
     }
 
-    private static String kg(double valor) {
-        return String.format(LOCALE_ES, "%.2f KG", valor);
-    }
-
-    private static String m3(double valor) {
-        return String.format(LOCALE_ES, "%.3f M3", valor);
+    /**
+     * El pie lleva NÚMEROS, no texto con las unidades pegadas, así que hay
+     * que redondear aquí: sin esto la suma de decimales en coma flotante
+     * escribiría "378,6400000000001" en una celda que lee el cliente.
+     */
+    private static double redondear(double valor, int decimales) {
+        return BigDecimal.valueOf(valor)
+                .setScale(decimales, RoundingMode.HALF_UP)
+                .doubleValue();
     }
 
     /** 10.0 -> "10", 8.04 -> "8.04" (para incrustar en fórmulas). */

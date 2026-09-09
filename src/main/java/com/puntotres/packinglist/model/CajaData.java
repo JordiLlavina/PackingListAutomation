@@ -17,6 +17,25 @@ public class CajaData {
      */
     public static final String PREFIJO_CINTURON = "UBL";
 
+    /**
+     * Número de palet de una caja que se manda <b>sin palet</b>: un envío de
+     * muy pocas cajas viaja suelto, así que no hay distribución de palets que
+     * cruzar y tampoco es un dato que falte.
+     *
+     * Es un número y no null a propósito: null significa "esta caja debería
+     * ir en un palet y no se sabe en cuál", que es lo que la revisión pinta en
+     * rojo y hay que corregir a mano. El cero se ve en la columna PALET, se
+     * conserva al recalcular y no vuelve a saltar la alerta. Lo que ningún
+     * documento del cliente puede hacer es contarlo como un palet: ni suma su
+     * tara, ni su volumen, ni se le imprime etiqueta.
+     */
+    public static final int SIN_PALET = 0;
+
+    /** true si la caja va suelta: sin palet asignado (null) o con {@link #SIN_PALET}. */
+    public static boolean vaSuelta(Integer numeroPalet) {
+        return numeroPalet == null || numeroPalet == SIN_PALET;
+    }
+
     private int numeroCaja;
     private String numeroPedido;
     private String referencia;

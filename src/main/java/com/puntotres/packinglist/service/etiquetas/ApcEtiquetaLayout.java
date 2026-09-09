@@ -40,10 +40,18 @@ record ApcEtiquetaLayout(
             "Etiquette colis FC Logistique", "Etiquette Palette FC logistique",
             44, 22, 11, 12, 13, 14, 15, 16, 19, 20);
 
+    /**
+     * filaReferencia = 11 y no 12: en esta plantilla la celda de valor de
+     * Reference está COMBINADA (C12:C13 en 1-based), así que su rótulo cae
+     * una fila por debajo de la celda que hay que escribir. Escribir en la
+     * fila del rótulo no da error ni celda vacía: Excel ignora lo escrito en
+     * una celda tapada por una combinación y se queda a la vista la
+     * referencia de ejemplo de la plantilla, que es de otro artículo.
+     */
     public static final ApcEtiquetaLayout USA = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-usa.xlsx",
             "ETIQUETTE COLIS", "PALET",
-            46, 23, 9, 10, 12, 13, 14, 15, 18, 19);
+            46, 23, 9, 10, 11, 13, 14, 15, 18, 19);
 
     public static final ApcEtiquetaLayout WH_CROSSLOG = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-wh-crosslog.xlsx",

@@ -84,7 +84,9 @@ public class ApcEtiquetasExcelBuilder {
     private static void escribirEtiquetaCaja(XSSFSheet hoja, ApcEtiquetaLayout layout,
                                              int base, EtiquetaCajaApc etiqueta,
                                              AjusteFuente ajuste) {
-        escribir(hoja, base + layout.filaOrder(), etiqueta.orderNumber());
+        // El Order N° también lleva un valor por artículo desde que una caja
+        // mixta los enseña todos, así que encoge igual que la referencia.
+        ajuste.ajustar(escribir(hoja, base + layout.filaOrder(), etiqueta.orderNumber()));
         escribir(hoja, base + layout.filaLivraison(), etiqueta.livraisonCode());
         // Estas tres pueden llevar varios artículos concatenados y crecer.
         ajuste.ajustar(escribir(hoja, base + layout.filaReferencia(), etiqueta.referencia()));

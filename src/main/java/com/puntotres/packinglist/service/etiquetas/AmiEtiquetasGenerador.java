@@ -178,10 +178,18 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         String nombreDestino = destino.getNombreDestino();
         boolean algunaSinPalet = destino.getCajas().stream()
                 .anyMatch(caja -> caja.getNumeroPalet() == null);
+        // Una destinación que se manda suelta (todas sus cajas con
+        // CajaData.SIN_PALET) no lleva hoja de palets NI aviso: no hay palet
+        // que etiquetar, así que no falta ningún dato.
+        boolean suelta = !destino.getCajas().isEmpty() && destino.getCajas().stream()
+                .allMatch(caja -> Integer.valueOf(CajaData.SIN_PALET)
+                        .equals(caja.getNumeroPalet()));
         if (palets.isEmpty() || algunaSinPalet) {
-            avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
-                    palets.isEmpty() ? "sin datos de palet" : "hay cajas sin palet asignado",
-                    "El excel sale sin hoja de etiquetas de palet"));
+            if (!suelta) {
+                avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
+                        palets.isEmpty() ? "sin datos de palet" : "hay cajas sin palet asignado",
+                        "El excel sale sin hoja de etiquetas de palet"));
+            }
             return List.of();
         }
         List<EtiquetaPaletAmi> etiquetas = new ArrayList<>();

@@ -185,21 +185,60 @@ class ApcExcelBuilderTest {
         }
     }
 
+    /**
+     * Pie de 6 líneas con rótulo en la D y valor en la E, tal como lo pide el
+     * ejemplo del cliente. Los pesos y volúmenes son NÚMEROS, no texto con
+     * las unidades pegadas.
+     */
     @Test
-    void escribeElResumenDeCincoLineas() throws Exception {
+    void escribeElResumenDeSeisLineas() throws Exception {
         List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());
 
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
             Sheet hoja = wb.getSheetAt(0);
 
-            // Cartones: 31.62 kg; + taras (8.04 + 10) = 49.66 kg.
-            assertEquals("TOTAL WEIGHT", hoja.getRow(26).getCell(3).getStringCellValue());
-            assertEquals("31,62 KG", hoja.getRow(26).getCell(4).getStringCellValue());
-            assertTrue(hoja.getRow(27).getCell(3).getStringCellValue().contains("49,66 KG"));
+            // 2 palets, uno con medidas en el JSON y otro sin ellas.
+            assertEquals("PALLETS", hoja.getRow(26).getCell(3).getStringCellValue());
+            assertEquals("2 (1*80x120x130+1*?)", hoja.getRow(26).getCell(4).getStringCellValue());
+            assertEquals("CARTONS", hoja.getRow(27).getCell(3).getStringCellValue());
+            assertEquals("3 (60x40x40cm)", hoja.getRow(27).getCell(4).getStringCellValue());
+            // Cartones: 31.62 kg; + taras (8.04 + 10) = 49.66 kg de bruto.
+            assertEquals("CARTON WEIGHT", hoja.getRow(28).getCell(3).getStringCellValue());
+            assertEquals(31.62, hoja.getRow(28).getCell(4).getNumericCellValue());
             // 3 cajas físicas de 60x40x40: 0.288 m3; + 2 palets * 0.168 = 0.624.
-            assertTrue(hoja.getRow(28).getCell(3).getStringCellValue().contains("0,288 M3"));
-            assertEquals("3 CARTONS 60 x 40 x 40 cm", hoja.getRow(29).getCell(3).getStringCellValue());
-            assertTrue(hoja.getRow(30).getCell(3).getStringCellValue().contains("0,624 M3"));
+            assertEquals("CARTONS VOLUME", hoja.getRow(29).getCell(3).getStringCellValue());
+            assertEquals(0.288, hoja.getRow(29).getCell(4).getNumericCellValue());
+            assertEquals("GROSS WEIGHT", hoja.getRow(30).getCell(3).getStringCellValue());
+            assertEquals(49.66, hoja.getRow(30).getCell(4).getNumericCellValue());
+            assertEquals("GROSS VOLUME", hoja.getRow(31).getCell(3).getStringCellValue());
+            assertEquals(0.624, hoja.getRow(31).getCell(4).getNumericCellValue());
+        }
+    }
+
+    /**
+     * Un envío que va suelto (cajas con {@link CajaData#SIN_PALET}) no cuenta
+     * ningún palet: ni suma su tara al bruto ni su volumen. GROSS y CARTON
+     * valen lo mismo, que es la verdad de lo que se entrega.
+     */
+    @Test
+    void unEnvioSueltoNoCuentaNingunPaletEnElPie() throws Exception {
+        DestinoData destino = destinoIvry();
+        destino.getCajas().forEach(caja -> caja.setNumeroPalet(CajaData.SIN_PALET));
+
+        List<ExcelGenerado> excels = builder.generar(destino, List.of(), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            // El rótulo del bloque va en inglés, como el resto de la
+            // plantilla: este excel lo lee el cliente.
+            assertEquals("NO PALLET", hoja.getRow(16).getCell(1).getStringCellValue());
+            // Un bloque menos que con dos palets: el pie sube una fila.
+            assertEquals("PALLETS", hoja.getRow(25).getCell(3).getStringCellValue());
+            assertEquals("0", hoja.getRow(25).getCell(4).getStringCellValue());
+            assertEquals(31.62, hoja.getRow(27).getCell(4).getNumericCellValue()); // CARTON WEIGHT
+            assertEquals(31.62, hoja.getRow(29).getCell(4).getNumericCellValue()); // GROSS WEIGHT
+            assertEquals(hoja.getRow(28).getCell(4).getNumericCellValue(),         // CARTONS VOLUME
+                    hoja.getRow(30).getCell(4).getNumericCellValue());             // GROSS VOLUME
         }
     }
 
@@ -220,10 +259,10 @@ class ApcExcelBuilderTest {
 
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
             Sheet hoja = wb.getSheetAt(0);
+            assertEquals("3 (2*60x40x40cm+1*?cm)",
+                    hoja.getRow(27).getCell(4).getStringCellValue());
             // Solo las dos cajas medidas suman: 2 * 0.096 = 0.192 m3.
-            assertTrue(hoja.getRow(28).getCell(3).getStringCellValue().contains("0,192 M3"));
-            assertEquals("3 CARTONS 2*60x40x40cm+1*?cm",
-                    hoja.getRow(29).getCell(3).getStringCellValue());
+            assertEquals(0.192, hoja.getRow(29).getCell(4).getNumericCellValue());
         }
     }
 

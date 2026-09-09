@@ -50,15 +50,51 @@ class PaletAssignmentServiceTest {
         assertEquals(1, paris.getCajas().get(0).getNumeroPalet());
     }
 
+    /**
+     * Por encima de {@link PaletAssignmentService#MAX_CAJAS_SIN_PALET} cajas,
+     * una destinación sin palets sí es un dato que falta.
+     */
     @Test
     void destinacionSinPaletsGeneraAviso() {
-        DestinoData japan = destino("Japan", 1);
+        DestinoData japan = destino("Japan", 1, 2, 3, 4);
         List<PaletData> palets = List.of(palet("Paris", 1, 1, 12));
 
         ResultadoAsignacion resultado = service.asignar(japan, palets);
 
-        assertEquals(1, resultado.getCajasSinPalet().size());
+        assertEquals(4, resultado.getCajasSinPalet().size());
         assertFalse(resultado.getAvisos().isEmpty());
+    }
+
+    /**
+     * De 1 a 3 cajas el envío va suelto: no hay palets que declarar, así que
+     * las cajas se marcan con SIN_PALET y no sale ni aviso ni lista de cajas
+     * sin palet. Avisar de lo que pasa en todos los envíos pequeños solo
+     * entierra los avisos que sí hay que leer.
+     */
+    @Test
+    void hastaTresCajasSinPaletsSeMandanSueltasYNoAvisan() {
+        DestinoData usa = destino("D. USA", 1, 2, 3);
+
+        ResultadoAsignacion resultado = service.asignar(usa, List.of());
+
+        assertTrue(resultado.todoAsignado());
+        assertTrue(resultado.getAvisos().isEmpty());
+        assertTrue(usa.getCajas().stream()
+                .allMatch(caja -> Integer.valueOf(CajaData.SIN_PALET).equals(caja.getNumeroPalet())));
+    }
+
+    /**
+     * Se cuentan cajas FÍSICAS, no líneas: una sola caja con cuatro artículos
+     * dentro sigue yendo suelta.
+     */
+    @Test
+    void unaSolaCajaConVariasLineasSigueYendoSuelta() {
+        DestinoData usa = destino("D. USA", 1, 1, 1, 1);
+
+        ResultadoAsignacion resultado = service.asignar(usa, List.of());
+
+        assertTrue(resultado.getAvisos().isEmpty());
+        assertEquals(CajaData.SIN_PALET, usa.getCajas().get(0).getNumeroPalet());
     }
 
     @Test

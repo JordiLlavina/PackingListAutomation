@@ -104,7 +104,7 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         }
 
         List<EtiquetaPaletApc> etiquetasPalet =
-                etiquetasDePalet(cajasFisicas, destino.getNombreDestino(), palets, avisos);
+                etiquetasDePalet(cajasFisicas, destino, palets, avisos);
 
         if (destino.getCajas().stream().anyMatch(caja -> caja.getNumeroPalet() == null)) {
             avisos.add(AvisoEtiqueta.deDestino(destino.getNombreDestino(),
@@ -138,10 +138,10 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                         linea.getTalla(), linea.getCantidad(), Integer::sum));
         boolean cinturones = !unidadesPorTalla.isEmpty();
 
-        // Caja mixta de verdad (varias referencias o colores): en cinturones
-        // la etiqueta solo lleva la línea líder, así que se avisa. En bolsos
-        // la etiqueta ya muestra todos los artículos (ver más abajo), así que
-        // una caja mixta ya no es un problema y no hay nada que avisar.
+        // Caja mixta de verdad (varias referencias o colores): la etiqueta ya
+        // lleva TODOS los artículos en Order N°, Reference y Colour, así que
+        // lo único que se queda corto en una caja de cinturones son SIZE y
+        // PIECES BY SIZE, que solo caben para un artículo.
         Set<String> refsColores = new LinkedHashSet<>();
         for (CajaData linea : lineas) {
             refsColores.add(claveRefColor(linea));
@@ -149,27 +149,33 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         if (refsColores.size() > 1 && cinturones) {
             avisos.add(AvisoEtiqueta.deCaja(nombreDestino, lider.getNumeroCaja(),
                     "Mezcla de referencias/colores",
-                    "La etiqueta lleva " + lider.getReferencia()
+                    "SIZE y PIECES BY SIZE son solo de " + lider.getReferencia()
                     + " " + lider.getCodigoColor()));
         }
 
+        // Un artículo = referencia + color, en el orden del packing list. Los
+        // tres campos que lo identifican (Order N°, Reference y Colour) se
+        // concatenan con " / " y en el MISMO orden, para poder leer la
+        // etiqueta en paralelo: el pedido de la posición n es el de la
+        // referencia de la posición n. El Document d'achat de APC es una
+        // destinación, un artículo y un color, así que cada artículo de la
+        // caja lleva el suyo y quedarse con el de la línea líder ponía en la
+        // etiqueta un pedido que no era el de los demás.
+        List<ArticuloEtiqueta> articulos = ArticulosDeCaja.de(caja, false);
+        String referencia = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::referencia);
+        String colour = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::codigoColor);
+        String orderNumber = ArticulosDeCaja.unirValores(pedidosDe(caja, articulos));
+
         String size;
         String piezas;
-        String referencia;
-        String colour;
         if (unidadesPorTalla.isEmpty()) {
-            // Bolsos: un valor por artículo en cada campo, en el orden del
-            // packing list. SIZE no se concatena: "U / U" no dice nada.
-            List<ArticuloEtiqueta> articulos = ArticulosDeCaja.de(caja, false);
-            referencia = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::referencia);
-            colour = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::codigoColor);
+            // Bolsos: un valor por artículo también en las unidades. SIZE no
+            // se concatena: "U / U" no dice nada.
             size = "U";
             piezas = ArticulosDeCaja.unir(articulos, a -> String.valueOf(a.cantidad()));
         } else {
-            // Cinturones: sin cambios, la referencia y el color son los de la
-            // línea líder y las unidades van agrupadas por talla.
-            referencia = lider.getReferencia();
-            colour = lider.getCodigoColor();
+            // Cinturones: las unidades van agrupadas por talla, y solo caben
+            // las del artículo líder (ver el aviso de arriba).
             if (unidadesPorTalla.size() == 1) {
                 var unica = unidadesPorTalla.entrySet().iterator().next();
                 size = unica.getKey();
@@ -190,9 +196,29 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         // El Order N° y el Livraison code los trae ya la caja: el packing list
         // los completó al importar (PedidoCompletionService y
         // ResolutorDestinosPadre). "NOT FOUND" queda solo para cuando falten.
-        return new EtiquetaCajaApc(oNoDisponible(lider.getNumeroPedido()),
+        // El Livraison code sí es uno solo: es de la destinación entera.
+        return new EtiquetaCajaApc(orderNumber,
                 oNoDisponible(lider.getLivraisonCode()), referencia,
                 colour, size, piezas, posicion + " / " + total, kg(peso));
+    }
+
+    /**
+     * El número de pedido de cada artículo, en el orden en que los devuelve
+     * {@link ArticulosDeCaja}. Un artículo sin pedido deja "NOT FOUND" en SU
+     * posición, no un hueco: la etiqueta se lee en paralelo y un hueco haría
+     * dudar de a qué referencia le falta el pedido.
+     */
+    private static List<String> pedidosDe(CajaFisica caja, List<ArticuloEtiqueta> articulos) {
+        Map<String, String> porArticulo = new LinkedHashMap<>();
+        for (CajaData linea : caja.lineas()) {
+            if (linea.getNumeroPedido() != null && !linea.getNumeroPedido().isBlank()) {
+                porArticulo.putIfAbsent(claveRefColor(linea), linea.getNumeroPedido());
+            }
+        }
+        return articulos.stream()
+                .map(articulo -> oNoDisponible(
+                        porArticulo.get(articulo.referencia() + "|" + articulo.codigoColor())))
+                .toList();
     }
 
     private static String oNoDisponible(String valor) {
@@ -203,16 +229,23 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
      * Peso del palet: la suma de los pesos de sus cajas FÍSICAS (uno por
      * caja, el de su línea líder) más la tara. En blanco, con aviso, si
      * alguna de esas cajas no trae peso.
+     *
+     * Una destinación que se manda suelta (cajas con
+     * {@link CajaData#SIN_PALET}) no lleva hoja de palets ni aviso: no hay
+     * ningún palet que etiquetar, así que no falta nada.
      */
     private List<EtiquetaPaletApc> etiquetasDePalet(List<CajaFisica> cajasFisicas,
-                                                    String nombreDestino,
+                                                    DestinoData destino,
                                                     List<PaletData> palets,
                                                     List<AvisoEtiqueta> avisos) {
         if (palets.isEmpty()) {
-            avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
-                    "sin palets", "La hoja de etiquetas de palet sale en blanco"));
+            if (!seMandaSuelta(destino)) {
+                avisos.add(AvisoEtiqueta.deDestino(destino.getNombreDestino(),
+                        "sin palets", "La hoja de etiquetas de palet sale en blanco"));
+            }
             return List.of();
         }
+        String nombreDestino = destino.getNombreDestino();
         List<EtiquetaPaletApc> etiquetas = new ArrayList<>();
         for (PaletData palet : palets.stream()
                 .sorted(Comparator.comparingInt(PaletData::getNumeroPalet)).toList()) {
@@ -239,6 +272,18 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
             etiquetas.add(new EtiquetaPaletApc(numeroCajas, kg(peso)));
         }
         return etiquetas;
+    }
+
+    /**
+     * Envío suelto: TODAS las cajas de la destinación llevan
+     * {@link CajaData#SIN_PALET}. Basta con que una lleve palet de verdad
+     * para que la hoja de palets vuelva a hacer falta y su ausencia sea un
+     * aviso.
+     */
+    private static boolean seMandaSuelta(DestinoData destino) {
+        return !destino.getCajas().isEmpty() && destino.getCajas().stream()
+                .allMatch(caja -> Integer.valueOf(CajaData.SIN_PALET)
+                        .equals(caja.getNumeroPalet()));
     }
 
     private static String kg(Double peso) {

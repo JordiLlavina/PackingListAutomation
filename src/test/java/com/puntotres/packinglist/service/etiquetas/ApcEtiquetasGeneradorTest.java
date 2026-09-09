@@ -216,21 +216,126 @@ class ApcEtiquetasGeneradorTest {
         assertEquals("1 / 1", texto(hoja, 17, 2));
     }
 
+    /**
+     * En una caja mixta de cinturones la referencia SÍ las lleva las dos: lo
+     * que no cabe más que para un artículo son SIZE y PIECES BY SIZE, y de
+     * eso es de lo que avisa.
+     */
     @Test
     void unaCajaDeCinturonesConDosReferenciasAvisaDeMezcla() throws IOException {
-        // Los cinturones no muestran todos los artículos (a diferencia de los
-        // bolsos): la etiqueta sigue llevando solo la línea líder, así que
-        // una caja mixta de verdad sigue siendo un aviso.
         ResultadoEtiquetas resultado = generador.generar(List.of(
                         destino("JAPAN", List.of(palet(1, 3, 3, null)),
                                 caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 6.0, 1),
                                 caja(3, "PXBHZ-H65078", "LZZ-NOIR", "90", 8, null, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("PXBHZ-H65077", texto(hoja, 11, 2));
-        assertTrue(resultado.getAvisos().contains("JAPAN: Caja 3. Mezcla de "
-                        + "referencias/colores. La etiqueta lleva PXBHZ-H65077 LZZ-NOIR"),
+        assertEquals("PXBHZ-H65077 / PXBHZ-H65078", texto(hoja, 11, 2));
+        assertEquals("85", texto(hoja, 13, 2));
+        assertTrue(resultado.getAvisos().contains("JAPAN: Caja 3. Mezcla de referencias/colores. "
+                        + "SIZE y PIECES BY SIZE son solo de PXBHZ-H65077 LZZ-NOIR"),
                 resultado.getAvisos().toString());
+    }
+
+    /**
+     * Una caja con varios artículos lleva TODOS los Order N° y TODAS las
+     * referencias, en el mismo orden, para poder leerlos en paralelo: en APC
+     * un Document d'achat es una destinación, un artículo y un color, así que
+     * el de la línea líder no vale para los demás artículos de la caja.
+     */
+    @Test
+    void unaCajaConVariosArticulosLlevaTodosLosPedidosYReferencias() throws IOException {
+        CajaData bolso = caja(1, "PXCBC-F63024", "LIQUEN", null, 3, 7.96, 1);
+        bolso.setNumeroPedido("4100128710");
+        CajaData otroColor = caja(1, "PXCBC-F63024", "NOIR", null, 16, null, 1);
+        otroColor.setNumeroPedido("4100128711");
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("JAPAN", List.of(palet(1, 1, 1, null)), bolso, otroColor)),
+                envio(), Map.of());
+
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        assertEquals("4100128710 / 4100128711", texto(hoja, 9, 2));
+        assertEquals("PXCBC-F63024 / PXCBC-F63024", texto(hoja, 11, 2));
+        assertEquals("LIQUEN / NOIR", texto(hoja, 12, 2));
+        assertEquals("3 / 16", texto(hoja, 14, 2));
+    }
+
+    /**
+     * Los cinturones también: la caja de la hoja real de D. USA lleva dos
+     * cinturones y dos monederos, cada uno con su pedido.
+     */
+    @Test
+    void unaCajaDeCinturonesYBolsosLlevaTodosLosPedidosEnElOrdenDeLasReferencias()
+            throws IOException {
+        CajaData cinturon = caja(1, "PXBHZ-F65101", "KBE-OCRE", "75", 5, 7.96, 1);
+        cinturon.setNumeroPedido("4100128715");
+        CajaData otraTalla = caja(1, "PXBHZ-F65101", "KBE-OCRE", "80", 5, null, 1);
+        otraTalla.setNumeroPedido("4100128715");
+        CajaData monedero = caja(1, "PXCBC-F63024", "LIQUEN", null, 3, null, 1);
+        monedero.setNumeroPedido("4100128710");
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("JAPAN", List.of(palet(1, 1, 1, null)),
+                        cinturon, otraTalla, monedero)),
+                envio(), Map.of());
+
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        // Las dos tallas del cinturón son UN artículo (referencia + color).
+        assertEquals("4100128715 / 4100128710", texto(hoja, 9, 2));
+        assertEquals("PXBHZ-F65101 / PXCBC-F63024", texto(hoja, 11, 2));
+    }
+
+    /**
+     * Un artículo sin pedido deja "NOT FOUND" en SU posición: un hueco haría
+     * dudar de a qué referencia le falta.
+     */
+    @Test
+    void elArticuloSinPedidoDejaNotFoundEnSuPosicion() throws IOException {
+        CajaData conPedido = caja(1, "PXCBC-F63024", "LIQUEN", null, 3, 7.96, 1);
+        conPedido.setNumeroPedido("4100128710");
+        CajaData sinPedido = caja(1, "PXCBC-F63024", "NOIR", null, 16, null, 1);
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("JAPAN", List.of(palet(1, 1, 1, null)), conPedido, sinPedido)),
+                envio(), Map.of());
+
+        XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
+        assertEquals("4100128710 / NOT FOUND", texto(hoja, 9, 2));
+    }
+
+    /**
+     * La referencia se escribe en la fila que de verdad se ve: en la
+     * plantilla de USA la celda de valor está combinada y su rótulo cae una
+     * fila más abajo, así que escribir en la del rótulo dejaba a la vista la
+     * referencia de ejemplo de la plantilla.
+     */
+    @Test
+    void enUsaLaReferenciaSustituyeALaDeLaPlantillaYNoSeQuedaTapada() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("D. USA", List.of(palet(1, 1, 1, null)),
+                        caja(1, "PXBHZ-F65101", "KBE-OCRE", "75", 5, 7.96, 1))),
+                envio(), Map.of());
+
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet hoja = libro.getSheet(ApcEtiquetaLayout.USA.hojaCajas());
+            assertEquals("PXBHZ-F65101",
+                    texto(hoja, ApcEtiquetaLayout.USA.filaReferencia(), 2));
+        }
+    }
+
+    /**
+     * Un envío que va suelto (de 1 a 3 cajas, todas con SIN_PALET) no avisa
+     * de que falten los palets: no hay ninguno que etiquetar.
+     */
+    @Test
+    void unEnvioSueltoNoAvisaDeQueFaltenLosPalets() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("D. USA", List.of(),
+                        caja(1, "PXBHZ-F65101", "KBE-OCRE", "75", 5, 7.96, CajaData.SIN_PALET))),
+                envio(), Map.of());
+
+        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
     }
 
     @Test

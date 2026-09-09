@@ -79,7 +79,7 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
         Map<Integer, List<CajaData>> porPalet = new LinkedHashMap<>();
         List<CajaData> sinPalet = new ArrayList<>();
         for (CajaData caja : destino.getCajas()) {
-            if (caja.getNumeroPalet() == null) {
+            if (CajaData.vaSuelta(caja.getNumeroPalet())) {
                 sinPalet.add(caja);
             } else {
                 porPalet.computeIfAbsent(caja.getNumeroPalet(), n -> new ArrayList<>()).add(caja);
