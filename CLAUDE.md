@@ -183,8 +183,10 @@ dos flujos, el de etiquetas de caja y el de etiquetas de artículo: **tocar uno
 afecta a los dos**.
 
 **Etiquetas de artículo** (`service/etiquetasarticulo/`): flujo **independiente
-del envío** (`/etiquetas-articulo`), su única entrada es el excel de pedido del
-cliente. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
+del envío** (`/etiquetas-articulo-produccion`), su única entrada es el excel de
+pedido del cliente. `/etiquetas-articulo` es el **menú de la sección** (en
+`MenuController`, que es una portada y no un paso del flujo): producción y, sin
+implementar todavía, SMS y prototipos. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
 clave de cliente; implementado AMI. Una hoja por fila del pedido (= por EAN13),
 40 etiquetas idénticas por hoja en una rejilla 4×10 que cabe en un A4, y un
 fichero por (tipo, Made in): bolsos MOROCCO, bolsos SPAIN, cinturones
@@ -196,7 +198,8 @@ copia el `pageSetup` al clonar hojas, así que heredarla de una plantilla no
 servía.
 
 **Procesado de escandallos ICSUITE** (`service/escandallos/`): flujo
-**totalmente independiente** del resto (`/escandallos`) — no hay envío, ni
+**totalmente independiente** del resto (`/clickup`, pantalla «Escandallos para
+ClickUp») — no hay envío, ni
 cliente, ni catálogo. Entran N excels de escandallo del ERP y sale **un solo
 `.xlsx` con una hoja por escandallo** (`Escandallos ICSUITE.xlsx`). Los
 escandallos son PDFs convertidos a excel: **los valores no caen en la columna de

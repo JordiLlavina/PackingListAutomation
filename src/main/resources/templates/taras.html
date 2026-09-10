@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragmentos :: head('Taras')}"></head>
 <body>
-<header th:replace="~{fragmentos :: cabecera('· Taras de los cartones')}"></header>
+<header th:replace="~{fragmentos :: cabecera('Taras de los cartones')}"></header>
 <main>
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>

@@ -56,11 +56,6 @@ header.cabecera .marca {
     flex: none;
 }
 
-header.cabecera .paso {
-    font-weight: 400;
-    opacity: 0.75;
-}
-
 h2 { margin-top: 2rem; }
 
 /* Los avisos se apilan de a muchos (una revisión con varias destinaciones
@@ -537,13 +532,16 @@ button:disabled {
 
 /* --- Menú de inicio: una tarjeta por familia de salidas --- */
 
+/* La marca es el enlace de vuelta al menú: en línea con el título y sin el
+   subrayado de un enlace de texto, que sobre un icono no se ve. */
 header.cabecera .enlace-menu {
+    display: inline-flex;
     color: inherit;
     text-decoration: none;
 }
 
 header.cabecera .enlace-menu:hover {
-    text-decoration: underline;
+    opacity: 0.75;
 }
 
 .menu-tarjetas {
@@ -581,6 +579,25 @@ header.cabecera .enlace-menu:hover {
     flex: none;
     margin-top: 0.05rem;
     color: var(--marca);
+}
+
+/* Sección prevista y todavía sin hacer: se enseña apagada en vez de
+   esconderla, para que se vea que está contemplada y no se pida dos veces. */
+.menu-tarjeta.deshabilitada {
+    opacity: 0.6;
+}
+
+/* No lleva a ningún sitio, así que es un <span> y no un enlace: hay que
+   repetirle la forma del botón, que el estilo base solo da a button y a.boton. */
+.menu-tarjeta .boton.deshabilitado {
+    display: inline-block;
+    padding: 0.55rem 1.2rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    background: var(--borde);
+    color: #7a8591;
+    font-weight: 600;
+    cursor: not-allowed;
 }
 
 .menu-entrada {

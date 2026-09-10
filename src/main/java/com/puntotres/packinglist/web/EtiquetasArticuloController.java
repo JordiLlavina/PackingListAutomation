@@ -29,8 +29,10 @@ import com.puntotres.packinglist.service.etiquetasarticulo.GeneradorEtiquetasArt
 import com.puntotres.packinglist.service.etiquetasarticulo.ResultadoEtiquetasArticulo;
 
 /**
- * Flujo de etiquetas de artículo, en dos pantallas: elegir cliente y subir su
- * excel de pedido → descargar los excels generados.
+ * Flujo de etiquetas de artículo de producción, en dos pantallas: elegir
+ * cliente y subir su excel de pedido → descargar los excels generados. Se
+ * llega desde el menú de etiquetas de artículo ({@code /etiquetas-articulo},
+ * en MenuController), que reparte entre producción, SMS y prototipos.
  *
  * No tiene nada que ver con el asistente de packing lists: no necesita JSON,
  * ni envío en curso, ni pesos. Su única entrada es el excel de pedido.
@@ -81,13 +83,13 @@ public class EtiquetasArticuloController {
 
     // --- Paso 1: elegir cliente y subir el pedido ---
 
-    @GetMapping("/etiquetas-articulo")
+    @GetMapping("/etiquetas-articulo-produccion")
     public String entrada(Model model) {
         model.addAttribute("clientes", vistaDeClientes());
-        return "etiquetas-articulo";
+        return "etiquetas-articulo-produccion";
     }
 
-    @PostMapping("/etiquetas-articulo/generar")
+    @PostMapping("/etiquetas-articulo-produccion/generar")
     public String generar(@RequestParam String cliente,
                           @RequestParam(required = false) String temporada,
                           @RequestParam MultipartFile pedido,
@@ -97,11 +99,11 @@ public class EtiquetasArticuloController {
         if (generador == null) {
             redirect.addFlashAttribute("error",
                     "El cliente '" + cliente + "' no tiene etiquetas de artículo implementadas");
-            return "redirect:/etiquetas-articulo";
+            return "redirect:/etiquetas-articulo-produccion";
         }
         if (pedido == null || pedido.isEmpty()) {
             redirect.addFlashAttribute("error", "Falta el " + generador.tituloCampoPedido());
-            return "redirect:/etiquetas-articulo";
+            return "redirect:/etiquetas-articulo-produccion";
         }
 
         ResultadoEtiquetasArticulo resultado;
@@ -115,7 +117,7 @@ public class EtiquetasArticuloController {
             // mostrar tal cual.
             redirect.addFlashAttribute("error", "No se pudieron generar las etiquetas: "
                     + (e.getMessage() != null ? e.getMessage() : MENSAJE_FORMATO_INESPERADO));
-            return "redirect:/etiquetas-articulo";
+            return "redirect:/etiquetas-articulo-produccion";
         } catch (IOException | RuntimeException e) {
             // Cualquier otra cosa (un fichero corrupto, una excepción de POI
             // en inglés, un mensaje null) no es algo que Jordi pueda leer y
@@ -123,12 +125,12 @@ public class EtiquetasArticuloController {
             // la excepción original.
             redirect.addFlashAttribute("error",
                     "No se pudieron generar las etiquetas: " + MENSAJE_FORMATO_INESPERADO);
-            return "redirect:/etiquetas-articulo";
+            return "redirect:/etiquetas-articulo-produccion";
         }
         if (resultado.getExcels().isEmpty()) {
             redirect.addFlashAttribute("error", "El excel de pedido no tiene ninguna fila "
                     + "utilizable: no se ha generado nada");
-            return "redirect:/etiquetas-articulo";
+            return "redirect:/etiquetas-articulo-produccion";
         }
 
         enCurso.reiniciar();
@@ -139,23 +141,23 @@ public class EtiquetasArticuloController {
         // pueden confiar en que nombreFichero no trae "/" ni similares.
         resultado.getExcels().forEach(excel -> enCurso.getExcels().add(sanear(excel)));
         enCurso.getAvisos().addAll(resultado.getAvisos());
-        return "redirect:/etiquetas-articulo/resultados";
+        return "redirect:/etiquetas-articulo-produccion/resultados";
     }
 
     // --- Paso 2: resultados y descargas ---
 
-    @GetMapping("/etiquetas-articulo/resultados")
+    @GetMapping("/etiquetas-articulo-produccion/resultados")
     public String resultados(Model model) {
         if (enCurso.estaVacio()) {
-            return "redirect:/etiquetas-articulo";
+            return "redirect:/etiquetas-articulo-produccion";
         }
         model.addAttribute("excels", enCurso.getExcels());
         model.addAttribute("avisos", enCurso.getAvisos());
         model.addAttribute("cliente", enCurso.getClaveCliente());
-        return "etiquetas-articulo-resultados";
+        return "etiquetas-articulo-produccion-resultados";
     }
 
-    @GetMapping("/etiquetas-articulo/descargar/{nombreFichero}")
+    @GetMapping("/etiquetas-articulo-produccion/descargar/{nombreFichero}")
     public ResponseEntity<byte[]> descargar(@PathVariable String nombreFichero) {
         return enCurso.getExcels().stream()
                 .filter(excel -> excel.nombreFichero().equals(nombreFichero))
@@ -168,7 +170,7 @@ public class EtiquetasArticuloController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @GetMapping("/etiquetas-articulo/descargar-todo")
+    @GetMapping("/etiquetas-articulo-produccion/descargar-todo")
     public ResponseEntity<byte[]> descargarTodo() throws IOException {
         if (enCurso.estaVacio()) {
             return ResponseEntity.notFound().build();
@@ -190,10 +192,10 @@ public class EtiquetasArticuloController {
                 .body(salida.toByteArray());
     }
 
-    @GetMapping("/etiquetas-articulo/nuevo")
+    @GetMapping("/etiquetas-articulo-produccion/nuevo")
     public String nuevo() {
         enCurso.reiniciar();
-        return "redirect:/etiquetas-articulo";
+        return "redirect:/etiquetas-articulo-produccion";
     }
 
     // --- Internos ---

@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragmentos :: head('Temporadas')}"></head>
 <body>
-<header th:replace="~{fragmentos :: cabecera('· Temporadas y ficheros')}"></header>
+<header th:replace="~{fragmentos :: cabecera('Temporadas y ficheros')}"></header>
 <main>
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
@@ -81,7 +81,7 @@
     </section>
 
     <p class="menu-ajustes">
-        <a th:href="@{/packing-list}">← Volver a la entrada del envío</a>
+        <a class="boton secundario" th:href="@{/packing-list}">← Volver</a>
     </p>
 </main>
 </body>

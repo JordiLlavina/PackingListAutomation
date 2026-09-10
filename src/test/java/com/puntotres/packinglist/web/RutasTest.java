@@ -143,10 +143,24 @@ class RutasTest {
     }
 
     @Test
-    void laPantallaDeEtiquetasDeArticuloOfreceElFormulario() throws Exception {
+    void lasEtiquetasDeArticuloAbrenSuPropioMenu() throws Exception {
+        // Producción es lo único hecho; SMS y prototipos se enseñan apagados
+        // en vez de esconderlos, para que se vea que están contemplados.
         mvc.perform(get("/etiquetas-articulo"))
                 .andExpect(status().isOk())
                 .andExpect(view().name("etiquetas-articulo"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "href=\"/etiquetas-articulo-produccion\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("SMS")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Prototipos")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("En desarrollo")));
+    }
+
+    @Test
+    void laPantallaDeEtiquetasDeArticuloOfreceElFormulario() throws Exception {
+        mvc.perform(get("/etiquetas-articulo-produccion"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("etiquetas-articulo-produccion"))
                 // El desplegable y el input del excel de pedido.
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("cliente")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("pedido")));
@@ -154,8 +168,26 @@ class RutasTest {
 
     @Test
     void sinNadaGeneradoLosResultadosVuelvenAlFormulario() throws Exception {
-        mvc.perform(get("/etiquetas-articulo/resultados"))
+        mvc.perform(get("/etiquetas-articulo-produccion/resultados"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/etiquetas-articulo"));
+                .andExpect(redirectedUrl("/etiquetas-articulo-produccion"));
+    }
+
+    @Test
+    void laCabeceraDiceEnQueSeccionEstasYLaMarcaVuelveAlMenu() throws Exception {
+        // El título de la barra era siempre el mismo, así que no informaba de
+        // nada; ahora nombra la sección y el enlace de vuelta es la marca.
+        String html = mvc.perform(get("/taras"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                html.contains("Taras de los cartones"), "el título es el de la sección");
+        org.junit.jupiter.api.Assertions.assertFalse(
+                html.contains("Automatizaciones de Puntotres"),
+                "fuera de la portada, ese título no dice en qué pantalla estás");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                html.matches("(?s).*<a href=\"/menu\" class=\"enlace-menu\".*<img class=\"marca\".*"),
+                "la vuelta al menú es la marca, no el título");
     }
 }

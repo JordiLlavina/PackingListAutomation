@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragmentos :: head('Inicio')}"></head>
 <body>
-<header th:replace="~{fragmentos :: cabecera('')}"></header>
+<header th:replace="~{fragmentos :: cabecera('Automatizaciones de Puntotres')}"></header>
 <main>
     <!-- Cada tarjeta se presenta con lo que produce. El párrafo que había
          encima de la lista repetía lo que la lista ya dice, así que se quitó:
@@ -35,11 +35,11 @@
                 </svg>
                 Etiquetas de artículo
             </h2>
-            <p class="menu-entrada">Necesitas el excel de pedido del cliente.</p>
+            <p class="menu-entrada">Las etiquetas que se pegan en cada pieza.</p>
             <ul class="menu-lista">
-                <li>Un excel de bolsos por país de fabricación</li>
-                <li>Un excel de cinturones</li>
-                <li>40 etiquetas por hoja, ajustadas a un A4</li>
+                <li>Producción, del excel de pedido del cliente</li>
+                <li>SMS — en desarrollo</li>
+                <li>Prototipos — en desarrollo</li>
             </ul>
             <a class="boton" th:href="@{/etiquetas-articulo}">Empezar</a>
         </section>
@@ -51,15 +51,15 @@
                     <path d="M5 3h9l5 5v13H5z"/>
                     <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
                 </svg>
-                Escandallos ICSUITE
+                Escandallos para ClickUp
             </h2>
-            <p class="menu-entrada">Necesitas los excels de escandallo del ERP.</p>
+            <p class="menu-entrada">Necesitas los excels de escandallo de ICSUITE.</p>
             <ul class="menu-lista">
                 <li>Un solo excel con una hoja por escandallo</li>
                 <li>Cada hoja, con el nombre de su modelo y su color</li>
                 <li>Sin precios, sin importes y sin fases</li>
             </ul>
-            <a class="boton" th:href="@{/escandallos}">Empezar</a>
+            <a class="boton" th:href="@{/clickup}">Empezar</a>
         </section>
     </div>
 

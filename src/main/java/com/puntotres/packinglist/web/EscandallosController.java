@@ -52,13 +52,13 @@ public class EscandallosController {
         this.enCurso = enCurso;
     }
 
-    @GetMapping("/escandallos")
+    @GetMapping("/clickup")
     public String entrada() {
         enCurso.reiniciar();
         return VISTA;
     }
 
-    @PostMapping("/escandallos/procesar")
+    @PostMapping("/clickup/procesar")
     public Object procesar(@RequestParam(name = "escandallos", required = false)
                            List<MultipartFile> ficheros, Model model) throws IOException {
         List<FicheroEscandallo> subidos = aFicheros(ficheros);
@@ -87,10 +87,10 @@ public class EscandallosController {
         return VISTA;
     }
 
-    @GetMapping("/escandallos/descargar")
+    @GetMapping("/clickup/descargar")
     public Object descargar() {
         if (enCurso.estaVacio()) {
-            return "redirect:/escandallos";
+            return "redirect:/clickup";
         }
         return descarga(enCurso.getExcel());
     }

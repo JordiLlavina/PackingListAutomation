@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Etiquetas de artículo · Producción')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Etiquetas de artículo · Producción')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <form class="tarjeta" th:action="@{/etiquetas-articulo-produccion/generar}" method="post"
+          enctype="multipart/form-data">
+        <h3 class="titulo-seccion">🏷️ Etiquetas de artículo de producción</h3>
+        <p class="ayuda">
+            Del excel de pedido de la temporada salen los códigos de barras EAN13 de cada
+            referencia, color, pedido y talla: un excel de bolsos por país de fabricación y
+            otro de cinturones, con 40 etiquetas por hoja ajustadas a un A4.
+        </p>
+
+        <label for="cliente">Cliente</label>
+        <select id="cliente" name="cliente" required>
+            <option th:each="entrada : ${clientes}"
+                    th:value="${entrada.key}"
+                    th:text="${entrada.value['disponible'] == 'true'
+                              ? entrada.value['nombre']
+                              : entrada.value['nombre'] + ' — en desarrollo'}"
+                    th:disabled="${entrada.value['disponible'] != 'true'}"
+                    th:attr="data-titulo=${entrada.value['tituloCampoPedido']},
+                             data-temporada=${entrada.value['placeholderTemporada']}"></option>
+        </select>
+
+        <label for="temporada">Temporada</label>
+        <input type="text" id="temporada" name="temporada">
+        <p class="ayuda">
+            Solo se usa si no se puede deducir del propio excel: si su hoja se llama
+            «EAN H26», manda «H26».
+        </p>
+
+        <label for="pedido" id="etiquetaPedido">Excel de pedido del cliente</label>
+        <input type="file" id="pedido" name="pedido" accept=".xlsx" required>
+
+        <button type="submit">Generar etiquetas</button>
+        <a class="boton secundario" th:href="@{/etiquetas-articulo}">Volver</a>
+    </form>
+</main>
+<script>
+    // El rótulo del input y la temporada por defecto dependen del cliente,
+    // igual que en la pantalla de entrada del asistente.
+    (function () {
+        const cliente = document.getElementById('cliente');
+        const etiqueta = document.getElementById('etiquetaPedido');
+        const temporada = document.getElementById('temporada');
+
+        function ajustar() {
+            const opcion = cliente.options[cliente.selectedIndex];
+            if (!opcion) {
+                return;
+            }
+            const titulo = opcion.dataset.titulo;
+            etiqueta.textContent = titulo ? titulo : 'Excel de pedido del cliente';
+            temporada.placeholder = opcion.dataset.temporada || '';
+        }
+
+        cliente.addEventListener('change', ajustar);
+        ajustar();
+    })();
+</script>
+</body>
+</html>

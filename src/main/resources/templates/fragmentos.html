@@ -13,13 +13,17 @@
     <link rel="icon" type="image/png" sizes="180x180" th:href="@{/icono-web-180.png}">
 </head>
 <body>
-<header class="cabecera" th:fragment="cabecera(paso)">
+<header class="cabecera" th:fragment="cabecera(titulo)">
     <div class="titulo">
-        <!-- La misma marca de la pestaña, que sobre la barra en tinta se lee
+        <!-- El camino de vuelta al menú es la marca, no el título: el título
+             dice en qué sección estás, y enlazarlo llevaría a otra distinta.
+             La misma marca de la pestaña, que sobre la barra en tinta se lee
              igual de bien que sobre el blanco de la pestaña. -->
-        <img class="marca" th:src="@{/icono-web-180.png}" alt="" aria-hidden="true">
-        <a th:href="@{/menu}" class="enlace-menu">Generador de Packing Lists</a>
-        <span class="paso" th:text="${paso}">paso</span>
+        <a th:href="@{/menu}" class="enlace-menu" title="Volver al menú"
+           aria-label="Volver al menú">
+            <img class="marca" th:src="@{/icono-web-180.png}" alt="" aria-hidden="true">
+        </a>
+        <span th:text="${titulo}">título de la sección</span>
     </div>
 </header>
 </body>

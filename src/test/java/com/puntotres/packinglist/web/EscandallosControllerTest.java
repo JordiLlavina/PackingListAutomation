@@ -53,21 +53,21 @@ class EscandallosControllerTest {
 
     @Test
     void laPantallaDeEntradaPideLosExcelsDeEscandallo() throws Exception {
-        mvc.perform(get("/escandallos"))
+        mvc.perform(get("/clickup"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Escandallos ICSUITE")));
+                .andExpect(content().string(containsString("Escandallos para ClickUp")));
     }
 
     @Test
     void elMenuEnlazaLaPantallaDeEscandallos() throws Exception {
         mvc.perform(get("/menu"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("/escandallos")));
+                .andExpect(content().string(containsString("/clickup")));
     }
 
     @Test
     void sinAvisosSeDescargaElExcelDirectamente() throws Exception {
-        byte[] excel = mvc.perform(multipart("/escandallos/procesar")
+        byte[] excel = mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
                         .file(escandalloReal("ULL770 SAND.xlsx")))
                 .andExpect(status().isOk())
@@ -83,26 +83,26 @@ class EscandallosControllerTest {
 
     @Test
     void conAvisosSeVuelveALaPantallaConLaListaYElBotonDeDescargar() throws Exception {
-        mvc.perform(multipart("/escandallos/procesar")
+        mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
                         .file(basura("roto.xlsx"))
                         .session(new MockHttpSession()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("roto.xlsx")))
                 .andExpect(content().string(containsString("ULL770.AL245 NOIR")))
-                .andExpect(content().string(containsString("/escandallos/descargar")));
+                .andExpect(content().string(containsString("/clickup/descargar")));
     }
 
     @Test
     void elExcelConAvisosSePuedeDescargarDespuesDesdeLaSesion() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
-        mvc.perform(multipart("/escandallos/procesar")
+        mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
                         .file(basura("roto.xlsx"))
                         .session(sesion))
                 .andExpect(status().isOk());
 
-        byte[] excel = mvc.perform(get("/escandallos/descargar").session(sesion))
+        byte[] excel = mvc.perform(get("/clickup/descargar").session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
 
@@ -113,7 +113,7 @@ class EscandallosControllerTest {
 
     @Test
     void siNingunFicheroEsUtilizableSeQuedaEnLaPantallaConElError() throws Exception {
-        mvc.perform(multipart("/escandallos/procesar").file(basura("roto.xlsx")))
+        mvc.perform(multipart("/clickup/procesar").file(basura("roto.xlsx")))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("roto.xlsx")))
                 .andExpect(content().string(containsString("No se ha podido procesar")));
@@ -121,15 +121,15 @@ class EscandallosControllerTest {
 
     @Test
     void sinFicherosSeAvisaEnVezDeGenerarUnExcelVacio() throws Exception {
-        mvc.perform(multipart("/escandallos/procesar"))
+        mvc.perform(multipart("/clickup/procesar"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("ningún excel de escandallo")));
     }
 
     @Test
     void descargarSinNadaEnSesionVuelveALaPantalla() throws Exception {
-        mvc.perform(get("/escandallos/descargar").session(new MockHttpSession()))
+        mvc.perform(get("/clickup/descargar").session(new MockHttpSession()))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/escandallos"));
+                .andExpect(redirectedUrl("/clickup"));
     }
 }

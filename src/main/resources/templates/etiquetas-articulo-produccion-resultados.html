@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragmentos :: head('Etiquetas de artículo generadas')}"></head>
 <body>
-<header th:replace="~{fragmentos :: cabecera('· Etiquetas de artículo')}"></header>
+<header th:replace="~{fragmentos :: cabecera('Etiquetas de artículo · Producción')}"></header>
 <main>
     <p class="resumen-envio">
         Cliente <strong th:text="${cliente}"></strong> ·
@@ -29,15 +29,15 @@
                 <td th:text="${excel.descripcion}"></td>
                 <td th:text="${excel.nombreFichero}"></td>
                 <td>
-                    <a th:href="@{/etiquetas-articulo/descargar/{nombre}(nombre=${excel.nombreFichero})}">
+                    <a th:href="@{/etiquetas-articulo-produccion/descargar/{nombre}(nombre=${excel.nombreFichero})}">
                         Descargar</a>
                 </td>
             </tr>
             </tbody>
         </table>
 
-        <a class="boton" th:href="@{/etiquetas-articulo/descargar-todo}">Descargar todo (ZIP)</a>
-        <a class="boton secundario" th:href="@{/etiquetas-articulo/nuevo}">Otro pedido</a>
+        <a class="boton" th:href="@{/etiquetas-articulo-produccion/descargar-todo}">Descargar todo (ZIP)</a>
+        <a class="boton secundario" th:href="@{/etiquetas-articulo-produccion/nuevo}">Otro pedido</a>
         <a class="boton secundario" th:href="@{/menu}">Volver al menú</a>
     </section>
 </main>

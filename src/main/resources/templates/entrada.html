@@ -2,7 +2,7 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragmentos :: head('Entrada')}"></head>
 <body>
-<header th:replace="~{fragmentos :: cabecera('· 1. Entrada del envío')}"></header>
+<header th:replace="~{fragmentos :: cabecera('1. Entrada del envío')}"></header>
 <main>
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${errorJson}" th:text="${errorJson}"></div>
@@ -210,19 +210,24 @@
             const ayudaPedido = document.getElementById('ayudaPedidoCliente');
             const bloqueLibre = document.getElementById('bloqueTemporadaLibre');
 
+            // Con una temporada guardada el excel ya está ahí: el input de
+            // fichero se esconde (no hay nada que subir) y su sitio lo ocupa
+            // la confirmación de que ya hay uno cargado.
+            const inputPedido = document.getElementById('pedidoCliente');
+
             if (elegida) {
                 document.getElementById('temporada').value = elegida.temporada;
                 bloqueLibre.style.display = 'none';
                 ayudaTemporada.textContent = 'Excel de pedido guardado: ' + elegida.fichero;
-                ayudaPedido.textContent = 'Ya hay uno guardado para esta temporada ('
-                    + elegida.fichero + '). Sube otro solo si en este envío quieres usar '
-                    + 'un fichero distinto.';
+                inputPedido.style.display = 'none';
+                ayudaPedido.textContent = 'Fichero cargado con éxito';
             } else {
                 bloqueLibre.style.display = '';
                 // Sin temporada elegida no se dice nada: el desplegable y el
                 // lápiz de al lado ya enseñan lo que hay que hacer, y una línea
                 // de texto bajo el campo movía de sitio todo lo de debajo.
                 ayudaTemporada.textContent = '';
+                inputPedido.style.display = '';
                 ayudaPedido.textContent = AYUDA_PEDIDO_SUELTO;
             }
         }

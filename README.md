@@ -47,8 +47,8 @@ mvn spring-boot:run
 Con el servidor levantado, abrir **http://localhost:8080** (redirige al menú `/menu`). Desde ahí:
 
 - `/packing-list` — asistente de packing lists en 3 pantallas: **entrada** (pegar JSON o subir fotos/PDFs) → **revisión** (avisos y tabla editable) → **resultados** (descarga individual, ZIP, volcado ERP y etiquetas de caja).
-- `/etiquetas-articulo` — etiquetas de artículo a partir del excel de pedido (sin envío).
-- `/escandallos` — procesado de escandallos ICSUITE (sin envío ni cliente).
+- `/etiquetas-articulo` — menú de etiquetas de artículo: `/etiquetas-articulo-produccion` (a partir del excel de pedido, sin envío), SMS y prototipos todavía en desarrollo.
+- `/clickup` — escandallos ICSUITE para ClickUp (sin envío ni cliente).
 
 Para usar el **modo CLAUDE** (fotos/PDFs → JSON) hay que exportar la clave antes de arrancar. En PowerShell:
 
