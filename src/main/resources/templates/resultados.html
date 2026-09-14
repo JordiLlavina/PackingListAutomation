@@ -62,24 +62,10 @@
         <a class="boton secundario" th:href="@{/nuevo}">Nuevo envío</a>
     </section>
 
-    <!-- Sección 2: el excel de volcado al ERP -->
-    <section class="tarjeta seccion-salida" th:with="hayVolcado=${volcadoErp != null && volcadoErp.tieneDatos()}">
-        <h3 class="titulo-seccion">📊 Volcado Albarán ICSUITE</h3>
-        <p th:if="${hayVolcado}">
-            <strong th:text="${volcadoErp.nombreFichero}"></strong> ·
-            <span th:text="|${volcadoErp.totalLineas} líneas de artículos listos para importar|"></span>
-        </p>
-        <p th:unless="${hayVolcado}">0 líneas</p>
-
-        <a th:if="${hayVolcado}" class="boton" th:href="@{/descargar-volcado-erp}">Descargar</a>
-        <button th:if="${hayVolcado}" type="button" class="secundario"
-                onclick="abrirModalVolcado()">Vista previa</button>
-        <button th:unless="${hayVolcado}" type="button" disabled>Descargar</button>
-        <button th:unless="${hayVolcado}" type="button" class="secundario" disabled>Vista previa</button>
-    </section>
-
-    <!-- Sección 3: etiquetas de caja. Se generan en el mismo /generar que los
-         packing lists: el excel de pedido que necesitan viene de la entrada. -->
+    <!-- Sección 2: etiquetas de caja. Se generan en el mismo /generar que los
+         packing lists: el excel de pedido que necesitan viene de la entrada.
+         Van antes que el volcado porque son lo que el almacén imprime a
+         continuación de los packing lists; el volcado es para el ERP. -->
     <section class="tarjeta seccion-salida" th:if="${hayGeneradorEtiquetas}">
         <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
 
@@ -153,6 +139,22 @@
         <h3 class="titulo-seccion">🏷️ Etiquetas de caja</h3>
         <p>🔒 En desarrollo — Próximamente</p>
         <button type="button" disabled>Descargar</button>
+    </section>
+
+    <!-- Sección 3: el excel de volcado al ERP -->
+    <section class="tarjeta seccion-salida" th:with="hayVolcado=${volcadoErp != null && volcadoErp.tieneDatos()}">
+        <h3 class="titulo-seccion">📊 Volcado Albarán ICSUITE</h3>
+        <p th:if="${hayVolcado}">
+            <strong th:text="${volcadoErp.nombreFichero}"></strong> ·
+            <span th:text="|${volcadoErp.totalLineas} líneas de artículos listos para importar|"></span>
+        </p>
+        <p th:unless="${hayVolcado}">0 líneas</p>
+
+        <a th:if="${hayVolcado}" class="boton" th:href="@{/descargar-volcado-erp}">Descargar</a>
+        <button th:if="${hayVolcado}" type="button" class="secundario"
+                onclick="abrirModalVolcado()">Vista previa</button>
+        <button th:unless="${hayVolcado}" type="button" disabled>Descargar</button>
+        <button th:unless="${hayVolcado}" type="button" class="secundario" disabled>Vista previa</button>
     </section>
 
     <!-- Modal de vista previa del volcado ERP -->

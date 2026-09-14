@@ -2,6 +2,7 @@ package com.puntotres.packinglist.web;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.PackingListGenerationService;
+import com.puntotres.packinglist.service.PackingPuntotresDocBuilder;
 import com.puntotres.packinglist.service.ValidadorResumenExtraccion;
 import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
 import com.puntotres.packinglist.service.VolcadoErpGenerationService;
@@ -72,8 +74,12 @@ import jakarta.validation.Valid;
 public class PackingListController {
 
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    /** La misma fecha en el nombre del Packing Puntotres: corta y sin barras. */
+    private static final DateTimeFormatter FORMATO_FECHA_CORTA = DateTimeFormatter.ofPattern("dd-MM-yy");
     private static final MediaType TIPO_XLSX =
             MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    private static final MediaType TIPO_DOCX =
+            MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
     private final PreparacionRevisionService preparacion;
     private final ClaudeEnvioExtractionService extractorClaude;
@@ -81,6 +87,7 @@ public class PackingListController {
     private final PackingListGenerationService generador;
     private final VolcadoErpGenerationService generadorVolcado;
     private final VolcadoErpExcelBuilder constructorVolcado;
+    private final PackingPuntotresDocBuilder constructorPackingPuntotres;
     private final EtiquetasGenerationService etiquetasService;
     private final ClientesProperties clientesProperties;
     private final CatalogoTaras catalogoTaras;
@@ -96,6 +103,7 @@ public class PackingListController {
                                  PackingListGenerationService generador,
                                  VolcadoErpGenerationService generadorVolcado,
                                  VolcadoErpExcelBuilder constructorVolcado,
+                                 PackingPuntotresDocBuilder constructorPackingPuntotres,
                                  EtiquetasGenerationService etiquetasService,
                                  ClientesProperties clientesProperties,
                                  CatalogoTaras catalogoTaras,
@@ -110,6 +118,7 @@ public class PackingListController {
         this.generador = generador;
         this.generadorVolcado = generadorVolcado;
         this.constructorVolcado = constructorVolcado;
+        this.constructorPackingPuntotres = constructorPackingPuntotres;
         this.etiquetasService = etiquetasService;
         this.clientesProperties = clientesProperties;
         this.catalogoTaras = catalogoTaras;
@@ -326,6 +335,68 @@ public class PackingListController {
         aplicarEdicionesYReinferir(revisionForm);
         envioEnCurso.alternarFilaDesplegada(destino, indice);
         return "redirect:/revision";
+    }
+
+    /**
+     * El Packing Puntotres: la hoja de trabajo del operario en Word, con las
+     * cajas y palets de la revisión ordenados y comprimidos para imprimirla.
+     * Es un submit del formulario de la revisión, así que aplica ANTES lo
+     * tecleado, igual que el recálculo; pero responde con la descarga en vez
+     * de redirigir, de ahí que devuelva {@code Object}: la única vuelta a la
+     * entrada es la de "no hay envío en curso", con su mensaje de siempre.
+     */
+    @PostMapping("/packing-puntotres")
+    public Object packingPuntotres(@ModelAttribute RevisionForm revisionForm,
+                                   RedirectAttributes redirect) throws IOException {
+        if (envioEnCurso.estaVacio()) {
+            return sinEnvio(redirect);
+        }
+        aplicarEdicionesYReinferir(revisionForm);
+
+        DatosEnvio cabecera = envioEnCurso.getCabecera();
+        String nombreCliente = clientesProperties.clientePara(cabecera.getClaveCliente())
+                .map(ClienteConfig::getNombre)
+                .orElse(cabecera.getClaveCliente());
+        List<PackingPuntotresDocBuilder.Destino> destinos = envioEnCurso.getImportado().getDestinos()
+                .stream()
+                .map(destino -> new PackingPuntotresDocBuilder.Destino(
+                        destino.getDestino().getNombreDestino(),
+                        destino.getDestino().getCajas(), destino.getPalets()))
+                .toList();
+        byte[] documento = constructorPackingPuntotres.generar(cabecera, nombreCliente, destinos);
+
+        String nombreFichero = nombreDelPackingPuntotres(cabecera, nombreCliente);
+        return ResponseEntity.ok()
+                .contentType(TIPO_DOCX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
+                        .attachment().filename(nombreFichero, StandardCharsets.UTF_8).build().toString())
+                .body(documento);
+    }
+
+    /**
+     * "Packing P3 - AMI 24-07-26.docx": cliente y fecha de envío, que es como
+     * se busca en la carpeta de descargas el papel de un envío concreto. La
+     * factura no entra —no es un dato del trabajo, igual que en la cabecera
+     * del documento— y los caracteres que Windows no admite en un nombre de
+     * fichero se sustituyen, porque el nombre del cliente sale del catálogo
+     * y puede traer cualquier cosa ("A.P.C.", una barra).
+     */
+    private static String nombreDelPackingPuntotres(DatosEnvio cabecera, String nombreCliente) {
+        return ("Packing P3 - " + nombreCliente + " " + fechaCorta(cabecera.getFechaEnvio()) + ".docx")
+                .replaceAll("[\\\\/:*?\"<>|]+", "_");
+    }
+
+    /**
+     * La fecha de envío (dd/MM/yyyy) en dd-MM-yy. Una fecha que falte o que no
+     * se entienda cae a la de hoy en vez de tumbar la descarga: el nombre del
+     * fichero no es sitio donde parar un envío.
+     */
+    private static String fechaCorta(String fechaEnvio) {
+        try {
+            return LocalDate.parse(fechaEnvio, FORMATO_FECHA).format(FORMATO_FECHA_CORTA);
+        } catch (RuntimeException sinFecha) {
+            return LocalDate.now().format(FORMATO_FECHA_CORTA);
+        }
     }
 
     @PostMapping("/generar")

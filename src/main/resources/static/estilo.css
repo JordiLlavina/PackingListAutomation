@@ -179,6 +179,25 @@ button.secundario, a.boton.secundario {
     color: var(--acento);
 }
 
+/* Acción de apoyo que no avanza de pantalla (imprimir el Packing Puntotres):
+   relleno como el botón principal para que se vea, pero en un gris claro
+   para que no compita con "Generar Excels Cliente", que es el paso siguiente
+   del flujo. */
+button.gris, a.boton.gris {
+    background: #a3acb5;
+    border-color: #a3acb5;
+    color: #fff;
+}
+
+/* El icono del botón va algo más grande que su texto, sin estirar el botón:
+   line-height 1 para que no sume altura. */
+button .icono {
+    font-size: 1.4em;
+    line-height: 1;
+    vertical-align: -0.15em;
+    margin-right: 0.15rem;
+}
+
 /* Botón de propagar por fila, discreto para no ensuciar la tabla. */
 button.mini {
     margin: 0;
@@ -267,11 +286,13 @@ td input[type="number"], td input[type="text"] {
    sección: poner scroll horizontal aquí convertiría la sección en el contenedor
    de scroll y rompería las cabeceras sticky de arriba.
 
-   La referencia es la más larga con diferencia (ULL136.AL00544); las
-   numéricas —caja, cantidad, palet y los dos pesos— comparten el ancho de
-   talla, que es el mínimo cómodo. */
-section.destino td input.c-referencia { width: 10rem; }
-section.destino td input.c-color { width: 4rem; }
+   La referencia (ULL136.AL00544) y el color comparten el sitio: el color
+   no es solo un código de tres cifras, en AMI llega con su nombre
+   ("221 DARK COFFEE") y tiene que caber entero. Las numéricas —caja,
+   cantidad, palet y los dos pesos— comparten el ancho de talla, que es el
+   mínimo cómodo. */
+section.destino td input.c-referencia { width: 8.5rem; }
+section.destino td input.c-color { width: 8.5rem; }
 section.destino td input.c-pedido { width: 6rem; }
 section.destino td input.c-talla { width: 3.5rem; }
 section.destino td select.c-tamano { width: 5.25rem; }

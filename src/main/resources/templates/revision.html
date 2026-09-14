@@ -181,9 +181,20 @@
             </table>
         </section>
 
-        <button type="submit" class="secundario" th:formaction="@{/recalcular}">Recalcular pesos</button>
-        <button type="submit">Generar excels</button>
-        <a class="boton secundario" th:href="@{/nuevo}">Empezar de nuevo</a>
+        <!-- Sin "Recalcular pesos" al pie: cada fila ya tiene su "recalcula
+             peso", y el envío se reinfiere entero al pulsar cualquiera. Sin
+             "Empezar de nuevo": el camino de vuelta es la marca de la cabecera,
+             y un botón de descartar el envío al lado del de generarlo era un
+             clic de distancia de perder lo tecleado. -->
+        <button type="submit">Generar Excels Cliente</button>
+        <!-- El Packing Puntotres es la hoja de trabajo del operario: solo tiene
+             sentido cuando el packing lo ha repartido el programa (entrada por
+             taller) y las cajas aún están por hacer. Es un submit del mismo
+             formulario, así que lo tecleado se aplica antes de imprimirlo, y
+             la respuesta es una descarga: la pantalla no se recarga. -->
+        <button th:if="${vieneDeTaller}" type="submit" class="gris"
+                th:formaction="@{/packing-puntotres}"
+                title="Descarga en Word la lista ordenada de cajas y palets para hacer el packing"><span class="icono">🖨️</span> Packing Puntotres</button>
     </form>
 </main>
 
@@ -191,7 +202,7 @@
     // Recalcular y desplegar una fila usan POST-redirect-GET: la página se
     // recarga entera y el navegador salta arriba. Thymeleaf no puede evitarlo
     // (el scroll es estado del navegador), así que guardamos la posición antes
-    // y la restauramos al recargar. "Generar excels" lleva a otra pantalla, por
+    // y la restauramos al recargar. "Generar Excels Cliente" lleva a otra pantalla, por
     // eso no se toca: ahí el scroll arriba es el comportamiento correcto.
     (function () {
         var CLAVE = 'revisionScroll';

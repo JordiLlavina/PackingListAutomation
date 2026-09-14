@@ -498,4 +498,31 @@ class PackingListTallerControllerTest {
                         .param("grupos[0].filas[0].objetivos[JAPAN]", "11"))
                 .andExpect(redirectedUrl("/revision"));
     }
+
+    @Test
+    void laRevisionDeUnaEntregaDeTallerOfreceImprimirElPackingPuntotres() throws Exception {
+        // El packing lo ha repartido el programa y las cajas están por hacer:
+        // aquí sí hay una hoja de trabajo que imprimir.
+        digerirUnaEntrega(tallerConUnaReferencia(10));
+        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+                        .param("grupos[0].medidaCaja", "60x40x40")
+                        .param("grupos[0].unidadesPorCaja", "10"))
+                .andExpect(redirectedUrl("/revision"));
+
+        String html = revision();
+        assertTrue(html.contains("Packing Puntotres"), "el botón de imprimir está en la revisión");
+        assertTrue(html.contains("formaction=\"/packing-puntotres\""),
+                "es un submit del mismo formulario, para aplicar lo tecleado antes de imprimir");
+
+        // Y el documento lleva la referencia del taller repartida en cajas.
+        byte[] documento = mvc.perform(post("/packing-puntotres").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        try (var doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(
+                new java.io.ByteArrayInputStream(documento))) {
+            String texto = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc).getText();
+            assertTrue(texto.contains(referencia));
+            assertTrue(texto.contains("CHINA"), "una destinación por tabla");
+        }
+    }
 }

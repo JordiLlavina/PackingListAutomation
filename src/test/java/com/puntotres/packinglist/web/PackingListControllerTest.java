@@ -1342,4 +1342,66 @@ class PackingListControllerTest {
                 // Y una caja sin palet no se tiñe: sale sin clase ninguna.
                 .andExpect(content().string(containsString("<tr>")));
     }
+
+    // --- Packing Puntotres (la hoja de trabajo del operario) ---
+
+    @Test
+    void elPackingPuntotresSeDescargaEnWordConLoTecleadoEnLaRevision() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        // Es un submit del formulario de la revisión: lo tecleado se aplica
+        // antes de imprimir, o el papel diría una cosa y los excels otra.
+        var respuesta = mvc.perform(post("/packing-puntotres").session(sesion)
+                        .param("cajas[0].indiceDestino", "0")
+                        .param("cajas[0].indicesCaja", "0")
+                        .param("cajas[0].codigoColor", "COLOR-TECLEADO"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .andReturn().getResponse();
+
+        // El nombre con el que se busca el papel en la carpeta de descargas:
+        // cliente y fecha de envío, sin la factura. Se lee decodificado
+        // porque la cabecera lo lleva escapado (los espacios viajan como
+        // %20) y buscar el texto crudo daría un falso negativo.
+        assertEquals("Packing P3 - AMI 24-07-26.docx",
+                org.springframework.http.ContentDisposition
+                        .parse(respuesta.getHeader("Content-Disposition")).getFilename());
+        byte[] documento = respuesta.getContentAsByteArray();
+
+        try (var doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(
+                new ByteArrayInputStream(documento))) {
+            String texto = new org.apache.poi.xwpf.extractor.XWPFWordExtractor(doc).getText();
+            assertTrue(texto.contains("Temporada: H26"), "lleva la cabecera del envío");
+            assertTrue(texto.contains("COLOR-TECLEADO"), "lleva el color corregido en la revisión");
+        }
+        // Y la edición se ha quedado en el envío, como con el recálculo.
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(content().string(containsString("COLOR-TECLEADO")));
+    }
+
+    @Test
+    void elPackingPuntotresSinEnvioEnCursoVuelveALaEntrada() throws Exception {
+        mvc.perform(post("/packing-puntotres"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/packing-list"));
+    }
+
+    @Test
+    void laRevisionDeUnEnvioPegadoNoOfreceElPackingPuntotresNiLosBotonesRetirados() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        // El Packing Puntotres es para hacer las cajas que ha repartido el
+        // programa: un envío pegado ya viene empaquetado. Y al pie solo queda
+        // "Generar Excels Cliente": el recálculo vive en cada fila y la salida es la
+        // marca de la cabecera.
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Generar Excels Cliente")))
+                .andExpect(content().string(not(containsString("formaction=\"/packing-puntotres\""))))
+                .andExpect(content().string(not(containsString(">Recalcular pesos<"))))
+                .andExpect(content().string(not(containsString(">Empezar de nuevo<"))));
+    }
 }
