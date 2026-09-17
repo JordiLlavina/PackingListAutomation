@@ -29,7 +29,7 @@ public class ResultadoObjetivos {
      * siendo una fila sin pedido y hay que seguir marcándola en pantalla.
      */
     private final Set<Integer> reconocidas = new LinkedHashSet<>();
-    private final List<String> avisos = new ArrayList<>();
+    private final List<AvisoTaller> avisos = new ArrayList<>();
     private final List<String> bloqueos = new ArrayList<>();
 
     /** Los objetivos de una fila del taller, identificada por su fila del excel. */
@@ -55,8 +55,24 @@ public class ResultadoObjetivos {
         return reconocidas.contains(linea.fila());
     }
 
-    public List<String> getAvisos() {
+    /** Los avisos despiezados; es la lista que se rellena al cruzar el pedido. */
+    public List<AvisoTaller> getDetalle() {
         return avisos;
+    }
+
+    /** Las frases ya sueltas. Vista derivada: añadir aquí no tendría efecto. */
+    public List<String> getAvisos() {
+        return avisos.stream().map(AvisoTaller::texto).toList();
+    }
+
+    /** Un aviso del fichero o del envío entero, sin referencia a la que ir. */
+    public void avisar(String texto) {
+        avisos.add(AvisoTaller.general(texto));
+    }
+
+    /** Un aviso de una referencia, el que baja a su tarjeta en la pantalla. */
+    public void avisarDe(String referencia, String texto) {
+        avisos.add(AvisoTaller.de(referencia, texto));
     }
 
     public List<String> getBloqueos() {

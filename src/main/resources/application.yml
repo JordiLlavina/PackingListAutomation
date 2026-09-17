@@ -82,13 +82,21 @@ packing-list:
           "[PARIS]": { altura-max-cm: 168, prioridad: 2, mezcla: MISMO_PEDIDO }
       "[APC]":
         numeracion-cajas: POR_DESTINACION
+        # Van las destinaciones HIJAS, no solo los padres: la prioridad se
+        # pregunta por la hija (CHINE FRANCH cuelga de WHOLESALE y sin
+        # embargo se sirve de las primeras), y una hija que no esté aquí
+        # bloquea el envío entero. Los nombres son los de la columna "Notre
+        # référence" del excel de pedido, que es de donde llegan.
+        # La altura se hereda del padre si la hija no la declara.
         destinos:
-          "[CHINE FRANCH]": { prioridad: 1, mezcla: LIBRE }
-          "[JAPAN]":        { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
-          "[KOREA]":        { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
-          "[D. USA]":       { altura-max-cm: 155, prioridad: 2, mezcla: LIBRE }
-          "[RETAIL]":       { altura-max-cm: 168, prioridad: 3, mezcla: LIBRE }
-          "[WHOLESALE]":    { altura-max-cm: 168, prioridad: 4, mezcla: LIBRE }
+          "[CHINE FRANCH]":  { prioridad: 1, mezcla: LIBRE }
+          "[AUSTRALIA]":     { prioridad: 1, mezcla: LIBRE }
+          "[JAPAN]":         { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
+          "[KOREA]":         { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
+          "[D. USA]":        { altura-max-cm: 155, prioridad: 2, mezcla: LIBRE }
+          "[DOUANES USA]":   { prioridad: 2, mezcla: LIBRE }
+          "[RETAIL]":        { altura-max-cm: 168, prioridad: 3, mezcla: LIBRE }
+          "[WHOLESALE]":     { altura-max-cm: 168, prioridad: 4, mezcla: LIBRE }
 
   # Catálogo de clientes. Añadir un cliente nuevo de plantilla GENERIC =
   # añadir aquí su bloque (nombre-legal + direccion-entrega), sin tocar Java.
@@ -136,6 +144,11 @@ packing-list:
           nombre-cliente: A.P.C.-USNY-TOUITOU
           direccion: 43 BROOME STREET, 5TH FLOOR; 10013 NEW YORK; USA
           abreviatura: UST
+          # "Douanes USA" es como llama APC a esta destinación en la columna
+          # "Notre référence" de su excel de pedido; "D. USA" es como se
+          # teclea a mano. Es el mismo sitio, así que entra como hija para
+          # que el envío que viene del pedido acabe en este mismo fichero.
+          destinos-hijo: [DOUANES USA, D. USA]
         "[IVRY]":
           nombre-cliente: A.P.C.
           direccion: 74 BIS AV MAURICE THOREZ 94200 IVRY SUR SEINE FRANCE

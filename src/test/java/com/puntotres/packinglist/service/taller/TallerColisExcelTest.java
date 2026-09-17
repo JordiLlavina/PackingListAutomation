@@ -85,7 +85,7 @@ class TallerColisExcelTest {
     }
 
     @Test
-    void laColumnaOpcionalQueNoEstaSaleComoAvisoYNoComoError() throws Exception {
+    void laColumnaOpcionalQueNoEstaSeDiceYNoEsUnError() throws Exception {
         // Sin QTITE / COLIS las unidades por caja quedan a null —nunca a
         // cero— y es el paso de ajuste el que obliga a rellenarlas.
         byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
@@ -94,8 +94,23 @@ class TallerColisExcelTest {
 
         TallerColisExcel excel = TallerColisExcel.desdeBytes(libro);
 
-        assertTrue(excel.avisos().stream().anyMatch(a -> a.contains("QTITE")));
+        assertTrue(excel.opcionalesAusentes().contains(TallerColisExcel.Columna.QTITE_COLIS));
         assertTrue(excel.lineas().stream().allMatch(l -> l.unidadesPorCajaTaller() == null));
+    }
+
+    @Test
+    void elLectorNoJuzgaSiLaColumnaQueFaltaImporta() throws Exception {
+        // Quién necesita CODE depende del cliente, y el cliente aquí no se
+        // conoce: el lector dice qué falta y la digestión decide si avisar.
+        // Por eso una columna ausente no genera aviso por sí sola.
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "QUANTITE"),
+                List.of(List.of("AMI", "PROD", "ULL1", "KAKI", "64")));
+
+        TallerColisExcel excel = TallerColisExcel.desdeBytes(libro);
+
+        assertTrue(excel.opcionalesAusentes().contains(TallerColisExcel.Columna.CODE));
+        assertEquals(List.of(), excel.avisos());
     }
 
     @Test

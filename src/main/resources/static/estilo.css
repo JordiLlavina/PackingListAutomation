@@ -832,6 +832,19 @@ tr.sin-pedido td { background: #fff8e1; }
 
 .lista-avisos { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; line-height: 1.6; }
 
+/* Los avisos de una referencia, dentro de su tarjeta del paso 1b. La tarjeta
+   es blanca como todas, asi que sin tinte estas lineas se leerian como una
+   nota del formulario y no como algo que atender; y sin el margen de abajo se
+   pegan a la cabecera de la tabla y parecen parte de ella. El filete de la
+   izquierda las ata al nombre de la referencia que tienen encima. */
+.avisos-referencia {
+    border-left: 3px solid var(--aviso-borde);
+    background: var(--aviso-fondo);
+    border-radius: 0 4px 4px 0;
+    padding: 0.4rem 0.75rem 0.4rem 1.9rem;
+    margin: 0.5rem 0 0.9rem;
+}
+
 .volver-taller { font-size: 0.9rem; color: #5a6673; margin-bottom: 0.8rem; }
 
 /* --- Avisos de etiquetas de caja (pantalla de resultados) ---------------

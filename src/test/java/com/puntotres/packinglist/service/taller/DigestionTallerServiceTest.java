@@ -27,6 +27,10 @@ class DigestionTallerServiceTest {
     @Autowired
     private MemoriaReferencias memoria;
 
+    /** Para comprobar que las destinaciones del pedido llegan a empaquetarse. */
+    @Autowired
+    private GeneradorPackingTaller generador;
+
     private static byte[] pedidoDe(String referencia, String color, int cantidad) {
         return PedidoAmiExcel.crear("EAN H26",
                 PedidoAmiExcel.Fila.pedida(referencia, color, "U", "07001 CH", cantidad));
@@ -187,6 +191,156 @@ class DigestionTallerServiceTest {
         assertEquals(20, resultado.getGrupos().get(0).getFilas().get(0)
                 .getObjetivos().get(0).cantidad());
         assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("pedido")));
+    }
+
+    // --- APC: el pedido manda, no la hoja del taller ---
+
+    private static byte[] pedidoRealDeApc() throws Exception {
+        try (java.io.InputStream in = DigestionTallerServiceTest.class
+                .getResourceAsStream("/ejemplos/APC_PEDIDO_FALL26.xlsx")) {
+            return in.readAllBytes();
+        }
+    }
+
+    @Test
+    void enApcLaDestinacionYLaCantidadSalenDelPedidoYNoDeLaHojaDelTaller() throws Exception {
+        // El lector de APC estaba escrito y probado pero no cableado, así que
+        // en la aplicación no se usaba nunca: el envío caía al camino
+        // genérico y se quedaba con lo que hubiera apuntado el taller. Este
+        // test va por el contenedor real, que es donde se ve.
+        // 4100128681 va a "Japan" en el fichero real de pedido.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("APC", "F63023", "CAMEL", 30)
+                        .conCode("681").conDestino("PARIS").conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digestion.digerir("APC", taller, pedidoRealDeApc());
+
+        assertEquals(List.of("JAPAN"), resultado.getDestinosActivos(),
+                "la destinación es la del Document d'achat, no el 'PARIS' de la hoja");
+        assertEquals("4100128681", resultado.getGrupos().get(0).getFilas().get(0)
+                .getObjetivos().get(0).pedido());
+    }
+
+    @Test
+    void lasSieteDestinacionesDelPedidoRealDeApcSePuedenEmpaquetar() throws Exception {
+        // Las siete que trae APC_PEDIDO_FALL26. El reparto pregunta la
+        // prioridad por la destinación HIJA, así que una que no esté en las
+        // normas de taller bloquea el envío entero ("no se sabe a qué altura
+        // se apila ni con qué preferencia se sirve"). Antes de cablear el
+        // lector nadie recorría este camino, y a AUSTRALIA y DOUANES USA les
+        // faltaba la norma.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "CAMEL", 20)
+                        .conCode("721").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "CAMEL", 20)
+                        .conCode("719").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "NOIR", 20)
+                        .conCode("706").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "CAMEL", 20)
+                        .conCode("681").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "BEIGE", 20)
+                        .conCode("689").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "NOIR", 20)
+                        .conCode("694").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "KAKI", 20)
+                        .conCode("718").conUnidadesPorCaja(10));
+
+        DigestionTaller digerido = digestion.digerir("APC", taller, pedidoRealDeApc());
+        ResultadoPackingTaller packing =
+                generador.generar("APC", digerido.aFilasAjustadas(), null);
+
+        assertEquals(List.of(), packing.getBloqueos());
+        assertEquals(List.of("AUSTRALIA", "CHINE FRANCH", "DOUANES USA", "JAPAN", "KOREA",
+                "RETAIL", "WHOLESALE"), digerido.getDestinosActivos());
+    }
+
+    @Test
+    void enApcLasHijasDeWholesaleSalenBajoSuDestinacionPadre() throws Exception {
+        // AUSTRALIA, CHINE FRANCH y WHOLESALE viajan al mismo almacén
+        // (Crosslog) y salen en el mismo fichero; la hija solo sobrevive en
+        // la columna DESTINATION. DOUANES USA es la hija única de D. USA.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "CAMEL", 20)
+                        .conCode("721").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "KAKI", 20)
+                        .conCode("718").conUnidadesPorCaja(10),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "NOIR", 20)
+                        .conCode("706").conUnidadesPorCaja(10));
+
+        DigestionTaller digerido = digestion.digerir("APC", taller, pedidoRealDeApc());
+        ResultadoPackingTaller packing =
+                generador.generar("APC", digerido.aFilasAjustadas(), null);
+
+        assertEquals(List.of("WHOLESALE", "D. USA"), packing.getEnvio().getDestinos().stream()
+                .map(d -> d.getDestino()).toList());
+    }
+
+    // --- De qué columnas que faltan vale la pena avisar ---
+
+    @Test
+    void enAmiNoSeAvisaDeQueFalteLaColumnaCode() throws Exception {
+        // CODE solo lo lee APC, donde el código de tres dígitos es el que
+        // dice a qué pedido y a qué destinación va la fila. En AMI el aviso
+        // mandaba a rellenar una columna que el programa ni va a mirar.
+        byte[] taller = PackingTallerExcel.crearSin(List.of("CODE"),
+                PackingTallerExcel.Fila.de("AMI", "BAG-A", "NOIR", 20).conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("BAG-A", "NOIR", 20));
+
+        assertTrue(resultado.getAvisos().stream().noneMatch(a -> a.contains("CODE")));
+    }
+
+    @Test
+    void enApcSiSeAvisaDeQueFalteLaColumnaCode() throws Exception {
+        byte[] taller = PackingTallerExcel.crearSin(List.of("CODE"),
+                PackingTallerExcel.Fila.de("APC", "F67008", "CAMEL", 20).conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digestion.digerir("APC", taller, null);
+
+        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("CODE")));
+    }
+
+    @Test
+    void noSeAvisaDeLasColumnasQueNadieLee() throws Exception {
+        // "Nº EXPEDITION PUNTOTRES" es trazabilidad del taller y "Nº DE
+        // COLIS" su numeración de cajas, que se descarta a propósito porque
+        // el packing se regenera desde cero. Ninguno de los dos se lee en
+        // ningún sitio, así que pedir que se rellenen es ruido que empuja
+        // hacia abajo los avisos que sí hay que atender.
+        byte[] taller = PackingTallerExcel.crearSin(
+                List.of("Nº EXPEDITION PUNTOTRES", "N° DE COLIS"),
+                PackingTallerExcel.Fila.de("AMI", "BAG-A", "NOIR", 20).conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("BAG-A", "NOIR", 20));
+
+        assertTrue(resultado.getAvisos().stream().noneMatch(a -> a.contains("EXPEDITION")));
+        assertTrue(resultado.getAvisos().stream().noneMatch(a -> a.contains("DE COLIS")));
+    }
+
+    @Test
+    void siSeAvisaDeUnaColumnaQueElProgramaSiUsa() throws Exception {
+        // Sin QTITE / COLIS no se sabe cuántas unidades entran en una caja,
+        // y eso hay que teclearlo en esta misma pantalla.
+        byte[] taller = PackingTallerExcel.crearSin(List.of("QTITE /\nCOLIS"),
+                PackingTallerExcel.Fila.de("AMI", "BAG-A", "NOIR", 20));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("BAG-A", "NOIR", 20));
+
+        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("QTITE")));
+    }
+
+    @Test
+    void elAvisoDeUnaColumnaQueFaltaEsDelFicheroYNoDeUnaReferencia() throws Exception {
+        // Habla de la hoja entera: va a la sección general de la pantalla,
+        // no a la tarjeta de ninguna referencia en concreto.
+        byte[] taller = PackingTallerExcel.crearSin(List.of("QTITE /\nCOLIS"),
+                PackingTallerExcel.Fila.de("AMI", "BAG-A", "NOIR", 20));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("BAG-A", "NOIR", 20));
+
+        assertTrue(resultado.getDetalle().stream()
+                .filter(a -> a.texto().contains("QTITE"))
+                .allMatch(a -> a.referencia() == null));
     }
 
     // --- Bloqueos ---
