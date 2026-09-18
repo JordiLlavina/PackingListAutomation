@@ -50,8 +50,8 @@ Producción: `DHL_BASE_URL=https://express.api.dhl.com/mydhlapi` (sin `/test`).
   de envíos y la semilla de motivos). Flyway gestiona el esquema; Hibernate solo valida
   (`ddl-auto: validate`).
 - Log de DHL: logger `dhl.api` — a `INFO` método, ruta, código de respuesta y duración; a
-  `DEBUG` los cuerpos JSON con los PDF sustituidos por `<pdf N bytes>`. La cabecera
-  `Authorization` nunca se escribe.
+  `DEBUG` los cuerpos JSON con los documentos sustituidos por `<documento base64, N
+  caracteres>`. La cabecera `Authorization` nunca se escribe.
 
 ## Dudas abiertas con el contrato de DHL (buscar `TODO DHL` en el código)
 
@@ -70,8 +70,10 @@ no bugs.
 - Seguimiento: `CarrierClient.track` (firma ya definida, lanza `UnsupportedOperationException`),
   tabla de eventos, notificaciones por `Notifier` (correo Microsoft 365, Telegram). El único
   `Notifier` de esta fase es `NoOpNotifier`; `Shipment.urlSeguimiento` ya se guarda al crear.
-- Recogidas y cancelación de guías por API, coste facturado (`Shipment.costeFacturado`, hoy
-  siempre `null`).
+- Gestionar por separado una recogida ya pedida (modificarla o cancelarla, `/pickups`
+  de MyDHL API) y cancelar una guía ya creada en DHL — pedir la recogida al crear el
+  envío (`pickup.isRequested`) ya está hecho, esto es todo lo que queda de recogidas.
+  Coste facturado (`Shipment.costeFacturado`, hoy siempre `null`).
 - Reports de costes por responsable, motivo y cliente (los campos ya están en `Shipment`).
 - Login de Microsoft: sustituir el desplegable de `envios.responsables` por el usuario
   autenticado.
