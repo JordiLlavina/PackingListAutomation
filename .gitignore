@@ -26,3 +26,6 @@ datos/
 # Excel lock files (created while a workbook is open)
 .~lock.*#
 ~$*.xlsx
+
+# Export real de la libreta de MyDHL+: datos personales de terceros, no se versiona.
+docs/Envios DHL/address-book-*.csv
