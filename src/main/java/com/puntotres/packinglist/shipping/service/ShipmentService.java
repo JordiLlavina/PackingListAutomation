@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,8 @@ import com.puntotres.packinglist.shipping.model.*;
  */
 @Service
 public class ShipmentService {
+
+    private static final Logger log = LoggerFactory.getLogger(ShipmentService.class);
 
     private final ShipmentRepository envios;
     private final ContactRepository contactos;
@@ -59,7 +63,14 @@ public class ShipmentService {
         return envios.save(envio);
     }
 
-    /** El envío con todas sus colecciones inicializadas (open-in-view está apagado). */
+    /**
+     * El envío con sus bultos, líneas de aduana, ofertas e historial ya
+     * inicializados (open-in-view está apagado, así que sin esto la vista
+     * lanzaría LazyInitializationException al recorrerlos). Los documentos
+     * NO se cargan aquí a propósito: son PDF y pesan, y la pantalla solo
+     * necesita saber qué tipos hay (tiposDocumento) para pintar los botones
+     * y trae el PDF concreto que se pulse (documento) bajo demanda.
+     */
     @Transactional(readOnly = true)
     public Shipment cargar(Long id) {
         Shipment envio = buscar(id);
@@ -235,13 +246,23 @@ public class ShipmentService {
             envio.setUltimoError(null);
             envio.cambiarEstado(ShipmentStatus.CREATED, envio.getResponsable(), "Guía " + creado.numeroGuia());
             Shipment guardado = envios.save(envio);
-            notifier.envioCreado(guardado);
+            // Un aviso que falla (SMTP caído, Telegram sin responder...) no puede deshacer
+            // un envío que ya existe en DHL: el estado se queda guardado y solo se registra.
+            try {
+                notifier.envioCreado(guardado);
+            } catch (RuntimeException e) {
+                log.warn("El aviso del envío {} ha fallado: {}", envio.getId(), e.getMessage(), e);
+            }
             return guardado;
         } catch (CarrierException e) {
             envio.setUltimoError(e.getMensajeUsuario());
             envio.cambiarEstado(ShipmentStatus.ERROR, envio.getResponsable(), e.getMensajeUsuario());
             Shipment guardado = envios.save(envio);
-            notifier.envioFallido(guardado, e.getMensajeUsuario());
+            try {
+                notifier.envioFallido(guardado, e.getMensajeUsuario());
+            } catch (RuntimeException ex) {
+                log.warn("El aviso del envío {} ha fallado: {}", envio.getId(), ex.getMessage(), ex);
+            }
             return guardado;
         }
     }

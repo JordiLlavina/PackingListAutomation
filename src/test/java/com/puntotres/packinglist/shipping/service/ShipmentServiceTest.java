@@ -188,6 +188,19 @@ class ShipmentServiceTest {
     }
 
     @Test
+    void unAvisoQueFallaNoDeshaceElEstadoDelEnvioNiPropagaLaExcepcion() {
+        servicio.editar(1L, datosCompletos());
+        servicio.tarifar(1L);
+        servicio.confirmar(1L, "P");
+        doThrow(new RuntimeException("smtp caído")).when(notifier).envioCreado(any());
+
+        assertDoesNotThrow(() -> servicio.crear(1L));
+
+        assertEquals(ShipmentStatus.CREATED, envio.getEstado());
+        assertEquals("1103733901", envio.getNumeroGuia());
+    }
+
+    @Test
     void siElTransportistaFallaAlCrearPasaAErrorYReintentarReutilizaElMismoRequestId() {
         servicio.editar(1L, datosCompletos());
         servicio.tarifar(1L);
