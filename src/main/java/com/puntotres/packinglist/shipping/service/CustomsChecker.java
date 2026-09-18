@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.puntotres.packinglist.shipping.config.EnviosProperties;
@@ -14,6 +15,8 @@ public class CustomsChecker {
 
     private final Set<String> unionAduanera;
 
+    // dos constructores; Spring necesita saber cuál
+    @Autowired
     public CustomsChecker(EnviosProperties propiedades) { this(propiedades.getPaisesUnionAduanera()); }
 
     CustomsChecker(List<String> paises) {

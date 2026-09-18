@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.shipping.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.puntotres.packinglist.shipping.config.EnviosProperties;
@@ -15,6 +16,8 @@ public class DirectionResolver {
 
     private final String paisSede;
 
+    // dos constructores; Spring necesita saber cuál
+    @Autowired
     public DirectionResolver(EnviosProperties propiedades) { this(propiedades.getPaisSede()); }
 
     DirectionResolver(String paisSede) { this.paisSede = paisSede.toUpperCase(); }
