@@ -56,6 +56,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Migraciones de esquema. Hasta aquí lo creaba Hibernate con
+             ddl-auto: update; con más de tres tablas eso deja de ser
+             controlable y una columna renombrada se convertiría en una
+             columna nueva vacía sin avisar. La base del almacén, que ya
+             existe, entra por baseline (ver application.yml). -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
         <!-- Apache POI: lectura/escritura de .xlsx (formato OOXML).
              No la gestiona Boot, por eso lleva versión explícita. -->
         <dependency>

@@ -18,8 +18,17 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: update
+      # El esquema lo crea Flyway (db/migration). Hibernate solo comprueba
+      # que las entidades cuadran con él y arranca en error si no.
+      ddl-auto: validate
     open-in-view: false
+
+  # La base del almacén ya tenía las tablas de V1 creadas por Hibernate:
+  # baseline-on-migrate la marca en la versión 1 sin tocarla y aplica el
+  # resto. Una base vacía ejecuta todo desde V1.
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 1
 
   # El CSS y el JS se sirven con un hash del contenido en el nombre
   # (/estilo-a1b2c3.css): sin esto el navegador se queda con la copia vieja
