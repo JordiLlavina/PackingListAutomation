@@ -40,7 +40,7 @@ public class BillingAccount {
         this.numero = numero;
         this.titular = titular;
         this.propia = propia;
-        this.roles = EnumSet.copyOf(roles);
+        setRoles(roles);
     }
 
     public boolean permite(BillingRole rol) { return roles.contains(rol); }
@@ -55,6 +55,7 @@ public class BillingAccount {
     public void setTitular(String titular) { this.titular = titular; }
     public void setPropia(boolean propia) { this.propia = propia; }
     public void setActiva(boolean activa) { this.activa = activa; }
-    public void setRoles(Set<BillingRole> roles) { this.roles = roles.isEmpty() ? EnumSet.noneOf(BillingRole.class) : EnumSet.copyOf(roles); }
+    /** EnumSet.copyOf lanza con una colección vacía que no sea ya un EnumSet (Set.of(), HashSet vacío...); null significa sin roles, como una colección vacía. */
+    public void setRoles(Set<BillingRole> roles) { this.roles = (roles == null || roles.isEmpty()) ? EnumSet.noneOf(BillingRole.class) : EnumSet.copyOf(roles); }
     public void anadirRol(BillingRole rol) { roles.add(rol); }
 }
