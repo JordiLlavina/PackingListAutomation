@@ -21,3 +21,18 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+# Cuenta propia de DHL para que CuentaPropiaInicial dé de alta una cuenta con
+# rol PAYER al arrancar: sin ella no habría ninguna cuenta de transporte que
+# elegir y el test de tarifar-sin-credenciales no llegaría a hablar con el
+# transportista. api-key y api-secret se dejan vacías a propósito: lo que
+# comprueban esos tests es el aviso de credenciales que faltan, no una tarifa real.
+#
+# El número NO es "300112049": ese es el que ya usan como fixture de mentira
+# EsquemaEnviosTest, ShipmentServiceTest y otros, insertándolo directamente
+# por repositorio; con ese mismo número aquí, CuentaPropiaInicial lo daría de
+# alta al arrancar el contexto compartido y esos tests chocarían con una
+# violación de índice único al insertar el suyo.
+envios:
+  dhl:
+    shipper-account: "999888777"
