@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Libreta de contactos')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos · Libreta de contactos')}"></header>
+<main>
+    <nav class="subnav">
+        <a th:href="@{/envios}">Envíos</a>
+        <a th:href="@{/envios/contactos}" class="activo">Libreta</a>
+        <a th:href="@{/envios/cuentas}">Cuentas DHL</a>
+        <a th:href="@{/envios/motivos}">Motivos</a>
+        <a th:href="@{/envios/articulos}">Artículos</a>
+    </nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+    <ul th:if="${errores}">
+        <li th:each="e : ${errores}" th:text="${e}"></li>
+    </ul>
+
+    <section class="tarjeta">
+        <form th:action="@{/envios/contactos}" method="get" class="form-fila">
+            <input type="search" name="q" th:value="${q}" placeholder="Empresa, persona, ciudad o alias">
+            <button type="submit" class="mini">Buscar</button>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <p class="ayuda">
+            <a th:href="@{/envios/contactos/nuevo}">Nuevo contacto</a>
+            &nbsp;·&nbsp;
+            <a th:href="@{/envios/contactos/importar}">Importar libreta de MyDHL+</a>
+        </p>
+        <table class="tabla-mantenimiento">
+            <thead>
+            <tr>
+                <th>Empresa</th>
+                <th>Persona</th>
+                <th>Ciudad</th>
+                <th>País</th>
+                <th>Teléfono</th>
+                <th>Email</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="c : ${contactos}">
+                <td th:text="${c.empresa}"></td>
+                <td th:text="${c.persona}"></td>
+                <td th:text="${c.ciudad}"></td>
+                <td th:text="${c.pais}"></td>
+                <td th:text="${c.telefono}"></td>
+                <td th:text="${c.email}"></td>
+                <td><a th:href="@{/envios/contactos/{id}(id=${c.id})}">Editar</a></td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

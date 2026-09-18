@@ -1,0 +1,5 @@
+# Los CSV de ejemplo son fixtures anonimizados que hay que conservar byte a
+# byte (empiezan por los dos BOM del export real de MyDHL+): git no debe
+# tocarles el final de línea al hacer checkout, pase lo que pase con
+# core.autocrlf en la máquina de quien clona el repo.
+src/test/resources/ejemplos/**/*.csv -text

@@ -920,3 +920,18 @@ tr.sin-pedido td { background: #fff8e1; }
 .tabla-mantenimiento tr.inactiva input { color: #8a949e; }
 .form-fila { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .form-inline { display: inline-block; margin-left: 0.5rem; }
+
+/* Ficha de un contacto: una tarjeta como las demás, pero a rejilla porque
+   tiene muchos más campos que un formulario de una fila. */
+form.form-ficha {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-top: 1rem;
+}
+.rejilla-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0 1.5rem;
+}

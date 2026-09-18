@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Contacto')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos · Libreta de contactos')}"></header>
+<main>
+    <nav class="subnav">
+        <a th:href="@{/envios}">Envíos</a>
+        <a th:href="@{/envios/contactos}" class="activo">Libreta</a>
+        <a th:href="@{/envios/cuentas}">Cuentas DHL</a>
+        <a th:href="@{/envios/motivos}">Motivos</a>
+        <a th:href="@{/envios/articulos}">Artículos</a>
+    </nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <form th:action="@{/envios/contactos}" th:object="${form}" method="post" class="form-ficha">
+        <input type="hidden" th:field="*{id}">
+        <input type="hidden" name="volver" th:value="${volver}">
+
+        <div class="rejilla-2">
+            <label>Empresa
+                <input type="text" th:field="*{empresa}" required>
+            </label>
+            <label>Persona
+                <input type="text" th:field="*{persona}">
+            </label>
+            <label>Dirección 1
+                <input type="text" th:field="*{direccion1}" maxlength="45" required>
+            </label>
+            <label>Dirección 2
+                <input type="text" th:field="*{direccion2}">
+            </label>
+            <label>Dirección 3
+                <input type="text" th:field="*{direccion3}">
+            </label>
+            <label>Código postal
+                <input type="text" th:field="*{codigoPostal}" maxlength="12">
+            </label>
+            <label>Ciudad
+                <input type="text" th:field="*{ciudad}" maxlength="45" required>
+            </label>
+            <label>Provincia
+                <input type="text" th:field="*{provincia}">
+            </label>
+            <label>Código de provincia
+                <input type="text" th:field="*{provinciaCodigo}">
+            </label>
+            <label>País
+                <input type="text" th:field="*{pais}" maxlength="2" placeholder="ES" required>
+            </label>
+            <label>Teléfono
+                <input type="text" th:field="*{telefono}" placeholder="+34 934425135">
+            </label>
+            <label>Email
+                <input type="text" th:field="*{email}">
+            </label>
+            <label>Tipo
+                <select th:field="*{tipo}">
+                    <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}"></option>
+                </select>
+            </label>
+            <label><input type="checkbox" th:field="*{residencial}"> Entrega residencial</label>
+            <label>NIF/VAT
+                <input type="text" th:field="*{nifVat}">
+            </label>
+            <label>EORI
+                <input type="text" th:field="*{eori}">
+            </label>
+            <label>ICE marroquí
+                <input type="text" th:field="*{identificadorMarroqui}">
+            </label>
+            <label>Incoterm por defecto
+                <select th:field="*{incotermPorDefecto}">
+                    <option value="">—</option>
+                    <option th:each="i : ${incoterms}" th:value="${i}" th:text="${i}"></option>
+                </select>
+            </label>
+            <label>Cuenta de transporte por defecto
+                <select th:field="*{cuentaTransportePorDefectoId}">
+                    <option value="">—</option>
+                    <option th:each="c : ${cuentasTransporte}" th:value="${c.id}" th:text="|${c.numero} · ${c.titular}|"></option>
+                </select>
+            </label>
+            <label>Cuenta de aranceles por defecto
+                <select th:field="*{cuentaArancelesPorDefectoId}">
+                    <option value="">—</option>
+                    <option th:each="c : ${cuentasAranceles}" th:value="${c.id}" th:text="|${c.numero} · ${c.titular}|"></option>
+                </select>
+            </label>
+            <label>Alias
+                <textarea th:field="*{aliasTexto}" rows="3"></textarea>
+                <span class="ayuda">uno por línea</span>
+            </label>
+            <label>Notas
+                <textarea th:field="*{notas}"></textarea>
+            </label>
+        </div>
+
+        <button type="submit">Guardar</button>
+        <a th:href="${#strings.isEmpty(volver)} ? @{/envios/contactos} : ${volver}">Volver</a>
+    </form>
+
+    <section class="tarjeta" th:if="${form.id != null}">
+        <form th:action="@{/envios/contactos/{id}/comprobar(id=${form.id})}" method="post" class="form-inline">
+            <input type="hidden" name="tipo" value="RECOGIDA">
+            <button type="submit" class="mini">Comprobar como recogida</button>
+        </form>
+        <form th:action="@{/envios/contactos/{id}/comprobar(id=${form.id})}" method="post" class="form-inline">
+            <input type="hidden" name="tipo" value="ENTREGA">
+            <button type="submit" class="mini">Comprobar como entrega</button>
+        </form>
+        <form th:action="@{/envios/contactos/{id}/baja(id=${form.id})}" method="post" class="form-inline">
+            <button type="submit" class="mini secundario">Dar de baja</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

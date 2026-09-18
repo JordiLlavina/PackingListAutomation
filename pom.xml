@@ -88,6 +88,16 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
+        <!-- Lectura de los CSV de la libreta de MyDHL+ y del catálogo de
+             artículos: campos entrecomillados con comas dentro, que un split
+             a mano acabaría reproduciendo a medias. Boot no gestiona esta
+             versión. -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.14.0</version>
+        </dependency>
+
         <!-- SDK oficial de Anthropic: extracción del packing list a partir
              de imágenes (modo CLAUDE de la pantalla de entrada). -->
         <dependency>

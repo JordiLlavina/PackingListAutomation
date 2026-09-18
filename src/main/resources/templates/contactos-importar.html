@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Importar libreta')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos · Libreta de contactos')}"></header>
+<main>
+    <nav class="subnav">
+        <a th:href="@{/envios}">Envíos</a>
+        <a th:href="@{/envios/contactos}" class="activo">Libreta</a>
+        <a th:href="@{/envios/cuentas}">Cuentas DHL</a>
+        <a th:href="@{/envios/motivos}">Motivos</a>
+        <a th:href="@{/envios/articulos}">Artículos</a>
+    </nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <form th:action="@{/envios/contactos/importar}" method="post" enctype="multipart/form-data" class="form-fila">
+            <input type="file" name="fichero" accept=".csv" required>
+            <button type="submit">Ver qué se importaría</button>
+        </form>
+    </section>
+
+    <div th:if="${previsualizacion}">
+        <p class="ayuda">Las filas con error no se importan; las duplicadas solo si las marcas.</p>
+
+        <form th:action="@{/envios/contactos/importar/confirmar}" method="post">
+            <section class="tarjeta">
+                <h3 class="titulo-seccion" th:text="|Listas para importar (${previsualizacion.listas().size()})|"></h3>
+                <table class="tabla-mantenimiento">
+                    <thead>
+                    <tr>
+                        <th>Fila</th><th>Empresa</th><th>Persona</th><th>Ciudad</th><th>País</th><th>Teléfono</th><th>Cuentas</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="f : ${previsualizacion.listas()}">
+                        <td th:text="${f.numero}"></td>
+                        <td th:text="${f.datos.empresa}"></td>
+                        <td th:text="${f.datos.persona}"></td>
+                        <td th:text="${f.datos.ciudad}"></td>
+                        <td th:text="${f.datos.pais}"></td>
+                        <td th:text="${f.datos.telefono}"></td>
+                        <td th:text="${#strings.listJoin({f.cuentaRemitente, f.cuentaTransporte, f.cuentaAranceles}.?[#this != null], ', ')}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="tarjeta">
+                <h3 class="titulo-seccion" th:text="|Duplicadas (${previsualizacion.duplicadas().size()})|"></h3>
+                <table class="tabla-mantenimiento">
+                    <thead>
+                    <tr>
+                        <th>Fila</th><th>Empresa</th><th>Persona</th><th>Ciudad</th><th>País</th><th>Teléfono</th><th>Cuentas</th>
+                        <th>Importar igual</th><th>Motivo</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="f : ${previsualizacion.duplicadas()}">
+                        <td th:text="${f.numero}"></td>
+                        <td th:text="${f.datos.empresa}"></td>
+                        <td th:text="${f.datos.persona}"></td>
+                        <td th:text="${f.datos.ciudad}"></td>
+                        <td th:text="${f.datos.pais}"></td>
+                        <td th:text="${f.datos.telefono}"></td>
+                        <td th:text="${#strings.listJoin({f.cuentaRemitente, f.cuentaTransporte, f.cuentaAranceles}.?[#this != null], ', ')}"></td>
+                        <td><input type="checkbox" name="duplicadas" th:value="${f.numero}"> importar igual</td>
+                        <td th:text="${f.duplicadoDe}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="tarjeta">
+                <h3 class="titulo-seccion" th:text="|Con errores (${previsualizacion.erroneas().size()})|"></h3>
+                <table class="tabla-mantenimiento">
+                    <thead>
+                    <tr><th>Fila</th><th>Empresa</th><th>Persona</th><th>Errores</th></tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="f : ${previsualizacion.erroneas()}">
+                        <td th:text="${f.numero}"></td>
+                        <td th:text="${f.datos.empresa}"></td>
+                        <td th:text="${f.datos.persona}"></td>
+                        <td th:text="${#strings.listJoin(f.errores, ' ')}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <button type="submit">Importar</button>
+        </form>
+    </div>
+</main>
+</body>
+</html>
