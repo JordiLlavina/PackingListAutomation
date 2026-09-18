@@ -1,0 +1,11 @@
+{
+  "instance": "/expressapi/shipments",
+  "detail": "#/customerDetails/receiverDetails/postalAddress: required key [postalCode] not found",
+  "title": "Validation error",
+  "message": "Bad request",
+  "additionalDetails": [
+    "customerDetails.receiverDetails.postalAddress.postalCode: is missing",
+    "content.packages[0].weight: must be greater than 0"
+  ],
+  "status": "400"
+}

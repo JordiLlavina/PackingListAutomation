@@ -1,0 +1,30 @@
+{
+  "products": [
+    {
+      "productName": "EXPRESS WORLDWIDE NONDOC",
+      "productCode": "P",
+      "localProductCode": "P",
+      "networkTypeCode": "TD",
+      "weight": { "volumetric": 4.8, "provided": 2.5, "unitOfMeasurement": "metric" },
+      "totalPrice": [
+        { "currencyType": "BILLC", "priceCurrency": "EUR", "price": 61.2 },
+        { "currencyType": "PULCL", "priceCurrency": "EUR", "price": 61.2 },
+        { "currencyType": "BASEC", "priceCurrency": "EUR", "price": 61.2 }
+      ],
+      "deliveryCapabilities": {
+        "deliveryTypeCode": "QDDC",
+        "estimatedDeliveryDateAndTime": "2026-09-23T23:59:00",
+        "totalTransitDays": 2
+      }
+    },
+    {
+      "productName": "EXPRESS 12:00 NONDOC",
+      "productCode": "Y",
+      "localProductCode": "Y",
+      "totalPrice": [
+        { "currencyType": "BILLC", "priceCurrency": "EUR", "price": 78.35 }
+      ],
+      "deliveryCapabilities": { "estimatedDeliveryDateAndTime": "2026-09-23T12:00:00" }
+    }
+  ]
+}

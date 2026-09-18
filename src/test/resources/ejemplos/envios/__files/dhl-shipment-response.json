@@ -1,0 +1,13 @@
+{
+  "shipmentTrackingNumber": "1103733901",
+  "trackingUrl": "https://express.api.dhl.com/mydhlapi/shipments/1103733901/tracking",
+  "dispatchConfirmationNumber": "PRG240918123",
+  "packages": [
+    { "referenceNumber": 1, "trackingNumber": "JD014600004617230770", "trackingUrl": "https://express.api.dhl.com/mydhlapi/shipments/1103733901/tracking?pieceTrackingNumber=JD014600004617230770" }
+  ],
+  "documents": [
+    { "imageFormat": "PDF", "content": "JVBERi0xLjQKZXRpcXVldGE=", "typeCode": "label" },
+    { "imageFormat": "PDF", "content": "JVBERi0xLjQKd2F5YmlsbA==", "typeCode": "waybillDoc" },
+    { "imageFormat": "PDF", "content": "JVBERi0xLjQKZmFjdHVyYQ==", "typeCode": "invoice" }
+  ]
+}
