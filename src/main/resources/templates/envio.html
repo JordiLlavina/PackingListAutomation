@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Envío')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera(|Envío DHL nº ${envio.id}|)}"></header>
+<main>
+    <nav th:replace="~{fragmentos :: subnavEnvios('envios')}"></nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error multilinea" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+    <div class="alerta error" th:if="${problemas != null and !#lists.isEmpty(problemas)}">
+        <strong>Falta para tarifar:</strong>
+        <ul><li th:each="p : ${problemas}" th:text="${p}"></li></ul>
+    </div>
+    <div class="alerta aviso" th:if="${!#lists.isEmpty(avisos)}">
+        <ul><li th:each="a : ${avisos}" th:text="${a}"></li></ul>
+    </div>
+
+    <p class="estado-envio">
+        Estado: <span class="estado" th:classappend="'estado-' + ${envio.estado}" th:text="${envio.estado}"></span>
+        <span th:if="${envio.sentido}" th:text="| · ${envio.sentido.etiqueta}|"></span>
+        <span th:text="${envio.aduanero} ? ' · con aduana' : ' · sin aduana'"></span>
+        <span th:if="${envio.numeroGuia}"> · Guía <strong th:text="${envio.numeroGuia}"></strong>
+            <a th:if="${envio.urlSeguimiento}" th:href="${envio.urlSeguimiento}" target="_blank">seguimiento</a></span>
+        <span th:if="${envio.numeroConfirmacionRecogida}" th:text="| · Recogida nº ${envio.numeroConfirmacionRecogida}|"></span>
+    </p>
+
+    <form th:action="@{/envios/{id}(id=${envio.id})}" th:object="${form}" method="post" class="form-envio">
+
+        <section class="tarjeta">
+            <h3 class="titulo-seccion">1. Remitente y destinatario</h3>
+            <div class="rejilla-2">
+                <label>Remitente
+                    <select th:field="*{remitenteId}" th:disabled="${!editable}">
+                        <option value="">— elegir —</option>
+                        <option th:each="c : ${contactos}" th:value="${c.id}" th:text="${c.etiqueta()}"></option>
+                    </select>
+                </label>
+                <label>Destinatario
+                    <select th:field="*{destinatarioId}" th:disabled="${!editable}">
+                        <option value="">— elegir —</option>
+                        <option th:each="c : ${contactos}" th:value="${c.id}" th:text="${c.etiqueta()}"></option>
+                    </select>
+                </label>
+            </div>
+            <p th:if="${editable}" class="acciones-fila">
+                <button type="submit" name="accion" value="intercambiar" class="mini secundario">Intercambiar</button>
+                <a class="boton mini secundario" th:href="@{/envios/contactos/nuevo(volver=|/envios/${envio.id}|)}">Alta rápida de contacto</a>
+            </p>
+        </section>
+
+        <section class="tarjeta">
+            <h3 class="titulo-seccion">2. Motivo, cliente y responsable</h3>
+            <div class="rejilla-3">
+                <label>Motivo
+                    <select th:field="*{motivoId}" th:disabled="${!editable}">
+                        <option value="">— elegir —</option>
+                        <option th:each="m : ${motivos}" th:value="${m.id}" th:text="${m.nombre}"></option>
+                    </select>
+                </label>
+                <label>Cliente <input type="text" th:field="*{cliente}" list="clientes" th:readonly="${!editable}"></label>
+                <datalist id="clientes"><option th:each="c : ${clientes}" th:value="${c}"></option></datalist>
+                <label>Temporada <input type="text" th:field="*{temporada}" list="temporadas" th:readonly="${!editable}"></label>
+                <datalist id="temporadas"><option th:each="t : ${temporadas}" th:value="${t}"></option></datalist>
+                <label>Referencia <input type="text" th:field="*{referencia}" maxlength="35" th:readonly="${!editable}"></label>
+                <label>Responsable
+                    <select th:field="*{responsable}" th:disabled="${!editable}">
+                        <option th:each="r : ${responsables}" th:value="${r}" th:text="${r}"></option>
+                    </select>
+                </label>
+                <label>Fecha de envío <input type="date" th:field="*{fechaRecogida}" th:readonly="${!editable}"></label>
+            </div>
+            <div class="rejilla-3 recogida">
+                <label class="check"><input type="checkbox" th:field="*{pedirRecogida}" th:disabled="${!editable}"> Pedir recogida al mensajero</label>
+                <label>Hora de cierre <input type="time" th:field="*{horaCierreRecogida}" th:readonly="${!editable}"></label>
+                <label>Lugar de recogida <input type="text" th:field="*{lugarRecogida}" maxlength="80" th:readonly="${!editable}"></label>
+            </div>
+            <label>Notas <textarea th:field="*{notas}" rows="2" th:readonly="${!editable}"></textarea></label>
+        </section>
+
+        <section class="tarjeta">
+            <h3 class="titulo-seccion">3. Bultos</h3>
+            <table class="tabla-bultos">
+                <thead><tr><th>#</th><th>Peso (kg)</th><th>Largo (cm)</th><th>Ancho (cm)</th><th>Alto (cm)</th><th>Descripción</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="b, it : *{bultos}">
+                    <td th:text="${it.count}"></td>
+                    <td><input type="number" step="0.01" min="0" th:field="*{bultos[__${it.index}__].peso}" th:readonly="${!editable}"></td>
+                    <td><input type="number" step="0.1" min="0" th:field="*{bultos[__${it.index}__].largo}" th:readonly="${!editable}"></td>
+                    <td><input type="number" step="0.1" min="0" th:field="*{bultos[__${it.index}__].ancho}" th:readonly="${!editable}"></td>
+                    <td><input type="number" step="0.1" min="0" th:field="*{bultos[__${it.index}__].alto}" th:readonly="${!editable}"></td>
+                    <td><input type="text" maxlength="70" th:field="*{bultos[__${it.index}__].descripcion}" th:readonly="${!editable}"></td>
+                    <td><button th:if="${editable}" type="submit" name="accion" value="quitarBulto" th:formaction="@{/envios/{id}(id=${envio.id}, indice=${it.index})}" class="mini gris">Quitar</button></td>
+                </tr>
+                </tbody>
+            </table>
+            <button th:if="${editable}" type="submit" name="accion" value="anadirBulto" class="mini secundario">Añadir bulto</button>
+        </section>
+
+        <section class="tarjeta" th:if="${envio.aduanero}">
+            <h3 class="titulo-seccion">4. Aduana</h3>
+            <table class="tabla-aduana">
+                <thead><tr><th>#</th><th>Descripción</th><th>HS</th><th>Cant.</th><th>Valor ud.</th><th>Neto (kg)</th><th>Bruto (kg)</th><th>Origen</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="l, it : *{lineas}">
+                    <td th:text="${it.count}"></td>
+                    <td><input type="text" maxlength="255" th:field="*{lineas[__${it.index}__].descripcion}" th:readonly="${!editable}"></td>
+                    <td><input type="text" maxlength="20" size="10" th:field="*{lineas[__${it.index}__].codigoHs}" th:readonly="${!editable}"></td>
+                    <td><input type="number" min="1" step="1" th:field="*{lineas[__${it.index}__].cantidad}" th:readonly="${!editable}"></td>
+                    <td><input type="number" min="0" step="0.01" th:field="*{lineas[__${it.index}__].valorUnitario}" th:readonly="${!editable}"></td>
+                    <td><input type="number" min="0" step="0.001" th:field="*{lineas[__${it.index}__].pesoNeto}" th:readonly="${!editable}"></td>
+                    <td><input type="number" min="0" step="0.001" th:field="*{lineas[__${it.index}__].pesoBruto}" th:readonly="${!editable}"></td>
+                    <td><input type="text" maxlength="2" size="2" th:field="*{lineas[__${it.index}__].paisOrigen}" th:readonly="${!editable}"></td>
+                    <td><input type="hidden" th:field="*{lineas[__${it.index}__].articuloId}">
+                        <button th:if="${editable}" type="submit" name="accion" value="quitarLinea" th:formaction="@{/envios/{id}(id=${envio.id}, indice=${it.index})}" class="mini gris">Quitar</button></td>
+                </tr>
+                </tbody>
+                <tfoot><tr><td colspan="4">Valor declarado</td><td th:text="|${#numbers.formatDecimal(envio.valorDeclarado(), 1, 2)} ${envio.moneda}|"></td>
+                    <td></td><td th:text="${#numbers.formatDecimal(envio.pesoBrutoLineas(), 1, 2)}"></td><td colspan="2"></td></tr></tfoot>
+            </table>
+            <p th:if="${editable}" class="acciones-fila">
+                <button type="submit" name="accion" value="anadirLinea" class="mini secundario">Añadir línea vacía</button>
+                <select name="articuloId"><option value="">— artículo del catálogo —</option>
+                    <option th:each="a : ${articulos}" th:value="${a.id}" th:text="|${a.referencia} · ${a.descripcionAduanera}|"></option></select>
+                <button type="submit" name="accion" value="anadirArticulo" class="mini secundario">Añadir del catálogo</button>
+            </p>
+        </section>
+
+        <section class="tarjeta">
+            <h3 class="titulo-seccion">5. Pago</h3>
+            <div class="rejilla-3">
+                <label>Cuenta que paga el transporte
+                    <select th:field="*{cuentaTransporteId}" th:disabled="${!editable}">
+                        <option value="">— elegir —</option>
+                        <option th:each="c : ${cuentasTransporte}" th:value="${c.id}" th:text="|${c.numero} · ${c.titular}|"></option>
+                    </select>
+                </label>
+                <label>Cuenta que paga los aranceles
+                    <select th:field="*{cuentaArancelesId}" th:disabled="${!editable}">
+                        <option value="">— el destinatario a la entrega —</option>
+                        <option th:each="c : ${cuentasAranceles}" th:value="${c.id}" th:text="|${c.numero} · ${c.titular}|"></option>
+                    </select>
+                </label>
+                <label>Incoterm
+                    <select th:field="*{incoterm}" th:disabled="${!editable}">
+                        <option th:each="i : ${incoterms}" th:value="${i}" th:text="${i}"></option>
+                    </select>
+                </label>
+            </div>
+        </section>
+
+        <section class="tarjeta" th:if="${!#lists.isEmpty(envio.ofertas)}">
+            <h3 class="titulo-seccion">6. Tarifa</h3>
+            <table class="tabla-ofertas">
+                <thead><tr><th></th><th>Producto</th><th>Precio</th><th>Entrega estimada</th></tr></thead>
+                <tbody>
+                <tr th:each="o : ${envio.ofertas}">
+                    <td><input type="radio" th:field="*{productoCodigo}" th:value="${o.productoCodigo}" th:disabled="${envio.estado.name() != 'QUOTED'}"></td>
+                    <td th:text="|${o.productoNombre} (${o.productoCodigo})|"></td>
+                    <td th:text="${o.precio != null} ? |${#numbers.formatDecimal(o.precio, 1, 2)} ${o.moneda}| : 'sin precio'"></td>
+                    <td th:text="${o.entregaEstimada != null} ? ${#temporals.format(o.entregaEstimada, 'dd/MM/yyyy HH:mm')} : ''"></td>
+                </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="tarjeta" th:if="${envio.estado.name() == 'CREATED'}">
+            <h3 class="titulo-seccion">Documentos</h3>
+            <p><a th:each="t : ${tiposDocumento}" class="boton secundario" th:href="@{/envios/{id}/documentos/{t}.pdf(id=${envio.id}, t=${t})}" th:text="${t}"></a></p>
+        </section>
+
+        <section class="acciones">
+            <th:block th:if="${editable}">
+                <button type="submit" name="accion" value="guardar" class="secundario">Guardar</button>
+                <button type="submit" name="accion" value="tarifar">Tarifar</button>
+            </th:block>
+            <th:block th:if="${envio.estado.name() == 'QUOTED'}">
+                <button type="submit" name="accion" value="modificar" class="secundario">Modificar datos</button>
+                <button type="submit" name="accion" value="confirmar">Confirmar y crear</button>
+            </th:block>
+            <th:block th:if="${envio.estado.name() == 'CONFIRMED' or envio.estado.name() == 'ERROR'}">
+                <button type="submit" name="accion" value="reintentar">Reintentar la creación en DHL</button>
+            </th:block>
+            <button th:if="${envio.estado.name() != 'CREATED' and envio.estado.name() != 'CANCELLED'}" type="submit" name="accion" value="cancelar" class="gris"
+                    onclick="return confirm('¿Cancelar este envío?')">Cancelar envío</button>
+        </section>
+    </form>
+
+    <section class="tarjeta historial" th:if="${!#lists.isEmpty(envio.historial)}">
+        <h3 class="titulo-seccion">Historial</h3>
+        <ul>
+            <li th:each="h : ${envio.historial}" th:text="|${#temporals.format(h.fecha, 'dd/MM/yyyy HH:mm')} · ${h.estadoNuevo} · ${h.responsable ?: ''} ${h.detalle != null ? '· ' + h.detalle : ''}|"></li>
+        </ul>
+    </section>
+</main>
+</body>
+</html>

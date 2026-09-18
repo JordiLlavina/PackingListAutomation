@@ -94,4 +94,38 @@ class RutasEnviosTest {
                 .andExpect(redirectedUrl("/envios/articulos"));
         mvc.perform(get("/envios/articulos")).andExpect(content().string(containsString("PXCEI-F67043")));
     }
+
+    @Test
+    void elListadoSePintaYNuevoCreaUnBorradorYRedirigeASuFicha() throws Exception {
+        mvc.perform(get("/envios")).andExpect(status().isOk()).andExpect(view().name("envios"));
+        String destino = mvc.perform(post("/envios/nuevo")).andExpect(status().is3xxRedirection())
+                .andReturn().getResponse().getRedirectedUrl();
+        org.junit.jupiter.api.Assertions.assertTrue(destino.matches("/envios/\\d+"), destino);
+        mvc.perform(get(destino)).andExpect(status().isOk()).andExpect(view().name("envio"))
+                .andExpect(content().string(containsString("DRAFT")))
+                .andExpect(content().string(containsString("Tarifar")));
+    }
+
+    @Test
+    void anadirUnBultoYGuardarSeReflejaEnLaFicha() throws Exception {
+        String destino = mvc.perform(post("/envios/nuevo")).andReturn().getResponse().getRedirectedUrl();
+        mvc.perform(post(destino).param("accion", "anadirBulto").param("responsable", "Jordi"))
+                .andExpect(redirectedUrl(destino));
+        mvc.perform(post(destino).param("accion", "guardar").param("responsable", "Jordi")
+                        .param("bultos[0].peso", "2.5").param("bultos[0].largo", "40").param("bultos[0].ancho", "30").param("bultos[0].alto", "20"))
+                .andExpect(flash().attribute("mensaje", "Guardado."));
+        mvc.perform(get(destino)).andExpect(content().string(containsString("value=\"2.5\"")));
+    }
+
+    @Test
+    void tarifarSinDatosVuelveConLaListaDeProblemas() throws Exception {
+        String destino = mvc.perform(post("/envios/nuevo")).andReturn().getResponse().getRedirectedUrl();
+        mvc.perform(post(destino).param("accion", "tarifar").param("responsable", "Jordi"))
+                .andExpect(flash().attributeExists("problemas"));
+    }
+
+    @Test
+    void unEnvioQueNoExisteVuelveAlListadoConMensaje() throws Exception {
+        mvc.perform(get("/envios/999999")).andExpect(redirectedUrl("/envios")).andExpect(flash().attributeExists("mensajeError"));
+    }
 }

@@ -4,13 +4,7 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('Envíos · Artículos')}"></header>
 <main>
-    <nav class="subnav">
-        <a th:href="@{/envios}">Envíos</a>
-        <a th:href="@{/envios/contactos}">Libreta</a>
-        <a th:href="@{/envios/cuentas}">Cuentas DHL</a>
-        <a th:href="@{/envios/motivos}">Motivos</a>
-        <a th:href="@{/envios/articulos}" class="activo">Artículos</a>
-    </nav>
+    <nav th:replace="~{fragmentos :: subnavEnvios('articulos')}"></nav>
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
 

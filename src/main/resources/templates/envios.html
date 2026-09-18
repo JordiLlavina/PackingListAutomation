@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Envíos')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos por transportista')}"></header>
+<main>
+    <nav th:replace="~{fragmentos :: subnavEnvios('envios')}"></nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <form th:action="@{/envios/nuevo}" method="post" class="form-inline">
+            <button type="submit">Nuevo envío DHL</button>
+        </form>
+        <form th:action="@{/envios}" method="get" th:object="${filtro}" class="form-fila filtros">
+            <label>Desde <input type="date" th:field="*{desde}"></label>
+            <label>Hasta <input type="date" th:field="*{hasta}"></label>
+            <label>Estado <select th:field="*{estado}"><option value="">todos</option><option th:each="e : ${estados}" th:value="${e}" th:text="${e}"></option></select></label>
+            <label>Motivo <select th:field="*{motivoId}"><option value="">todos</option><option th:each="m : ${motivos}" th:value="${m.id}" th:text="${m.nombre}"></option></select></label>
+            <label>Cliente <input type="text" th:field="*{cliente}" size="10"></label>
+            <label>Sentido <select th:field="*{sentido}"><option value="">todos</option><option th:each="s : ${sentidos}" th:value="${s}" th:text="${s.etiqueta}"></option></select></label>
+            <button type="submit" class="secundario">Filtrar</button>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <table class="tabla-envios">
+            <thead><tr><th>Fecha</th><th>Guía</th><th>De → a</th><th>Motivo</th><th>Cliente</th><th>Responsable</th><th>Coste</th><th>Estado</th></tr></thead>
+            <tbody>
+            <tr th:each="e : ${envios}">
+                <td><a th:href="@{/envios/{id}(id=${e.id})}" th:text="${#temporals.format(e.fechaCreacion, 'dd/MM/yyyy')}"></a></td>
+                <td th:text="${e.numeroGuia} ?: '—'"></td>
+                <td th:text="|${e.remitente?.empresa ?: '?'} → ${e.destinatario?.empresa ?: '?'}|"></td>
+                <td th:text="${e.motivo?.nombre}"></td>
+                <td th:text="${e.cliente}"></td>
+                <td th:text="${e.responsable}"></td>
+                <td th:text="${e.costeEstimado != null} ? |${#numbers.formatDecimal(e.costeEstimado, 1, 2)} ${e.moneda}| : ''"></td>
+                <td><span class="estado" th:classappend="'estado-' + ${e.estado}" th:text="${e.estado}"></span></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(envios)}"><td colspan="8" class="ayuda">No hay envíos con esos filtros.</td></tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

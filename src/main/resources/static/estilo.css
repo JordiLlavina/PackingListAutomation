@@ -935,3 +935,26 @@ form.form-ficha {
     grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
     gap: 0 1.5rem;
 }
+
+/* La ficha del envío reutiliza el nombre .rejilla-2/.rejilla-3, pero con dos
+   y tres columnas fijas en vez del auto-fit de la ficha de contacto: aquí las
+   parejas (remitente/destinatario) y tríos de campos van siempre a ancho
+   igual. Va con el prefijo .form-envio para no pisar la rejilla de la ficha
+   de contacto, que comparte el nombre .rejilla-2 con otro sentido. */
+.form-envio .rejilla-2 { grid-template-columns: 1fr 1fr; gap: 0.6rem 1rem; }
+.form-envio .rejilla-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem 1rem; }
+.form-envio .rejilla-2 label, .form-envio .rejilla-3 label, .form-envio > .tarjeta > label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.9rem; }
+.form-envio select, .form-envio input[type="date"] { padding: 0.35rem; font: inherit; }
+.form-envio input:read-only, .form-envio select:disabled { background: #f3f5f7; color: #3a4550; }
+.acciones { display: flex; gap: 0.6rem; flex-wrap: wrap; margin: 1rem 0; }
+.acciones-fila { display: flex; gap: 0.5rem; align-items: center; margin: 0.5rem 0 0; }
+.estado { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 0.8rem; font-size: 0.8rem; font-weight: bold; background: #e6e9ed; }
+.estado-QUOTED { background: #e3ecfa; } .estado-CONFIRMED { background: #fff1cc; }
+.estado-CREATED { background: #d9f2df; } .estado-ERROR { background: #f9d6d5; } .estado-CANCELLED { background: #e6e9ed; color: #7a8590; }
+.alerta.aviso { background: #fff8e1; border-left: 4px solid #e0a800; }
+.alerta.multilinea { white-space: pre-line; }
+.alerta ul { margin: 0.3rem 0 0 1rem; }
+.historial ul { margin: 0; padding-left: 1rem; font-size: 0.85rem; color: #5a6673; }
+.tabla-bultos input[type="number"], .tabla-aduana input[type="number"] { width: 5.5rem; }
+.tabla-aduana input[type="text"] { width: 100%; box-sizing: border-box; }
+.filtros { margin-top: 0.6rem; }

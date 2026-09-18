@@ -26,5 +26,12 @@
         <span th:text="${titulo}">título de la sección</span>
     </div>
 </header>
+<nav class="subnav" th:fragment="subnavEnvios(activo)">
+    <a th:href="@{/envios}" th:classappend="${activo == 'envios'} ? 'activo'">Envíos</a>
+    <a th:href="@{/envios/contactos}" th:classappend="${activo == 'contactos'} ? 'activo'">Libreta</a>
+    <a th:href="@{/envios/cuentas}" th:classappend="${activo == 'cuentas'} ? 'activo'">Cuentas DHL</a>
+    <a th:href="@{/envios/motivos}" th:classappend="${activo == 'motivos'} ? 'activo'">Motivos</a>
+    <a th:href="@{/envios/articulos}" th:classappend="${activo == 'articulos'} ? 'activo'">Artículos</a>
+</nav>
 </body>
 </html>
