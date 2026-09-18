@@ -11,7 +11,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import com.puntotres.packinglist.shipping.model.*;
@@ -36,41 +35,10 @@ public class ShipmentsApiController {
     public ResponseEntity<ShipmentDto> crear(@RequestBody @Valid ShipmentInput entrada) {
         String responsable = entrada.responsable() == null || entrada.responsable().isBlank() ? "api" : entrada.responsable();
         Shipment borrador = envios.crearBorrador(responsable);
-        Shipment editado = envios.editar(borrador.getId(), conDefectosDeRecogida(entrada.aDatos(), borrador));
+        Shipment editado = envios.editar(borrador.getId(), entrada.aDatos());
         return ResponseEntity.status(HttpStatus.CREATED).body(dto(editado));
     }
 
-    /**
-     * editar() sobrescribe siempre pedirRecogida/horaCierreRecogida/lugarRecogida
-     * con lo que traiga la entrada, sin mirar el valor anterior (igual que hace
-     * con cliente o notas): el formulario web nunca lo nota porque siempre
-     * reenvía las tres con las que se rellenó el envío. Un POST o PUT de la API
-     * que no las mande no debería perder la hora de cierre por defecto que
-     * crearBorrador puso (o la que ya tenía el envío), o "pedirRecogida" se
-     * queda true sin hora y problemasParaTarifar lo bloquea con un dato que
-     * nadie pidió cambiar. "previo" es el borrador recién creado en el POST y
-     * el envío ya existente en el PUT.
-     */
-    private static DatosEnvio conDefectosDeRecogida(DatosEnvio datos, Shipment previo) {
-        if (datos.pedirRecogida() != null && datos.horaCierreRecogida() != null && datos.lugarRecogida() != null) return datos;
-        return new DatosEnvio(datos.remitenteId(), datos.destinatarioId(), datos.fechaRecogida(), datos.incoterm(),
-                datos.cuentaTransporteId(), datos.cuentaArancelesId(), datos.motivoId(),
-                datos.cliente(), datos.temporada(), datos.referencia(), datos.notas(), datos.responsable(),
-                datos.pedirRecogida() == null ? previo.isPedirRecogida() : datos.pedirRecogida(),
-                datos.horaCierreRecogida() == null ? previo.getHoraCierreRecogida() : datos.horaCierreRecogida(),
-                datos.lugarRecogida() == null ? previo.getLugarRecogida() : datos.lugarRecogida(),
-                datos.bultos(), datos.lineasAduana());
-    }
-
-    /**
-     * @Transactional propia: listar() no toca los bultos ni las líneas de
-     * aduana de cada envío (la pantalla solo pinta columnas sueltas), así que
-     * ShipmentService no las inicializa; aquí sí hace falta para poder montar
-     * el ShipmentDto completo, y sin una transacción abierta durante el
-     * volcado a DTO la colección lazy revienta con LazyInitializationException
-     * en cuanto se ha cerrado la de ShipmentService.listar().
-     */
-    @Transactional(readOnly = true)
     @GetMapping
     public List<ShipmentDto> listar(@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                                     @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
@@ -84,10 +52,7 @@ public class ShipmentsApiController {
     public ShipmentDto uno(@PathVariable Long id) { return dto(envios.cargar(id)); }
 
     @PutMapping("/{id}")
-    public ShipmentDto editar(@PathVariable Long id, @RequestBody @Valid ShipmentInput entrada) {
-        Shipment actual = envios.cargar(id);
-        return dto(envios.editar(id, conDefectosDeRecogida(entrada.aDatos(), actual)));
-    }
+    public ShipmentDto editar(@PathVariable Long id, @RequestBody @Valid ShipmentInput entrada) { return dto(envios.editar(id, entrada.aDatos())); }
 
     @PostMapping("/{id}/quote")
     public ResponseEntity<?> tarifar(@PathVariable Long id) {

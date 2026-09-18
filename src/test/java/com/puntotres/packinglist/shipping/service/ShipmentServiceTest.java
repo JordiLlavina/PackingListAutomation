@@ -260,4 +260,26 @@ class ShipmentServiceTest {
         servicio.editar(1L, pesado);
         assertTrue(servicio.avisos(envio).stream().anyMatch(a -> a.contains("bruto")), "Σ bruto líneas 5 > Σ bultos 1");
     }
+
+    @Test
+    void editarConHoraCierreYLugarNulosConservaLoDelBorradorYConCadenaVaciaLosBorra() {
+        Shipment borrador = servicio.crearBorrador("Jordi");
+        when(envios.findById(1L)).thenReturn(Optional.of(borrador));
+        assertEquals("18:00", borrador.getHoraCierreRecogida());
+        assertEquals("Recepción", borrador.getLugarRecogida());
+
+        // null en la entrada significa "no tocar": lo que puso crearBorrador sobrevive.
+        DatosEnvio sinRecogida = new DatosEnvio(10L, 20L, LocalDate.now().plusDays(1), Incoterm.DAP, 30L, null, 40L,
+                "AMI", "H26", "MUESTRAS-1", null, "Jordi", null, null, null, List.of(), List.of());
+        Shipment editado = servicio.editar(1L, sinRecogida);
+        assertEquals("18:00", editado.getHoraCierreRecogida());
+        assertEquals("Recepción", editado.getLugarRecogida());
+
+        // una cadena vacía sí es una orden explícita de borrar, vía limpiar().
+        DatosEnvio vaciando = new DatosEnvio(10L, 20L, LocalDate.now().plusDays(1), Incoterm.DAP, 30L, null, 40L,
+                "AMI", "H26", "MUESTRAS-1", null, "Jordi", null, "", "", List.of(), List.of());
+        Shipment vaciado = servicio.editar(1L, vaciando);
+        assertNull(vaciado.getHoraCierreRecogida());
+        assertNull(vaciado.getLugarRecogida());
+    }
 }

@@ -74,13 +74,20 @@ public class ShipmentService {
     @Transactional(readOnly = true)
     public Shipment cargar(Long id) {
         Shipment envio = buscar(id);
-        envio.getBultos().size();
-        envio.getLineasAduana().size();
-        envio.getOfertas().size();
-        envio.getHistorial().size();
+        inicializar(envio);
         return envio;
     }
 
+    /**
+     * Igual que cargar(), para toda la lista: la pantalla de listado solo
+     * pinta columnas sueltas y nunca lo necesitó, pero la API sí monta un DTO
+     * completo por envío (bultos, líneas, ofertas, historial), así que sin
+     * esto cada entidad llegaría con esas colecciones lazy sin inicializar.
+     * El servicio es el dueño de la carga perezosa porque open-in-view está
+     * apagado y los controladores no deben abrir transacciones propias: una
+     * sola regla para cualquier llamador, en vez de que cada controlador
+     * decida por su cuenta qué inicializar.
+     */
     @Transactional(readOnly = true)
     public List<Shipment> listar(FiltroEnvios filtro) {
         Specification<Shipment> spec = (raiz, consulta, cb) -> {
@@ -95,9 +102,24 @@ public class ShipmentService {
             consulta.orderBy(cb.desc(raiz.get("fechaCreacion")));
             return cb.and(condiciones.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
-        return envios.findAll(spec);
+        List<Shipment> resultado = envios.findAll(spec);
+        resultado.forEach(this::inicializar);
+        return resultado;
     }
 
+    private void inicializar(Shipment envio) {
+        envio.getBultos().size();
+        envio.getLineasAduana().size();
+        envio.getOfertas().size();
+        envio.getHistorial().size();
+    }
+
+    /**
+     * Igual que responsable, horaCierreRecogida y lugarRecogida solo se tocan
+     * si datos las trae (null significa "no tocar" y conserva lo que ya
+     * tuviera el envío, típicamente lo que puso crearBorrador); una cadena
+     * vacía sí las borra, vía limpiar().
+     */
     @Transactional
     public Shipment editar(Long id, DatosEnvio datos) {
         Shipment envio = buscar(id);
@@ -117,8 +139,8 @@ public class ShipmentService {
         envio.setNotas(limpiar(datos.notas()));
         if (datos.responsable() != null && !datos.responsable().isBlank()) envio.setResponsable(datos.responsable());
         envio.setPedirRecogida(datos.pedirRecogida() == null || datos.pedirRecogida());
-        envio.setHoraCierreRecogida(limpiar(datos.horaCierreRecogida()));
-        envio.setLugarRecogida(limpiar(datos.lugarRecogida()));
+        if (datos.horaCierreRecogida() != null) envio.setHoraCierreRecogida(limpiar(datos.horaCierreRecogida()));
+        if (datos.lugarRecogida() != null) envio.setLugarRecogida(limpiar(datos.lugarRecogida()));
 
         envio.getBultos().clear();
         for (DatosEnvio.DatosBulto b : datos.bultos()) {
