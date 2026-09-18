@@ -1,0 +1,275 @@
+package com.puntotres.packinglist.shipping.service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.puntotres.packinglist.shipping.carrier.*;
+import com.puntotres.packinglist.shipping.config.EnviosProperties;
+import com.puntotres.packinglist.shipping.model.*;
+
+/**
+ * La máquina de estados del envío:
+ *
+ *   DRAFT ─tarifar→ QUOTED ─confirmar→ CONFIRMED ─crear→ CREATED | ERROR ─crear→ ...
+ *   editar desde QUOTED vuelve a DRAFT; cancelar desde todo menos CREATED/CANCELLED.
+ *
+ * Confirmar persiste el requestId ANTES de hablar con el transportista, y
+ * crear lo reutiliza: así un envío confirmado nunca se crea dos veces aunque
+ * el proceso muera a medias o el usuario haga doble clic (@Version en Shipment
+ * hace que el segundo clic falle con una excepción de concurrencia).
+ */
+@Service
+public class ShipmentService {
+
+    private final ShipmentRepository envios;
+    private final ContactRepository contactos;
+    private final BillingAccountRepository cuentas;
+    private final ShipmentReasonRepository motivos;
+    private final ArticleRepository articulos;
+    private final ShipmentDocumentRepository documentos;
+    private final CarrierClientRegistry transportistas;
+    private final Notifier notifier;
+    private final DirectionResolver sentidos;
+    private final CustomsChecker aduanas;
+    private final EnviosProperties propiedades;
+
+    public ShipmentService(ShipmentRepository envios, ContactRepository contactos, BillingAccountRepository cuentas,
+                           ShipmentReasonRepository motivos, ArticleRepository articulos, ShipmentDocumentRepository documentos,
+                           CarrierClientRegistry transportistas, Notifier notifier,
+                           DirectionResolver sentidos, CustomsChecker aduanas, EnviosProperties propiedades) {
+        this.envios = envios; this.contactos = contactos; this.cuentas = cuentas; this.motivos = motivos;
+        this.articulos = articulos; this.documentos = documentos; this.transportistas = transportistas;
+        this.notifier = notifier; this.sentidos = sentidos; this.aduanas = aduanas; this.propiedades = propiedades;
+    }
+
+    @Transactional
+    public Shipment crearBorrador(String responsable) {
+        Shipment envio = new Shipment(responsable);
+        envio.setMoneda(propiedades.getMoneda());
+        envio.setPedirRecogida(true);
+        envio.setHoraCierreRecogida(propiedades.getHoraCierreRecogida());
+        envio.setLugarRecogida(propiedades.getLugarRecogida());
+        envio.cambiarEstado(ShipmentStatus.DRAFT, responsable, "Borrador creado");
+        return envios.save(envio);
+    }
+
+    /** El envío con todas sus colecciones inicializadas (open-in-view está apagado). */
+    @Transactional(readOnly = true)
+    public Shipment cargar(Long id) {
+        Shipment envio = buscar(id);
+        envio.getBultos().size();
+        envio.getLineasAduana().size();
+        envio.getOfertas().size();
+        envio.getHistorial().size();
+        return envio;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Shipment> listar(FiltroEnvios filtro) {
+        Specification<Shipment> spec = (raiz, consulta, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> condiciones = new ArrayList<>();
+            if (filtro.desde() != null) condiciones.add(cb.greaterThanOrEqualTo(raiz.get("fechaCreacion"), filtro.desde().atStartOfDay()));
+            if (filtro.hasta() != null) condiciones.add(cb.lessThan(raiz.get("fechaCreacion"), filtro.hasta().plusDays(1).atStartOfDay()));
+            if (filtro.estado() != null) condiciones.add(cb.equal(raiz.get("estado"), filtro.estado()));
+            if (filtro.motivoId() != null) condiciones.add(cb.equal(raiz.get("motivo").get("id"), filtro.motivoId()));
+            if (filtro.cliente() != null && !filtro.cliente().isBlank())
+                condiciones.add(cb.like(cb.upper(raiz.get("cliente")), "%" + filtro.cliente().trim().toUpperCase() + "%"));
+            if (filtro.sentido() != null) condiciones.add(cb.equal(raiz.get("sentido"), filtro.sentido()));
+            consulta.orderBy(cb.desc(raiz.get("fechaCreacion")));
+            return cb.and(condiciones.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+        return envios.findAll(spec);
+    }
+
+    @Transactional
+    public Shipment editar(Long id, DatosEnvio datos) {
+        Shipment envio = buscar(id);
+        if (!envio.editable()) {
+            throw new TransicionIlegalException("El envío " + id + " está en " + envio.getEstado() + " y ya no se edita");
+        }
+        envio.setRemitente(datos.remitenteId() == null ? null : contactos.findById(datos.remitenteId()).orElse(null));
+        envio.setDestinatario(datos.destinatarioId() == null ? null : contactos.findById(datos.destinatarioId()).orElse(null));
+        envio.setFechaRecogida(datos.fechaRecogida());
+        if (datos.incoterm() != null) envio.setIncoterm(datos.incoterm());
+        envio.setCuentaTransporte(datos.cuentaTransporteId() == null ? null : cuentas.findById(datos.cuentaTransporteId()).orElse(null));
+        envio.setCuentaAranceles(datos.cuentaArancelesId() == null ? null : cuentas.findById(datos.cuentaArancelesId()).orElse(null));
+        envio.setMotivo(datos.motivoId() == null ? null : motivos.findById(datos.motivoId()).orElse(null));
+        envio.setCliente(limpiar(datos.cliente()));
+        envio.setTemporada(limpiar(datos.temporada()));
+        envio.setReferencia(limpiar(datos.referencia()));
+        envio.setNotas(limpiar(datos.notas()));
+        if (datos.responsable() != null && !datos.responsable().isBlank()) envio.setResponsable(datos.responsable());
+        envio.setPedirRecogida(datos.pedirRecogida() == null || datos.pedirRecogida());
+        envio.setHoraCierreRecogida(limpiar(datos.horaCierreRecogida()));
+        envio.setLugarRecogida(limpiar(datos.lugarRecogida()));
+
+        envio.getBultos().clear();
+        for (DatosEnvio.DatosBulto b : datos.bultos()) {
+            envio.getBultos().add(new ShipmentPackage(b.peso(), b.largo(), b.ancho(), b.alto(), limpiar(b.descripcion())));
+        }
+        envio.getLineasAduana().clear();
+        for (DatosEnvio.DatosLinea l : datos.lineasAduana()) {
+            Article articulo = l.articuloId() == null ? null : articulos.findById(l.articuloId()).orElse(null);
+            envio.getLineasAduana().add(new CustomsLineItem(limpiar(l.descripcion()), limpiar(l.codigoHs()), l.cantidad(),
+                    l.valorUnitario(), l.pesoNeto(), l.pesoBruto(), limpiar(l.paisOrigen()), articulo));
+        }
+
+        // Sentido y aduana se deducen siempre de los países: no son opinables y
+        // desactivar la aduana a mano dejaría un envío internacional sin declarar.
+        String origen = envio.getRemitente() == null ? null : envio.getRemitente().getPais();
+        String destino = envio.getDestinatario() == null ? null : envio.getDestinatario().getPais();
+        envio.setSentido(sentidos.resolver(origen, destino));
+        envio.setAduanero(aduanas.esAduanero(origen, destino));
+
+        if (envio.getEstado() == ShipmentStatus.QUOTED) {
+            envio.borrarOfertas();
+            envio.setCosteEstimado(null);
+            envio.cambiarEstado(ShipmentStatus.DRAFT, envio.getResponsable(), "Editado tras tarifar: la tarifa ya no vale");
+        }
+        envio.tocar();
+        return envios.save(envio);
+    }
+
+    /** Lo que impide tarifar. Vacío = se puede. */
+    public List<String> problemasParaTarifar(Shipment envio) {
+        List<String> problemas = new ArrayList<>();
+        if (envio.getRemitente() == null) problemas.add("Falta el remitente.");
+        if (envio.getDestinatario() == null) problemas.add("Falta el destinatario.");
+        for (Contact c : List.of(Optional.ofNullable(envio.getRemitente()), Optional.ofNullable(envio.getDestinatario())).stream()
+                .flatMap(Optional::stream).toList()) {
+            if (c.getTelefono() == null || c.getTelefono().isBlank()) problemas.add("El contacto " + c.getEmpresa() + " no tiene teléfono; DHL lo exige.");
+        }
+        if (envio.getFechaRecogida() == null) problemas.add("Falta la fecha de recogida.");
+        else if (envio.getFechaRecogida().isBefore(java.time.LocalDate.now())) problemas.add("La fecha de recogida ya ha pasado.");
+        if (envio.getMotivo() == null) problemas.add("Falta el motivo del envío.");
+        if (envio.isPedirRecogida()
+                && (envio.getHoraCierreRecogida() == null || !envio.getHoraCierreRecogida().matches("([0-1][0-9]|2[0-3]):[0-5][0-9]")))
+            problemas.add("Se pide recogida y falta la hora de cierre (HH:MM).");
+        if (envio.getResponsable() == null || envio.getResponsable().isBlank()) problemas.add("Falta el responsable.");
+        if (envio.getBultos().isEmpty()) problemas.add("No hay bultos.");
+        for (int i = 0; i < envio.getBultos().size(); i++) {
+            if (!envio.getBultos().get(i).completo()) problemas.add("El bulto " + (i + 1) + " no tiene peso o medidas.");
+        }
+        if (envio.getCuentaTransporte() == null) problemas.add("Falta la cuenta que paga el transporte.");
+        else if (!envio.getCuentaTransporte().permite(BillingRole.PAYER)) problemas.add("La cuenta " + envio.getCuentaTransporte().getNumero() + " no puede pagar transporte.");
+        if (envio.getCuentaAranceles() != null && !envio.getCuentaAranceles().permite(BillingRole.DUTIES)) problemas.add("La cuenta " + envio.getCuentaAranceles().getNumero() + " no puede pagar aranceles.");
+        if (envio.isAduanero()) {
+            if (envio.getLineasAduana().isEmpty()) problemas.add("Es un envío con aduana y no hay líneas de mercancía.");
+            for (int i = 0; i < envio.getLineasAduana().size(); i++) {
+                if (!envio.getLineasAduana().get(i).completa()) problemas.add("La línea de aduana " + (i + 1) + " está incompleta (descripción, código HS, cantidad, valor y país de origen).");
+            }
+        }
+        return problemas;
+    }
+
+    /** Lo que conviene mirar pero no impide seguir. */
+    public List<String> avisos(Shipment envio) {
+        List<String> avisos = new ArrayList<>();
+        if (envio.getSentido() == Direction.DOMESTIC) avisos.add("Sentido: Nacional. Los dos contactos están en " + propiedades.getPaisSede() + ".");
+        if (envio.getSentido() == Direction.CROSS_TRADE) avisos.add("Sentido: Entre terceros países. El envío ni sale ni entra en " + propiedades.getPaisSede() + ".");
+        for (int i = 0; i < envio.getLineasAduana().size(); i++) {
+            CustomsLineItem l = envio.getLineasAduana().get(i);
+            if (l.getPesoNeto() != null && l.getPesoBruto() != null && l.getPesoNeto() > l.getPesoBruto())
+                avisos.add("La línea " + (i + 1) + " pesa más en neto que en bruto.");
+        }
+        double bultos = envio.pesoBultos();
+        double lineas = envio.pesoBrutoLineas();
+        if (bultos > 0 && lineas > bultos + 0.001)
+            avisos.add(String.format("El peso bruto de las líneas (%.2f kg) supera el de los bultos (%.2f kg).", lineas, bultos));
+        return avisos;
+    }
+
+    @Transactional
+    public ResultadoTarifa tarifar(Long id) {
+        Shipment envio = buscar(id);
+        if (!envio.editable()) throw new TransicionIlegalException("Solo se tarifa un borrador; el envío está en " + envio.getEstado());
+        List<String> problemas = problemasParaTarifar(envio);
+        if (!problemas.isEmpty()) return new ResultadoTarifa(envio, problemas, null);
+        try {
+            List<ProductOffer> ofertas = transportistas.para(envio.getTransportista()).quote(envio);
+            envio.reemplazarOfertas(ofertas.stream()
+                    .map(o -> new RateOffer(o.codigo(), o.nombre(), o.precio(), o.moneda(), o.entregaEstimada())).toList());
+            envio.setUltimoError(null);
+            envio.cambiarEstado(ShipmentStatus.QUOTED, envio.getResponsable(), ofertas.size() + " productos disponibles");
+            return new ResultadoTarifa(envios.save(envio), List.of(), null);
+        } catch (CarrierException e) {
+            envio.setUltimoError(e.getMensajeUsuario());
+            envios.save(envio);
+            return new ResultadoTarifa(envio, List.of(), e.getMensajeUsuario());
+        }
+    }
+
+    @Transactional
+    public Shipment confirmar(Long id, String productoCodigo) {
+        Shipment envio = buscar(id);
+        if (envio.getEstado() != ShipmentStatus.QUOTED) throw new TransicionIlegalException("Solo se confirma un envío tarifado; está en " + envio.getEstado());
+        RateOffer elegida = envio.getOfertas().stream().filter(o -> o.getProductoCodigo().equals(productoCodigo)).findFirst()
+                .orElseThrow(() -> new TransicionIlegalException("El producto " + productoCodigo + " no está entre los tarifados"));
+        envio.setProductoCodigo(elegida.getProductoCodigo());
+        envio.setProductoNombre(elegida.getProductoNombre());
+        envio.setCosteEstimado(elegida.getPrecio());
+        if (elegida.getMoneda() != null) envio.setMoneda(elegida.getMoneda());
+        envio.setRequestId(UUID.randomUUID().toString());
+        envio.cambiarEstado(ShipmentStatus.CONFIRMED, envio.getResponsable(), "Producto " + elegida.getProductoNombre());
+        return envios.save(envio);
+    }
+
+    @Transactional
+    public Shipment crear(Long id) {
+        Shipment envio = buscar(id);
+        if (envio.getEstado() != ShipmentStatus.CONFIRMED && envio.getEstado() != ShipmentStatus.ERROR)
+            throw new TransicionIlegalException("Solo se crea un envío confirmado; está en " + envio.getEstado());
+        try {
+            CreatedShipment creado = transportistas.para(envio.getTransportista()).createShipment(envio);
+            envio.setNumeroGuia(creado.numeroGuia());
+            envio.setUrlSeguimiento(creado.urlSeguimiento());
+            envio.setNumeroConfirmacionRecogida(creado.numeroConfirmacionRecogida());
+            envio.getDocumentos().clear();
+            for (CarrierDocument d : creado.documentos()) envio.anadirDocumento(d.tipo(), d.formato(), d.contenido());
+            envio.setUltimoError(null);
+            envio.cambiarEstado(ShipmentStatus.CREATED, envio.getResponsable(), "Guía " + creado.numeroGuia());
+            Shipment guardado = envios.save(envio);
+            notifier.envioCreado(guardado);
+            return guardado;
+        } catch (CarrierException e) {
+            envio.setUltimoError(e.getMensajeUsuario());
+            envio.cambiarEstado(ShipmentStatus.ERROR, envio.getResponsable(), e.getMensajeUsuario());
+            Shipment guardado = envios.save(envio);
+            notifier.envioFallido(guardado, e.getMensajeUsuario());
+            return guardado;
+        }
+    }
+
+    @Transactional
+    public Shipment cancelar(Long id) {
+        Shipment envio = buscar(id);
+        if (envio.getEstado() == ShipmentStatus.CREATED || envio.getEstado() == ShipmentStatus.CANCELLED)
+            throw new TransicionIlegalException("Un envío en " + envio.getEstado() + " no se cancela desde aquí");
+        envio.cambiarEstado(ShipmentStatus.CANCELLED, envio.getResponsable(), null);
+        return envios.save(envio);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<ShipmentDocument> documento(Long id, String tipo) {
+        return documentos.findFirstByEnvioIdAndTipo(id, tipo);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> tiposDocumento(Long id) {
+        return documentos.tiposDe(id);
+    }
+
+    private Shipment buscar(Long id) {
+        return envios.findById(id).orElseThrow(() -> new EnvioNoEncontradoException(id));
+    }
+
+    private static String limpiar(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+}
