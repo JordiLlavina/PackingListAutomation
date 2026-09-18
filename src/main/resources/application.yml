@@ -199,3 +199,41 @@ packing-list:
       plantilla: GENERIC
       nombre-legal: SONIA RYKIEL INTERNATIONAL
       direccion-entrega: BLECKMANN - TRB INTERNATIONAL; INDUSTRIEWEG 38C; QUAI B12; 2280 GROBBENDONK, BELGIUM
+
+# Envíos por transportista (sección /envios).
+envios:
+  moneda: EUR
+  # El sentido (exportación/importación) se mide respecto a la sede.
+  pais-sede: ES
+  # Dos países de esta lista no declaran aduana entre sí. Es la UE; si algún
+  # día se envía a Suiza o Reino Unido, no están y por eso declaran.
+  paises-union-aduanera: [AT, BE, BG, CY, CZ, DE, DK, EE, ES, FI, FR, GR, HR, HU, IE, IT, LT, LU, LV, MT, NL, PL, PT, RO, SE, SI, SK]
+  # Quién hace envíos. Es lo que se elige en el formulario y por lo que se
+  # agruparán los reports; cuando llegue el login de Microsoft vendrá de ahí.
+  responsables:
+    - Pol
+    - Susana
+    - Carme
+  # Recogida del mensajero: el envío nace con "Pedir recogida" marcado y estos
+  # valores, que se cambian en la ficha. La hora es la de cierre del local (HH:MM).
+  hora-cierre-recogida: "18:00"
+  lugar-recogida: Recepción
+  dhl:
+    # Entorno de test de MyDHL API por defecto; producción es la misma URL sin /test.
+    base-url: ${DHL_BASE_URL:https://express.api.dhl.com/mydhlapi/test}
+    api-key: ${DHL_API_KEY:}
+    api-secret: ${DHL_API_SECRET:}
+    # Cuenta bajo la que se crean los envíos (accounts[shipper]).
+    shipper-account: ${DHL_SHIPPER_ACCOUNT:}
+    # ECOM26_84_A4_001 imprime la etiqueta en una hoja A4; ECOM26_84_001 es
+    # para impresora térmica de etiquetas.
+    plantilla-etiqueta: ECOM26_84_A4_001
+    hora-recogida: "12:00"
+    timeout-segundos: 30
+    # Zona horaria del país de origen, para plannedShippingDateAndTime.
+    zonas-horarias:
+      ES: Europe/Madrid
+      FR: Europe/Paris
+      MA: Africa/Casablanca
+      IT: Europe/Rome
+      PT: Europe/Lisbon
