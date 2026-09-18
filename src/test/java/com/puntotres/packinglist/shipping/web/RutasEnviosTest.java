@@ -78,4 +78,20 @@ class RutasEnviosTest {
         mvc.perform(get("/envios/contactos/999999")).andExpect(redirectedUrl("/envios/contactos")).andExpect(flash().attributeExists("mensajeError"));
         mvc.perform(post("/envios/contactos/999999/comprobar").param("tipo", "ENTREGA")).andExpect(redirectedUrl("/envios/contactos")).andExpect(flash().attributeExists("mensajeError"));
     }
+
+    @Test
+    void laImportacionDeArticulosPrevisualizaYConfirma() throws Exception {
+        byte[] csv = new org.springframework.core.io.ClassPathResource("ejemplos/envios/articulos.csv").getInputStream().readAllBytes();
+        org.springframework.mock.web.MockMultipartFile fichero = new org.springframework.mock.web.MockMultipartFile("fichero", "articulos.csv", "text/csv", csv);
+        org.springframework.mock.web.MockHttpSession sesion = new org.springframework.mock.web.MockHttpSession();
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/envios/articulos/importar").file(fichero).session(sesion))
+                .andExpect(redirectedUrl("/envios/articulos/importar"));
+        mvc.perform(get("/envios/articulos/importar").session(sesion)).andExpect(status().isOk())
+                .andExpect(content().string(containsString("Con errores (2)")))
+                .andExpect(content().string(containsString("UBL029")));
+        mvc.perform(post("/envios/articulos/importar/confirmar").session(sesion))
+                .andExpect(redirectedUrl("/envios/articulos"));
+        mvc.perform(get("/envios/articulos")).andExpect(content().string(containsString("PXCEI-F67043")));
+    }
 }
