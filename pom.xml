@@ -101,6 +101,17 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Servidor HTTP falso para probar el cliente de DHL contra respuestas
+             reales del OpenAPI sin credenciales ni red. La variante standalone
+             lleva sus dependencias empaquetadas y no choca con el Jetty/Tomcat
+             de Boot. -->
+        <dependency>
+            <groupId>org.wiremock</groupId>
+            <artifactId>wiremock-standalone</artifactId>
+            <version>3.13.1</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
