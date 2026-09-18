@@ -1,6 +1,6 @@
 # Envíos por transportista — Fase 1: DHL Express (MyDHL API)
 
-Fecha: 2026-09-18. Estado: diseño aprobado (los dos puntos de la sección 18 quedaron cerrados el 2026-09-18); plan en
+Fecha: 2026-09-18. Estado: implementado en la rama envios-dhl (fase 1); pendiente de probar contra el entorno de test de DHL. Plan en
 `docs/superpowers/plans/2026-09-18-envios-dhl-express-fase1.md`. Se ejecuta con un subagente
 nuevo por tarea y revisión entre tareas. El CSV real de la libreta está en `.gitignore`.
 

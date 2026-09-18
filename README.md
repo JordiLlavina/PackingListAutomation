@@ -15,6 +15,7 @@ Todo se maneja desde un asistente web (Spring Boot + Thymeleaf). Código y docum
 - **Java 17** (probado con Temurin 17)
 - **Maven 3.9+**
 - *(Opcional)* Variable de entorno `ANTHROPIC_API_KEY` — solo para el modo CLAUDE de la pantalla de entrada (extracción desde fotos/PDFs). Sin ella la aplicación arranca igual y el resto de modos funciona.
+- *(Opcional)* `DHL_API_KEY`, `DHL_API_SECRET`, `DHL_SHIPPER_ACCOUNT` y `DHL_BASE_URL` — solo para la sección de envíos DHL Express (`/envios`). Sin ellas la app arranca igual y esa sección avisa "Faltan las credenciales de DHL" al tarifar o crear; ver [docs/Envios DHL/README.md](docs/Envios%20DHL/README.md).
 
 Dependencias clave (las versiones las gestiona el parent de Spring Boot salvo donde se indica, ver [pom.xml](pom.xml)):
 
@@ -49,6 +50,7 @@ Con el servidor levantado, abrir **http://localhost:8080** (redirige al menú `/
 - `/packing-list` — asistente de packing lists en 3 pantallas: **entrada** (pegar JSON o subir fotos/PDFs) → **revisión** (avisos y tabla editable) → **resultados** (descarga individual, ZIP, volcado ERP y etiquetas de caja).
 - `/etiquetas-articulo` — menú de etiquetas de artículo: `/etiquetas-articulo-produccion` (a partir del excel de pedido, sin envío), SMS y prototipos todavía en desarrollo.
 - `/clickup` — escandallos ICSUITE para ClickUp (sin envío ni cliente).
+- **Envíos por transportista** (`/envios`): envíos DHL Express con libreta de contactos, aduana, tarifa y creación de la guía; independiente del packing list; ver [docs/Envios DHL/README.md](docs/Envios%20DHL/README.md).
 
 Para usar el **modo CLAUDE** (fotos/PDFs → JSON) hay que exportar la clave antes de arrancar. En PowerShell:
 
@@ -237,7 +239,7 @@ El detalle de qué campos usa cada cliente está en [docs/Packing Lists/campos-j
 - **Catálogo de clientes** (`packing-list.clientes`): nombre, plantilla (AMI/APC/GENERIC), y por cliente lo suyo — si sube excel de pedido (`pedido-cliente`), las destinaciones de APC con sus direcciones, abreviaturas del Livraison code y destinos hijo.
 - Límites de subida multipart (las fotos del móvil superan el 1MB por defecto de Spring) y hash del contenido en los nombres de los estáticos (sin él, el navegador reutiliza el CSS viejo tras cada cambio).
 
-La única variable de entorno es `ANTHROPIC_API_KEY` (opcional, ver arriba).
+Las variables de entorno son opcionales y solo hacen falta para funciones concretas: `ANTHROPIC_API_KEY` para el modo CLAUDE y `DHL_API_KEY`/`DHL_API_SECRET`/`DHL_SHIPPER_ACCOUNT`/`DHL_BASE_URL` para la sección de envíos DHL Express (ver [Requisitos](#requisitos) y [docs/Envios DHL/README.md](docs/Envios%20DHL/README.md)).
 
 Si la aplicación corre desde un `.jar` en otro ordenador, estos ajustes se pueden cambiar sin recompilar con un `application.yml` junto al jar: ver [Distribuir la aplicación](#distribuir-la-aplicación-un-jar-para-otro-ordenador).
 
