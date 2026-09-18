@@ -107,4 +107,13 @@ class ShipmentsApiTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detalles[0]", containsString("referencia")));
     }
+
+    /** Un id que no existe (un contacto borrado entre que un script lo leyó y lo mandó) no se traga en silencio como null. */
+    @Test
+    void unRemitenteQueNoExisteEs422ConElId() throws Exception {
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"responsable\": \"Jordi\", \"remitenteId\": 999999}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.mensaje", containsString("999999")));
+    }
 }

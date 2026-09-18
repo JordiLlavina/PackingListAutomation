@@ -119,6 +119,28 @@ public class ShipmentService {
      * si datos las trae (null significa "no tocar" y conserva lo que ya
      * tuviera el envío, típicamente lo que puso crearBorrador); una cadena
      * vacía sí las borra, vía limpiar().
+     *
+     * <p>Las cuentas y el incoterm del destinatario se heredan UNA SOLA VEZ, en
+     * el guardado donde el destinatario cambia (o el envío no tenía ninguno
+     * todavía), y solo para los campos donde el destinatario nuevo trae de
+     * verdad un valor por defecto: ese guardado pisa lo que trajera el
+     * formulario para esos tres campos, porque, al no haber JavaScript que
+     * refresque los desplegables al vuelo, lo que viaja en esa petición para
+     * cuenta de transporte/aranceles/incoterm es lo que mostraba la pantalla
+     * del contacto anterior (o nada), no una elección pensada para el nuevo. Si
+     * el destinatario nuevo no tiene un valor por defecto para alguno de los
+     * tres, ese campo se deja tal como llegó en datos — es la única forma de no
+     * confundir "sin valor por defecto" con "bórralo", que rompería crear un
+     * envío entero de una sola vez (remitente, destinatario y cuenta en el
+     * mismo guardado, el caso normal). En guardados siguientes con el mismo
+     * destinatario ya no se vuelve a heredar: manda lo que teclee el usuario,
+     * incluido dejar el campo vacío.
+     *
+     * <p>Un id que no existe (remitente, destinatario, cuentas, motivo o el
+     * artículo de una línea) no se traga en silencio como {@code null}: quien
+     * lo mandó tecleó o programó algo que ya no está, y seguir adelante
+     * guardaría un envío con un contacto o una cuenta distintos de los que
+     * creía estar eligiendo.
      */
     @Transactional
     public Shipment editar(Long id, DatosEnvio datos) {
@@ -126,13 +148,16 @@ public class ShipmentService {
         if (!envio.editable()) {
             throw new TransicionIlegalException("El envío " + id + " está en " + envio.getEstado() + " y ya no se edita");
         }
-        envio.setRemitente(datos.remitenteId() == null ? null : contactos.findById(datos.remitenteId()).orElse(null));
-        envio.setDestinatario(datos.destinatarioId() == null ? null : contactos.findById(datos.destinatarioId()).orElse(null));
+        Contact destinatarioAnterior = envio.getDestinatario();
+
+        envio.setRemitente(buscarContacto(datos.remitenteId(), "remitente"));
+        Contact nuevoDestinatario = buscarContacto(datos.destinatarioId(), "destinatario");
+        envio.setDestinatario(nuevoDestinatario);
         envio.setFechaRecogida(datos.fechaRecogida());
         if (datos.incoterm() != null) envio.setIncoterm(datos.incoterm());
-        envio.setCuentaTransporte(datos.cuentaTransporteId() == null ? null : cuentas.findById(datos.cuentaTransporteId()).orElse(null));
-        envio.setCuentaAranceles(datos.cuentaArancelesId() == null ? null : cuentas.findById(datos.cuentaArancelesId()).orElse(null));
-        envio.setMotivo(datos.motivoId() == null ? null : motivos.findById(datos.motivoId()).orElse(null));
+        envio.setCuentaTransporte(buscarCuenta(datos.cuentaTransporteId()));
+        envio.setCuentaAranceles(buscarCuenta(datos.cuentaArancelesId()));
+        envio.setMotivo(buscarMotivo(datos.motivoId()));
         envio.setCliente(limpiar(datos.cliente()));
         envio.setTemporada(limpiar(datos.temporada()));
         envio.setReferencia(limpiar(datos.referencia()));
@@ -148,9 +173,26 @@ public class ShipmentService {
         }
         envio.getLineasAduana().clear();
         for (DatosEnvio.DatosLinea l : datos.lineasAduana()) {
-            Article articulo = l.articuloId() == null ? null : articulos.findById(l.articuloId()).orElse(null);
+            Article articulo = buscarArticulo(l.articuloId());
             envio.getLineasAduana().add(new CustomsLineItem(limpiar(l.descripcion()), limpiar(l.codigoHs()), l.cantidad(),
                     l.valorUnitario(), l.pesoNeto(), l.pesoBruto(), limpiar(l.paisOrigen()), articulo));
+        }
+
+        // Contact no redefine equals(): comparar por identidad es lo correcto tanto en
+        // producción (un mismo id dentro de una transacción JPA resuelve al mismo
+        // objeto gestionado, por la caché de primer nivel) como en los tests con dobles,
+        // y evita un NullPointerException con contactos sin persistir (id == null) que
+        // sí pueden llegar en los tests aunque nunca en producción.
+        boolean cambioDestinatario = nuevoDestinatario != null && nuevoDestinatario != destinatarioAnterior;
+        if (cambioDestinatario) {
+            // Solo se pisa el campo si el destinatario nuevo trae de verdad un valor por
+            // defecto: si no lo trae, lo que haya llegado en datos para ese campo en este
+            // mismo guardado es la elección real del usuario (p. ej. crear un envío
+            // entero de una vez, remitente+destinatario+cuenta en el mismo POST), no un
+            // resto de la pantalla del contacto anterior, y no hay motivo para borrarlo.
+            if (nuevoDestinatario.getCuentaTransportePorDefecto() != null) envio.setCuentaTransporte(nuevoDestinatario.getCuentaTransportePorDefecto());
+            if (nuevoDestinatario.getCuentaArancelesPorDefecto() != null) envio.setCuentaAranceles(nuevoDestinatario.getCuentaArancelesPorDefecto());
+            if (nuevoDestinatario.getIncotermPorDefecto() != null) envio.setIncoterm(nuevoDestinatario.getIncotermPorDefecto());
         }
 
         // Sentido y aduana se deducen siempre de los países: no son opinables y
@@ -167,6 +209,26 @@ public class ShipmentService {
         }
         envio.tocar();
         return envios.save(envio);
+    }
+
+    private Contact buscarContacto(Long id, String rol) {
+        if (id == null) return null;
+        return contactos.findById(id).orElseThrow(() -> new DatoInvalidoException("No existe el contacto " + id + " (" + rol + ")"));
+    }
+
+    private BillingAccount buscarCuenta(Long id) {
+        if (id == null) return null;
+        return cuentas.findById(id).orElseThrow(() -> new DatoInvalidoException("No existe la cuenta " + id));
+    }
+
+    private ShipmentReason buscarMotivo(Long id) {
+        if (id == null) return null;
+        return motivos.findById(id).orElseThrow(() -> new DatoInvalidoException("No existe el motivo " + id));
+    }
+
+    private Article buscarArticulo(Long id) {
+        if (id == null) return null;
+        return articulos.findById(id).orElseThrow(() -> new DatoInvalidoException("No existe el artículo " + id));
     }
 
     /** Lo que impide tarifar. Vacío = se puede. */
@@ -277,16 +339,28 @@ public class ShipmentService {
             }
             return guardado;
         } catch (CarrierException e) {
-            envio.setUltimoError(e.getMensajeUsuario());
-            envio.cambiarEstado(ShipmentStatus.ERROR, envio.getResponsable(), e.getMensajeUsuario());
-            Shipment guardado = envios.save(envio);
-            try {
-                notifier.envioFallido(guardado, e.getMensajeUsuario());
-            } catch (RuntimeException ex) {
-                log.warn("El aviso del envío {} ha fallado: {}", envio.getId(), ex.getMessage(), ex);
-            }
-            return guardado;
+            return marcarError(envio, e.getMensajeUsuario());
+        } catch (RuntimeException e) {
+            // Un fallo que no es CarrierException (un mapeo roto, un NullPointerException
+            // con un contrato de DHL que cambió) no puede tirar la transacción con un 500:
+            // merece el mismo tratamiento que un fallo reconocido del transportista, con
+            // el mensaje técnico delante para el log.
+            log.warn("Fallo inesperado creando el envío {}: {}", envio.getId(), e.getMessage(), e);
+            return marcarError(envio, "Error inesperado hablando con el transportista: " + e.getMessage());
         }
+    }
+
+    /** Cuerpo compartido por los dos catch de crear(): deja el envío en ERROR con el mensaje y avisa. */
+    private Shipment marcarError(Shipment envio, String mensaje) {
+        envio.setUltimoError(mensaje);
+        envio.cambiarEstado(ShipmentStatus.ERROR, envio.getResponsable(), mensaje);
+        Shipment guardado = envios.save(envio);
+        try {
+            notifier.envioFallido(guardado, mensaje);
+        } catch (RuntimeException ex) {
+            log.warn("El aviso del envío {} ha fallado: {}", envio.getId(), ex.getMessage(), ex);
+        }
+        return guardado;
     }
 
     @Transactional

@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.carrier.dhl.dto.DhlRatesResponse;
 import com.puntotres.packinglist.carrier.dhl.dto.DhlShipmentResponse;
+import com.puntotres.packinglist.shipping.carrier.CarrierException;
 import com.puntotres.packinglist.shipping.carrier.CreatedShipment;
 import com.puntotres.packinglist.shipping.carrier.ProductOffer;
 
@@ -55,5 +56,21 @@ class DhlResponseMapperTest {
         assertEquals("label", creado.documentos().get(0).tipo());
         assertEquals("PDF", creado.documentos().get(0).formato());
         assertTrue(new String(creado.documentos().get(0).contenido(), StandardCharsets.ISO_8859_1).startsWith("%PDF"));
+    }
+
+    @Test
+    void unaRespuestaSinCuerpoLanzaCarrierException() {
+        assertThrows(CarrierException.class, () -> mapper.creado(null));
+    }
+
+    @Test
+    void unDocumentoSinContenidoLanzaCarrierExceptionConElTypeCode() throws Exception {
+        DhlShipmentResponse respuesta = json.readValue(
+                "{\"shipmentTrackingNumber\":\"1\",\"documents\":[{\"typeCode\":\"label\",\"imageFormat\":\"PDF\",\"content\":null}]}",
+                DhlShipmentResponse.class);
+
+        CarrierException e = assertThrows(CarrierException.class, () -> mapper.creado(respuesta));
+
+        assertTrue(e.getMensajeUsuario().contains("label"), e.getMensajeUsuario());
     }
 }

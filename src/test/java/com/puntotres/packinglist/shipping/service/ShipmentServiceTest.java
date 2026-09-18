@@ -2,6 +2,8 @@ package com.puntotres.packinglist.shipping.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 import java.math.BigDecimal;
@@ -24,6 +26,8 @@ class ShipmentServiceTest {
         CreatedShipment creado = new CreatedShipment("1103733901", "https://dhl/1103733901", "PRG240918",
                 List.of(new CarrierDocument("label", "PDF", new byte[] {1}), new CarrierDocument("invoice", "PDF", new byte[] {2})));
         CarrierException fallo;
+        /** Un fallo que NO es CarrierException: lo que soltaría un mapeo roto si DhlExpressClient no lo atrapara. */
+        RuntimeException falloGenerico;
         int llamadasCrear;
         String ultimoRequestId;
 
@@ -33,6 +37,7 @@ class ShipmentServiceTest {
         public CreatedShipment createShipment(Shipment envio) {
             llamadasCrear++;
             ultimoRequestId = envio.getRequestId();
+            if (falloGenerico != null) throw falloGenerico;
             if (fallo != null) throw fallo;
             return creado;
         }
@@ -221,6 +226,26 @@ class ShipmentServiceTest {
     }
 
     @Test
+    void siElTransportistaLanzaUnFalloQueNoEsCarrierExceptionElEnvioPasaAErrorIgual() {
+        // Con DhlExpressClient arreglado esto ya no puede pasar a través suyo (el mapeo
+        // de la respuesta corre dentro de ejecutar(), que solo sabe soltar
+        // CarrierException), pero el contrato de crear() tiene que sostenerse igual
+        // para cualquier CarrierClient: un RuntimeException que se escape de la llamada
+        // no puede tirar la transacción con un 500, tiene que acabar en ERROR como
+        // cualquier otro fallo del transportista.
+        servicio.editar(1L, datosCompletos());
+        servicio.tarifar(1L);
+        servicio.confirmar(1L, "P");
+        carrier.falloGenerico = new IllegalStateException("mapper roto");
+
+        assertDoesNotThrow(() -> servicio.crear(1L));
+
+        assertEquals(ShipmentStatus.ERROR, envio.getEstado());
+        assertTrue(envio.getUltimoError().contains("mapper roto"), envio.getUltimoError());
+        verify(notifier).envioFallido(eq(envio), contains("mapper roto"));
+    }
+
+    @Test
     void crearDesdeQuotedOCreatedEsIlegal() {
         servicio.editar(1L, datosCompletos());
         servicio.tarifar(1L);
@@ -281,5 +306,47 @@ class ShipmentServiceTest {
         Shipment vaciado = servicio.editar(1L, vaciando);
         assertNull(vaciado.getHoraCierreRecogida());
         assertNull(vaciado.getLugarRecogida());
+    }
+
+    @Test
+    void cambiarDeDestinatarioHeredaSusCuentasEIncotermUnaSolaVez() {
+        BillingAccount cuentaTransporteDestino = new BillingAccount("400112049", "Cuenta transporte destino", false, java.util.EnumSet.of(BillingRole.PAYER));
+        BillingAccount cuentaArancelesDestino = new BillingAccount("400112050", "Cuenta aranceles destino", false, java.util.EnumSet.of(BillingRole.DUTIES));
+        Contact destinoConDefectos = new Contact("TALLER 2", "Zone franche 2", "Tanger", "MA");
+        destinoConDefectos.setTelefono("+212500000001");
+        destinoConDefectos.setCuentaTransportePorDefecto(cuentaTransporteDestino);
+        destinoConDefectos.setCuentaArancelesPorDefecto(cuentaArancelesDestino);
+        destinoConDefectos.setIncotermPorDefecto(Incoterm.DDP);
+        when(contactos.findById(21L)).thenReturn(Optional.of(destinoConDefectos));
+
+        // El formulario manda otra cuenta (30L) y otro incoterm (DAP): son los que
+        // mostraba la pantalla para el destinatario ANTERIOR (el envío nace sin
+        // ninguno), así que al cambiar de destinatario mandan los del contacto nuevo.
+        DatosEnvio primeraVezConEsteDestino = new DatosEnvio(10L, 21L, LocalDate.now().plusDays(1), Incoterm.DAP, 30L, null, 40L,
+                "AMI", "H26", "MUESTRAS-1", null, "Jordi", true, "18:00", "Recepción",
+                List.of(new DatosEnvio.DatosBulto(2.5, 40.0, 30.0, 20.0, null)), List.of());
+        Shipment editado = servicio.editar(1L, primeraVezConEsteDestino);
+
+        assertEquals(cuentaTransporteDestino, editado.getCuentaTransporte());
+        assertEquals(cuentaArancelesDestino, editado.getCuentaAranceles());
+        assertEquals(Incoterm.DDP, editado.getIncoterm());
+
+        // Segunda vez con el MISMO destinatario, pidiendo a mano vaciar la cuenta de
+        // aranceles: ya no se vuelve a heredar, así que el vacío tecleado manda.
+        DatosEnvio segundaVezMismoDestino = new DatosEnvio(10L, 21L, LocalDate.now().plusDays(1), Incoterm.DDP, 30L, null, 40L,
+                "AMI", "H26", "MUESTRAS-1", null, "Jordi", true, "18:00", "Recepción",
+                List.of(new DatosEnvio.DatosBulto(2.5, 40.0, 30.0, 20.0, null)), List.of());
+        Shipment editado2 = servicio.editar(1L, segundaVezMismoDestino);
+
+        assertNull(editado2.getCuentaAranceles());
+    }
+
+    @Test
+    void editarConUnIdQueNoExisteLanzaDatoInvalidoConElId() {
+        DatosEnvio conMotivoInventado = new DatosEnvio(10L, 20L, LocalDate.now().plusDays(1), Incoterm.DAP, 30L, null, 999999L,
+                "AMI", "H26", "MUESTRAS-1", null, "Jordi", true, "18:00", "Recepción", List.of(), List.of());
+
+        DatoInvalidoException e = assertThrows(DatoInvalidoException.class, () -> servicio.editar(1L, conMotivoInventado));
+        assertTrue(e.getMessage().contains("999999"), e.getMessage());
     }
 }

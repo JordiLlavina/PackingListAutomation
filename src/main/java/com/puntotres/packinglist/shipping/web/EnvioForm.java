@@ -47,14 +47,6 @@ public class EnvioForm {
                 lineas.stream().map(l -> new DatosEnvio.DatosLinea(l.descripcion, l.codigoHs, l.cantidad, l.valorUnitario, l.pesoNeto, l.pesoBruto, l.paisOrigen, l.articuloId)).toList());
     }
 
-    /** Preselecciona cuentas e incoterm del destinatario si el envío aún no los tiene. */
-    public void heredarDe(Contact destinatario) {
-        if (destinatario == null) return;
-        if (cuentaTransporteId == null && destinatario.getCuentaTransportePorDefecto() != null) cuentaTransporteId = destinatario.getCuentaTransportePorDefecto().getId();
-        if (cuentaArancelesId == null && destinatario.getCuentaArancelesPorDefecto() != null) cuentaArancelesId = destinatario.getCuentaArancelesPorDefecto().getId();
-        if (destinatario.getIncotermPorDefecto() != null && incoterm == Incoterm.DAP) incoterm = destinatario.getIncotermPorDefecto();
-    }
-
     public void anadirLineaDe(Article a) {
         lineas.add(new LineaForm(a.getDescripcionAduanera(), a.getCodigoHs(), 1, a.getValorUnitario(), a.getPesoNetoUnitario(), a.getPesoBrutoUnitario(), a.getPaisOrigen(), a.getId()));
     }

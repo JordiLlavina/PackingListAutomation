@@ -61,12 +61,26 @@ public class ContactosController {
         try {
             Contact c = contactos.guardar(form.getId(), form.aDatos());
             redirect.addFlashAttribute("mensaje", "Guardado " + c.getEmpresa() + ".");
-            return "redirect:" + (volver == null || volver.isBlank() ? "/envios/contactos" : volver);
+            return "redirect:" + volverSeguro(volver);
         } catch (DatoInvalidoException e) {
             redirect.addFlashAttribute("mensajeError", e.getMessage());
             return "redirect:" + (form.getId() == null ? "/envios/contactos/nuevo" : "/envios/contactos/" + form.getId())
-                    + (volver == null ? "" : "?volver=" + volver);
+                    + (volver == null ? "" : "?volver=" + volverSeguro(volver));
         }
+    }
+
+    /**
+     * "volver" viaja como parámetro de la URL para volver a la pantalla que
+     * abrió la ficha (la del envío, normalmente) en vez de a la libreta, y se
+     * redirige y se pinta tal cual llega. Sin acotarlo, un enlace con
+     * {@code ?volver=https://evil.example} redirigiría fuera de la aplicación
+     * (open redirect) y el hidden del formulario lo devolvería en el href de
+     * "Volver" sin comprobar nada. Solo se acepta una ruta local que empiece
+     * por "/" y no por "//" (que el navegador trata como protocolo-relativa,
+     * o sea otro host); cualquier otra cosa cae al destino de siempre.
+     */
+    private static String volverSeguro(String volver) {
+        return volver != null && volver.startsWith("/") && !volver.startsWith("//") ? volver : "/envios/contactos";
     }
 
     /** Un id que no existe es un enlace viejo (favorito, pestaña olvidada), no un fallo del programa: se avisa y se vuelve a la libreta en vez de dar un 500. */
@@ -123,7 +137,7 @@ public class ContactosController {
 
     private String ficha(Model model, ContactoForm form, String volver) {
         model.addAttribute("form", form);
-        model.addAttribute("volver", volver);
+        model.addAttribute("volver", volverSeguro(volver));
         model.addAttribute("tipos", ContactType.values());
         model.addAttribute("incoterms", Incoterm.values());
         model.addAttribute("cuentasTransporte", cuentas.activasConRol(BillingRole.PAYER));

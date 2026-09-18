@@ -57,51 +57,62 @@ public class DhlExpressClient implements CarrierClient {
 
     @Override
     public List<ProductOffer> quote(Shipment envio) {
-        DhlRatesResponse respuesta = ejecutar(() -> rest().post().uri("/rates")
-                .headers(h -> referencia(h, UUID.randomUUID().toString()))
-                .body(peticiones.tarifa(envio))
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, this::traducirError)
-                .body(DhlRatesResponse.class));
-        return respuestas.ofertas(respuesta);
+        // El mapeo va DENTRO de ejecutar(): si respuestas.ofertas(...) lanza (un
+        // contrato de DHL que cambió, un campo que no encaja), tiene que salir como
+        // CarrierException y no como la excepción cruda del mapeo, o el llamador
+        // (ShipmentService) no la reconoce y el error escapa como un 500 en vez de
+        // dejar el envío en ERROR con un mensaje que se pueda leer.
+        return ejecutar(() -> {
+            DhlRatesResponse respuesta = rest().post().uri("/rates")
+                    .headers(h -> referencia(h, UUID.randomUUID().toString()))
+                    .body(peticiones.tarifa(envio))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, this::traducirError)
+                    .body(DhlRatesResponse.class);
+            return respuestas.ofertas(respuesta);
+        });
     }
 
     @Override
     public CreatedShipment createShipment(Shipment envio) {
-        DhlShipmentResponse respuesta = ejecutar(() -> rest().post().uri("/shipments")
-                .headers(h -> referencia(h, envio.getRequestId()))
-                .body(peticiones.envio(envio))
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, this::traducirError)
-                .body(DhlShipmentResponse.class));
-        return respuestas.creado(respuesta);
+        return ejecutar(() -> {
+            DhlShipmentResponse respuesta = rest().post().uri("/shipments")
+                    .headers(h -> referencia(h, envio.getRequestId()))
+                    .body(peticiones.envio(envio))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, this::traducirError)
+                    .body(DhlShipmentResponse.class);
+            return respuestas.creado(respuesta);
+        });
     }
 
     @Override
     public AddressCheck validateAddress(Contact contacto, TipoDireccion tipo) {
-        DhlAddressValidateResponse respuesta = ejecutar(() -> rest().get()
-                .uri(b -> b.path("/address-validate")
-                        .queryParam("type", tipo == TipoDireccion.RECOGIDA ? "pickup" : "delivery")
-                        .queryParam("countryCode", contacto.getPais())
-                        .queryParamIfPresent("postalCode", java.util.Optional.ofNullable(contacto.getCodigoPostal()))
-                        .queryParamIfPresent("cityName", java.util.Optional.ofNullable(contacto.getCiudad()))
-                        .queryParam("strictValidation", "false")
-                        .build())
-                .headers(h -> referencia(h, UUID.randomUUID().toString()))
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, this::traducirError)
-                .body(DhlAddressValidateResponse.class));
-        boolean valida = respuesta != null && respuesta.address() != null && !respuesta.address().isEmpty();
-        StringBuilder detalle = new StringBuilder();
-        if (valida) {
-            DhlValidatedAddress a = respuesta.address().get(0);
-            detalle.append("DHL sirve ").append(a.cityName()).append(" ").append(a.postalCode() == null ? "" : a.postalCode());
-            if (a.serviceArea() != null) detalle.append(" (").append(a.serviceArea().description()).append(")");
-        } else {
-            detalle.append("DHL no reconoce la dirección");
-        }
-        if (respuesta != null && respuesta.warnings() != null) respuesta.warnings().forEach(w -> detalle.append(". ").append(w));
-        return new AddressCheck(valida, detalle.toString());
+        return ejecutar(() -> {
+            DhlAddressValidateResponse respuesta = rest().get()
+                    .uri(b -> b.path("/address-validate")
+                            .queryParam("type", tipo == TipoDireccion.RECOGIDA ? "pickup" : "delivery")
+                            .queryParam("countryCode", contacto.getPais())
+                            .queryParamIfPresent("postalCode", java.util.Optional.ofNullable(contacto.getCodigoPostal()))
+                            .queryParamIfPresent("cityName", java.util.Optional.ofNullable(contacto.getCiudad()))
+                            .queryParam("strictValidation", "false")
+                            .build())
+                    .headers(h -> referencia(h, UUID.randomUUID().toString()))
+                    .retrieve()
+                    .onStatus(HttpStatusCode::isError, this::traducirError)
+                    .body(DhlAddressValidateResponse.class);
+            boolean valida = respuesta != null && respuesta.address() != null && !respuesta.address().isEmpty();
+            StringBuilder detalle = new StringBuilder();
+            if (valida) {
+                DhlValidatedAddress a = respuesta.address().get(0);
+                detalle.append("DHL sirve ").append(a.cityName()).append(" ").append(a.postalCode() == null ? "" : a.postalCode());
+                if (a.serviceArea() != null) detalle.append(" (").append(a.serviceArea().description()).append(")");
+            } else {
+                detalle.append("DHL no reconoce la dirección");
+            }
+            if (respuesta != null && respuesta.warnings() != null) respuesta.warnings().forEach(w -> detalle.append(". ").append(w));
+            return new AddressCheck(valida, detalle.toString());
+        });
     }
 
     @Override

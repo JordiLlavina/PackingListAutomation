@@ -8,6 +8,7 @@ import java.util.List;
 
 import com.puntotres.packinglist.carrier.dhl.dto.*;
 import com.puntotres.packinglist.shipping.carrier.CarrierDocument;
+import com.puntotres.packinglist.shipping.carrier.CarrierException;
 import com.puntotres.packinglist.shipping.carrier.CreatedShipment;
 import com.puntotres.packinglist.shipping.carrier.ProductOffer;
 
@@ -30,10 +31,24 @@ public class DhlResponseMapper {
     }
 
     public CreatedShipment creado(DhlShipmentResponse respuesta) {
+        // Un 2xx con un cuerpo que no encaja el contrato (sin cuerpo, un documento sin
+        // content, un base64 roto) no es un NullPointerException para quien llama: es
+        // DHL respondiendo mal, y ShipmentService.crear solo sabe reaccionar a
+        // CarrierException, no a cualquier RuntimeException del mapeo.
+        if (respuesta == null) throw new CarrierException("DHL ha respondido sin cuerpo al crear el envío.");
         List<CarrierDocument> documentos = new ArrayList<>();
         if (respuesta.documents() != null) {
             for (DhlResponseDocument d : respuesta.documents()) {
-                documentos.add(new CarrierDocument(d.typeCode(), d.imageFormat(), Base64.getDecoder().decode(d.content())));
+                if (d.content() == null) {
+                    throw new CarrierException("DHL no ha incluido el contenido del documento " + d.typeCode() + ".");
+                }
+                byte[] contenido;
+                try {
+                    contenido = Base64.getDecoder().decode(d.content());
+                } catch (IllegalArgumentException e) {
+                    throw new CarrierException("El documento " + d.typeCode() + " que ha devuelto DHL no es base64 válido.");
+                }
+                documentos.add(new CarrierDocument(d.typeCode(), d.imageFormat(), contenido));
             }
         }
         return new CreatedShipment(respuesta.shipmentTrackingNumber(), respuesta.trackingUrl(), respuesta.dispatchConfirmationNumber(), documentos);

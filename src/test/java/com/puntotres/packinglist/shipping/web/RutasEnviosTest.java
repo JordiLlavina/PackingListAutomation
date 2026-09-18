@@ -79,6 +79,16 @@ class RutasEnviosTest {
         mvc.perform(post("/envios/contactos/999999/comprobar").param("tipo", "ENTREGA")).andExpect(redirectedUrl("/envios/contactos")).andExpect(flash().attributeExists("mensajeError"));
     }
 
+    /** Un "volver" con una URL absoluta ajena es un open redirect: se ignora y cae al destino de siempre. */
+    @Test
+    void unVolverConUrlAbsolutaAjenaSeIgnoraYVaALaLibreta() throws Exception {
+        mvc.perform(post("/envios/contactos").param("empresa", "TEST VOLVER").param("direccion1", "C/1")
+                        .param("ciudad", "Ciudad").param("pais", "ES").param("telefono", "+34600000000")
+                        .param("volver", "https://evil.example"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/envios/contactos"));
+    }
+
     @Test
     void laImportacionDeArticulosPrevisualizaYConfirma() throws Exception {
         byte[] csv = new org.springframework.core.io.ClassPathResource("ejemplos/envios/articulos.csv").getInputStream().readAllBytes();
@@ -127,5 +137,15 @@ class RutasEnviosTest {
     @Test
     void unEnvioQueNoExisteVuelveAlListadoConMensaje() throws Exception {
         mvc.perform(get("/envios/999999")).andExpect(redirectedUrl("/envios")).andExpect(flash().attributeExists("mensajeError"));
+    }
+
+    /** Un índice negativo (parámetro manipulado a mano) no puede tirar un 500 al quitar una fila. */
+    @Test
+    void quitarBultoOLineaConIndiceNegativoNoDaError() throws Exception {
+        String destino = mvc.perform(post("/envios/nuevo")).andReturn().getResponse().getRedirectedUrl();
+        mvc.perform(post(destino).param("accion", "quitarBulto").param("indice", "-1").param("responsable", "Jordi"))
+                .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl(destino));
+        mvc.perform(post(destino).param("accion", "quitarLinea").param("indice", "-1").param("responsable", "Jordi"))
+                .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl(destino));
     }
 }

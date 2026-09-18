@@ -67,8 +67,13 @@ public class EnviosController {
     @GetMapping("/{id}")
     public String ficha(@PathVariable Long id, Model model) {
         Shipment envio = envios.cargar(id);
+        // La herencia de cuenta/incoterm del destinatario ya no se aplica aquí: si se
+        // hiciera en cada GET, un campo que el usuario dejó explícitamente vacío (el
+        // desplegable "— el destinatario a la entrega —") volvería a mostrar el valor
+        // heredado en la siguiente carga, y el siguiente guardado lo escribiría otra
+        // vez aunque nadie lo hubiera tocado. ShipmentService.editar hereda una sola
+        // vez, cuando el destinatario cambia de verdad; aquí solo se pinta lo guardado.
         EnvioForm form = EnvioForm.de(envio);
-        form.heredarDe(envio.getDestinatario());
         return pintar(envio, form, model);
     }
 
@@ -80,10 +85,10 @@ public class EnviosController {
             switch (accion) {
                 case "guardar" -> { envios.editar(id, form.aDatos()); redirect.addFlashAttribute("mensaje", "Guardado."); }
                 case "anadirBulto" -> { form.getBultos().add(new EnvioForm.BultoForm()); envios.editar(id, form.aDatos()); }
-                case "quitarBulto" -> { if (indice != null && indice < form.getBultos().size()) form.getBultos().remove(indice.intValue()); envios.editar(id, form.aDatos()); }
+                case "quitarBulto" -> { if (indice != null && indice >= 0 && indice < form.getBultos().size()) form.getBultos().remove(indice.intValue()); envios.editar(id, form.aDatos()); }
                 case "anadirLinea" -> { form.getLineas().add(new EnvioForm.LineaForm()); envios.editar(id, form.aDatos()); }
                 case "anadirArticulo" -> { articulos.porId(articuloId).ifPresent(form::anadirLineaDe); envios.editar(id, form.aDatos()); }
-                case "quitarLinea" -> { if (indice != null && indice < form.getLineas().size()) form.getLineas().remove(indice.intValue()); envios.editar(id, form.aDatos()); }
+                case "quitarLinea" -> { if (indice != null && indice >= 0 && indice < form.getLineas().size()) form.getLineas().remove(indice.intValue()); envios.editar(id, form.aDatos()); }
                 case "intercambiar" -> { Long r = form.getRemitenteId(); form.setRemitenteId(form.getDestinatarioId()); form.setDestinatarioId(r); envios.editar(id, form.aDatos()); }
                 case "tarifar" -> {
                     envios.editar(id, form.aDatos());
@@ -114,6 +119,11 @@ public class EnviosController {
         } catch (TransicionIlegalException | ObjectOptimisticLockingFailureException e) {
             // Doble clic o dos pestañas: la pantalla se recarga con el estado real, que es lo que hay que ver.
             redirect.addFlashAttribute("mensajeError", "El envío ha cambiado de estado mientras tanto. Se muestra tal como está ahora.");
+        } catch (DatoInvalidoException e) {
+            // La web solo puede mandar un id inexistente si el dato se borró entre que se
+            // pintaron los desplegables y se envió el formulario: no es un 500, es un
+            // dato que ya no está, y se avisa igual que en ContactosController.
+            redirect.addFlashAttribute("mensajeError", e.getMessage());
         }
         return "redirect:/envios/" + id;
     }

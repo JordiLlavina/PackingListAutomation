@@ -10,6 +10,11 @@ comercial). API REST equivalente en `/api/shipments`.
 Es una sección **independiente** del asistente de packing lists: no comparte
 envío ni pantallas con él, solo el menú (`/menu`) y el estilo.
 
+La libreta de contactos guarda datos personales de terceros (nombre, dirección,
+teléfono, email de personas de contacto reales) y la aplicación no tiene
+autenticación, así que esta sección debe seguir funcionando **solo dentro de la
+red interna** de la empresa, nunca expuesta a Internet.
+
 ## Variables de entorno
 
 | Variable | Qué es | Sin ella |
@@ -23,20 +28,41 @@ Producción: `DHL_BASE_URL=https://express.api.dhl.com/mydhlapi` (sin `/test`).
 
 ## Probar contra el entorno de test de DHL
 
-1. Pedir credenciales de test en https://developer.dhl.com (app sobre "DHL Express - MyDHL API").
-2. Exportar las cuatro variables y arrancar `mvn spring-boot:run`.
-3. `/envios/contactos/importar`: subir el export CSV de la libreta de MyDHL+ (44 columnas; el
+1. **Antes del primer arranque con esta rama, copia `./datos/` a un lugar seguro.**
+   Flyway marca el esquema actual como baseline la primera vez que arranca contra una
+   base existente, y a partir de ahí Hibernate ya no crea ni actualiza nada: solo
+   `validate`. Si una entidad no encaja con lo que hay en la base (una columna que
+   falta, un tipo distinto), el arranque se detiene con el nombre de la columna en el
+   mensaje. La solución es siempre una migración nueva `V3__algo.sql`, **nunca** volver
+   a `ddl-auto: update`; tener la copia de `./datos/` a mano evita perder la base real
+   mientras se decide esa migración.
+2. Pedir credenciales de test en https://developer.dhl.com (app sobre "DHL Express - MyDHL API").
+3. Exportar las cuatro variables y arrancar `mvn spring-boot:run`.
+4. `/envios/contactos/importar`: subir el export CSV de la libreta de MyDHL+ (44 columnas; el
    fichero de referencia está en esta carpeta, `address-book-*.csv`, y **no** se copia al
    repo por llevar datos personales de terceros — está en `.gitignore`).
-4. `/envios/cuentas`: comprobar que la cuenta propia (la de `DHL_SHIPPER_ACCOUNT`) aparece
+5. `/envios/cuentas`: comprobar que la cuenta propia (la de `DHL_SHIPPER_ACCOUNT`) aparece
    marcada como "propia"; añadir las de los clientes que pagan transporte o aranceles.
-5. `/envios` → "Nuevo envío DHL": remitente, destinatario, motivo, bultos, líneas de aduana,
+6. `/envios` → "Nuevo envío DHL": remitente, destinatario, motivo, bultos, líneas de aduana,
    recogida (check "Pedir recogida al mensajero", marcado por defecto, hora de cierre y
    lugar), cuenta de pago → Tarifar → elegir producto → Confirmar y crear.
-6. Descargar la etiqueta, el waybill y la factura comercial desde la ficha del envío ya
+7. Descargar la etiqueta, el waybill y la factura comercial desde la ficha del envío ya
    `CREATED`. En el entorno de test la guía y los PDF son ficticios.
-7. Si falla la creación en DHL, el envío queda en `ERROR` con el mensaje de DHL a la vista y
+8. Si falla la creación en DHL, el envío queda en `ERROR` con el mensaje de DHL a la vista y
    un botón "Reintentar la creación en DHL" que reutiliza el mismo `requestId`.
+
+## API
+
+`PUT /api/shipments/{id}` es un **reemplazo completo** del envío, con las mismas
+reglas de "campo ausente" que la pantalla:
+
+- `horaCierreRecogida` y `lugarRecogida`: `null` (el campo no viaja en el JSON)
+  significa "no tocar" y conserva lo que hubiera; una cadena vacía `""` sí lo borra.
+- `pedirRecogida`: `null` equivale a `true` (se pide recogida salvo que se mande
+  explícitamente `false`).
+
+El resto de campos (remitente, destinatario, cuentas, motivo, bultos, líneas de
+aduana...) sí se reemplazan enteros con lo que traiga el `PUT`, incluido `null`.
 
 ## Dónde está cada cosa
 
@@ -44,7 +70,9 @@ Producción: `DHL_BASE_URL=https://express.api.dhl.com/mydhlapi` (sin `/test`).
   `CarrierClient`, `DirectionResolver`/`CustomsChecker`, importadores CSV, web, api).
 - Adaptador: `carrier/dhl/` (DTOs del OpenAPI 3.3.2 de esta carpeta, `DhlRequestMapper`/
   `DhlResponseMapper`, `DhlErrorTranslator`, `DhlExpressClient`). `shipping` no importa nada
-  de `carrier.dhl`.
+  de `carrier.dhl`, y `carrier.dhl` solo importa `shipping.carrier` y `shipping.model` —
+  y, como única excepción, `CuentaPropiaInicial` usa `BillingAccountService` para dar de
+  alta la cuenta propia al arrancar, porque es quien conoce `shipper-account`.
 - Esquema: `db/migration/V1__esquema_inicial.sql` (baseline del esquema que ya existía:
   taras, temporadas guardadas, memoria de referencias) y `V2__envios.sql` (todas las tablas
   de envíos y la semilla de motivos). Flyway gestiona el esquema; Hibernate solo valida
