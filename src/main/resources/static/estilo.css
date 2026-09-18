@@ -911,3 +911,12 @@ tr.sin-pedido td { background: #fff8e1; }
 .linea-detalle.palet strong {
     color: #372f77;
 }
+
+/* ---- Envíos por transportista ---- */
+.subnav { display: flex; gap: 1rem; margin: 0 0 1rem; padding: 0.4rem 0; border-bottom: 1px solid #d9dee3; }
+.subnav a { text-decoration: none; color: #2c3e50; padding: 0.2rem 0.4rem; }
+.subnav a.activo { font-weight: bold; border-bottom: 2px solid #2c3e50; }
+.tabla-mantenimiento tr.inactiva { color: #8a949e; }
+.tabla-mantenimiento tr.inactiva input { color: #8a949e; }
+.form-fila { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.form-inline { display: inline-block; margin-left: 0.5rem; }

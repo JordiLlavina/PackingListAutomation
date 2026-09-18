@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Artículos')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos · Artículos')}"></header>
+<main>
+    <nav class="subnav">
+        <a th:href="@{/envios}">Envíos</a>
+        <a th:href="@{/envios/contactos}">Libreta</a>
+        <a th:href="@{/envios/cuentas}">Cuentas DHL</a>
+        <a th:href="@{/envios/motivos}">Motivos</a>
+        <a th:href="@{/envios/articulos}" class="activo">Artículos</a>
+    </nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <p class="ayuda">El catálogo aduanero: lo que hace falta para rellenar una línea de aduana sin teclearla
+            cada vez.</p>
+        <a class="boton secundario" th:href="@{/envios/articulos/importar}">Importar CSV</a>
+        <table class="tabla-mantenimiento">
+            <thead>
+            <tr>
+                <th>Referencia</th><th>Descripción aduanera</th><th>HS</th><th>Origen</th>
+                <th>Neto</th><th>Bruto</th><th>Valor</th><th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="articulo : ${articulos}" th:classappend="${!articulo.activo} ? 'inactiva'">
+                <td colspan="8">
+                    <form th:action="@{/envios/articulos}" method="post" class="form-fila">
+                        <input type="hidden" name="id" th:value="${articulo.id}">
+                        <input type="text" name="referencia" th:value="${articulo.referencia}" size="16" required>
+                        <input type="text" name="descripcion" th:value="${articulo.descripcionAduanera}" size="30" required>
+                        <input type="text" name="codigoHs" th:value="${articulo.codigoHs}" size="10" required>
+                        <input type="text" name="paisOrigen" th:value="${articulo.paisOrigen}" size="2" maxlength="2" required>
+                        <input type="number" name="pesoNeto" th:value="${articulo.pesoNetoUnitario}" step="0.001">
+                        <input type="number" name="pesoBruto" th:value="${articulo.pesoBrutoUnitario}" step="0.001">
+                        <input type="number" name="valorUnitario" th:value="${articulo.valorUnitario}" step="0.01">
+                        <button type="submit" class="mini">Guardar</button>
+                    </form>
+                    <form th:action="@{/envios/articulos/{id}/activar(id=${articulo.id})}" method="post" class="form-inline">
+                        <input type="hidden" name="activo" th:value="${!articulo.activo}">
+                        <button type="submit" class="mini secundario" th:text="${articulo.activo} ? 'Desactivar' : 'Reactivar'"></button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Añadir un artículo</h3>
+        <form th:action="@{/envios/articulos}" method="post" class="form-fila">
+            <label>Referencia <input type="text" name="referencia" required placeholder="PXCEI-F67043"></label>
+            <label>Descripción aduanera <input type="text" name="descripcion" required placeholder="Bolso de piel"></label>
+            <label>HS <input type="text" name="codigoHs" required placeholder="42022210"></label>
+            <label>Origen <input type="text" name="paisOrigen" size="2" maxlength="2" required placeholder="MA"></label>
+            <label>Neto <input type="number" name="pesoNeto" step="0.001"></label>
+            <label>Bruto <input type="number" name="pesoBruto" step="0.001"></label>
+            <label>Valor <input type="number" name="valorUnitario" step="0.01"></label>
+            <button type="submit">Añadir</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

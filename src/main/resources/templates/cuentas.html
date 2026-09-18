@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Cuentas DHL')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos · Cuentas DHL')}"></header>
+<main>
+    <nav class="subnav">
+        <a th:href="@{/envios}">Envíos</a>
+        <a th:href="@{/envios/contactos}">Libreta</a>
+        <a th:href="@{/envios/cuentas}" class="activo">Cuentas DHL</a>
+        <a th:href="@{/envios/motivos}">Motivos</a>
+        <a th:href="@{/envios/articulos}">Artículos</a>
+    </nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <p class="ayuda">Las cuentas con las que se paga a DHL: la nuestra y las de los clientes que pagan ellos el
+            transporte o los aranceles. Los usos dicen en qué desplegable del envío aparece cada una.</p>
+        <table class="tabla-mantenimiento">
+            <thead><tr><th>Número</th><th>Titular</th><th>Propia</th><th>Usos</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="c : ${cuentas}" th:classappend="${!c.activa} ? 'inactiva'">
+                <td colspan="5">
+                    <form th:action="@{/envios/cuentas}" method="post" class="form-fila">
+                        <input type="hidden" name="id" th:value="${c.id}">
+                        <input type="text" name="numero" th:value="${c.numero}" size="12" required>
+                        <input type="text" name="titular" th:value="${c.titular}" size="30" required>
+                        <label><input type="checkbox" name="propia" value="true" th:checked="${c.propia}"> propia</label>
+                        <span th:each="r : ${roles}">
+                            <label><input type="checkbox" name="roles" th:value="${r}" th:checked="${c.roles.contains(r)}"> <span th:text="${r.etiqueta}"></span></label>
+                        </span>
+                        <button type="submit" class="mini">Guardar</button>
+                    </form>
+                    <form th:action="@{/envios/cuentas/{id}/activar(id=${c.id})}" method="post" class="form-inline">
+                        <input type="hidden" name="activa" th:value="${!c.activa}">
+                        <button type="submit" class="mini secundario" th:text="${c.activa} ? 'Desactivar' : 'Reactivar'"></button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Añadir una cuenta</h3>
+        <form th:action="@{/envios/cuentas}" method="post" class="form-fila">
+            <label>Número <input type="text" name="numero" required placeholder="956483537"></label>
+            <label>Titular <input type="text" name="titular" required placeholder="AMI PARIS"></label>
+            <label><input type="checkbox" name="propia" value="true"> propia</label>
+            <span th:each="r : ${roles}"><label><input type="checkbox" name="roles" th:value="${r}"> <span th:text="${r.etiqueta}"></span></label></span>
+            <button type="submit">Añadir</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

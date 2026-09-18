@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Motivos de envío')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Envíos · Motivos')}"></header>
+<main>
+    <nav class="subnav">
+        <a th:href="@{/envios}">Envíos</a>
+        <a th:href="@{/envios/contactos}">Libreta</a>
+        <a th:href="@{/envios/cuentas}">Cuentas DHL</a>
+        <a th:href="@{/envios/motivos}" class="activo">Motivos</a>
+        <a th:href="@{/envios/articulos}">Artículos</a>
+    </nav>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <section class="tarjeta">
+        <p class="ayuda">Los motivos del envío (muestras, producción...) y a qué motivo de la declaración de
+            exportación de DHL corresponde cada uno.</p>
+        <table class="tabla-mantenimiento">
+            <thead><tr><th>Nombre</th><th>Motivo DHL</th><th></th></tr></thead>
+            <tbody>
+            <tr th:each="motivo : ${motivos}" th:classappend="${!motivo.activo} ? 'inactiva'">
+                <td colspan="3">
+                    <form th:action="@{/envios/motivos}" method="post" class="form-fila">
+                        <input type="hidden" name="id" th:value="${motivo.id}">
+                        <input type="text" name="nombre" th:value="${motivo.nombre}" size="20" required>
+                        <select name="motivoDhl" required>
+                            <option th:each="m : ${motivosDhl}" th:value="${m}" th:text="${m.codigoDhl()}"
+                                    th:selected="${m == motivo.motivoDhl}"></option>
+                        </select>
+                        <button type="submit" class="mini">Guardar</button>
+                    </form>
+                    <form th:action="@{/envios/motivos/{id}/activar(id=${motivo.id})}" method="post" class="form-inline">
+                        <input type="hidden" name="activo" th:value="${!motivo.activo}">
+                        <button type="submit" class="mini secundario" th:text="${motivo.activo} ? 'Desactivar' : 'Reactivar'"></button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Añadir un motivo</h3>
+        <form th:action="@{/envios/motivos}" method="post" class="form-fila">
+            <label>Nombre <input type="text" name="nombre" required placeholder="Muestras"></label>
+            <select name="motivoDhl" required>
+                <option th:each="m : ${motivosDhl}" th:value="${m}" th:text="${m.codigoDhl()}"></option>
+            </select>
+            <button type="submit">Añadir</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>
