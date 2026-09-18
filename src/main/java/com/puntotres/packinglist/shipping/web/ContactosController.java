@@ -69,6 +69,13 @@ public class ContactosController {
         }
     }
 
+    /** Un id que no existe es un enlace viejo (favorito, pestaña olvidada), no un fallo del programa: se avisa y se vuelve a la libreta en vez de dar un 500. */
+    @ExceptionHandler(DatoInvalidoException.class)
+    public String contactoInvalido(DatoInvalidoException e, RedirectAttributes redirect) {
+        redirect.addFlashAttribute("mensajeError", e.getMessage());
+        return "redirect:/envios/contactos";
+    }
+
     @PostMapping("/{id}/baja")
     public String baja(@PathVariable Long id, RedirectAttributes redirect) {
         contactos.darDeBaja(id);

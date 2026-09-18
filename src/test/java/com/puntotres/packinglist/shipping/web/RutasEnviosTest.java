@@ -72,4 +72,10 @@ class RutasEnviosTest {
         mvc.perform(get("/envios/contactos").param("q", "PELLI ESEMPIO")).andExpect(content().string(containsString("PELLI ESEMPIO SRL")));
         mvc.perform(get("/envios/cuentas")).andExpect(content().string(containsString("956483537")));
     }
+
+    @Test
+    void unContactoQueNoExisteVuelveALaLibretaConMensaje() throws Exception {
+        mvc.perform(get("/envios/contactos/999999")).andExpect(redirectedUrl("/envios/contactos")).andExpect(flash().attributeExists("mensajeError"));
+        mvc.perform(post("/envios/contactos/999999/comprobar").param("tipo", "ENTREGA")).andExpect(redirectedUrl("/envios/contactos")).andExpect(flash().attributeExists("mensajeError"));
+    }
 }
