@@ -89,6 +89,16 @@ class RutasEnviosTest {
                 .andExpect(redirectedUrl("/envios/contactos"));
     }
 
+    /** "/\evil.example" es protocolo-relativa una vez el navegador normaliza "\" a "/": también se rechaza. */
+    @Test
+    void unVolverConBarraInvertidaDisfrazadaDeProtocoloRelativaSeIgnora() throws Exception {
+        mvc.perform(post("/envios/contactos").param("empresa", "TEST VOLVER 2").param("direccion1", "C/1")
+                        .param("ciudad", "Ciudad").param("pais", "ES").param("telefono", "+34600000000")
+                        .param("volver", "/\\evil.example"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/envios/contactos"));
+    }
+
     @Test
     void laImportacionDeArticulosPrevisualizaYConfirma() throws Exception {
         byte[] csv = new org.springframework.core.io.ClassPathResource("ejemplos/envios/articulos.csv").getInputStream().readAllBytes();

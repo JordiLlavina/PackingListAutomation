@@ -122,19 +122,18 @@ public class ShipmentService {
      *
      * <p>Las cuentas y el incoterm del destinatario se heredan UNA SOLA VEZ, en
      * el guardado donde el destinatario cambia (o el envío no tenía ninguno
-     * todavía), y solo para los campos donde el destinatario nuevo trae de
-     * verdad un valor por defecto: ese guardado pisa lo que trajera el
-     * formulario para esos tres campos, porque, al no haber JavaScript que
-     * refresque los desplegables al vuelo, lo que viaja en esa petición para
-     * cuenta de transporte/aranceles/incoterm es lo que mostraba la pantalla
-     * del contacto anterior (o nada), no una elección pensada para el nuevo. Si
-     * el destinatario nuevo no tiene un valor por defecto para alguno de los
-     * tres, ese campo se deja tal como llegó en datos — es la única forma de no
-     * confundir "sin valor por defecto" con "bórralo", que rompería crear un
-     * envío entero de una sola vez (remitente, destinatario y cuenta en el
-     * mismo guardado, el caso normal). En guardados siguientes con el mismo
-     * destinatario ya no se vuelve a heredar: manda lo que teclee el usuario,
-     * incluido dejar el campo vacío.
+     * todavía), y la herencia SOLO RELLENA HUECOS: se copia el valor por
+     * defecto del destinatario nuevo a un campo únicamente si ese campo llegó
+     * vacío en {@code datos} ({@code cuentaTransporteId}/{@code
+     * cuentaArancelesId}/{@code incoterm} a {@code null}) y el destinatario sí
+     * trae un valor por defecto. Lo que llega explícito en {@code datos} manda
+     * siempre, coincida o no con el del contacto: un {@code POST}/{@code PUT}
+     * con una cuenta de aranceles elegida a mano, o un guardado del formulario
+     * que fija remitente+destinatario+cuenta de una vez, no pierde esa
+     * elección — pisarla contradiría el contrato de "el PUT reemplaza con lo
+     * que traiga" que documenta el README de la sección. En guardados
+     * siguientes con el mismo destinatario ya no se vuelve a heredar: manda lo
+     * que teclee el usuario, incluido dejar el campo vacío.
      *
      * <p>Un id que no existe (remitente, destinatario, cuentas, motivo o el
      * artículo de una línea) no se traga en silencio como {@code null}: quien
@@ -185,14 +184,15 @@ public class ShipmentService {
         // sí pueden llegar en los tests aunque nunca en producción.
         boolean cambioDestinatario = nuevoDestinatario != null && nuevoDestinatario != destinatarioAnterior;
         if (cambioDestinatario) {
-            // Solo se pisa el campo si el destinatario nuevo trae de verdad un valor por
-            // defecto: si no lo trae, lo que haya llegado en datos para ese campo en este
-            // mismo guardado es la elección real del usuario (p. ej. crear un envío
-            // entero de una vez, remitente+destinatario+cuenta en el mismo POST), no un
-            // resto de la pantalla del contacto anterior, y no hay motivo para borrarlo.
-            if (nuevoDestinatario.getCuentaTransportePorDefecto() != null) envio.setCuentaTransporte(nuevoDestinatario.getCuentaTransportePorDefecto());
-            if (nuevoDestinatario.getCuentaArancelesPorDefecto() != null) envio.setCuentaAranceles(nuevoDestinatario.getCuentaArancelesPorDefecto());
-            if (nuevoDestinatario.getIncotermPorDefecto() != null) envio.setIncoterm(nuevoDestinatario.getIncotermPorDefecto());
+            // Rellena huecos, nunca pisa: si datos trajo un valor explícito para el
+            // campo (cuenta elegida a mano, incoterm del formulario), ese manda siempre
+            // — la herencia solo entra donde el llamador no dijo nada.
+            if (datos.cuentaTransporteId() == null && nuevoDestinatario.getCuentaTransportePorDefecto() != null)
+                envio.setCuentaTransporte(nuevoDestinatario.getCuentaTransportePorDefecto());
+            if (datos.cuentaArancelesId() == null && nuevoDestinatario.getCuentaArancelesPorDefecto() != null)
+                envio.setCuentaAranceles(nuevoDestinatario.getCuentaArancelesPorDefecto());
+            if (datos.incoterm() == null && nuevoDestinatario.getIncotermPorDefecto() != null)
+                envio.setIncoterm(nuevoDestinatario.getIncotermPorDefecto());
         }
 
         // Sentido y aduana se deducen siempre de los países: no son opinables y

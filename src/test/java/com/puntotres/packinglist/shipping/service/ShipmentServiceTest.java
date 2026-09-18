@@ -47,6 +47,7 @@ class ShipmentServiceTest {
 
     private ShipmentRepository envios;
     private ContactRepository contactos;
+    private BillingAccountRepository cuentas;
     private CarrierFalso carrier;
     private Notifier notifier;
     private ShipmentService servicio;
@@ -57,7 +58,7 @@ class ShipmentServiceTest {
     void preparar() {
         envios = mock(ShipmentRepository.class);
         contactos = mock(ContactRepository.class);
-        BillingAccountRepository cuentas = mock(BillingAccountRepository.class);
+        cuentas = mock(BillingAccountRepository.class);
         ShipmentReasonRepository motivos = mock(ShipmentReasonRepository.class);
         ArticleRepository articulos = mock(ArticleRepository.class);
         ShipmentDocumentRepository documentos = mock(ShipmentDocumentRepository.class);
@@ -309,7 +310,7 @@ class ShipmentServiceTest {
     }
 
     @Test
-    void cambiarDeDestinatarioHeredaSusCuentasEIncotermUnaSolaVez() {
+    void cambiarDeDestinatarioHeredaSusCuentasEIncotermSoloEnLosCamposQueLleganVacios() {
         BillingAccount cuentaTransporteDestino = new BillingAccount("400112049", "Cuenta transporte destino", false, java.util.EnumSet.of(BillingRole.PAYER));
         BillingAccount cuentaArancelesDestino = new BillingAccount("400112050", "Cuenta aranceles destino", false, java.util.EnumSet.of(BillingRole.DUTIES));
         Contact destinoConDefectos = new Contact("TALLER 2", "Zone franche 2", "Tanger", "MA");
@@ -319,10 +320,9 @@ class ShipmentServiceTest {
         destinoConDefectos.setIncotermPorDefecto(Incoterm.DDP);
         when(contactos.findById(21L)).thenReturn(Optional.of(destinoConDefectos));
 
-        // El formulario manda otra cuenta (30L) y otro incoterm (DAP): son los que
-        // mostraba la pantalla para el destinatario ANTERIOR (el envío nace sin
-        // ninguno), así que al cambiar de destinatario mandan los del contacto nuevo.
-        DatosEnvio primeraVezConEsteDestino = new DatosEnvio(10L, 21L, LocalDate.now().plusDays(1), Incoterm.DAP, 30L, null, 40L,
+        // Los tres campos llegan vacíos (null): es el hueco que la herencia rellena al
+        // cambiar de destinatario, el caso de un formulario/API que no dijo nada de ellos.
+        DatosEnvio primeraVezConEsteDestino = new DatosEnvio(10L, 21L, LocalDate.now().plusDays(1), null, null, null, 40L,
                 "AMI", "H26", "MUESTRAS-1", null, "Jordi", true, "18:00", "Recepción",
                 List.of(new DatosEnvio.DatosBulto(2.5, 40.0, 30.0, 20.0, null)), List.of());
         Shipment editado = servicio.editar(1L, primeraVezConEsteDestino);
@@ -339,6 +339,29 @@ class ShipmentServiceTest {
         Shipment editado2 = servicio.editar(1L, segundaVezMismoDestino);
 
         assertNull(editado2.getCuentaAranceles());
+    }
+
+    @Test
+    void cambiarDeDestinatarioNoPisaUnaCuentaExplicitaAunqueElDestinatarioTraigaOtraPorDefecto() {
+        BillingAccount cuentaArancelesDestino = new BillingAccount("400112050", "Cuenta aranceles destino", false, java.util.EnumSet.of(BillingRole.DUTIES));
+        Contact destinoConDefectos = new Contact("TALLER 2", "Zone franche 2", "Tanger", "MA");
+        destinoConDefectos.setTelefono("+212500000001");
+        destinoConDefectos.setCuentaArancelesPorDefecto(cuentaArancelesDestino);
+        when(contactos.findById(21L)).thenReturn(Optional.of(destinoConDefectos));
+        BillingAccount cuentaElegidaAMano = new BillingAccount("500112050", "Cuenta elegida a mano", false, java.util.EnumSet.of(BillingRole.DUTIES));
+        when(cuentas.findById(31L)).thenReturn(Optional.of(cuentaElegidaAMano));
+
+        // Un guardado de una sola vez (remitente+destinatario+cuenta de aranceles
+        // explícita, el caso normal de un POST o de rellenar el formulario entero):
+        // aunque el destinatario cambia y trae su propia cuenta de aranceles por
+        // defecto, la elegida a mano en esta misma llamada no se pierde.
+        DatosEnvio datos = new DatosEnvio(10L, 21L, LocalDate.now().plusDays(1), Incoterm.DAP, 30L, 31L, 40L,
+                "AMI", "H26", "MUESTRAS-1", null, "Jordi", true, "18:00", "Recepción",
+                List.of(new DatosEnvio.DatosBulto(2.5, 40.0, 30.0, 20.0, null)), List.of());
+
+        Shipment editado = servicio.editar(1L, datos);
+
+        assertEquals(cuentaElegidaAMano, editado.getCuentaAranceles());
     }
 
     @Test

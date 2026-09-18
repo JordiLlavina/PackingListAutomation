@@ -77,10 +77,15 @@ public class ContactosController {
      * (open redirect) y el hidden del formulario lo devolvería en el href de
      * "Volver" sin comprobar nada. Solo se acepta una ruta local que empiece
      * por "/" y no por "//" (que el navegador trata como protocolo-relativa,
-     * o sea otro host); cualquier otra cosa cae al destino de siempre.
+     * o sea otro host); cualquier otra cosa cae al destino de siempre. Antes
+     * de comprobarlo se normaliza "\" a "/", porque varios navegadores tratan
+     * una barra invertida igual que una barra normal en una URL, así que
+     * "/\evil.example" cuela como protocolo-relativa si no se normaliza antes
+     * del check.
      */
     private static String volverSeguro(String volver) {
-        return volver != null && volver.startsWith("/") && !volver.startsWith("//") ? volver : "/envios/contactos";
+        String normalizado = volver == null ? null : volver.replace('\\', '/');
+        return normalizado != null && normalizado.startsWith("/") && !normalizado.startsWith("//") ? normalizado : "/envios/contactos";
     }
 
     /** Un id que no existe es un enlace viejo (favorito, pestaña olvidada), no un fallo del programa: se avisa y se vuelve a la libreta en vez de dar un 500. */

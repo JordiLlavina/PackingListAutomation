@@ -28,6 +28,13 @@ class ShipmentsApiTest {
         return lista.get(0).get("id").asLong();
     }
 
+    private long crearCuentaDeAranceles(String numero) throws Exception {
+        mvc.perform(post("/envios/cuentas").param("numero", numero).param("titular", "Titular " + numero).param("roles", "DUTIES"));
+        JsonNode lista = json.readTree(mvc.perform(get("/api/billing-accounts")).andReturn().getResponse().getContentAsString());
+        for (JsonNode c : lista) if (numero.equals(c.get("numero").asText())) return c.get("id").asLong();
+        throw new IllegalStateException("Cuenta " + numero + " no encontrada tras crearla");
+    }
+
     @Test
     void crearBorradorLeerEditarYCancelar() throws Exception {
         long origen = crearContacto("API ORIGEN", "ES");
@@ -115,5 +122,33 @@ class ShipmentsApiTest {
                         .content("{\"responsable\": \"Jordi\", \"remitenteId\": 999999}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.mensaje", containsString("999999")));
+    }
+
+    /**
+     * La herencia de cuentas del destinatario solo rellena huecos: un POST que ya trae
+     * una cuenta de aranceles explícita no pierde esa elección aunque el destinatario
+     * (nuevo para este envío) traiga su propia cuenta por defecto.
+     */
+    @Test
+    void unaCuentaDeArancelesExplicitaEnElPostNoSePisaAunqueElDestinatarioTraigaOtraPorDefecto() throws Exception {
+        long cuentaPorDefecto = crearCuentaDeAranceles("600000001");
+        long cuentaExplicita = crearCuentaDeAranceles("600000002");
+        long origen = crearContacto("API ORIGEN HERENCIA", "ES");
+        // No se usa crearContacto aquí: hace falta fijar cuentaArancelesPorDefectoId en la
+        // misma alta, y crearContacto no lo admite.
+        mvc.perform(post("/envios/contactos").param("empresa", "API DESTINO HERENCIA").param("direccion1", "Calle 1")
+                .param("ciudad", "Ciudad").param("pais", "MA").param("telefono", "+34600000000")
+                .param("cuentaArancelesPorDefectoId", String.valueOf(cuentaPorDefecto)));
+        long destino = json.readTree(mvc.perform(get("/api/contacts").param("q", "API DESTINO HERENCIA")).andReturn().getResponse().getContentAsString())
+                .get(0).get("id").asLong();
+
+        String entrada = """
+            {"remitenteId": %d, "destinatarioId": %d, "fechaRecogida": "2030-01-10", "responsable": "Jordi",
+             "cuentaArancelesId": %d}
+            """.formatted(origen, destino, cuentaExplicita);
+
+        mvc.perform(post("/api/shipments").contentType(MediaType.APPLICATION_JSON).content(entrada))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.cuentaAranceles").value("600000002"));
     }
 }
