@@ -11,6 +11,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.puntotres.packinglist.carrier.dhl.dto.*;
 import com.puntotres.packinglist.shipping.model.*;
@@ -146,6 +147,15 @@ class DhlRequestMapperTest {
         assertEquals("MA", primera.manufacturerCountry());
         assertEquals(new DhlLineWeight(1.0, 1.5), primera.weight());
         assertEquals(2, declaracion.lineItems().get(1).number());
+    }
+
+    @Test
+    void elNumeroDeFacturaEsPTAnioYIdDelEnvio() {
+        ReflectionTestUtils.setField(envio, "id", 42L);
+
+        DhlExportDeclaration declaracion = mapper.envio(envio).content().exportDeclaration();
+
+        assertEquals("PT-2026-42", declaracion.invoice().number());
     }
 
     @Test

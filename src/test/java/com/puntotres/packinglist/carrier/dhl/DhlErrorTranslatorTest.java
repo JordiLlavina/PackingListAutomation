@@ -3,11 +3,13 @@ package com.puntotres.packinglist.carrier.dhl;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.carrier.dhl.dto.DhlErrorResponse;
 
 class DhlErrorTranslatorTest {
 
@@ -36,5 +38,22 @@ class DhlErrorTranslatorTest {
     void unCuerpoVacioSoloDiceElCodigo() {
         assertEquals("DHL (500): sin detalle", traductor.traducir(500, ""));
         assertEquals("DHL (500): sin detalle", traductor.traducir(500, null));
+    }
+
+    @Test
+    void unCuerpoLarguisimoSeRecortaAMilQuinientosCaracteresConPuntosSuspensivos() throws Exception {
+        String texto = traductor.traducir(502, "x".repeat(3000));
+
+        assertEquals(1501, texto.length());
+        assertTrue(texto.endsWith("…"));
+
+        List<String> detallesLargos = java.util.stream.Stream.generate(() -> "x".repeat(40)).limit(100).toList();
+        String cuerpoJson = new ObjectMapper().writeValueAsString(
+                new DhlErrorResponse("/expressapi/shipments", "detalle", "Validation error", null, detallesLargos, "400"));
+
+        String textoJson = traductor.traducir(400, cuerpoJson);
+
+        assertEquals(1501, textoJson.length());
+        assertTrue(textoJson.endsWith("…"));
     }
 }
