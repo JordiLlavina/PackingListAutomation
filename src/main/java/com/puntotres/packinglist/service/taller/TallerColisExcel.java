@@ -71,7 +71,10 @@ public final class TallerColisExcel {
         COULEUR(true, "COULEUR", "COLORIS", "COLOR"),
         TAILLE(false, "TAILLE", "SIZE", "TALLA"),
         DESTINATION(false, "DESTINATION", "DESTINO"),
-        CODE(false, "CODE", "CODIGO"),
+        // La hoja real la titula "CODE CLIENT" (es el código del pedido del
+        // cliente, no un código del taller), pero hay hojas antiguas que ponen
+        // solo "CODE": las dos formas valen.
+        CODE(false, "CODE", "CODE CLIENT", "CODIGO", "CODIGO CLIENTE"),
         NUM_EXPEDICION(false, "N EXPEDITION PUNTOTRES", "N EXPEDICION PUNTOTRES",
                 "EXPEDITION PUNTOTRES"),
         QTITE_COLIS(false, "QTITE/COLIS", "QTE/COLIS", "QTITE COLIS", "QTE COLIS"),

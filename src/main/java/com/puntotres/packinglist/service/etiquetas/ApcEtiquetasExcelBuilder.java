@@ -44,7 +44,20 @@ public class ApcEtiquetasExcelBuilder {
              XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
             AjusteFuente ajuste = new AjusteFuente(libro);
             escribirHojaCajas(hoja(libro, layout.hojaCajas(), layout), layout, cajas, ajuste);
-            escribirHojaPalets(hoja(libro, layout.hojaPalet(), layout), palets);
+            // Sin ningún palet que etiquetar la hoja no se conserva: la
+            // etiqueta modelo de la plantilla se imprimiría en blanco y se
+            // pegaría en un bulto igual que una buena.
+            if (palets.isEmpty()) {
+                quitarHojaPalets(libro, layout);
+            } else {
+                escribirHojaPalets(hoja(libro, layout.hojaPalet(), layout), palets);
+            }
+            // Después de quitar la hoja de palets: solo se toca lo que queda
+            // vivo en el libro.
+            for (int i = 0; i < libro.getNumberOfSheets(); i++) {
+                libro.getSheetAt(i).setColumnWidth(ApcEtiquetaLayout.COL_MARGEN,
+                        ApcEtiquetaLayout.ANCHO_COL_MARGEN);
+            }
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             libro.write(salida);
             return salida.toByteArray();
@@ -141,15 +154,21 @@ public class ApcEtiquetasExcelBuilder {
         }
     }
 
+    /**
+     * Deja el libro con una sola hoja, la de cajas. La plantilla trae una
+     * hoja marcada como seleccionada: con la de palets fuera hay que dejar
+     * seleccionada la que queda, o Excel abre el libro sin pestaña activa.
+     */
+    private static void quitarHojaPalets(XSSFWorkbook libro, ApcEtiquetaLayout layout) {
+        libro.removeSheetAt(libro.getSheetIndex(hoja(libro, layout.hojaPalet(), layout)));
+        for (int i = 0; i < libro.getNumberOfSheets(); i++) {
+            libro.getSheetAt(i).setSelected(i == 0);
+        }
+        libro.setActiveSheet(0);
+    }
+
     private static void escribirHojaPalets(XSSFSheet hoja, List<EtiquetaPaletApc> palets) {
         limpiarContadorManual(hoja);
-        if (palets.isEmpty()) {
-            // Sin palets no se sabe qué imprimir: la etiqueta modelo queda
-            // con los valores en blanco (el generador avisa).
-            escribir(hoja, ApcEtiquetaLayout.FILA_PALET_NUM_CAJAS, null);
-            escribir(hoja, ApcEtiquetaLayout.FILA_PALET_PESO, null);
-            return;
-        }
         BloqueEtiquetaModelo modelo =
                 BloqueEtiquetaModelo.capturar(hoja, ApcEtiquetaLayout.ALTURA_BLOQUE_PALET);
         for (int i = 1; i < palets.size(); i++) {

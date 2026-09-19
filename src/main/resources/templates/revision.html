@@ -144,7 +144,12 @@
                     <td><input type="number" min="0" class="c-cantidad"
                                th:name="|cajas[${fila.indiceGlobal}].cantidad|"
                                th:value="${fila.caja.cantidad}"></td>
-                    <td><input type="number" min="1" class="c-palet"
+                    <!-- min 0 y no 1: el palet 0 es el de las cajas que van
+                         sueltas (de 1 a 3 cajas de una destinación se mandan
+                         sin palet) y es un valor legítimo que hay que poder
+                         teclear; con min="1" el navegador no dejaba guardar
+                         la pantalla. -->
+                    <td><input type="number" min="0" class="c-palet"
                                th:classappend="${fila.caja.numeroPalet == null} ? 'sin-palet'"
                                th:name="|cajas[${fila.indiceGlobal}].numeroPalet|"
                                th:value="${fila.caja.numeroPalet}"></td>

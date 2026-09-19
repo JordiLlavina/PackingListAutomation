@@ -9,6 +9,9 @@
        —eso lo sigue haciendo --acento— sino la marca: la pieza de la cabecera
        y los iconos de las tarjetas del menú. */
     --marca: #ff8900;
+    /* Gris fuerte: el de las acciones que sacan de la pantalla, oscuro para
+       que se lea como texto y no como botón deshabilitado. */
+    --gris-fuerte: #5b6773;
     --aviso-fondo: #fff7e0;
     --aviso-borde: #e6c34a;
     --error-fondo: #fdecec;
@@ -187,6 +190,15 @@ button.gris, a.boton.gris {
     background: #a3acb5;
     border-color: #a3acb5;
     color: #fff;
+}
+
+/* Salidas de pantalla (volver atrás, empezar otro envío): no son lo que se ha
+   venido a hacer aquí, así que van sin relleno y con el texto y el borde en
+   gris fuerte, en vez de en el azul de acción. */
+button.neutro, a.boton.neutro {
+    background: #fff;
+    border-color: var(--gris-fuerte);
+    color: var(--gris-fuerte);
 }
 
 /* El icono del botón va algo más grande que su texto, sin estirar el botón:

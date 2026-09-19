@@ -76,6 +76,20 @@ public class AmiPedidoExcel {
     public record Comanda(String poNumerico, String poSufijo, int cantidad) {
     }
 
+    /**
+     * Una fila vista desde el catálogo que se le enseña a Claude para que
+     * contraste lo que lee en las hojas manuscritas: la referencia con su
+     * patrón de puntos, el color con código y nombre —el operario escribe
+     * tanto "2221" como "chocolat"— y la talla.
+     *
+     * <b>No trae la cantidad de "Commandé" a propósito</b>: lo pedido y lo
+     * empaquetado pueden diferir de verdad, y ese descuadre tiene que llegar
+     * a la pantalla de revisión, no cuadrarse por el camino.
+     */
+    public record LineaCatalogo(String referencia, String colorCode, String colorNombre,
+                                String talla, String poNumerico, String poSufijo) {
+    }
+
     private final List<FilaCruda> filas;
     private final List<String> avisos;
 
@@ -231,6 +245,18 @@ public class AmiPedidoExcel {
     public List<Comanda> comandasTodas() {
         return filas.stream()
                 .map(fila -> new Comanda(fila.poNumerico(), fila.poSufijo(), fila.commande()))
+                .toList();
+    }
+
+    /**
+     * Una línea por fila del fichero (o sea, por talla), en su orden, para
+     * montar el catálogo que se le enseña a Claude. Agruparlas es cosa de
+     * quien lo formatea: aquí no se decide cómo se lee.
+     */
+    public List<LineaCatalogo> catalogo() {
+        return filas.stream()
+                .map(fila -> new LineaCatalogo(fila.article(), fila.coloris(), fila.libelle(),
+                        fila.taille(), fila.poNumerico(), fila.poSufijo()))
                 .toList();
     }
 

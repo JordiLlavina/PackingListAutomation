@@ -26,6 +26,15 @@ record ApcEtiquetaLayout(
         int filaTalla, int filaPiezas, int filaColisage, int filaPeso) {
 
     public static final int COL_VALOR = 2;          // columna C
+    /**
+     * La columna A es el margen izquierdo de la etiqueta y las cinco
+     * plantillas la traen en anchos distintos (de 3,3 a 5,7 caracteres). Se
+     * iguala a 18,5 en las dos hojas del libro: es un ajuste del área de
+     * impresión hecho viendo la etiqueta impresa, no algo que se deduzca de
+     * las plantillas. En unidades de POI: 1/256 de carácter.
+     */
+    public static final int COL_MARGEN = 0;         // columna A
+    public static final int ANCHO_COL_MARGEN = (int) Math.round(18.5 * 256);
     public static final int ALTURA_BLOQUE_PALET = 14;
     public static final int FILA_PALET_NUM_CAJAS = 12; // C13
     public static final int FILA_PALET_PESO = 13;      // C14

@@ -105,7 +105,7 @@ class ClaudeEnvioExtractionServiceTest {
         MessageCreateParams peticion = ClaudeEnvioExtractionService.peticionPara(
                 List.of(new ClaudeEnvioExtractionService.Adjunto(
                         "application/pdf", new byte[] {1})),
-                TipoPlantilla.APC);
+                TipoPlantilla.APC, "");
 
         assertTrue(peticion.thinking().orElseThrow().isAdaptive(),
                 "Opus 4.8 solo admite thinking adaptativo");
@@ -113,6 +113,56 @@ class ClaudeEnvioExtractionServiceTest {
                 "sin effort no hay forma de acotar cuánto razona");
         assertTrue(peticion.maxTokens() >= 24000,
                 "con el techo justo, el razonamiento se come el JSON");
+    }
+
+    // --- catálogo del pedido ---
+
+    /**
+     * El catálogo es una ayuda para dudas de caligrafía, y el prompt tiene
+     * que acotarlo o crea peores fallos de los que quita: lo que no esté en
+     * él se transcribe igual (puede ser una reposición o una muestra) y nunca
+     * toca cantidades, que es lo que la regla 4 manda dejar descuadrado a la
+     * vista del operario.
+     */
+    @Test
+    void elPromptAcotaParaQueSirveElCatalogoDelPedido() {
+        for (TipoPlantilla plantilla : TipoPlantilla.values()) {
+            String prompt = ClaudeEnvioExtractionService.promptPara(plantilla);
+            assertTrue(prompt.contains("CATÁLOGO DEL PEDIDO"),
+                    plantilla + ": no enseña el catálogo");
+            assertTrue(prompt.contains("NO está en el catálogo"),
+                    plantilla + ": no dice qué hacer con lo que no esté en el catálogo");
+            assertTrue(prompt.contains("NO cambia nunca cantidades"),
+                    plantilla + ": el catálogo podría acabar cuadrando cantidades");
+        }
+    }
+
+    /**
+     * El catálogo va DELANTE de los documentos: leyendo, la referencia se
+     * tiene delante antes de empezar, no después de ocho páginas. Y sin
+     * catálogo no viaja ningún bloque de más, que dejaría al modelo buscando
+     * un listado vacío.
+     */
+    @Test
+    void elCatalogoViajaDelanteDeLosDocumentosYSoloCuandoLoHay() {
+        List<ClaudeEnvioExtractionService.Adjunto> adjuntos = List.of(
+                new ClaudeEnvioExtractionService.Adjunto("application/pdf", new byte[] {1}));
+
+        MessageCreateParams conCatalogo = ClaudeEnvioExtractionService.peticionPara(
+                adjuntos, TipoPlantilla.APC, "## Catálogo del pedido\nPXCEI-F67043 | ...");
+        List<ContentBlockParam> bloques = conCatalogo.messages().get(0).content().asBlockParams();
+        assertTrue(bloques.get(0).isText());
+        assertTrue(bloques.get(0).asText().text().contains("PXCEI-F67043"),
+                "el catálogo tiene que ir antes que los documentos");
+        // catálogo + ordinal + pdf + mensaje final
+        assertEquals(4, bloques.size());
+
+        for (String vacio : new String[] {null, "", "   "}) {
+            MessageCreateParams sinCatalogo = ClaudeEnvioExtractionService.peticionPara(
+                    adjuntos, TipoPlantilla.APC, vacio);
+            assertEquals(3, sinCatalogo.messages().get(0).content().asBlockParams().size(),
+                    "sin catálogo no debe viajar un bloque vacío");
+        }
     }
 
     @Test

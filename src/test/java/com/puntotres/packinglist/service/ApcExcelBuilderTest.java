@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream;
 import java.util.List;
 
 import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.util.CellRangeAddress;
@@ -290,6 +291,30 @@ class ApcExcelBuilderTest {
         List<CajaData> pendientes = excels.get(0).getCajasPendientes();
         assertEquals(1, pendientes.size(), "una entrada por caja física, no por línea");
         assertEquals(3, pendientes.get(0).getNumeroCaja());
+    }
+
+    /**
+     * Dos ajustes del área de impresión que no se deducen del contenido: la
+     * columna D (el rótulo del pie) sale a 15 caracteres y las seis celdas de
+     * valor del pie, alineadas a la izquierda. Sin lo segundo la columna sale
+     * descuadrada consigo misma: PALLETS y CARTONS son texto y se quedan a la
+     * izquierda, mientras que los cuatro pesos y volúmenes son NÚMEROS y la
+     * alineación General de la plantilla los manda al borde derecho.
+     */
+    @Test
+    void laColumnaDelRotuloYElPieSalenConElAreaDeImpresionAjustada() throws Exception {
+        List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            assertEquals(15.0, hoja.getColumnWidth(3) / 256.0, 0.01);
+            // Las seis líneas del pie de este envío (PALLETS..GROSS VOLUME).
+            for (int fila = 26; fila <= 31; fila++) {
+                assertEquals(HorizontalAlignment.LEFT,
+                        hoja.getRow(fila).getCell(4).getCellStyle().getAlignment(),
+                        "fila " + (fila + 1));
+            }
+        }
     }
 
     @Test

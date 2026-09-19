@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -27,7 +28,8 @@ class ApcEtiquetasExcelBuilderTest {
     @Test
     void escribeElParDeEtiquetasYConservaLasDosHojas() throws IOException {
         byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
-                List.of(etiqueta("1 / 1", "7,60 Kg")), List.of());
+                List.of(etiqueta("1 / 1", "7,60 Kg")),
+                List.of(new EtiquetaPaletApc(1, "17,60 Kg")));
         try (XSSFWorkbook libro = abrir(excel)) {
             assertEquals(2, libro.getNumberOfSheets());
             XSSFSheet cajas = libro.getSheet("Etiquette colis Bolloré ");
@@ -104,21 +106,49 @@ class ApcEtiquetasExcelBuilderTest {
             // (en la plantilla de JAPAN es E1).
             assertEquals("", texto(palet, 0, 4));
         }
-    }
-
-    @Test
-    void sinPaletsLaHojaDePaletQuedaConLosValoresEnBlanco() throws IOException {
-        byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
-                List.of(etiqueta("1 / 1", "7,60 Kg")), List.of());
-        try (XSSFWorkbook libro = abrir(excel)) {
-            XSSFSheet palet = libro.getSheet("Etiquette Palette Bolloré");
-            assertEquals("", texto(palet, 12, 2));
-            assertEquals("", texto(palet, 13, 2));
-        }
         // Copia para inspección manual, como hace el e2e de packing lists.
         java.nio.file.Files.createDirectories(java.nio.file.Path.of("target"));
         java.nio.file.Files.write(
                 java.nio.file.Path.of("target", "etiquetas-apc-japan.xlsx"), excel);
+    }
+
+    @Test
+    void sinPaletsElExcelSaleSinLaHojaDePalet() throws IOException {
+        // Una etiqueta de palet en blanco se imprime y se pega en un bulto
+        // igual que una buena, así que la hoja se quita entera. Es el caso de
+        // la destinación que va suelta, con sus cajas en el palet 0.
+        byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
+                List.of(etiqueta("1 / 1", "7,60 Kg")), List.of());
+        try (XSSFWorkbook libro = abrir(excel)) {
+            assertEquals(1, libro.getNumberOfSheets());
+            assertNull(libro.getSheet("Etiquette Palette Bolloré"));
+            // Y la que queda, seleccionada: si no, Excel abre el libro sin
+            // ninguna pestaña activa.
+            assertTrue(libro.getSheetAt(0).isSelected());
+        }
+    }
+
+    /**
+     * La columna A es el margen izquierdo de la etiqueta y las cinco
+     * plantillas la traen en anchos distintos (de 3,3 a 5,7 caracteres): se
+     * iguala a 18,5 en las DOS hojas de cada libro. No se deduce de la
+     * plantilla, es el ajuste del área de impresión que pidió el cliente.
+     */
+    @Test
+    void elMargenIzquierdoSaleIgualEnLasDosHojasDeLasCincoPlantillas() throws IOException {
+        for (ApcEtiquetaLayout layout : List.of(ApcEtiquetaLayout.JAPAN, ApcEtiquetaLayout.KOREA,
+                ApcEtiquetaLayout.USA, ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.RETAIL)) {
+            byte[] excel = builder.generar(layout, List.of(etiqueta("1 / 1", "7,60 Kg")),
+                    List.of(new EtiquetaPaletApc(1, "17,60 Kg")));
+            try (XSSFWorkbook libro = abrir(excel)) {
+                assertEquals(2, libro.getNumberOfSheets(), layout.rutaPlantilla());
+                for (int i = 0; i < libro.getNumberOfSheets(); i++) {
+                    assertEquals(18.5,
+                            libro.getSheetAt(i).getColumnWidth(0) / 256.0, 0.01,
+                            layout.rutaPlantilla() + " / " + libro.getSheetName(i));
+                }
+            }
+        }
     }
 
     static XSSFWorkbook abrir(byte[] contenido) throws IOException {

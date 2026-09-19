@@ -233,29 +233,50 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
      * Una destinación que se manda suelta (cajas con
      * {@link CajaData#SIN_PALET}) no lleva hoja de palets ni aviso: no hay
      * ningún palet que etiquetar, así que no falta nada.
+     *
+     * Sin ninguna etiqueta que escribir el excel sale SIN la hoja de palets,
+     * como en AMI: antes se conservaba con la etiqueta modelo de la plantilla
+     * en blanco, y una etiqueta de palet sin rango de cajas ni peso se
+     * imprime y se pega en un bulto igual que una buena.
      */
     private List<EtiquetaPaletApc> etiquetasDePalet(List<CajaFisica> cajasFisicas,
                                                     DestinoData destino,
                                                     List<PaletData> palets,
                                                     List<AvisoEtiqueta> avisos) {
-        if (palets.isEmpty()) {
-            if (!seMandaSuelta(destino)) {
-                avisos.add(AvisoEtiqueta.deDestino(destino.getNombreDestino(),
-                        "sin palets", "La hoja de etiquetas de palet sale en blanco"));
-            }
+        String nombreDestino = destino.getNombreDestino();
+        if (seMandaSuelta(destino)) {
             return List.of();
         }
-        String nombreDestino = destino.getNombreDestino();
+        // El palet 0 no es un palet: es la marca de las cajas que van
+        // sueltas. Etiquetarlo pegaría en un bulto la etiqueta de un palet
+        // que no existe.
+        List<PaletData> deVerdad = palets.stream()
+                .filter(palet -> palet.getNumeroPalet() != CajaData.SIN_PALET)
+                .sorted(Comparator.comparingInt(PaletData::getNumeroPalet))
+                .toList();
+        if (deVerdad.isEmpty()) {
+            avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
+                    "sin palets", "El excel sale sin hoja de etiquetas de palet"));
+            return List.of();
+        }
         List<EtiquetaPaletApc> etiquetas = new ArrayList<>();
-        for (PaletData palet : palets.stream()
-                .sorted(Comparator.comparingInt(PaletData::getNumeroPalet)).toList()) {
-            int numeroCajas = palet.getCajaFin() - palet.getCajaInicio() + 1;
+        for (PaletData palet : deVerdad) {
+            // Las cajas del palet se cuentan de LAS CAJAS y no del rango
+            // cajaInicio..cajaFin del PaletData: ese es el del envío original
+            // y se queda viejo en cuanto se corrige un palet en la revisión.
+            List<CajaFisica> suyas = cajasFisicas.stream()
+                    .filter(caja -> Integer.valueOf(palet.getNumeroPalet())
+                            .equals(caja.numeroPalet()))
+                    .toList();
+            if (suyas.isEmpty()) {
+                avisos.add(AvisoEtiqueta.dePalet(nombreDestino, palet.getNumeroPalet(),
+                        "sin cajas asignadas", "No se le genera etiqueta"));
+                continue;
+            }
+            int numeroCajas = suyas.size();
             Double peso = null;
             boolean completo = true;
-            for (CajaFisica caja : cajasFisicas) {
-                if (!Integer.valueOf(palet.getNumeroPalet()).equals(caja.numeroPalet())) {
-                    continue;
-                }
+            for (CajaFisica caja : suyas) {
                 if (caja.pesoBrutoKg() == null) {
                     completo = false;
                 } else {

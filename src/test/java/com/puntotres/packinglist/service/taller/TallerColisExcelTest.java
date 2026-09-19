@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service.taller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -256,6 +257,23 @@ class TallerColisExcelTest {
                 List.of(List.of("APC", "PROD", "F67008", "CAMEL", "863", "10")));
 
         assertEquals("863", TallerColisExcel.desdeBytes(libro).lineas().get(0).code());
+    }
+
+    @Test
+    void elCodeSeTituleCodeOCodeClient() throws Exception {
+        // La hoja del taller lo titula "CODE CLIENT" —es el código del pedido
+        // del cliente—, pero las hojas antiguas ponen solo "CODE". Con una
+        // sola de las dos formas reconocida, en APC se perdía el pedido y la
+        // destinación de todas las filas.
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "CODE CLIENT", "QUANTITE"),
+                List.of(List.of("APC", "PROD", "F67008", "CAMEL", "863", "10")));
+
+        TallerColisExcel excel = TallerColisExcel.desdeBytes(libro);
+
+        assertEquals("863", excel.lineas().get(0).code());
+        assertFalse(excel.opcionalesAusentes().contains(TallerColisExcel.Columna.CODE),
+                "y la columna no se echa de menos");
     }
 
     @Test

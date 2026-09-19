@@ -90,6 +90,8 @@ public class AmiEtiquetasExcelBuilder {
             XSSFSheet hoja = libro.getSheetAt(0);
             limpiarImagenesDeEjemplo(hoja);
 
+            corregirAlturasDeFila(hoja, layout);
+
             BloqueEtiquetaModelo modelo = BloqueEtiquetaModelo.capturar(hoja, layout.alturaBloque());
             for (int i = 1; i < etiquetas.size(); i++) {
                 modelo.copiarEn(hoja, i * layout.alturaBloque());
@@ -249,6 +251,19 @@ public class AmiEtiquetasExcelBuilder {
                 hoja.setRowBreak(primera + (i + 1) * altura - 1);
             }
         }
+    }
+
+    /**
+     * Aplica los altos de fila corregidos de la destinación (layout.alturasFila)
+     * sobre el bloque modelo de la plantilla. Va ANTES de capturarlo: así la
+     * corrección viaja dentro del modelo y la hereda cada etiqueta copiada;
+     * hecha después solo valdría para la primera caja del libro.
+     */
+    private static void corregirAlturasDeFila(XSSFSheet hoja, AmiEtiquetaLayout layout) {
+        layout.alturasFila().forEach((fila, altoPuntos) -> {
+            XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
+            f.setHeightInPoints(altoPuntos);
+        });
     }
 
     /** Quita los anclajes de las imágenes de ejemplo (los gifs de barcode y el png). */

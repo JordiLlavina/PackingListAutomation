@@ -24,7 +24,9 @@ public class EnvioForm {
 
     private static final String FORMATO_FECHA = "\\d{2}/\\d{2}/\\d{4}";
 
-    /** Modo de entrada activo: JSON (por defecto), CLAUDE o FORMULARIO. */
+    /** Modo de entrada activo: JSON, CLAUDE o FORMULARIO. La pantalla de entrada
+     * abre en CLAUDE ("CON IMAGEN"); este valor solo gobierna los envíos que
+     * llegan sin el campo, que son texto pegado. */
     private String modo = "JSON";
 
     @NotBlank(message = "Elige un cliente")

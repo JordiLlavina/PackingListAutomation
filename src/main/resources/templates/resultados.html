@@ -58,8 +58,6 @@
         </table>
 
         <a class="boton" th:href="@{/descargar-todo}">Descargar todo (ZIP)</a>
-        <a class="boton secundario" th:href="@{/revision}">Volver a revisión</a>
-        <a class="boton secundario" th:href="@{/nuevo}">Nuevo envío</a>
     </section>
 
     <!-- Sección 2: etiquetas de caja. Se generan en el mismo /generar que los
@@ -156,6 +154,14 @@
         <button th:unless="${hayVolcado}" type="button" disabled>Descargar</button>
         <button th:unless="${hayVolcado}" type="button" class="secundario" disabled>Vista previa</button>
     </section>
+
+    <!-- Salir de la pantalla no es una descarga más, así que los dos botones
+         van al pie y debajo del último panel, no dentro del de packing lists,
+         donde competían con el ZIP; y en gris, no en el azul de acción. -->
+    <div class="salidas-pantalla">
+        <a class="boton neutro" th:href="@{/revision}">Volver a revisión</a>
+        <a class="boton neutro" th:href="@{/nuevo}">Nuevo envío</a>
+    </div>
 
     <!-- Modal de vista previa del volcado ERP -->
     <div th:if="${volcadoErp != null && volcadoErp.tieneDatos()}"

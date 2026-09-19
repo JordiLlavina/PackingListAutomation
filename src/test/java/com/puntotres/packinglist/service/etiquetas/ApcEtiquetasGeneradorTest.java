@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.etiquetas;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -336,6 +337,64 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
 
         assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+    }
+
+    @Test
+    void elPaletCeroNoLlevaHojaDeEtiquetasDePalet() throws IOException {
+        // Palet 0 = la caja va suelta, no en un palet. El excel salía con la
+        // hoja de palets de la plantilla y su etiqueta modelo en blanco, que
+        // se imprime y se pega en un bulto igual que una buena.
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("D. USA", List.of(),
+                        caja(1, "PXBHZ-F65101", "KBE-OCRE", "75", 5, 7.96, CajaData.SIN_PALET))),
+                envio(), Map.of());
+
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            assertNotNull(libro.getSheet(ApcEtiquetaLayout.USA.hojaCajas()),
+                    "las etiquetas de caja sí se generan");
+            assertNull(libro.getSheet(ApcEtiquetaLayout.USA.hojaPalet()));
+        }
+    }
+
+    @Test
+    void unPaletAlQueSeLeHanQuitadoLasCajasNoSeEtiqueta() throws IOException {
+        // Pasar las cajas de un palet al 0 en la revisión deja el PaletData
+        // del envío original sin ninguna caja: su etiqueta diría un número de
+        // cajas y un peso que ya no son de nadie.
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("JAPAN", List.of(palet(1, 1, 2, null)),
+                        caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, CajaData.SIN_PALET),
+                        caja(2, "PXCBC-F67008", "LZZ-NOIR", null, 11, 8.2, CajaData.SIN_PALET))),
+                envio(), Map.of());
+
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            assertNull(libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet()));
+        }
+        assertTrue(resultado.getAvisos().isEmpty(), resultado.getAvisos().toString());
+    }
+
+    @Test
+    void lasCajasDelPaletSeCuentanDeLasCajasYNoDelRangoViejo() throws IOException {
+        // El palet declara 1..3 pero una de sus cajas se ha pasado al 0 en la
+        // revisión: la etiqueta dice 2 cajas, las que de verdad lleva.
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("JAPAN", List.of(palet(1, 1, 3, 8.0)),
+                        caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.0, 1),
+                        caja(2, "PXCBC-F67008", "LZZ-NOIR", null, 11, 8.0, 1),
+                        caja(3, "PXCBC-F67008", "LZZ-NOIR", null, 11, 9.0, CajaData.SIN_PALET))),
+                envio(), Map.of());
+
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
+            assertEquals(2, palet.getRow(ApcEtiquetaLayout.FILA_PALET_NUM_CAJAS)
+                    .getCell(ApcEtiquetaLayout.COL_VALOR).getNumericCellValue(), 0.001);
+            // Y el peso, el de esas dos más la tara: 7 + 8 + 8.
+            assertEquals("23,00 Kg", texto(palet, ApcEtiquetaLayout.FILA_PALET_PESO,
+                    ApcEtiquetaLayout.COL_VALOR));
+        }
     }
 
     @Test

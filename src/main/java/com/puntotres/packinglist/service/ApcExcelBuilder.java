@@ -14,6 +14,7 @@ import java.util.Map;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -86,6 +87,14 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
     private static final int COL_CANTIDAD = 15;   // P QUANTITE
     private static final int ULTIMA_COLUMNA = COL_CANTIDAD;
 
+    /**
+     * Ancho de la columna D (MODÈLE, y también el rótulo de las 6 líneas del
+     * pie) en unidades de POI: 1/256 de carácter, así que 15 caracteres. Es
+     * un ajuste del área de impresión hecho viendo el papel, no algo que se
+     * deduzca de la plantilla, que venía con 14,38.
+     */
+    private static final int ANCHO_COL_MODELO = (int) Math.round(15 * 256);
+
     @Override
     public TipoPlantilla tipo() {
         return TipoPlantilla.APC;
@@ -107,6 +116,7 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
 
             Sheet hoja = wb.getSheetAt(0);
             wb.setSheetName(0, nombreHoja(envio.getNumeroFactura(), destino.getNombreDestino()));
+            hoja.setColumnWidth(COL_MODELO, ANCHO_COL_MODELO);
 
             escribirCabecera(hoja, destinoConfig, envio);
             ResultadoBloques resultado = escribirBloques(hoja, bloques);
@@ -388,19 +398,52 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
                 .map(Bloque::medidas).toList();
         double volumenPalets = medidasPalets.size() * VOLUMEN_PALET_M3_DEFECTO;
 
-        resumen(hoja, idx, "PALLETS").setCellValue(recuento(medidasPalets, ""));
-        resumen(hoja, idx + 1, "CARTONS").setCellValue(recuento(medidasCajasFisicas, "cm"));
-        resumen(hoja, idx + 2, "CARTON WEIGHT").setCellValue(redondear(pesoCartones, 2));
-        resumen(hoja, idx + 3, "CARTONS VOLUME").setCellValue(redondear(volumenCartones, 3));
-        resumen(hoja, idx + 4, "GROSS WEIGHT").setCellValue(redondear(pesoCartones + taras, 2));
-        resumen(hoja, idx + 5, "GROSS VOLUME")
+        Map<Integer, CellStyle> estilos = new LinkedHashMap<>();
+        resumen(hoja, idx, "PALLETS", estilos).setCellValue(recuento(medidasPalets, ""));
+        resumen(hoja, idx + 1, "CARTONS", estilos)
+                .setCellValue(recuento(medidasCajasFisicas, "cm"));
+        resumen(hoja, idx + 2, "CARTON WEIGHT", estilos)
+                .setCellValue(redondear(pesoCartones, 2));
+        resumen(hoja, idx + 3, "CARTONS VOLUME", estilos)
+                .setCellValue(redondear(volumenCartones, 3));
+        resumen(hoja, idx + 4, "GROSS WEIGHT", estilos)
+                .setCellValue(redondear(pesoCartones + taras, 2));
+        resumen(hoja, idx + 5, "GROSS VOLUME", estilos)
                 .setCellValue(redondear(volumenCartones + volumenPalets, 3));
     }
 
-    /** Escribe el rótulo en la D y devuelve la celda de valor (la E). */
-    private Cell resumen(Sheet hoja, int idxFila, String rotulo) {
+    /**
+     * Escribe el rótulo en la D y devuelve la celda de valor (la E), ya
+     * alineada a la izquierda.
+     */
+    private Cell resumen(Sheet hoja, int idxFila, String rotulo, Map<Integer, CellStyle> estilos) {
         celda(hoja, idxFila, 3).setCellValue(rotulo);
-        return celda(hoja, idxFila, 4);
+        return alinearIzquierda(celda(hoja, idxFila, 4), estilos);
+    }
+
+    /**
+     * Las seis celdas de valor del pie van alineadas a la izquierda, pegadas
+     * a su rótulo de la D. Sin esto no quedan ni siquiera entre ellas: cuatro
+     * llevan un NÚMERO y con la alineación General de la plantilla se van al
+     * borde derecho de la celda, mientras que PALLETS y CARTONS, que son
+     * texto, se quedan a la izquierda.
+     *
+     * <p>El estilo NO se toca en sitio: es el de la plantilla y lo comparten
+     * muchas más celdas de la hoja, así que se clona (y se cachea por estilo
+     * de origen, que en la plantilla son dos distintos entre las seis filas).
+     */
+    private static Cell alinearIzquierda(Cell celda, Map<Integer, CellStyle> cache) {
+        CellStyle original = celda.getCellStyle();
+        if (original.getAlignment() == HorizontalAlignment.LEFT) {
+            return celda;
+        }
+        celda.setCellStyle(cache.computeIfAbsent((int) original.getIndex(), indice -> {
+            CellStyle alineado = celda.getSheet().getWorkbook().createCellStyle();
+            alineado.cloneStyleFrom(original);
+            alineado.setAlignment(HorizontalAlignment.LEFT);
+            return alineado;
+        }));
+        return celda;
     }
 
     /** Una medida por caja FÍSICA (no por línea), para contar y sumar volumen. */

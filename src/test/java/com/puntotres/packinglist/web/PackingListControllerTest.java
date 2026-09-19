@@ -564,6 +564,31 @@ class PackingListControllerTest {
     }
 
     @Test
+    void elPaletCeroSePuedeTeclearPorqueEsElDeLasCajasSueltas() throws Exception {
+        // De 1 a 3 cajas de una destinación van sueltas, y su palet es el 0:
+        // es un valor legítimo, no un hueco. El campo llevaba min="1", así
+        // que el navegador no dejaba guardar la pantalla al teclearlo.
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        String html = mvc.perform(get("/revision").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(html.contains("min=\"0\" class=\"c-palet\""),
+                "el campo de palet acepta el 0 desde el navegador");
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("cajas[0].indiceDestino", "0")
+                        .param("cajas[0].indicesCaja", "0")
+                        .param("cajas[0].numeroPalet", "0"))
+                .andExpect(redirectedUrl("/revision"));
+
+        EnvioEnCurso envio = (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
+        assertEquals(0, envio.getImportado().getDestinos().get(0).getDestino()
+                .getCajas().get(0).getNumeroPalet());
+    }
+
+    @Test
     void unCampoEnviadoVacioNoBorraElValorQueYaHabia() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);

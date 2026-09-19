@@ -563,6 +563,31 @@ class AmiEtiquetasExcelBuilderTest {
         }
     }
 
+    /**
+     * Los altos de fila corregidos de cada destinación viajan dentro del
+     * bloque modelo, así que los lleva TODA etiqueta del libro y no solo la
+     * primera caja: aplicarlos después de capturar el modelo dejaría la
+     * segunda caja impresa distinta de la primera.
+     */
+    @Test
+    void elAltoDeFilaCorregidoLlegaATodosLosBloques() throws IOException {
+        for (AmiEtiquetaLayout layout : List.of(AmiEtiquetaLayout.CHINA,
+                AmiEtiquetaLayout.JAPAN, AmiEtiquetaLayout.FRANCE)) {
+            byte[] excel = builder.generar(layout,
+                    List.of(etiquetaBolso("1 / 2"), etiquetaBolso("2 / 2")));
+            try (XSSFWorkbook libro = abrir(excel)) {
+                XSSFSheet hoja = libro.getSheetAt(0);
+                layout.alturasFila().forEach((fila, alto) -> {
+                    for (int bloque = 0; bloque < 2; bloque++) {
+                        int absoluta = fila + bloque * layout.alturaBloque();
+                        assertEquals(alto, hoja.getRow(absoluta).getHeightInPoints(), 0.01,
+                                layout.nombreHoja() + " fila " + (absoluta + 1));
+                    }
+                });
+            }
+        }
+    }
+
     private static XSSFWorkbook abrir(byte[] contenido) throws IOException {
         return new XSSFWorkbook(new ByteArrayInputStream(contenido));
     }

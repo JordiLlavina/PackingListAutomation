@@ -144,10 +144,14 @@
                                th:name="|grupos[${iterGrupo.index}].filas[${iterFila.index}].objetivos[${destino}]|"
                                th:value="${fila.cantidadPara(destino)}"
                                th:title="|Unidades de esta fila que se envían a ${destino}|">
+                        <!-- El hueco es estrecho y el rótulo del cliente
+                             ("Document d'achat", "PO - Orden de Producto") no
+                             cabe dentro: en el hueco va "PO" a secas y el
+                             nombre entero se queda en el título. -->
                         <input type="text" class="c-pedido-destino"
                                th:name="|grupos[${iterGrupo.index}].filas[${iterFila.index}].pedidos[${destino}]|"
                                th:value="${fila.pedidoPara(destino)}"
-                               th:placeholder="${etiquetaPedido}"
+                               placeholder="PO"
                                th:title="|${etiquetaPedido} con el que va esta fila a ${destino}. Sale del excel de pedido; corrígelo si hace falta|">
                     </td>
                 </tr>

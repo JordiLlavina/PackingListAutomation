@@ -52,8 +52,36 @@ public final class ApcPedidoExcel {
 
     private static final String CABECERA_CANTIDAD = "QUANTIT";
 
+    /**
+     * Las tres columnas que solo usa el catálogo del pedido que se le enseña
+     * a Claude al leer las hojas manuscritas. La designación se busca por
+     * "SIGNATION" y no por prefijo como las demás: "Désignation" lleva el
+     * acento en la segunda letra, así que un prefijo sin acento no casa y uno
+     * de una sola letra ("D") casaría también con "Document d'achat" y con
+     * las media docena de columnas de fecha.
+     */
+    private static final String CABECERA_DESIGNACION = "SIGNATION";
+    private static final String CABECERA_COLOR = "COULEUR";
+    private static final String CABECERA_TALLA = "TAILLE";
+
     /** Una fila del excel: referencia (Article) y pedido completos. */
     public record FilaPedido(String referencia, String pedido) {
+    }
+
+    /**
+     * Una fila vista desde el catálogo que se le enseña a Claude para que
+     * contraste lo que lee en las hojas manuscritas. Trae justo los campos
+     * que el operario escribe en la cabecera de artículo y que no hay forma
+     * de reparar después: el nombre del modelo ("le neige clou") y el color
+     * ("CAB"), que son la separación más difícil de toda la hoja.
+     *
+     * <b>No trae cantidades a propósito</b>: lo pedido y lo empaquetado
+     * pueden diferir de verdad (una entrega parcial), y un descuadre ahí es
+     * justo lo que el operario tiene que ver, no algo que el modelo deba
+     * cuadrar por su cuenta.
+     */
+    public record LineaCatalogo(String referencia, String pedido, String destino,
+                                String designacion, String color, String talla) {
     }
 
     /**
@@ -74,12 +102,14 @@ public final class ApcPedidoExcel {
     /** Filas únicas (referencia + pedido), en el orden del fichero. */
     private final List<FilaPedido> filas;
     private final Map<String, Comanda> comandas;
+    private final List<LineaCatalogo> catalogo;
     private final List<String> avisos;
 
     private ApcPedidoExcel(List<FilaPedido> filas, Map<String, Comanda> comandas,
-                           List<String> avisos) {
+                           List<LineaCatalogo> catalogo, List<String> avisos) {
         this.filas = List.copyOf(filas);
         this.comandas = Map.copyOf(comandas);
+        this.catalogo = List.copyOf(catalogo);
         this.avisos = List.copyOf(avisos);
     }
 
@@ -93,8 +123,14 @@ public final class ApcPedidoExcel {
             // lectura de un fichero de una temporada anterior que no las traiga.
             int colDestino = columnaOpcional(cabecera, CABECERA_DESTINO);
             int colCantidad = columnaOpcional(cabecera, CABECERA_CANTIDAD);
+            // Solo las usa el catálogo que se le enseña a Claude: opcionales
+            // por lo mismo, para no romper la lectura de un fichero viejo.
+            int colDesignacion = columnaQueContenga(cabecera, CABECERA_DESIGNACION);
+            int colColor = columnaOpcional(cabecera, CABECERA_COLOR);
+            int colTalla = columnaOpcional(cabecera, CABECERA_TALLA);
 
             List<FilaPedido> filas = new ArrayList<>();
+            List<LineaCatalogo> catalogo = new ArrayList<>();
             Set<FilaPedido> vistas = new LinkedHashSet<>();
             Map<String, String> pedidoPorClave = new LinkedHashMap<>();
             Set<String> ambiguas = new LinkedHashSet<>();
@@ -110,6 +146,11 @@ public final class ApcPedidoExcel {
                 if (vistas.add(entrada)) {
                     filas.add(entrada);
                 }
+                catalogo.add(new LineaCatalogo(entrada.referencia(), entrada.pedido(),
+                        textoOpcional(hoja, fila, colDestino),
+                        textoOpcional(hoja, fila, colDesignacion),
+                        textoOpcional(hoja, fila, colColor),
+                        textoOpcional(hoja, fila, colTalla)));
                 acumularComanda(comandas, destinosMezclados, entrada.pedido(),
                         colDestino < 0 ? "" : texto(hoja, fila, colDestino),
                         colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)));
@@ -135,7 +176,7 @@ public final class ApcPedidoExcel {
                 avisos.add("El excel de pedido no tiene la columna 'Quantité échéancée': "
                         + "las cantidades a enviar hay que teclearlas a mano");
             }
-            return new ApcPedidoExcel(filas, comandas, avisos);
+            return new ApcPedidoExcel(filas, comandas, catalogo, avisos);
         }
     }
 
@@ -197,6 +238,15 @@ public final class ApcPedidoExcel {
     /** Avisos de nivel de fichero (claves ambiguas). Nunca null. */
     public List<String> avisos() {
         return avisos;
+    }
+
+    /**
+     * Una línea por fila del fichero (o sea, por talla), en su orden, para
+     * montar el catálogo que se le enseña a Claude. Agruparlas es cosa de
+     * quien lo formatea: aquí no se decide cómo se lee.
+     */
+    public List<LineaCatalogo> catalogo() {
+        return catalogo;
     }
 
     /**
@@ -281,6 +331,26 @@ public final class ApcPedidoExcel {
             }
         }
         return -1;
+    }
+
+    /**
+     * Como {@link #columnaOpcional} pero por un trozo del centro del título.
+     * Es la salida para las cabeceras cuyo acento cae en las primeras letras
+     * ("Désignation"), donde un prefijo obligaría a elegir entre depender del
+     * acento o quedarse en una sola letra que casa con media hoja.
+     */
+    private static int columnaQueContenga(Row cabecera, String trozo) {
+        for (Cell celda : cabecera) {
+            if (texto(celda).trim().toUpperCase(Locale.ROOT).contains(trozo)) {
+                return celda.getColumnIndex();
+            }
+        }
+        return -1;
+    }
+
+    /** Texto de una celda cuya columna puede no existir (-1 = "" sin leer). */
+    private static String textoOpcional(Sheet hoja, int fila, int columna) {
+        return columna < 0 ? "" : texto(hoja, fila, columna).trim();
     }
 
     private static String texto(Sheet hoja, int fila, int columna) {

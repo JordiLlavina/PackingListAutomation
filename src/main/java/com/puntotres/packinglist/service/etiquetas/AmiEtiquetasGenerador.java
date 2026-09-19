@@ -184,17 +184,24 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         boolean suelta = !destino.getCajas().isEmpty() && destino.getCajas().stream()
                 .allMatch(caja -> Integer.valueOf(CajaData.SIN_PALET)
                         .equals(caja.getNumeroPalet()));
-        if (palets.isEmpty() || algunaSinPalet) {
-            if (!suelta) {
-                avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
-                        palets.isEmpty() ? "sin datos de palet" : "hay cajas sin palet asignado",
-                        "El excel sale sin hoja de etiquetas de palet"));
-            }
+        if (suelta) {
+            return List.of();
+        }
+        // El palet 0 no es un palet: es la marca de las cajas que van
+        // sueltas. Etiquetarlo pegaría en un bulto la etiqueta de un palet
+        // que no existe.
+        List<PaletData> deVerdad = palets.stream()
+                .filter(palet -> palet.getNumeroPalet() != CajaData.SIN_PALET)
+                .sorted(Comparator.comparingInt(PaletData::getNumeroPalet))
+                .toList();
+        if (deVerdad.isEmpty() || algunaSinPalet) {
+            avisos.add(AvisoEtiqueta.deDestino(nombreDestino,
+                    deVerdad.isEmpty() ? "sin datos de palet" : "hay cajas sin palet asignado",
+                    "El excel sale sin hoja de etiquetas de palet"));
             return List.of();
         }
         List<EtiquetaPaletAmi> etiquetas = new ArrayList<>();
-        for (PaletData palet : palets.stream()
-                .sorted(Comparator.comparingInt(PaletData::getNumeroPalet)).toList()) {
+        for (PaletData palet : deVerdad) {
             List<CajaFisica> suyas = cajasFisicas.stream()
                     .filter(caja -> Integer.valueOf(palet.getNumeroPalet())
                             .equals(caja.numeroPalet()))

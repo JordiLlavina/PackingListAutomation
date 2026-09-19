@@ -207,6 +207,25 @@ public class ClaudeEnvioExtractionService {
                 lectura Y además como una línea de "avisos" diciendo qué es dudoso y
                 dónde. Nunca dejes un campo mal en silencio.
 
+            15. Con los documentos puede venir un CATÁLOGO DEL PEDIDO: el listado de
+                lo que el cliente ha pedido esta temporada, una línea por artículo.
+                Es una AYUDA PARA RESOLVER DUDAS DE CALIGRAFÍA, no la lista de lo
+                que tiene que salir.
+                - Úsalo solo cuando dudes de lo que lees: si lo escrito casa con una
+                  sola línea del catálogo salvo por un trazo dudoso ("0014" contra
+                  "0015", una talla, dónde acaba el modelo y empieza el color), vale
+                  la del catálogo.
+                - Si lo que lees NO está en el catálogo, transcríbelo TAL CUAL y
+                  añade una línea a "avisos". Puede ser una reposición, una muestra o
+                  un pedido nuevo: el catálogo no lo tiene todo, y encajar a la
+                  fuerza lo escrito en la línea más parecida pone en el packing list
+                  un artículo que no es el que va en la caja.
+                - Cada vez que el catálogo te haga CAMBIAR una lectura, dilo en
+                  "avisos": qué habías leído, por qué lo cambias y en qué caja.
+                - El catálogo NO cambia nunca cantidades, números de caja, pesos,
+                  medidas ni palets. Eso es lo que ha pasado en el almacén y no está
+                  en ningún pedido; el catálogo no trae cantidades justamente por eso.
+
             ## Estructura exacta del JSON
 
             {
@@ -397,10 +416,11 @@ public class ClaudeEnvioExtractionService {
      * un mensaje legible si falta la clave de API, la llamada falla o la
      * respuesta no es un JSON interpretable.
      */
-    public EnvioInput extraer(List<Adjunto> adjuntos, TipoPlantilla plantilla) {
+    public EnvioInput extraer(List<Adjunto> adjuntos, TipoPlantilla plantilla,
+                              String catalogoPedido) {
         Message respuesta;
         try {
-            respuesta = acumular(peticionPara(adjuntos, plantilla));
+            respuesta = acumular(peticionPara(adjuntos, plantilla, catalogoPedido));
         } catch (AnthropicServiceException e) {
             throw new ExtraccionException("La API de Claude ha devuelto un error: "
                     + e.getMessage(), e);
@@ -422,11 +442,25 @@ public class ClaudeEnvioExtractionService {
     }
 
     /**
-     * La petición completa: documentos, mensaje de usuario, prompt del
-     * cliente y presupuestos de tokens. Package-private para los tests.
+     * La petición completa: catálogo del pedido, documentos, mensaje de
+     * usuario, prompt del cliente y presupuestos de tokens. Package-private
+     * para los tests.
+     *
+     * El catálogo va DELANTE de los documentos —y no en el prompt de sistema—
+     * por dos motivos: el prompt de sistema es el mismo para todos los envíos
+     * de un cliente y es el que se copia al plan B manual
+     * (docs/Packing Lists/prompts-para-copiar.md), mientras que el catálogo
+     * cambia con la temporada; y leyendo, la referencia se tiene delante antes
+     * de empezar, no después de haber transcrito ocho páginas.
      */
-    static MessageCreateParams peticionPara(List<Adjunto> adjuntos, TipoPlantilla plantilla) {
-        List<ContentBlockParam> bloques = bloquesDe(adjuntos);
+    static MessageCreateParams peticionPara(List<Adjunto> adjuntos, TipoPlantilla plantilla,
+                                            String catalogoPedido) {
+        List<ContentBlockParam> bloques = new ArrayList<>();
+        if (catalogoPedido != null && !catalogoPedido.isBlank()) {
+            bloques.add(ContentBlockParam.ofText(TextBlockParam.builder()
+                    .text(catalogoPedido).build()));
+        }
+        bloques.addAll(bloquesDe(adjuntos));
         bloques.add(ContentBlockParam.ofText(TextBlockParam.builder()
                 .text(MENSAJE_USUARIO).build()));
         return MessageCreateParams.builder()

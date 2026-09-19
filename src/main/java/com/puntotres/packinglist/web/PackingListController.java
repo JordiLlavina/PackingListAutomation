@@ -40,6 +40,7 @@ import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.service.CatalogoPedido;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
@@ -135,6 +136,9 @@ public class PackingListController {
     public String entrada(Model model) {
         if (!model.containsAttribute("envioForm")) {
             EnvioForm form = new EnvioForm();
+            // La entrada abre en "CON IMAGEN": es la vía por la que llegan
+            // casi todos los envíos, así que no hay que elegirla cada vez.
+            form.setModo("CLAUDE");
             String hoy = LocalDate.now().format(FORMATO_FECHA);
             form.setFechaFactura(hoy);
             form.setFechaEnvio(hoy);
@@ -176,11 +180,21 @@ public class PackingListController {
             return "entrada";
         }
 
+        // El excel de pedido se resuelve ANTES de extraer, no después: en modo
+        // CLAUDE su catálogo viaja en la misma petición para que el modelo
+        // pueda contrastar lo que lee en las hojas manuscritas. Se guarda
+        // aunque el cliente no lo use en el packing list: AMI lo necesita
+        // para sus etiquetas de caja.
+        PedidoDeTemporada pedido = resolverPedidoDeTemporada(envioForm);
+        CatalogoPedido.Catalogo catalogo = modoClaude
+                ? CatalogoPedido.para(cliente.getPlantilla(), pedido.excel())
+                : CatalogoPedido.Catalogo.vacio();
+
         EnvioInput envio;
         if (modoClaude) {
             try {
                 envio = extractorClaude.extraer(aAdjuntos(imagenesDe(envioForm)),
-                        cliente.getPlantilla());
+                        cliente.getPlantilla(), catalogo.texto());
             } catch (ClaudeEnvioExtractionService.ExtraccionException | IOException e) {
                 model.addAttribute("errorJson",
                         "No se pudo extraer el packing list con Claude: " + e.getMessage());
@@ -243,51 +257,64 @@ public class PackingListController {
         // pesos— la comparten las cuatro vías de entrada: vive en
         // PreparacionRevisionService.
         List<String> avisosPrevios = new ArrayList<>(resumen.avisos());
+        avisosPrevios.addAll(pedido.avisos());
+        avisosPrevios.addAll(catalogo.avisos());
         if (modoClaude) {
             avisosPrevios.add(0, "Datos extraídos por Claude a partir de "
-                    + imagenesDe(envioForm).size()
-                    + " documento(s): revisa referencias, tallas y cantidades antes de generar");
-        }
-
-        // El excel de pedido se guarda aunque el cliente no lo use en el
-        // packing list: AMI lo necesita para sus etiquetas de caja.
-        byte[] excelPedido = null;
-        String nombreExcelPedido = null;
-        MultipartFile pedidoSubido = envioForm.getPedidoCliente();
-        if (pedidoSubido != null && !pedidoSubido.isEmpty()) {
-            try {
-                excelPedido = pedidoSubido.getBytes();
-                nombreExcelPedido = pedidoSubido.getOriginalFilename();
-            } catch (IOException e) {
-                avisosPrevios.add("No se ha podido leer el excel de pedido subido: "
-                        + e.getMessage());
-            }
-        }
-
-        // Si no se ha subido ninguno, el de la temporada guardada. Es el motivo
-        // de que existan: el pedido de una temporada es el mismo documento
-        // durante meses y buscarlo en el disco en cada envío es trabajo
-        // repetido. Un fichero subido a mano manda sobre el guardado.
-        if (excelPedido == null && envioForm.getTemporadaGuardadaId() != null) {
-            TemporadaGuardada guardada = archivoTemporadas
-                    .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
-                    .orElse(null);
-            if (guardada != null) {
-                excelPedido = guardada.getExcel();
-                nombreExcelPedido = guardada.getNombreFichero();
-            } else {
-                avisosPrevios.add("La temporada guardada que se eligió ya no está disponible: "
-                        + "el envío va sin excel de pedido");
-            }
+                    + imagenesDe(envioForm).size() + " documento(s)"
+                    + (catalogo.estaVacio() ? ""
+                            : ", con el pedido de la temporada delante para contrastar "
+                                    + "referencias, colores y tallas")
+                    + ": revisa referencias, tallas y cantidades antes de generar");
         }
 
         // Este envío no viene de un taller: si quedaba una entrega a medias en
         // sesión, el enlace de "volver al ajuste" llevaría a datos de otro
         // envío.
         tallerEnCurso.reiniciar();
-        preparacion.preparar(envio, cabecera, cliente, excelPedido, nombreExcelPedido,
+        preparacion.preparar(envio, cabecera, cliente, pedido.excel(), pedido.nombre(),
                 avisosPrevios, envioEnCurso);
         return "redirect:/revision";
+    }
+
+    /** El excel de pedido del envío, de donde salga, con lo que haya que avisar. */
+    private record PedidoDeTemporada(byte[] excel, String nombre, List<String> avisos) {
+    }
+
+    /**
+     * El excel de pedido: el que se acabe de subir o, si no hay, el de la
+     * temporada guardada que se haya elegido.
+     *
+     * Las temporadas guardadas existen justamente por esto: el pedido de una
+     * temporada es el mismo documento durante meses y buscarlo en el disco en
+     * cada envío es trabajo repetido. Un fichero subido a mano manda sobre el
+     * guardado, pero si no se deja leer se sigue probando la temporada: mejor
+     * el pedido de la temporada que ninguno, y el aviso ya dice lo que ha
+     * pasado.
+     */
+    private PedidoDeTemporada resolverPedidoDeTemporada(EnvioForm envioForm) {
+        List<String> avisos = new ArrayList<>();
+        MultipartFile pedidoSubido = envioForm.getPedidoCliente();
+        if (pedidoSubido != null && !pedidoSubido.isEmpty()) {
+            try {
+                return new PedidoDeTemporada(pedidoSubido.getBytes(),
+                        pedidoSubido.getOriginalFilename(), avisos);
+            } catch (IOException e) {
+                avisos.add("No se ha podido leer el excel de pedido subido: " + e.getMessage());
+            }
+        }
+        if (envioForm.getTemporadaGuardadaId() == null) {
+            return new PedidoDeTemporada(null, null, avisos);
+        }
+        TemporadaGuardada guardada = archivoTemporadas
+                .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                .orElse(null);
+        if (guardada == null) {
+            avisos.add("La temporada guardada que se eligió ya no está disponible: "
+                    + "el envío va sin excel de pedido");
+            return new PedidoDeTemporada(null, null, avisos);
+        }
+        return new PedidoDeTemporada(guardada.getExcel(), guardada.getNombreFichero(), avisos);
     }
 
     // --- Paso 2: revisión ---

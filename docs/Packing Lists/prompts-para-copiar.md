@@ -11,10 +11,16 @@ la aplicación**, copiados literalmente del código
 
 1. Abre una conversación nueva en claude.ai (con un modelo Opus).
 2. **Adjunta el PDF** escaneado del packing list (o las fotos, en orden).
-3. Copia el bloque del cliente que toque (AMI, APC o genérico) y pégalo
+3. Si es un cliente con excel de pedido (AMI, APC), **adjúntalo también**.
+   La aplicación no manda el excel entero: manda un listado de las
+   referencias, colores, tallas y números de pedido de la temporada para
+   que Claude pueda contrastar lo que lee (es la regla 15 del prompt). A
+   mano, el propio excel hace ese papel. No es obligatorio: sin él se lee
+   como siempre, solo que sin nada con lo que resolver las dudas.
+4. Copia el bloque del cliente que toque (AMI, APC o genérico) y pégalo
    como mensaje, seguido del mensaje final de abajo.
-4. Copia el JSON de la respuesta.
-5. En la aplicación: `/packing-list`, modo **JSON**, pégalo, elige el
+5. Copia el JSON de la respuesta.
+6. En la aplicación: `/packing-list`, modo **JSON**, pégalo, elige el
    cliente y rellena la cabecera como siempre.
 
 Todo lo demás del flujo es idéntico: la revisión valida, avisa de
@@ -138,6 +144,25 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
     haya marcado con "?" o "!?", va igualmente en el campo con tu mejor
     lectura Y además como una línea de "avisos" diciendo qué es dudoso y
     dónde. Nunca dejes un campo mal en silencio.
+
+15. Con los documentos puede venir un CATÁLOGO DEL PEDIDO: el listado de
+    lo que el cliente ha pedido esta temporada, una línea por artículo.
+    Es una AYUDA PARA RESOLVER DUDAS DE CALIGRAFÍA, no la lista de lo
+    que tiene que salir.
+    - Úsalo solo cuando dudes de lo que lees: si lo escrito casa con una
+      sola línea del catálogo salvo por un trazo dudoso ("0014" contra
+      "0015", una talla, dónde acaba el modelo y empieza el color), vale
+      la del catálogo.
+    - Si lo que lees NO está en el catálogo, transcríbelo TAL CUAL y
+      añade una línea a "avisos". Puede ser una reposición, una muestra o
+      un pedido nuevo: el catálogo no lo tiene todo, y encajar a la
+      fuerza lo escrito en la línea más parecida pone en el packing list
+      un artículo que no es el que va en la caja.
+    - Cada vez que el catálogo te haga CAMBIAR una lectura, dilo en
+      "avisos": qué habías leído, por qué lo cambias y en qué caja.
+    - El catálogo NO cambia nunca cantidades, números de caja, pesos,
+      medidas ni palets. Eso es lo que ha pasado en el almacén y no está
+      en ningún pedido; el catálogo no trae cantidades justamente por eso.
 
 ## Estructura exacta del JSON
 
@@ -335,6 +360,25 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
     haya marcado con "?" o "!?", va igualmente en el campo con tu mejor
     lectura Y además como una línea de "avisos" diciendo qué es dudoso y
     dónde. Nunca dejes un campo mal en silencio.
+
+15. Con los documentos puede venir un CATÁLOGO DEL PEDIDO: el listado de
+    lo que el cliente ha pedido esta temporada, una línea por artículo.
+    Es una AYUDA PARA RESOLVER DUDAS DE CALIGRAFÍA, no la lista de lo
+    que tiene que salir.
+    - Úsalo solo cuando dudes de lo que lees: si lo escrito casa con una
+      sola línea del catálogo salvo por un trazo dudoso ("0014" contra
+      "0015", una talla, dónde acaba el modelo y empieza el color), vale
+      la del catálogo.
+    - Si lo que lees NO está en el catálogo, transcríbelo TAL CUAL y
+      añade una línea a "avisos". Puede ser una reposición, una muestra o
+      un pedido nuevo: el catálogo no lo tiene todo, y encajar a la
+      fuerza lo escrito en la línea más parecida pone en el packing list
+      un artículo que no es el que va en la caja.
+    - Cada vez que el catálogo te haga CAMBIAR una lectura, dilo en
+      "avisos": qué habías leído, por qué lo cambias y en qué caja.
+    - El catálogo NO cambia nunca cantidades, números de caja, pesos,
+      medidas ni palets. Eso es lo que ha pasado en el almacén y no está
+      en ningún pedido; el catálogo no trae cantidades justamente por eso.
 
 ## Estructura exacta del JSON
 
@@ -565,6 +609,25 @@ en qué caja física ha ido cada una. Anatomía típica de un bloque:
     haya marcado con "?" o "!?", va igualmente en el campo con tu mejor
     lectura Y además como una línea de "avisos" diciendo qué es dudoso y
     dónde. Nunca dejes un campo mal en silencio.
+
+15. Con los documentos puede venir un CATÁLOGO DEL PEDIDO: el listado de
+    lo que el cliente ha pedido esta temporada, una línea por artículo.
+    Es una AYUDA PARA RESOLVER DUDAS DE CALIGRAFÍA, no la lista de lo
+    que tiene que salir.
+    - Úsalo solo cuando dudes de lo que lees: si lo escrito casa con una
+      sola línea del catálogo salvo por un trazo dudoso ("0014" contra
+      "0015", una talla, dónde acaba el modelo y empieza el color), vale
+      la del catálogo.
+    - Si lo que lees NO está en el catálogo, transcríbelo TAL CUAL y
+      añade una línea a "avisos". Puede ser una reposición, una muestra o
+      un pedido nuevo: el catálogo no lo tiene todo, y encajar a la
+      fuerza lo escrito en la línea más parecida pone en el packing list
+      un artículo que no es el que va en la caja.
+    - Cada vez que el catálogo te haga CAMBIAR una lectura, dilo en
+      "avisos": qué habías leído, por qué lo cambias y en qué caja.
+    - El catálogo NO cambia nunca cantidades, números de caja, pesos,
+      medidas ni palets. Eso es lo que ha pasado en el almacén y no está
+      en ningún pedido; el catálogo no trae cantidades justamente por eso.
 
 ## Estructura exacta del JSON
 

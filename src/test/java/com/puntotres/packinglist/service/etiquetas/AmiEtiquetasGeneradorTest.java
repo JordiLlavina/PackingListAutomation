@@ -852,6 +852,27 @@ class AmiEtiquetasGeneradorTest {
     }
 
     @Test
+    void conLasCajasEnElPaletCeroNoHayHojaDePaletsNiAviso() throws IOException {
+        // Palet 0 = la destinación va suelta, sin palet. Aunque el envío
+        // original declarase un palet —y lo sigue declarando si las cajas se
+        // han pasado al 0 en la revisión—, no hay nada que etiquetar: ni hoja
+        // ni aviso, porque no falta ningún dato.
+        ResultadoEtiquetas resultado = generador.generar(List.of(importado(
+                        destino("PARIS",
+                                cajaEnPalet(1, 5.0, CajaData.SIN_PALET),
+                                cajaEnPalet(2, 5.0, CajaData.SIN_PALET)),
+                        palet(1, 1, 2, 8.0))),
+                cabecera(), Map.of("pedido", pedido()));
+
+        try (XSSFWorkbook libro = abrir(resultado.getExcels().get(0))) {
+            assertNull(libro.getSheet(AmiEtiquetaLayout.FRANCE.nombreHojaPalets()));
+        }
+        assertTrue(resultado.getAvisos().stream()
+                        .noneMatch(aviso -> aviso.contains("palet")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
     void unPaletConUnaCajaSinPesoSaleSinPesoPeroConHoja() throws IOException {
         // Falta un peso, no un palet: la hoja se genera igual y solo esa
         // etiqueta va sin peso, como el resto del proyecto.

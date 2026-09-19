@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
@@ -289,6 +290,29 @@ class AmiEtiquetaLayoutTest {
                         + " no está dentro de ninguna celda combinada en columna de valores"));
         assertEquals(fila, combinada.getFirstRow(), contexto
                 + ": la fila " + fila + " no es la fila superior de su celda combinada");
+    }
+
+    /**
+     * Los altos de fila corregidos son los que pidió el cliente viendo la
+     * etiqueta impresa: no salen de ningún sitio del fichero, así que aquí se
+     * fijan los números tal cual. Lo que sí se comprueba es que la fila cae
+     * DENTRO del bloque de su destinación; fuera de él, la corrección no
+     * viajaría en las copias y solo valdría para la primera caja.
+     *
+     * <p>Cada destinación trae la suya porque las tres maquetaciones no están
+     * alineadas entre sí: la fila 8 de CHINA no es la fila 8 de JAPAN.
+     */
+    @Test
+    void cadaDestinacionCorrigeSuFilaConElAltoQuePidioElCliente() {
+        assertEquals(Map.of(7, 28.5f), AmiEtiquetaLayout.CHINA.alturasFila());   // fila 8
+        assertEquals(Map.of(16, 57f), AmiEtiquetaLayout.JAPAN.alturasFila());    // fila 17
+        assertEquals(Map.of(16, 31f), AmiEtiquetaLayout.FRANCE.alturasFila());   // fila 17
+        for (AmiEtiquetaLayout layout : todos()) {
+            layout.alturasFila().forEach((fila, alto) -> assertTrue(
+                    fila >= 0 && fila < layout.alturaBloque(),
+                    layout.nombreHoja() + ": la fila " + (fila + 1)
+                            + " cae fuera de su bloque de " + layout.alturaBloque()));
+        }
     }
 
     private static AmiEtiquetaLayout[] todos() {

@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
@@ -18,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -62,7 +64,7 @@ class ImportarConClaudeControllerTest {
 
     @Test
     void importarConImagenesExtraeConClaudeYLlevaALaRevision() throws Exception {
-        when(extractorClaude.extraer(anyList(), any())).thenReturn(envioDePrueba());
+        when(extractorClaude.extraer(anyList(), any(), any())).thenReturn(envioDePrueba());
 
         MockHttpSession sesion = new MockHttpSession();
         mvc.perform(multipart("/importar").file(imagenDePrueba()).session(sesion)
@@ -76,12 +78,51 @@ class ImportarConClaudeControllerTest {
                 .andExpect(redirectedUrl("/revision"));
 
         // El prompt se monta con el tipo de plantilla del cliente elegido.
-        verify(extractorClaude).extraer(anyList(), eq(TipoPlantilla.AMI));
+        verify(extractorClaude).extraer(anyList(), eq(TipoPlantilla.AMI), any());
 
         // La revisión avisa de que los datos vienen de Claude.
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Datos extraídos por Claude")));
+    }
+
+    /**
+     * El excel de pedido se sube en la misma pantalla que las hojas, así que
+     * su catálogo puede viajar en la misma petición y el modelo contrasta lo
+     * que lee contra lo que el cliente ha pedido de verdad. Ojo al orden: el
+     * excel se resolvía DESPUÉS de extraer, y entonces esto no era posible.
+     */
+    @Test
+    void elCatalogoDelPedidoSubidoLlegaAlExtractor() throws Exception {
+        when(extractorClaude.extraer(anyList(), any(), any())).thenReturn(envioDePrueba());
+
+        byte[] pedido;
+        try (var in = getClass().getResourceAsStream("/ejemplos/EAN PUNTOTRES H26.xlsx")) {
+            pedido = in.readAllBytes();
+        }
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(multipart("/importar").file(imagenDePrueba())
+                        .file(new MockMultipartFile("pedidoCliente", "EAN H26.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                pedido))
+                        .session(sesion)
+                        .param("modo", "CLAUDE")
+                        .param("cliente", "AMI")
+                        .param("temporada", "H26")
+                        .param("numeroFactura", "FA-26-1189")
+                        .param("fechaFactura", "10/07/2026")
+                        .param("fechaEnvio", "24/07/2026"))
+                .andExpect(status().is3xxRedirection());
+
+        ArgumentCaptor<String> catalogo = ArgumentCaptor.forClass(String.class);
+        verify(extractorClaude).extraer(anyList(), eq(TipoPlantilla.AMI), catalogo.capture());
+        assertTrue(catalogo.getValue().contains("UBL029.AL0216 | 2221 CHOCOLATE BROWN"),
+                "el catálogo del pedido real no ha llegado al extractor");
+
+        // Y la revisión dice que se ha leído con el pedido delante: cambia
+        // cómo hay que revisar lo que sale.
+        mvc.perform(get("/revision").session(sesion))
+                .andExpect(content().string(containsString("con el pedido de la temporada delante")));
     }
 
     @Test
@@ -102,7 +143,7 @@ class ImportarConClaudeControllerTest {
 
     @Test
     void siLaExtraccionFallaSeVuelveALaEntradaConElMensaje() throws Exception {
-        when(extractorClaude.extraer(anyList(), any())).thenThrow(
+        when(extractorClaude.extraer(anyList(), any(), any())).thenThrow(
                 new ClaudeEnvioExtractionService.ExtraccionException(
                         "Falta configurar la clave de la API de Claude"));
 
@@ -129,7 +170,7 @@ class ImportarConClaudeControllerTest {
         declarado.setDestino("WHOLESALE");
         declarado.setPalets(5);
         envio.setResumenPalets(List.of(declarado));
-        when(extractorClaude.extraer(anyList(), any())).thenReturn(envio);
+        when(extractorClaude.extraer(anyList(), any(), any())).thenReturn(envio);
 
         mvc.perform(multipart("/importar").file(imagenDePrueba())
                         .param("modo", "CLAUDE")
@@ -149,7 +190,7 @@ class ImportarConClaudeControllerTest {
     void losAvisosDeLecturaDeLaExtraccionLleganALaRevision() throws Exception {
         EnvioInput envio = envioDePrueba();
         envio.setAvisos(List.of("La caja 6 trae dos pesos (12,82 y 13,94): se usa 13,94"));
-        when(extractorClaude.extraer(anyList(), any())).thenReturn(envio);
+        when(extractorClaude.extraer(anyList(), any(), any())).thenReturn(envio);
 
         MockHttpSession sesion = new MockHttpSession();
         mvc.perform(multipart("/importar").file(imagenDePrueba()).session(sesion)
