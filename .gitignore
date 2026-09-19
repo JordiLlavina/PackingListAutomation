@@ -26,3 +26,4 @@ datos/
 # Excel lock files (created while a workbook is open)
 .~lock.*#
 ~$*.xlsx
+docs/Envios DHL/address-book-*.csv
