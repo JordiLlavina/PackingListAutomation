@@ -279,7 +279,13 @@ public class PackingListTallerController {
                 .map(ClienteConfig::getEtiquetaPedido).orElse("Nº pedido"));
         model.addAttribute("destinos", digestion.getDestinosActivos());
         model.addAttribute("tamanosCaja", tamanosParaElDesplegable(digestion));
-        model.addAttribute("avisos", digestion.getAvisos());
+
+        // Los avisos que hablan de una referencia se pintan encima de su
+        // tabla; los del envío o del fichero entero, en la lista de arriba.
+        AvisosDelAjuste avisos = AvisosDelAjuste.repartir(digestion.getDetalle(),
+                digestion.getGrupos().stream().map(GrupoReferencia::getReferencia).toList());
+        model.addAttribute("avisos", avisos.getGenerales());
+        model.addAttribute("avisosPorReferencia", avisos.getPorReferencia());
 
         List<String> bloqueos = new ArrayList<>(digestion.getBloqueos());
         for (String pendiente : digestion.referenciasPendientes()) {

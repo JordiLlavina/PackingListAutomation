@@ -6,10 +6,12 @@ import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -40,9 +42,13 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  * {@link #normalizar}.
  *
  * Falta una columna obligatoria: se lanza, nombrando cuáles faltan y cuáles
- * se han leído. Falta una opcional: aviso, y el dato queda pendiente. Es la
- * única lectura del proyecto que puede impedir seguir, y lo hace porque sin
- * referencia o sin cantidad no hay packing que generar.
+ * se han leído. Es la única lectura del proyecto que puede impedir seguir, y
+ * lo hace porque sin referencia o sin cantidad no hay packing que generar.
+ *
+ * Falta una opcional: el dato queda pendiente y la columna sale en
+ * {@link #opcionalesAusentes()}, sin aviso. Si eso importa o no depende del
+ * cliente del envío, que aquí no se conoce; quien lo decide es
+ * {@code DigestionTallerService}.
  */
 public final class TallerColisExcel {
 
@@ -58,7 +64,7 @@ public final class TallerColisExcel {
      * Los acentos y los signos los quita {@link #normalizar}, así que
      * "QTÉ / COLIS", "N° DE COLIS" y "RÉFÉRENCE" no necesitan entrada propia.
      */
-    private enum Columna {
+    enum Columna {
         CLIENT(true, "CLIENT", "CLIENTE"),
         MOTIF(true, "MOTIF", "MOTIVO"),
         REFERENCE(true, "REFERENCE", "REF"),
@@ -91,11 +97,14 @@ public final class TallerColisExcel {
     }
 
     private final List<LineaTaller> lineas;
-    private final List<String> avisos;
+    private final List<AvisoTaller> avisos;
+    private final Set<Columna> opcionalesAusentes;
 
-    private TallerColisExcel(List<LineaTaller> lineas, List<String> avisos) {
+    private TallerColisExcel(List<LineaTaller> lineas, List<AvisoTaller> avisos,
+                             Set<Columna> opcionalesAusentes) {
         this.lineas = List.copyOf(lineas);
         this.avisos = List.copyOf(avisos);
+        this.opcionalesAusentes = Set.copyOf(opcionalesAusentes);
     }
 
     public static TallerColisExcel desdeBytes(byte[] contenido)
@@ -112,9 +121,10 @@ public final class TallerColisExcel {
             throws IOException, TallerExcelException {
         try (Workbook libro = new XSSFWorkbook(new ByteArrayInputStream(contenido))) {
             Sheet hoja = localizarHoja(libro, nombreHoja);
-            List<String> avisos = new ArrayList<>();
-            Map<Columna, Integer> columnas = localizarColumnas(hoja, avisos);
-            return new TallerColisExcel(leerFilas(hoja, columnas, avisos), avisos);
+            List<AvisoTaller> avisos = new ArrayList<>();
+            Map<Columna, Integer> columnas = localizarColumnas(hoja);
+            return new TallerColisExcel(leerFilas(hoja, columnas, avisos), avisos,
+                    opcionalesQueFaltan(columnas));
         }
     }
 
@@ -122,9 +132,27 @@ public final class TallerColisExcel {
         return lineas;
     }
 
-    /** Columnas opcionales que no estaban y datos que no se han podido leer. */
-    public List<String> avisos() {
+    /** Los avisos despiezados; es la lista que se rellena al leer. */
+    public List<AvisoTaller> detalleAvisos() {
         return avisos;
+    }
+
+    /** Las frases sueltas. Vista derivada: añadir aquí no tendría efecto. */
+    public List<String> avisos() {
+        return avisos.stream().map(AvisoTaller::texto).toList();
+    }
+
+    /**
+     * Las columnas opcionales que la hoja no trae, sin juzgar si importan.
+     *
+     * El lector no decide eso: depende del cliente, que aquí no se conoce.
+     * {@code CODE} solo lo lee APC, y avisar de que falta cuando el envío es
+     * de AMI manda al usuario a arreglar algo que el programa ni va a mirar.
+     * Quien sabe de qué cliente es el envío es la digestión, y es ella la que
+     * convierte esta lista en avisos.
+     */
+    Set<Columna> opcionalesAusentes() {
+        return opcionalesAusentes;
     }
 
     // --- Localización ---
@@ -149,7 +177,7 @@ public final class TallerColisExcel {
      * columnas obligatorias. Si ninguna las trae, se lanza señalando la que
      * más cerca estuvo: es la que el usuario tiene que mirar.
      */
-    private static Map<Columna, Integer> localizarColumnas(Sheet hoja, List<String> avisos)
+    private static Map<Columna, Integer> localizarColumnas(Sheet hoja)
             throws ColumnasAusentesException {
         Map<Columna, Integer> mejor = Map.of();
         List<String> mejoresCabeceras = List.of();
@@ -163,7 +191,6 @@ public final class TallerColisExcel {
             }
             Map<Columna, Integer> encontradas = columnasDe(hoja, fila);
             if (encontradas.keySet().containsAll(obligatorias())) {
-                avisarDeLasOpcionalesQueFaltan(encontradas, avisos);
                 return encontradas;
             }
             if (encontradas.size() > mejor.size()) {
@@ -207,31 +234,20 @@ public final class TallerColisExcel {
         return cabeceras;
     }
 
-    private static void avisarDeLasOpcionalesQueFaltan(Map<Columna, Integer> encontradas,
-                                                       List<String> avisos) {
+    private static Set<Columna> opcionalesQueFaltan(Map<Columna, Integer> encontradas) {
+        Set<Columna> ausentes = EnumSet.noneOf(Columna.class);
         for (Columna columna : Columna.values()) {
-            if (columna.obligatoria || encontradas.containsKey(columna)) {
-                continue;
+            if (!columna.obligatoria && !encontradas.containsKey(columna)) {
+                ausentes.add(columna);
             }
-            avisos.add("La hoja del taller no tiene la columna '" + columna.rotulo() + "': "
-                    + explicacionDe(columna));
         }
-    }
-
-    private static String explicacionDe(Columna columna) {
-        return switch (columna) {
-            case TAILLE -> "todas las tallas se toman como talla única";
-            case QTITE_COLIS -> "habrá que decir cuántas unidades entran en cada caja";
-            case CODE -> "en APC no se podrá saber a qué pedido y a qué destinación va cada fila";
-            case DESTINATION -> "no se podrá contrastar la destinación con la del pedido";
-            default -> "ese dato no llega y se resuelve en la pantalla siguiente";
-        };
+        return ausentes;
     }
 
     // --- Lectura ---
 
     private static List<LineaTaller> leerFilas(Sheet hoja, Map<Columna, Integer> columnas,
-                                               List<String> avisos) {
+                                               List<AvisoTaller> avisos) {
         List<LineaTaller> lineas = new ArrayList<>();
         int primeraFilaDatos = filaDeCabecera(hoja, columnas) + 1;
         int vaciasSeguidas = 0;
@@ -258,7 +274,7 @@ public final class TallerColisExcel {
 
     private static LineaTaller leerLinea(Row fila, int indiceFila, Map<Columna, Integer> columnas,
                                          String referencia, String cantidadCruda,
-                                         List<String> avisos) {
+                                         List<AvisoTaller> avisos) {
         return new LineaTaller(
                 indiceFila + 1,
                 mayusculas(texto(fila, columnas.get(Columna.CLIENT))),
@@ -282,14 +298,16 @@ public final class TallerColisExcel {
         return limpio.matches("\\d+") ? limpio : TALLA_UNICA;
     }
 
-    private static int cantidad(String crudo, String referencia, int fila, List<String> avisos) {
+    private static int cantidad(String crudo, String referencia, int fila,
+                                List<AvisoTaller> avisos) {
         Integer valor = enteroOpcional(crudo);
         if (valor != null) {
             return valor;
         }
         if (!crudo.isBlank()) {
-            avisos.add("En la fila " + fila + " la cantidad de '" + mayusculas(referencia)
-                    + "' no se entiende ('" + crudo.trim() + "'): se deja en 0 y hay que teclearla");
+            avisos.add(AvisoTaller.de(mayusculas(referencia),
+                    "En la fila " + fila + " la cantidad de '" + mayusculas(referencia)
+                    + "' no se entiende ('" + crudo.trim() + "'): se deja en 0 y hay que teclearla"));
         }
         return 0;
     }

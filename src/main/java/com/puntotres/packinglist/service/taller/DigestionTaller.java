@@ -27,7 +27,7 @@ public class DigestionTaller {
      * más hay que leerla, y quien la mira acaba dándola por ruido. El mismo
      * mensaje dos veces no añade nada.
      */
-    private final Set<String> avisos = new LinkedHashSet<>();
+    private final Set<AvisoTaller> avisos = new LinkedHashSet<>();
     private final Set<String> bloqueos = new LinkedHashSet<>();
 
     public List<GrupoReferencia> getGrupos() {
@@ -39,8 +39,24 @@ public class DigestionTaller {
         return destinosActivos;
     }
 
-    public Collection<String> getAvisos() {
+    /** Los avisos despiezados; es la colección que se rellena al digerir. */
+    public Collection<AvisoTaller> getDetalle() {
         return avisos;
+    }
+
+    /** Las frases sueltas. Vista derivada: añadir aquí no tendría efecto. */
+    public List<String> getAvisos() {
+        return avisos.stream().map(AvisoTaller::texto).toList();
+    }
+
+    /** Un aviso del fichero o del envío entero, sin referencia a la que ir. */
+    public void avisar(String texto) {
+        avisos.add(AvisoTaller.general(texto));
+    }
+
+    /** Un aviso de una referencia, el que baja a su tarjeta en la pantalla. */
+    public void avisarDe(String referencia, String texto) {
+        avisos.add(AvisoTaller.de(referencia, texto));
     }
 
     public Collection<String> getBloqueos() {

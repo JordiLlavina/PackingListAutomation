@@ -26,6 +26,9 @@
         </ul>
     </section>
 
+    <!-- Solo los avisos del envío o del fichero entero. Los que hablan de una
+         referencia se pintan encima de su tabla, que es donde se arreglan:
+         aquí todos juntos obligaban a ir buscando a cuál tocaba cada uno. -->
     <section class="tarjeta" th:if="${!avisos.isEmpty()}">
         <h3 class="titulo-seccion">⚠️ Para tener en cuenta</h3>
         <ul class="lista-avisos">
@@ -86,6 +89,16 @@
                            title="Lo que pesa UNA caja llena de esta referencia, con el cartón. Las cajas que van a medias se calculan a partir de él, escalando solo la mercancía">
                 </label>
             </div>
+
+            <!-- Lo que hay que saber de ESTA referencia, encima de su tabla y
+                 debajo de su nombre: una fila que el pedido no reconoce, una
+                 destinación que el taller apunta distinta, una cantidad que
+                 no se ha entendido. -->
+            <ul class="lista-avisos avisos-referencia"
+                th:if="${avisosPorReferencia.containsKey(grupo.referencia)}">
+                <li th:each="aviso : ${avisosPorReferencia.get(grupo.referencia)}"
+                    th:text="${aviso}"></li>
+            </ul>
 
             <!-- Las columnas van con anchura fija y en el mismo orden en todas
                  las tablas: son la misma información en todas, y con anchura

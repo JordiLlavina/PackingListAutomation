@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import org.springframework.stereotype.Service;
+
 import com.puntotres.packinglist.service.ApcPedidoExcel;
 
 /**
@@ -22,7 +24,17 @@ import com.puntotres.packinglist.service.ApcPedidoExcel;
  * Una fila sin CODE es bloqueante —sin pedido no hay destinación—, pero un
  * CODE que no aparece en el fichero solo avisa: puede ser un pedido de otra
  * temporada y el usuario lo resuelve tecleando.
+ *
+ * <p><b>Es un bean a propósito, y hay que acordarse de que lo sea.</b>
+ * {@code DigestionTallerService} recibe la {@code List<ObjetivosPedido>} que
+ * le inyecta Spring, así que sin la anotación esta clase no llega nunca al
+ * envío por mucho que sus tests pasen: los tests unitarios la construyen con
+ * {@code new}, que es justo lo que no comprueba el cableado. Durante un
+ * tiempo faltó, y los envíos de taller de APC caían al camino genérico
+ * —objetivo = lo que hubiera llegado, destinación = la que apuntara la hoja—
+ * ignorando el Document d'achat entero, sin que nada avisara.
  */
+@Service
 public class ObjetivosPedidoApc implements ObjetivosPedido {
 
     public static final String CLIENTE = "APC";
@@ -40,11 +52,11 @@ public class ObjetivosPedidoApc implements ObjetivosPedido {
         try {
             pedido = ApcPedidoExcel.desdeBytes(excelPedido);
         } catch (IOException | RuntimeException e) {
-            resultado.getAvisos().add("No se ha podido leer el excel de pedido de APC ("
+            resultado.avisar("No se ha podido leer el excel de pedido de APC ("
                     + e.getMessage() + "): las cantidades hay que teclearlas a mano");
             return resultado;
         }
-        resultado.getAvisos().addAll(pedido.avisos());
+        pedido.avisos().forEach(resultado::avisar);
 
         for (LineaTaller linea : lineas) {
             if (linea.code() == null || linea.code().isBlank()) {
@@ -56,13 +68,15 @@ public class ObjetivosPedidoApc implements ObjetivosPedido {
             List<ApcPedidoExcel.FilaPedido> candidatas =
                     pedido.filasPara(linea.referencia(), linea.code());
             if (candidatas.isEmpty()) {
-                resultado.getAvisos().add("En el pedido de APC no hay ninguna línea de "
-                        + linea.referencia() + " con el código " + linea.code()
+                resultado.avisarDe(linea.referencia(),
+                        "En el pedido de APC no hay ninguna línea de " + linea.referencia()
+                        + " con el código " + linea.code()
                         + ": hay que decir a mano cuánto se envía y a dónde");
                 continue;
             }
             if (candidatas.size() > 1) {
-                resultado.getAvisos().add("En el pedido de APC, " + linea.referencia()
+                resultado.avisarDe(linea.referencia(),
+                        "En el pedido de APC, " + linea.referencia()
                         + " con el código " + linea.code() + " encaja con "
                         + candidatas.size() + " pedidos distintos: no se elige a ciegas, "
                         + "hay que decir a mano cuánto se envía y a dónde");
@@ -71,7 +85,7 @@ public class ObjetivosPedidoApc implements ObjetivosPedido {
             Optional<ApcPedidoExcel.Comanda> comanda =
                     pedido.comandaDe(candidatas.get(0).pedido());
             if (comanda.isEmpty() || comanda.get().destino().isBlank()) {
-                resultado.getAvisos().add("El pedido " + candidatas.get(0).pedido()
+                resultado.avisarDe(linea.referencia(), "El pedido " + candidatas.get(0).pedido()
                         + " no dice a qué destinación va: hay que decirlo a mano");
                 continue;
             }
