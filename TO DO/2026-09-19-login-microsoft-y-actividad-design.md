@@ -393,7 +393,8 @@ Cada fase compila y deja la suite en verde.
 | 8 | **Documentación**: README (retirar el aviso de "sin usuarios ni contraseña"), ARCHITECTURE, CLAUDE.md | S | todas |
 
 La fase 1 es **la misma tarea** que la Task 1 del plan de Envíos DHL
-(`docs/superpowers/plans/2026-09-18-envios-dhl-express-fase1.md`). Si se acomete DHL antes, esta
+(`docs/superpowers/plans/2026-09-18-envios-dhl-express-fase1.md`, **en la rama `envios-dhl`**, que
+no está fusionada en main y queda aparcada). Si se acomete DHL antes, esta
 fase ya estará hecha y no se repite.
 
 Las fases 1-2 son útiles por sí solas aunque nunca se publique nada: son deuda que ya existe hoy.
