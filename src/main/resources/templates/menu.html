@@ -8,7 +8,8 @@
          encima de la lista repetía lo que la lista ya dice, así que se quitó:
          aquí solo se elige por dónde empezar. -->
     <div class="menu-tarjetas">
-        <section class="tarjeta menu-tarjeta">
+        <section class="tarjeta menu-tarjeta"
+                 th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).PACKING_LIST)}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -26,7 +27,8 @@
             <a class="boton" th:href="@{/packing-list}">Empezar</a>
         </section>
 
-        <section class="tarjeta menu-tarjeta">
+        <section class="tarjeta menu-tarjeta"
+                 th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).ETIQUETAS_ARTICULO)}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -44,7 +46,8 @@
             <a class="boton" th:href="@{/etiquetas-articulo}">Empezar</a>
         </section>
 
-        <section class="tarjeta menu-tarjeta">
+        <section class="tarjeta menu-tarjeta"
+                 th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).ESCANDALLOS)}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -63,14 +66,35 @@
         </section>
     </div>
 
-    <p class="menu-ajustes">
+    <p class="menu-ajustes"
+       th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).TARAS)}">
         ⚖️ <a th:href="@{/taras}">Taras de los cartones</a> — el peso de cada caja vacía,
         de donde salen los pesos brutos.
     </p>
 
-    <p class="menu-ajustes">
+    <p class="menu-ajustes"
+       th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).TEMPORADAS)}">
         🗂️ <a th:href="@{/temporadas}">Guarda Temporadas y Ficheros</a> — el excel de pedido de
         cada temporada, guardado una vez para no subirlo en cada envío.
+    </p>
+
+    <!-- Quien entra por primera vez no tiene nada concedido: el menú vacío
+         sin explicación parece una aplicación rota. -->
+    <p class="menu-ajustes" th:if="${puede.isEmpty()}">
+        Tu cuenta ha entrado bien, pero todavía no tienes ninguna sección concedida.
+        Pídeselas a quien administra la aplicación.
+    </p>
+
+    <p class="menu-ajustes"
+       th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).ACTIVIDAD)}">
+        📊 <a th:href="@{/actividad}">Actividad</a> — quién ha usado la aplicación y qué ha salido
+        de ella.
+    </p>
+
+    <p class="menu-ajustes"
+       th:if="${puede.contains(T(com.puntotres.packinglist.seguridad.Seccion).ADMINISTRACION)}">
+        👥 <a th:href="@{/administracion/usuarios}">Usuarios y permisos</a> — quién entra y qué ve
+        cada uno.
     </p>
 </main>
 </body>
