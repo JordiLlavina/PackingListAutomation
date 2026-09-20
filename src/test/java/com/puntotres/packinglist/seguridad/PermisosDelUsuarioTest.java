@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.puntotres.packinglist.actividad.EventoActividadRepository;
+
 @SpringBootTest
 @Transactional
 class PermisosDelUsuarioTest {
@@ -16,12 +18,17 @@ class PermisosDelUsuarioTest {
     @Autowired
     private UsuarioRepository repositorio;
 
+    @Autowired
+    private EventoActividadRepository eventos;
+
     @BeforeEach
     void limpiar() {
         // Otros tests dejan su "oid-1" en la base compartida; aquí se borra
         // dentro de la transacción del test, que se deshace al terminar. El
         // flush es necesario: Hibernate manda los INSERT antes que los DELETE
         // pendientes, y el alta del test chocaría con la fila vieja.
+        // Los eventos de actividad apuntan a los usuarios: se borran antes.
+        eventos.deleteAll();
         repositorio.deleteAll();
         repositorio.flush();
     }

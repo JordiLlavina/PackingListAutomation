@@ -3,6 +3,7 @@ package com.puntotres.packinglist.web;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -17,10 +18,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.seguridad.Seccion;
 
 /**
  * Pantalla del archivo de temporadas: guardar el excel de pedido de una
@@ -42,10 +46,13 @@ public class TemporadasController {
 
     private final ArchivoTemporadas archivo;
     private final ClientesProperties clientesProperties;
+    private final RegistroActividad registro;
 
-    public TemporadasController(ArchivoTemporadas archivo, ClientesProperties clientesProperties) {
+    public TemporadasController(ArchivoTemporadas archivo, ClientesProperties clientesProperties,
+                                RegistroActividad registro) {
         this.archivo = archivo;
         this.clientesProperties = clientesProperties;
+        this.registro = registro;
     }
 
     @GetMapping("/temporadas")
@@ -105,6 +112,8 @@ public class TemporadasController {
         }
 
         archivo.guardar(id, cliente, nombreTemporada, nombreFichero, excel);
+        registro.registrar(TipoEvento.TEMPORADA_GUARDADA, Seccion.TEMPORADAS, cliente, 1,
+                nombreTemporada);
         redirect.addFlashAttribute("mensaje", "Guardada la temporada " + nombreTemporada
                 + " de " + config.getNombre() + ".");
         return "redirect:/temporadas";
@@ -112,9 +121,14 @@ public class TemporadasController {
 
     @PostMapping("/temporadas/borrar")
     public String borrar(@RequestParam Long id, RedirectAttributes redirect) {
-        archivo.conFichero(id).ifPresent(temporada -> redirect.addFlashAttribute("mensaje",
-                "Borrada la temporada " + temporada.getTemporada() + "."));
+        Optional<TemporadaGuardada> borrada = archivo.conFichero(id);
         archivo.borrar(id);
+        borrada.ifPresent(temporada -> {
+            redirect.addFlashAttribute("mensaje",
+                    "Borrada la temporada " + temporada.getTemporada() + ".");
+            registro.registrar(TipoEvento.TEMPORADA_BORRADA, Seccion.TEMPORADAS,
+                    temporada.getCliente(), 1, temporada.getTemporada());
+        });
         return "redirect:/temporadas";
     }
 

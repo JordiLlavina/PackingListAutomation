@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
+import com.puntotres.packinglist.seguridad.Seccion;
 import com.puntotres.packinglist.service.escandallos.EscandallosGenerationService;
 import com.puntotres.packinglist.service.escandallos.ExcelEscandallos;
 import com.puntotres.packinglist.service.escandallos.FicheroEscandallo;
@@ -45,11 +48,14 @@ public class EscandallosController {
 
     private final EscandallosGenerationService escandallosService;
     private final EscandallosEnCurso enCurso;
+    private final RegistroActividad registro;
 
     public EscandallosController(EscandallosGenerationService escandallosService,
-                                 EscandallosEnCurso enCurso) {
+                                 EscandallosEnCurso enCurso,
+                                 RegistroActividad registro) {
         this.escandallosService = escandallosService;
         this.enCurso = enCurso;
+        this.registro = registro;
     }
 
     @GetMapping("/clickup")
@@ -75,6 +81,12 @@ public class EscandallosController {
             model.addAttribute("avisos", excel.avisos());
             return VISTA;
         }
+
+        // Sin cliente: este flujo no tiene. Se cuentan los escandallos que
+        // han salido, que es lo que el dashboard suma como documentos.
+        registro.registrar(TipoEvento.ESCANDALLOS_PROCESADOS, Seccion.ESCANDALLOS, null,
+                excel.hojas().size(), excel.hojas().size() + " escandallos de "
+                        + subidos.size() + " ficheros");
 
         if (excel.avisos().isEmpty()) {
             enCurso.reiniciar();

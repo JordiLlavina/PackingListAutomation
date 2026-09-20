@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.puntotres.packinglist.actividad.EventoActividadRepository;
+
 /**
  * El alta es automática y sin permisos, y la fila es la misma persona para
  * siempre aunque le cambien el correo.
@@ -22,8 +24,13 @@ class UsuarioOidcServiceTest {
     @Autowired
     private UsuarioRepository repositorio;
 
+    @Autowired
+    private EventoActividadRepository eventos;
+
     @BeforeEach
     void limpiar() {
+        // Los eventos de actividad apuntan a los usuarios: se borran antes.
+        eventos.deleteAll();
         repositorio.deleteAll();
     }
 

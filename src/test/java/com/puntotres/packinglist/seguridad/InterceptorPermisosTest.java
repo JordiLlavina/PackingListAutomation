@@ -13,6 +13,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.actividad.EventoActividadRepository;
+
 /**
  * Los permisos se leen de la base de datos en cada petición, no de la sesión:
  * quitarle una sección a alguien que está dentro surte efecto en su siguiente
@@ -28,8 +30,13 @@ class InterceptorPermisosTest {
     @Autowired
     private UsuarioRepository repositorio;
 
+    @Autowired
+    private EventoActividadRepository eventos;
+
     @BeforeEach
     void limpiar() {
+        // Los eventos de actividad apuntan a los usuarios: se borran antes.
+        eventos.deleteAll();
         repositorio.deleteAll();
     }
 

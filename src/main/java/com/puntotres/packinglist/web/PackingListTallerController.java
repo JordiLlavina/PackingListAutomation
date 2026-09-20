@@ -14,12 +14,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.seguridad.Seccion;
 import com.puntotres.packinglist.service.taller.DigestionTaller;
 import com.puntotres.packinglist.service.taller.DigestionTallerService;
 import com.puntotres.packinglist.service.taller.FilaDigerida;
@@ -61,6 +64,7 @@ public class PackingListTallerController {
     private final AtributosEntrada atributosEntrada;
     private final TallerEnCurso tallerEnCurso;
     private final EnvioEnCurso envioEnCurso;
+    private final RegistroActividad registro;
 
     public PackingListTallerController(DigestionTallerService digestionService,
                                        GeneradorPackingTaller generadorTaller,
@@ -70,7 +74,8 @@ public class PackingListTallerController {
                                        ArchivoTemporadas archivoTemporadas,
                                        AtributosEntrada atributosEntrada,
                                        TallerEnCurso tallerEnCurso,
-                                       EnvioEnCurso envioEnCurso) {
+                                       EnvioEnCurso envioEnCurso,
+                                       RegistroActividad registro) {
         this.digestionService = digestionService;
         this.generadorTaller = generadorTaller;
         this.preparacion = preparacion;
@@ -80,6 +85,7 @@ public class PackingListTallerController {
         this.atributosEntrada = atributosEntrada;
         this.tallerEnCurso = tallerEnCurso;
         this.envioEnCurso = envioEnCurso;
+        this.registro = registro;
     }
 
     // --- Paso 1a: carga y digestión ---
@@ -211,6 +217,14 @@ public class PackingListTallerController {
         preparacion.preparar(packing.getEnvio(), tallerEnCurso.getCabecera(), cliente,
                 tallerEnCurso.getExcelPedido(), tallerEnCurso.getNombreExcelPedido(),
                 avisosPrevios, envioEnCurso);
+        // Es la cuarta vía de entrada de un envío, no una generación: los
+        // excels salen después en POST /generar y es ahí donde se cuentan.
+        registro.registrar(TipoEvento.ENVIO_IMPORTADO, Seccion.PACKING_LIST,
+                tallerEnCurso.getClaveCliente(),
+                envioEnCurso.getImportado().getDestinos().stream()
+                        .mapToInt(destino -> destino.getDestino().getCajas().size()).sum(),
+                "Modo TALLER, " + envioEnCurso.getImportado().getDestinos().size()
+                        + " destinaciones");
         return "redirect:/revision";
     }
 

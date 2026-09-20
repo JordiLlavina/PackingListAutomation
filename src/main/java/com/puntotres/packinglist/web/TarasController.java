@@ -7,8 +7,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
 import com.puntotres.packinglist.model.MedidaCaja;
 import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
+import com.puntotres.packinglist.seguridad.Seccion;
 
 /**
  * Pantalla de la tabla de taras: el peso del cartón vacío de cada tamaño de
@@ -23,9 +26,11 @@ import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
 public class TarasController {
 
     private final CatalogoTarasJpa catalogo;
+    private final RegistroActividad registro;
 
-    public TarasController(CatalogoTarasJpa catalogo) {
+    public TarasController(CatalogoTarasJpa catalogo, RegistroActividad registro) {
         this.catalogo = catalogo;
+        this.registro = registro;
     }
 
     @GetMapping("/taras")
@@ -51,6 +56,8 @@ public class TarasController {
             return "redirect:/taras";
         }
         catalogo.guardar(MedidaCaja.parse(medida).orElseThrow().normalizada(), taraKg);
+        registro.registrar(TipoEvento.TARA_EDITADA, Seccion.TARAS, null, null,
+                "Cartón " + medida + ": " + taraKg + " kg");
         redirect.addFlashAttribute("mensaje", "Guardado el cartón " + medida + ".");
         return "redirect:/taras";
     }

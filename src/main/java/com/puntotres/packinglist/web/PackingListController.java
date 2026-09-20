@@ -30,6 +30,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.CatalogoTaras;
@@ -40,6 +42,7 @@ import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.seguridad.Seccion;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
@@ -96,6 +99,7 @@ public class PackingListController {
     private final AtributosEntrada atributosEntrada;
     private final EnvioEnCurso envioEnCurso;
     private final TallerEnCurso tallerEnCurso;
+    private final RegistroActividad registro;
 
     public PackingListController(PreparacionRevisionService preparacion,
                                  ClaudeEnvioExtractionService extractorClaude,
@@ -111,7 +115,8 @@ public class PackingListController {
                                  ArchivoTemporadas archivoTemporadas,
                                  AtributosEntrada atributosEntrada,
                                  EnvioEnCurso envioEnCurso,
-                                 TallerEnCurso tallerEnCurso) {
+                                 TallerEnCurso tallerEnCurso,
+                                 RegistroActividad registro) {
         this.preparacion = preparacion;
         this.extractorClaude = extractorClaude;
         this.validadorResumen = validadorResumen;
@@ -127,6 +132,7 @@ public class PackingListController {
         this.atributosEntrada = atributosEntrada;
         this.envioEnCurso = envioEnCurso;
         this.tallerEnCurso = tallerEnCurso;
+        this.registro = registro;
     }
 
     // --- Paso 1: entrada ---
@@ -287,6 +293,19 @@ public class PackingListController {
         tallerEnCurso.reiniciar();
         preparacion.preparar(envio, cabecera, cliente, excelPedido, nombreExcelPedido,
                 avisosPrevios, envioEnCurso);
+        // El evento va después del trabajo y antes de la respuesta: un evento
+        // de algo que luego falló es peor que no tenerlo. Solo metadatos:
+        // cliente, modo y recuentos, nunca el contenido del envío.
+        String modo = envioForm.getModo() == null ? "JSON" : envioForm.getModo();
+        registro.registrar(TipoEvento.ENVIO_IMPORTADO, Seccion.PACKING_LIST,
+                envioForm.getCliente(), cajasDelEnvio(),
+                "Modo " + modo + ", " + envio.getDestinos().size() + " destinaciones");
+        if (modoClaude) {
+            registro.registrar(TipoEvento.EXTRACCION_FOTOS, Seccion.PACKING_LIST,
+                    envioForm.getCliente(), imagenesDe(envioForm).size(),
+                    imagenesDe(envioForm).size() + " documentos, " + referenciasDelEnvio()
+                            + " referencias");
+        }
         return "redirect:/revision";
     }
 
@@ -365,6 +384,8 @@ public class PackingListController {
                 .toList();
         byte[] documento = constructorPackingPuntotres.generar(cabecera, nombreCliente, destinos);
 
+        registro.registrar(TipoEvento.PACKING_PUNTOTRES_IMPRESO, Seccion.PACKING_LIST,
+                cabecera.getClaveCliente(), 1, null);
         String nombreFichero = nombreDelPackingPuntotres(cabecera, nombreCliente);
         return ResponseEntity.ok()
                 .contentType(TIPO_DOCX)
@@ -453,6 +474,15 @@ public class PackingListController {
         // Las etiquetas se rehacen en el mismo paso: regenerar invalidaría las
         // ya hechas de todos modos (pesos y cajas pueden haber cambiado).
         generarEtiquetasDelEnvio();
+        registro.registrar(TipoEvento.PACKING_LIST_GENERADO, Seccion.PACKING_LIST,
+                envioEnCurso.getCabecera().getClaveCliente(), excels.size(),
+                excels.size() + " ficheros en " + envioEnCurso.getImportado().getDestinos().size()
+                        + " destinaciones");
+        if (!envioEnCurso.getEtiquetas().isEmpty()) {
+            registro.registrar(TipoEvento.ETIQUETAS_CAJA_GENERADAS, Seccion.PACKING_LIST,
+                    envioEnCurso.getCabecera().getClaveCliente(),
+                    envioEnCurso.getEtiquetas().size(), null);
+        }
         return "redirect:/resultados";
     }
 
@@ -568,6 +598,8 @@ public class PackingListController {
         if (envioEnCurso.estaVacio() || volcado == null) {
             return ResponseEntity.notFound().build();
         }
+        registro.registrar(TipoEvento.VOLCADO_ERP_DESCARGADO, Seccion.PACKING_LIST,
+                envioEnCurso.getCabecera().getClaveCliente(), 1, null);
         return ResponseEntity.ok()
                 .contentType(TIPO_XLSX)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition
@@ -597,6 +629,22 @@ public class PackingListController {
     // --- Internos ---
 
     /** Imágenes realmente subidas: el input file manda una entrada vacía si no eliges nada. */
+    /** Cajas físicas del envío en curso, para el registro de actividad. */
+    private int cajasDelEnvio() {
+        return envioEnCurso.getImportado().getDestinos().stream()
+                .mapToInt(destino -> destino.getDestino().getCajas().size())
+                .sum();
+    }
+
+    /** Referencias distintas del envío en curso, para el registro de actividad. */
+    private long referenciasDelEnvio() {
+        return envioEnCurso.getImportado().getDestinos().stream()
+                .flatMap(destino -> destino.getDestino().getCajas().stream())
+                .map(CajaData::getReferencia)
+                .distinct()
+                .count();
+    }
+
     private static List<MultipartFile> imagenesDe(EnvioForm form) {
         if (form.getImagenes() == null) {
             return List.of();

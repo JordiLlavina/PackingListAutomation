@@ -21,8 +21,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.seguridad.Seccion;
 import com.puntotres.packinglist.service.etiquetasarticulo.EtiquetasArticuloGenerationService;
 import com.puntotres.packinglist.service.etiquetasarticulo.ExcelEtiquetasArticulo;
 import com.puntotres.packinglist.service.etiquetasarticulo.GeneradorEtiquetasArticuloCliente;
@@ -71,14 +74,17 @@ public class EtiquetasArticuloController {
     private final EtiquetasArticuloGenerationService etiquetasArticuloService;
     private final ClientesProperties clientesProperties;
     private final EtiquetasArticuloEnCurso enCurso;
+    private final RegistroActividad registro;
 
     public EtiquetasArticuloController(
             EtiquetasArticuloGenerationService etiquetasArticuloService,
             ClientesProperties clientesProperties,
-            EtiquetasArticuloEnCurso enCurso) {
+            EtiquetasArticuloEnCurso enCurso,
+            RegistroActividad registro) {
         this.etiquetasArticuloService = etiquetasArticuloService;
         this.clientesProperties = clientesProperties;
         this.enCurso = enCurso;
+        this.registro = registro;
     }
 
     // --- Paso 1: elegir cliente y subir el pedido ---
@@ -141,6 +147,8 @@ public class EtiquetasArticuloController {
         // pueden confiar en que nombreFichero no trae "/" ni similares.
         resultado.getExcels().forEach(excel -> enCurso.getExcels().add(sanear(excel)));
         enCurso.getAvisos().addAll(resultado.getAvisos());
+        registro.registrar(TipoEvento.ETIQUETAS_ARTICULO_GENERADAS, Seccion.ETIQUETAS_ARTICULO,
+                cliente, enCurso.getExcels().size(), enCurso.getExcels().size() + " ficheros");
         return "redirect:/etiquetas-articulo-produccion/resultados";
     }
 

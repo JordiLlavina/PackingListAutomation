@@ -16,6 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.actividad.EventoActividadRepository;
 import com.puntotres.packinglist.seguridad.Seccion;
 import com.puntotres.packinglist.seguridad.Usuario;
 import com.puntotres.packinglist.seguridad.UsuarioRepository;
@@ -30,11 +31,16 @@ class AdministracionControllerTest {
     @Autowired
     private UsuarioRepository usuarios;
 
+    @Autowired
+    private EventoActividadRepository eventos;
+
     private Usuario jefa;
     private Usuario ana;
 
     @BeforeEach
     void sembrar() {
+        // Los eventos de actividad apuntan a los usuarios: se borran antes.
+        eventos.deleteAll();
         usuarios.deleteAll();
         Usuario nuevaJefa = new Usuario("oid-jefa", "jefa@puntotres.com", "Jefa");
         nuevaJefa.setAdministrador(true);

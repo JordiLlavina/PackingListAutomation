@@ -9,6 +9,9 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
+
 /**
  * Da de alta sola a la persona la primera vez que entra, y sin ningún
  * permiso: quien entra por primera vez ve el menú vacío y un texto que dice a
@@ -22,10 +25,13 @@ public class UsuarioOidcService extends OidcUserService {
 
     private final UsuarioRepository repositorio;
     private final SeguridadProperties propiedades;
+    private final RegistroActividad registro;
 
-    public UsuarioOidcService(UsuarioRepository repositorio, SeguridadProperties propiedades) {
+    public UsuarioOidcService(UsuarioRepository repositorio, SeguridadProperties propiedades,
+                              RegistroActividad registro) {
         this.repositorio = repositorio;
         this.propiedades = propiedades;
+        this.registro = registro;
     }
 
     @Override
@@ -55,7 +61,9 @@ public class UsuarioOidcService extends OidcUserService {
         usuario.setCorreo(correo);
         usuario.setNombre(nombre);
         usuario.setUltimoAcceso(OffsetDateTime.now());
-        return repositorio.save(usuario);
+        Usuario guardado = repositorio.save(usuario);
+        registro.registrarPara(guardado, TipoEvento.ENTRADA, null, null, null, null);
+        return guardado;
     }
 
     private Usuario altaNueva(String oidEntra, String correo, String nombre) {

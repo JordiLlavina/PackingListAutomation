@@ -1,6 +1,8 @@
 package com.puntotres.packinglist.web;
 
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -10,6 +12,8 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
 import com.puntotres.packinglist.seguridad.Seccion;
 import com.puntotres.packinglist.seguridad.Usuario;
 import com.puntotres.packinglist.seguridad.UsuarioActual;
@@ -27,10 +31,13 @@ public class AdministracionController {
 
     private final UsuarioRepository usuarios;
     private final UsuarioActual usuarioActual;
+    private final RegistroActividad registro;
 
-    public AdministracionController(UsuarioRepository usuarios, UsuarioActual usuarioActual) {
+    public AdministracionController(UsuarioRepository usuarios, UsuarioActual usuarioActual,
+                                    RegistroActividad registro) {
         this.usuarios = usuarios;
         this.usuarioActual = usuarioActual;
+        this.registro = registro;
     }
 
     @GetMapping("/administracion/usuarios")
@@ -60,6 +67,8 @@ public class AdministracionController {
             // desactivarse: quedarse sin ningún administrador deja la
             // aplicación sin forma de conceder permisos salvo tocando la base
             // de datos a mano.
+            boolean estabaActivo = usuario.isActivo();
+            Set<Seccion> antes = new HashSet<>(usuario.getPermisos());
             boolean soyYo = Objects.equals(usuario.getId(), yo);
             if (!soyYo) {
                 usuario.setAdministrador(fila.isAdministrador());
@@ -72,6 +81,16 @@ public class AdministracionController {
                 } else {
                     usuario.retirar(seccion);
                 }
+            }
+            if (estabaActivo != usuario.isActivo()) {
+                registro.registrar(usuario.isActivo()
+                                ? TipoEvento.USUARIO_REACTIVADO : TipoEvento.USUARIO_DESACTIVADO,
+                        Seccion.ADMINISTRACION, null, null, usuario.getCorreo());
+            }
+            if (!antes.equals(usuario.getPermisos())) {
+                registro.registrar(TipoEvento.PERMISOS_CAMBIADOS, Seccion.ADMINISTRACION,
+                        null, usuario.getPermisos().size(),
+                        usuario.getCorreo() + ": " + usuario.getPermisos());
             }
             usuarios.save(usuario);
             cambiados++;

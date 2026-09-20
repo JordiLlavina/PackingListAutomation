@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 
+import com.puntotres.packinglist.actividad.RegistroActividad;
+import com.puntotres.packinglist.actividad.TipoEvento;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -21,9 +24,14 @@ import jakarta.servlet.http.HttpServletResponse;
 public class InterceptorPermisos implements HandlerInterceptor {
 
     private final ObjectProvider<UsuarioActual> usuarioActual;
+    // Como ObjectProvider y no directo: el registro depende de un bean de
+    // ámbito petición y este interceptor se construye antes de que exista.
+    private final ObjectProvider<RegistroActividad> registro;
 
-    public InterceptorPermisos(ObjectProvider<UsuarioActual> usuarioActual) {
+    public InterceptorPermisos(ObjectProvider<UsuarioActual> usuarioActual,
+                               ObjectProvider<RegistroActividad> registro) {
         this.usuarioActual = usuarioActual;
+        this.registro = registro;
     }
 
     @Override
@@ -47,6 +55,8 @@ public class InterceptorPermisos implements HandlerInterceptor {
         if (seccion.isEmpty()) {
             // Una ruta sin dueño no debería existir: CoberturaDeRutasTest lo
             // impide. Si aparece una, se cierra en vez de abrirse.
+            registro.getObject().registrar(TipoEvento.ACCESO_DENEGADO, null,
+                    null, null, "Ha intentado abrir " + uri);
             respuesta.sendRedirect(peticion.getContextPath() + "/sin-permiso");
             return false;
         }
@@ -56,6 +66,8 @@ public class InterceptorPermisos implements HandlerInterceptor {
             return true;
         }
 
+        registro.getObject().registrar(TipoEvento.ACCESO_DENEGADO, seccion.get(),
+                null, null, "Ha intentado abrir " + uri);
         respuesta.sendRedirect(
                 peticion.getContextPath() + "/sin-permiso?seccion=" + seccion.get().name());
         return false;
