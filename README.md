@@ -15,6 +15,7 @@ Todo se maneja desde un asistente web (Spring Boot + Thymeleaf). Código y docum
 - **Java 17** (probado con Temurin 17)
 - **Maven 3.9+**
 - *(Opcional)* Variable de entorno `ANTHROPIC_API_KEY` — solo para el modo CLAUDE de la pantalla de entrada (extracción desde fotos/PDFs). Sin ella la aplicación arranca igual y el resto de modos funciona.
+- **Obligatorias** para arrancar la web: `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` y `ENTRA_CLIENT_SECRET`, del registro de la aplicación en Entra ID (Microsoft). Se entra con la cuenta de Microsoft de Puntotres y sin ellas el contexto no arranca. Los tests no las necesitan: el perfil `test` simula la identidad.
 
 Dependencias clave (las versiones las gestiona el parent de Spring Boot salvo donde se indica, ver [pom.xml](pom.xml)):
 
@@ -44,16 +45,19 @@ mvn test
 mvn spring-boot:run
 ```
 
-Con el servidor levantado, abrir **http://localhost:8080** (redirige al menú `/menu`). Desde ahí:
+Con el servidor levantado, abrir **http://localhost:8080** (redirige al menú `/menu`). Pide iniciar sesión con la cuenta de Microsoft de Puntotres: en desarrollo se entra por `localhost`, que es el único host para el que Entra admite `http`. Quien entra por primera vez no ve ninguna sección hasta que un administrador se la concede en `/administracion/usuarios`; el primer administrador sale de `seguridad.administradores-iniciales` en `application.yml`. Desde ahí:
 
 - `/packing-list` — asistente de packing lists en 3 pantallas: **entrada** (pegar JSON o subir fotos/PDFs) → **revisión** (avisos y tabla editable) → **resultados** (descarga individual, ZIP, volcado ERP y etiquetas de caja).
 - `/etiquetas-articulo` — menú de etiquetas de artículo: `/etiquetas-articulo-produccion` (a partir del excel de pedido, sin envío), SMS y prototipos todavía en desarrollo.
 - `/clickup` — escandallos ICSUITE para ClickUp (sin envío ni cliente).
 
-Para usar el **modo CLAUDE** (fotos/PDFs → JSON) hay que exportar la clave antes de arrancar. En PowerShell:
+Antes de arrancar hay que exportar los tres valores de Entra y, para el **modo CLAUDE** (fotos/PDFs → JSON), la clave de Anthropic. En PowerShell:
 
 ```powershell
-$env:ANTHROPIC_API_KEY = "sk-ant-..."   # solo esta sesión de terminal
+$env:ENTRA_TENANT_ID = "<Directory (tenant) ID>"   # solo esta sesión de terminal
+$env:ENTRA_CLIENT_ID = "<Application (client) ID>"
+$env:ENTRA_CLIENT_SECRET = "<Value del client secret>"
+$env:ANTHROPIC_API_KEY = "sk-ant-..."
 mvn spring-boot:run
 ```
 
@@ -112,6 +116,7 @@ java -jar packing-list-ami-1.0.0-SNAPSHOT.jar
 y abrir **http://localhost:8080**. Variantes habituales:
 
 ```powershell
+$env:ENTRA_TENANT_ID = "..."; $env:ENTRA_CLIENT_ID = "..."; $env:ENTRA_CLIENT_SECRET = "..."   # obligatorias: login de Microsoft
 java -jar packing-list-ami-1.0.0-SNAPSHOT.jar --server.port=8081   # si el 8080 está ocupado
 $env:ANTHROPIC_API_KEY = "sk-ant-..."                              # antes de arrancar, para el modo CLAUDE
 ```
@@ -163,9 +168,9 @@ cambia el nombre de APC en el desplegable y le deja intactos su `plantilla`, su 
 
 > ⚠️ La única excepción son las **listas**: si el fichero externo define una (`destinos-hijo`, las destinaciones de APC...), sustituye a la de dentro **entera**, no se suman los elementos. Si tocas una lista, cópiala completa desde el [application.yml interno](src/main/resources/application.yml).
 
-### Alternativa: no copiar el jar, compartir el que ya está corriendo
+### Compartirla: el servidor de la empresa
 
-El servidor escucha en todas las interfaces de red, así que desde otro ordenador de la misma red se entra en `http://<IP-del-ordenador>:8080` (abriendo antes el puerto 8080 en el firewall de Windows). Ojo: **la aplicación no tiene usuarios ni contraseña**, así que solo dentro de la red de la empresa.
+La aplicación vive en el servidor de la empresa, en `https://packing.puntotres.com`, detrás de Caddy con TLS y **solo desde la red de la oficina**: el despliegue (servicio systemd, Caddy, copia diaria) está paso a paso en [TO DO/2026-09-20-login-microsoft-y-actividad-en-red-local-plan.md](TO%20DO/2026-09-20-login-microsoft-y-actividad-en-red-local-plan.md), fases 0 y 1. Se entra con la cuenta de Microsoft de Puntotres y cada persona ve solo las secciones que se le hayan concedido; quién hace qué queda en `/actividad`. Sacarla a internet es otro plan: [TO DO/2026-09-20-publicar-la-web-en-internet-plan.md](TO%20DO/2026-09-20-publicar-la-web-en-internet-plan.md).
 
 ## Estructura del proyecto
 
@@ -236,8 +241,10 @@ El detalle de qué campos usa cada cliente está en [docs/Packing Lists/campos-j
 - **Taras por tamaño de caja** (`packing-list.taras`): kg del embalaje vacío por clave `LxWxH`. **Un tamaño de caja nuevo es una línea aquí**, sin tocar código. Las claves se normalizan (`"60X40X40 "` casa con `"60x40x40"`). Es un dato del almacén, no una constante: los tamaños aún sin pesar están puestos a `0.01`.
 - **Catálogo de clientes** (`packing-list.clientes`): nombre, plantilla (AMI/APC/GENERIC), y por cliente lo suyo — si sube excel de pedido (`pedido-cliente`), las destinaciones de APC con sus direcciones, abreviaturas del Livraison code y destinos hijo.
 - Límites de subida multipart (las fotos del móvil superan el 1MB por defecto de Spring) y hash del contenido en los nombres de los estáticos (sin él, el navegador reutiliza el CSS viejo tras cada cambio).
+- **Administradores iniciales** (`seguridad.administradores-iniciales`): correos que entran como administrador la primera vez. Se aplica solo en el alta; después mandan las casillas de `/administracion/usuarios`.
+- **Sesión de 8 horas** con cookie `secure`, `http-only` y `SameSite=Lax` (`server.servlet.session`): la sesión contiene el envío en curso y un timeout corto borraría el trabajo de la mañana.
 
-La única variable de entorno es `ANTHROPIC_API_KEY` (opcional, ver arriba).
+Variables de entorno: `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` y `ENTRA_CLIENT_SECRET` (obligatorias, login de Microsoft) y `ANTHROPIC_API_KEY` (opcional, ver arriba). En el servidor viven en `/etc/packing/entorno` (600, root), nunca en el yml de dentro del jar ni en git.
 
 Si la aplicación corre desde un `.jar` en otro ordenador, estos ajustes se pueden cambiar sin recompilar con un `application.yml` junto al jar: ver [Distribuir la aplicación](#distribuir-la-aplicación-un-jar-para-otro-ordenador).
 

@@ -24,7 +24,7 @@ CajaData.pesoNetoKg / pesoBrutoKg rellenos donde se pudo inferir
 List<ExcelGenerado>  (uno por referencia+color, con AmiExcelBuilder)
 ```
 
-Cada flecha es un `@Service` de Spring, sin estado, que se puede llamar independientemente. [`Main.java`](src/main/java/com/puntotres/packinglist/Main.java) es quien los encadena a mano hoy (no hay endpoint web todavía); mañana ese papel lo hará un controlador REST.
+Cada flecha es un `@Service` de Spring, sin estado, que se puede llamar independientemente. [`Main.java`](src/main/java/com/puntotres/packinglist/Main.java) los encadena a mano como prueba manual; en la aplicación los encadena `PackingListController` a través de `PreparacionRevisionService`, y delante de todo hay una capa de seguridad (ver más abajo).
 
 ## Por qué hay dos modelos de datos distintos
 
@@ -147,15 +147,26 @@ Las claves se normalizan (minúsculas, sin espacios) tanto al cargar como al con
 
 En `CajaData` y en `PackingListData.Caja`, `pesoNetoKg`/`pesoBrutoKg` son el tipo objeto `Double`, no el primitivo `double`. Es deliberado: un primitivo no puede representar "desconocido", solo `0.0`, y `0.0` es un peso real y ambiguo con "no lo sé todavía". `null` sí distingue ambos casos, y es lo que permite que `WeightInferenceService` sepa qué cajas necesitan inferencia y que `AmiExcelBuilder` sepa qué celdas dejar en blanco.
 
-## Spring Boot: qué hace hoy y qué no hace todavía
+## Spring Boot: la web, la seguridad y la base de datos
 
-El proyecto usa `spring-boot-starter` (núcleo) pero **no** `spring-boot-starter-web**: no hay ningún endpoint HTTP. Lo que aporta Spring hoy es:
+Hoy sí hay web: `spring-boot-starter-web` con Thymeleaf, controladores en `web/` y el estado de cada asistente en la sesión HTTP (`EnvioEnCurso`, `TallerEnCurso`, `EscandallosEnCurso`, `EtiquetasArticuloEnCurso`, con los excels generados dentro). Lo que cuenta el resto de este documento sobre el pipeline de dominio sigue siendo válido; lo que sigue es lo que se añadió encima.
 
-- **Inyección de dependencias**: los tres servicios y `AmiExcelBuilder` son `@Service`; en producción Spring los instanciaría y conectaría solos. Hoy, en `Main.java`, se instancian a mano con `new` porque no hay contexto de Spring arrancado (es una clase de prueba manual, no un componente gestionado).
-- **`@ConfigurationProperties`**: la lectura de `application.yml` descrita arriba.
-- **`PackingListApplication`** ([PackingListApplication.java](src/main/java/com/puntotres/packinglist/PackingListApplication.java)) es el punto de arranque `@SpringBootApplication`, hoy sin ningún `@RestController` — solo sirve para que `mvn test` pueda levantar un contexto Spring real en `PackingListApplicationTest` y verificar que `TaraProperties` se cablea bien.
+### Seguridad: quién entra y qué abre
 
-Cuando llegue el endpoint REST (ver README), `Main.java` dejará de ser necesario para probar manualmente porque se podrá probar contra el endpoint real; hoy sigue siendo el atajo más rápido para ejecutar el flujo completo sin levantar un servidor.
+El recorrido de una petición, en orden:
+
+1. **`SecurityConfig`** (`seguridad/`): sin identidad no se ve nada salvo los estáticos y `/error`. Login OIDC contra Entra ID con el cliente OAuth2 estándar de Spring (registro `azure`), sin el starter de Azure. La aplicación es de un solo tenant y el `issuer-uri` valida el `iss`. Ese `issuer-uri` vive en un documento del yml activo en todo perfil menos `test`: con él Spring sale a internet al arrancar, y la suite simula la identidad con `oidcLogin()` contra endpoints declarados a mano. La seguridad no se apaga en ningún perfil.
+2. **`UsuarioOidcService`**: en cada login da de alta (o refresca) la fila de `usuario` por el claim `oid`, nunca por el correo, y sin ningún permiso. La lista `seguridad.administradores-iniciales` solo se aplica en el alta. Deja el evento `ENTRADA`.
+3. **`InterceptorPermisos`**: lee los permisos de la base de datos en cada petición (no de las autoridades de la sesión, que se calculan en el login): retirar una sección surte efecto en el siguiente clic. El mapa de rutas a secciones vive únicamente en el enum `Seccion`, y `CoberturaDeRutasTest` impide que nazca una ruta sin dueño. El manejador de recursos estáticos pasa sin sección, para que una URL inexistente dé 404 y no "sin permiso".
+4. **`RegistroActividad`** (`actividad/`): llamadas explícitas desde los controladores, después del trabajo y antes de la respuesta, solo con metadatos (cliente, recuentos). Un fallo suyo se captura y se registra como `WARN`: nunca tumba un envío. `ConsultaActividad` agrega con `group by` en la base de datos para el dashboard `/actividad`.
+
+`UsuarioActual` es un bean de ámbito petición con caché, para que el interceptor, el menú y el registro no consulten tres veces al mismo usuario.
+
+### Base de datos: H2 en fichero, esquema por Flyway
+
+La memoria de referencias, las taras, las temporadas guardadas, los usuarios, sus permisos y el histórico de actividad viven en H2 (`./datos/packinglist`). El esquema lo mandan las migraciones de Flyway y Hibernate solo lo valida (`ddl-auto: validate`). `db/migration/{vendor}` contiene únicamente el baseline V1, porque el tipo binario del excel de una temporada difiere entre H2 (`blob`) y PostgreSQL (`bytea`); de V2 en adelante todo va en `db/migration/common`, en SQL que entienden los dos motores. Es lo que hace barato el paso a PostgreSQL del plan de publicación.
+
+`Main.java` sigue siendo la prueba manual del pipeline sin levantar Spring, y por eso no ve la seguridad.
 
 ## Tests: qué cubre cada uno
 
@@ -166,6 +177,7 @@ Todos los tests son JUnit 5 puro instanciando los servicios con `new` (sin conte
 - [`WeightInferenceServiceTest`](src/test/java/com/puntotres/packinglist/service/WeightInferenceServiceTest.java) — promedio con varias cajas conocidas, tamaño sin tara, referencia sin ninguna caja conocida, normalización de la clave de tara, agrupación por referencia.
 - [`PackingListGenerationServiceTest`](src/test/java/com/puntotres/packinglist/service/PackingListGenerationServiceTest.java) — agrupación por modelo+color reabriendo el `.xlsx` generado con POI para comprobar celdas reales; un test de flujo completo (`flujoCompletoGeneraExcelsAbribles`) que encadena los tres servicios y deja los excels en `target/` para inspección manual.
 - [`PackingListApplicationTest`](src/test/java/com/puntotres/packinglist/PackingListApplicationTest.java) — el único que levanta contexto Spring (`@SpringBootTest`), para verificar que `application.yml` se enlaza de verdad en `TaraProperties` (no solo que la clase compile).
+- `seguridad/` y `actividad/` (tests): `CoberturaDeRutasTest` (toda ruta tiene sección o es pública), `InterceptorPermisosTest` (un permiso retirado en caliente surte efecto al siguiente clic), `UsuarioOidcServiceTest` (el alta va por `oid`), `MigracionesTest` (Flyway es la única fuente del esquema), `ConsultaActividadTest` (las cuatro cifras del dashboard y el borde del "hasta hoy").
 
 ## Estructura de ficheros
 
@@ -183,6 +195,14 @@ src/main/java/com/puntotres/packinglist/
         DatosEnvio.java              Cabecera que no sale de las imágenes
     config/
         TaraProperties.java          Tabla de taras, desde application.yml
+    seguridad/
+        SecurityConfig.java          Login OIDC contra Entra, cabeceras, CSP
+        Seccion.java                 El único mapa de rutas a permisos
+        InterceptorPermisos.java     Aplica los permisos leyendo de la base de datos
+        UsuarioOidcService.java      Alta automática por oid
+    actividad/
+        RegistroActividad.java       Deja constancia de quién hizo qué, sin fallar nunca
+        ConsultaActividad.java       Las cuentas del dashboard, en la base de datos
     service/
         EnvioImportService.java      JSON → dominio (expande rangos, valida)
         PaletAssignmentService.java  Cruza cajas con rangos de palet
