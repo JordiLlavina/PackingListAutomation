@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Actividad')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Actividad')}"></header>
+<main>
+    <form class="tarjeta filtros" th:action="@{/actividad}" method="get">
+        <label>Desde <input type="date" name="desde" th:value="${filtro.desde}"></label>
+        <label>Hasta <input type="date" name="hasta" th:value="${filtro.hasta}"></label>
+        <label>Persona
+            <select name="usuarioId">
+                <option value="">todas</option>
+                <option th:each="u : ${usuarios}" th:value="${u.id}" th:text="${u.nombre}"
+                        th:selected="${u.id == filtro.usuarioId}">Nombre</option>
+            </select>
+        </label>
+        <label>Sección
+            <select name="seccion">
+                <option value="">todas</option>
+                <option th:each="s : ${secciones}" th:value="${s.name()}" th:text="${s.rotulo}"
+                        th:selected="${s == filtro.seccion}">Sección</option>
+            </select>
+        </label>
+        <button type="submit" class="boton">Ver</button>
+        <a class="boton boton-secundario"
+           th:href="@{/actividad/exportar(desde=${filtro.desde},hasta=${filtro.hasta},
+                      usuarioId=${filtro.usuarioId},seccion=${filtro.seccion?.name()})}">Exportar a Excel</a>
+    </form>
+
+    <div class="cifras">
+        <div class="cifra"><span th:text="${resumen.personas}">0</span><small>personas</small></div>
+        <div class="cifra"><span th:text="${resumen.accesos}">0</span><small>accesos</small></div>
+        <div class="cifra"><span th:text="${resumen.documentos}">0</span><small>documentos</small></div>
+        <div class="cifra"><span th:text="${resumen.envios}">0</span><small>envíos</small></div>
+    </div>
+
+    <p class="tarjeta" th:if="${resumen.cronologia.isEmpty()}">Sin actividad en este periodo.</p>
+
+    <section class="tarjeta" th:unless="${resumen.porUsuario.isEmpty()}">
+        <h2>Por persona</h2>
+        <table class="tabla">
+            <thead><tr><th>Correo</th><th>Último acceso</th><th>Accesos</th><th>Acciones</th></tr></thead>
+            <tbody>
+            <tr th:each="l : ${resumen.porUsuario}">
+                <td th:text="${l.correo}">correo</td>
+                <td th:text="${l.ultimoAcceso == null ? '—'
+                              : #temporals.format(l.ultimoAcceso, 'dd/MM/yyyy HH:mm')}">—</td>
+                <td th:text="${l.accesos}">0</td>
+                <td th:text="${l.documentos}">0</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta" th:unless="${resumen.porSeccion.isEmpty()}">
+        <h2>Por sección</h2>
+        <ul class="barras">
+            <li th:each="l : ${resumen.porSeccion}">
+                <span class="barra-rotulo" th:text="${l.seccion.rotulo}">Sección</span>
+                <!-- La barra es un span con una clase de tramo, no un style en
+                     línea: un style obligaría a abrir la CSP con
+                     unsafe-inline, que es justo lo que esta aplicación no
+                     necesita hacer. -->
+                <span class="barra" th:classappend="|barra-${l.tramo(maximoSeccion)}|"></span>
+                <span class="barra-valor" th:text="${l.acciones}">0</span>
+            </li>
+        </ul>
+    </section>
+
+    <section class="tarjeta" th:unless="${resumen.porCliente.isEmpty()}">
+        <h2>Por cliente</h2>
+        <table class="tabla">
+            <thead><tr><th>Cliente</th><th>Documentos</th><th>Acciones</th></tr></thead>
+            <tbody>
+            <tr th:each="l : ${resumen.porCliente}">
+                <td th:text="${l.cliente}">AMI</td>
+                <td th:text="${l.documentos}">0</td>
+                <td th:text="${l.acciones}">0</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta" th:unless="${resumen.cronologia.isEmpty()}">
+        <h2>Últimos movimientos</h2>
+        <table class="tabla">
+            <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Cliente</th><th>Detalle</th></tr></thead>
+            <tbody>
+            <tr th:each="e : ${resumen.cronologia}">
+                <td th:text="${#temporals.format(e.momento, 'dd/MM/yyyy HH:mm')}">—</td>
+                <td th:text="${e.correo}">correo</td>
+                <td th:text="${e.tipo.rotulo}">Qué</td>
+                <td th:text="${e.cliente} ?: '—'">—</td>
+                <td th:text="${e.detalle} ?: '—'">—</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+</main>
+</body>
+</html>

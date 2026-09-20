@@ -960,3 +960,40 @@ header.cabecera .enlace-salir {
 .tabla-usuarios td:first-child, .tabla-usuarios td:nth-child(2),
 .tabla-usuarios th:first-child, .tabla-usuarios th:nth-child(2) { text-align: left; }
 .tabla-usuarios input[type="checkbox"]:disabled { opacity: 0.4; }
+
+/* Dashboard de actividad. Sin librería de gráficos y sin JavaScript,
+   coherente con el resto: las barras son un span con un ancho de tramo fijo.
+   Se hace con clases y no con un style en línea porque el style obligaría a
+   abrir la CSP con unsafe-inline. Las veinte clases de tramo son
+   obligatorias: sin ellas la barra sale sin ancho y la sección parece vacía. */
+.filtros { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; }
+.cifras { display: flex; gap: 1rem; flex-wrap: wrap; margin: 1rem 0; }
+.cifra { flex: 1 1 8rem; text-align: center; padding: 1rem; border: 1px solid currentColor; }
+.cifra span { display: block; font-size: 2rem; font-weight: 600; }
+.cifra small { opacity: 0.7; }
+.barras { list-style: none; padding: 0; }
+.barras li { display: grid; grid-template-columns: 12rem 1fr 4rem; gap: 0.5rem; align-items: center; }
+.barra { display: block; height: 0.9rem; background: currentColor; opacity: 0.35; }
+.barra-valor { text-align: right; }
+
+.barra-0   { width: 0; }
+.barra-5   { width: 5%; }
+.barra-10  { width: 10%; }
+.barra-15  { width: 15%; }
+.barra-20  { width: 20%; }
+.barra-25  { width: 25%; }
+.barra-30  { width: 30%; }
+.barra-35  { width: 35%; }
+.barra-40  { width: 40%; }
+.barra-45  { width: 45%; }
+.barra-50  { width: 50%; }
+.barra-55  { width: 55%; }
+.barra-60  { width: 60%; }
+.barra-65  { width: 65%; }
+.barra-70  { width: 70%; }
+.barra-75  { width: 75%; }
+.barra-80  { width: 80%; }
+.barra-85  { width: 85%; }
+.barra-90  { width: 90%; }
+.barra-95  { width: 95%; }
+.barra-100 { width: 100%; }
