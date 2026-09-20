@@ -108,6 +108,24 @@ class RutasTest {
     }
 
     @Test
+    void losAvisosDeUnaReferenciaSeDistinguenDentroDeSuTarjeta() throws Exception {
+        // La tarjeta del paso 1b es blanca como todas, así que sin tinte esas
+        // líneas se leen como una nota del formulario y no como algo que
+        // atender; y sin margen abajo se pegan a la cabecera de la tabla y
+        // parecen parte de ella. Desde el código no se ve ninguna de las dos.
+        String css = new String(new org.springframework.core.io.ClassPathResource(
+                "static/estilo.css").getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.matches("(?s).*\\.avisos-referencia \\{[^}]*background:[^}]*\\}.*"),
+                "los avisos de una referencia van teñidos dentro de su tarjeta");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.matches("(?s).*\\.avisos-referencia \\{[^}]*margin:[^}]*\\}.*"),
+                "y separados de la tabla que tienen debajo");
+    }
+
+    @Test
     void elAsistenteDePackingListViveEnSuPropiaRuta() throws Exception {
         mvc.perform(get("/packing-list"))
                 .andExpect(status().isOk())

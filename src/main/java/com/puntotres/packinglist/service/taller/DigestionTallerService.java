@@ -70,16 +70,60 @@ public class DigestionTallerService {
             throws IOException, TallerColisExcel.TallerExcelException {
         TallerColisExcel taller = TallerColisExcel.desdeBytes(excelTaller, nombreHoja);
         DigestionTaller digestion = new DigestionTaller();
-        digestion.getAvisos().addAll(taller.avisos());
+        digestion.getDetalle().addAll(taller.detalleAvisos());
+        avisarDeLasColumnasQueFaltanYHacenFalta(clienteClave, taller, digestion);
 
         List<LineaTaller> lineas = soloLasDelCliente(clienteClave, taller.lineas(), digestion);
 
         ResultadoObjetivos objetivos = objetivosDe(clienteClave, lineas, excelPedido);
-        digestion.getAvisos().addAll(objetivos.getAvisos());
+        digestion.getDetalle().addAll(objetivos.getDetalle());
         digestion.getBloqueos().addAll(objetivos.getBloqueos());
 
         montarGrupos(clienteClave, lineas, objetivos, digestion);
         return digestion;
+    }
+
+    /**
+     * Avisa de las columnas opcionales que faltan, pero solo de las que este
+     * envío va a echar en falta de verdad.
+     *
+     * El lector de la hoja no puede decidir esto: no sabe de qué cliente es
+     * el envío, y de eso depende. Aquí sí se sabe, así que aquí se decide.
+     *
+     * Dos columnas no avisan nunca, y no es un olvido: el programa <b>no lee
+     * su contenido en ningún sitio</b>. "Nº EXPEDITION PUNTOTRES" es
+     * trazabilidad del taller, y "Nº DE COLIS" su numeración de cajas, que se
+     * descarta a propósito porque el packing se regenera desde cero. Pedir
+     * que se rellenen mandaba a arreglar algo que no cambia nada, y un aviso
+     * que sale siempre y no sirve para nada empuja hacia abajo los que sí hay
+     * que atender.
+     */
+    private static void avisarDeLasColumnasQueFaltanYHacenFalta(String clienteClave,
+                                                                TallerColisExcel taller,
+                                                                DigestionTaller digestion) {
+        for (TallerColisExcel.Columna columna : taller.opcionalesAusentes()) {
+            explicacionDe(columna, clienteClave).ifPresent(porQue -> digestion.avisar(
+                    "La hoja del taller no tiene la columna '" + columna.rotulo() + "': " + porQue));
+        }
+    }
+
+    /** Qué se pierde este cliente sin esa columna, o vacío si no se pierde nada. */
+    private static Optional<String> explicacionDe(TallerColisExcel.Columna columna,
+                                                  String clienteClave) {
+        return switch (columna) {
+            case TAILLE -> Optional.of("todas las tallas se toman como talla única");
+            case QTITE_COLIS -> Optional.of("habrá que decir cuántas unidades entran en cada caja");
+            case DESTINATION -> Optional.of("no se podrá contrastar la destinación con la del "
+                    + "pedido");
+            // El CODE de tres dígitos solo lo lee APC, donde es lo que dice a
+            // qué "Document d'achat" va la fila. Los demás clientes no lo
+            // miran, así que echarlo de menos por ellos es mandar a rellenar
+            // una columna que no se va a leer.
+            case CODE -> ObjetivosPedidoApc.CLIENTE.equalsIgnoreCase(clienteClave)
+                    ? Optional.of("sin él no se sabe a qué pedido ni a qué destinación va cada fila")
+                    : Optional.empty();
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -155,7 +199,7 @@ public class DigestionTallerService {
                                                                boolean faltaElPedido) {
         ResultadoObjetivos resultado = new ResultadoObjetivos();
         if (faltaElPedido) {
-            resultado.getAvisos().add("No se ha subido el excel de pedido de " + clienteClave
+            resultado.avisar("No se ha subido el excel de pedido de " + clienteClave
                     + ": la cantidad a enviar de cada cosa es la que ha llegado del taller, "
                     + "y hay que revisarla");
         }
@@ -292,7 +336,8 @@ public class DigestionTallerService {
         boolean cuadra = delPedido.stream()
                 .anyMatch(destino -> destino.startsWith(delTaller) || delTaller.startsWith(destino));
         if (!cuadra) {
-            digestion.getAvisos().add("En la fila " + linea.fila() + ", el taller apunta '"
+            digestion.avisarDe(linea.referencia(), "En la fila " + linea.fila()
+                    + ", el taller apunta '"
                     + delTaller + "' para " + linea.referencia() + " " + linea.color()
                     + ", y el pedido la manda a " + String.join(" y ", delPedido)
                     + ". Manda el pedido");

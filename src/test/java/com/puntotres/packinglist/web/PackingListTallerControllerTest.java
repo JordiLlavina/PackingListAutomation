@@ -164,6 +164,48 @@ class PackingListTallerControllerTest {
     }
 
     @Test
+    void elAvisoDeUnaReferenciaSePintaEnSuTarjetaYNoEnLaListaDeArriba() throws Exception {
+        // Con veinte referencias en pantalla, una lista general de veinte
+        // avisos obliga a ir buscando a cuál toca cada uno. Encima de su
+        // tabla se lee de un vistazo.
+        byte[] pedidoDeOtraCosa = PedidoAmiExcel.crear("EAN H26",
+                PedidoAmiExcel.Fila.pedida("OTRA-REF", "KAKI", "U", "07001 CH", 20));
+
+        String html = mvc.perform(peticionDeDigerir(tallerConUnaReferencia(8), pedidoDeOtraCosa)
+                        .param("modo", "TALLER").param("cliente", "AMI")
+                        .param("temporada", "H26").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "05/09/2026").param("fechaEnvio", "05/09/2026"))
+                .andExpect(view().name("taller-ajuste"))
+                .andReturn().getResponse().getContentAsString();
+
+        int aviso = html.indexOf("El pedido de AMI no tiene ninguna línea de " + referencia);
+        assertTrue(aviso > 0, "el aviso de la referencia sigue saliendo");
+        assertTrue(aviso > html.indexOf("grupo-referencia"),
+                "y sale dentro de la tarjeta de su referencia, no en la lista general de arriba");
+    }
+
+    @Test
+    void elAvisoQueNoEsDeNingunaReferenciaSeQuedaEnLaListaDeArriba() throws Exception {
+        // Una columna que falta habla de la hoja entera: no tiene tarjeta a
+        // la que bajar.
+        byte[] sinUnidadesPorCaja = PackingTallerExcel.crearSin(
+                java.util.List.of("QTITE /\nCOLIS"),
+                PackingTallerExcel.Fila.de("AMI", referencia, "KAKI", 31));
+
+        String html = mvc.perform(peticionDeDigerir(sinUnidadesPorCaja, pedidoDeAmi())
+                        .param("modo", "TALLER").param("cliente", "AMI")
+                        .param("temporada", "H26").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "05/09/2026").param("fechaEnvio", "05/09/2026"))
+                .andExpect(view().name("taller-ajuste"))
+                .andReturn().getResponse().getContentAsString();
+
+        int aviso = html.indexOf("La hoja del taller no tiene la columna");
+        assertTrue(aviso > 0, "el aviso general sigue saliendo");
+        assertTrue(aviso < html.indexOf("grupo-referencia"),
+                "y sale antes de las tarjetas, en la sección de avisos generales");
+    }
+
+    @Test
     void cadaDestinacionEnsenaSuNumeroDePedidoYSePuedeCorregir() throws Exception {
         // El número sale del excel de pedido del cliente —el PO de AMI, el
         // Document d'achat de APC— y hasta ahora no se veía por ningún lado,

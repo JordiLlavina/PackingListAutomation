@@ -60,6 +60,23 @@ public final class PackingTallerExcel {
     }
 
     public static byte[] crear(List<Fila> filas) {
+        return crearSin(List.of(), filas);
+    }
+
+    /**
+     * El mismo packing pero sin alguna columna opcional, para los casos en
+     * que un taller no la escribe. Los títulos se dan tal como salen en
+     * {@link #TITULOS} ("Nº EXPEDITION PUNTOTRES", "QTITE /\nCOLIS").
+     *
+     * <p>Se quita solo el TÍTULO y no las celdas de debajo: sin cabecera la
+     * columna no se reconoce, que es justo lo que pasa en el fichero real
+     * cuando el taller no la rellena.
+     */
+    public static byte[] crearSin(List<String> titulosFuera, Fila... filas) {
+        return crearSin(titulosFuera, List.of(filas));
+    }
+
+    public static byte[] crearSin(List<String> titulosFuera, List<Fila> filas) {
         try (XSSFWorkbook libro = new XSSFWorkbook();
              ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
             libro.createSheet("FACTURE");
@@ -71,7 +88,9 @@ public final class PackingTallerExcel {
 
             Row cabecera = hoja.createRow(FILA_CABECERA);
             for (int c = 1; c < TITULOS.length; c++) {
-                cabecera.createCell(c).setCellValue(TITULOS[c]);
+                if (!titulosFuera.contains(TITULOS[c])) {
+                    cabecera.createCell(c).setCellValue(TITULOS[c]);
+                }
             }
 
             int numFila = FILA_CABECERA + 1;

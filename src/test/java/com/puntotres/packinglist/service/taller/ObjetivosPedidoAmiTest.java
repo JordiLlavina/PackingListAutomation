@@ -173,6 +173,31 @@ class ObjetivosPedidoAmiTest {
     }
 
     @Test
+    void elAvisoDeUnaReferenciaSabeDeQueReferenciaHabla() {
+        // La pantalla de ajuste lo pinta dentro de la tarjeta de su
+        // referencia, y buscar el código dentro de la frase se caería en
+        // silencio el día que alguien reescribiera el texto.
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                PedidoAmiExcel.Fila.pedida("ULL1", "A236", "U", "07001 CH", 20));
+        LineaTaller linea = linea("NO-EXISTE", "0000", "U");
+
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(linea), pedido);
+
+        assertEquals(List.of("NO-EXISTE"), resultado.getDetalle().stream()
+                .map(AvisoTaller::referencia).toList());
+    }
+
+    @Test
+    void elAvisoDeUnExcelIlegibleNoEsDeNingunaReferencia() {
+        // Habla del fichero entero: va a la sección general de la pantalla.
+        ResultadoObjetivos resultado = new ObjetivosPedidoAmi(reglasDeAmi())
+                .objetivosPara(List.of(linea("ULL1", "A236", "U")), new byte[] {1, 2, 3});
+
+        assertTrue(resultado.getDetalle().stream().allMatch(a -> a.referencia() == null));
+    }
+
+    @Test
     void unColorQueNoEstaEnElPedidoAvisaAunqueLaReferenciaSiEste() {
         byte[] pedido = PedidoAmiExcel.crear("EAN H26",
                 PedidoAmiExcel.Fila.pedida("ULL1", "A236", "U", "07001 CH", 20));
