@@ -22,8 +22,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.seguridad.Seccion;
+import com.puntotres.packinglist.seguridad.Usuario;
+import com.puntotres.packinglist.seguridad.UsuarioRepository;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.ResumenTemporada;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
@@ -47,6 +51,30 @@ class TemporadasControllerTest {
     private MockMvc mvc;
 
     @Autowired
+    private UsuarioRepository usuarios;
+
+    /**
+     * La identidad con la que corren los tests de esta pantalla. Se da de alta
+     * con TODAS las secciones concedibles porque el interceptor lee los
+     * permisos de la base de datos, no del token, y lo que estos tests
+     * comprueban es el flujo de la pantalla, no los permisos: de eso se ocupa
+     * InterceptorPermisosTest, que los concede de uno en uno.
+     */
+    private OidcLoginRequestPostProcessor operario() {
+        usuarios.findByOidEntra("oid-test").orElseGet(() -> {
+            Usuario usuario = new Usuario("oid-test", "test@puntotres.com", "Operario de prueba");
+            for (Seccion seccion : Seccion.concedibles()) {
+                usuario.conceder(seccion);
+            }
+            return usuarios.saveAndFlush(usuario);
+        });
+        return oidcLogin().idToken(token -> token
+                .claim("oid", "oid-test")
+                .claim("name", "Operario de prueba")
+                .claim("email", "test@puntotres.com"));
+    }
+
+    @Autowired
     private ArchivoTemporadas archivo;
 
     private static MockMultipartFile pedido(String nombre, String contenido) {
@@ -56,7 +84,7 @@ class TemporadasControllerTest {
     /** Da de alta una temporada por la pantalla y devuelve su id. */
     private Long alta(String cliente, String temporada, String fichero) throws Exception {
         mvc.perform(multipart("/temporadas")
-                        .file(pedido(fichero, "pedido de " + temporada)).with(oidcLogin()).with(csrf())
+                        .file(pedido(fichero, "pedido de " + temporada)).with(operario()).with(csrf())
                         .param("cliente", cliente)
                         .param("temporada", temporada))
                 .andExpect(redirectedUrl("/temporadas"));
@@ -80,7 +108,7 @@ class TemporadasControllerTest {
     void laPantallaListaLasTemporadasGuardadas() throws Exception {
         alta("AMI", "H29", "EAN H29.xlsx");
 
-        mvc.perform(get("/temporadas").with(oidcLogin()))
+        mvc.perform(get("/temporadas").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("H29")))
                 .andExpect(content().string(containsString("EAN H29.xlsx")));
@@ -92,7 +120,7 @@ class TemporadasControllerTest {
         // el excel en el disco: es justo el trabajo que esto ahorra.
         Long id = alta("AMI", "H27", "EAN H27.xlsx");
 
-        mvc.perform(multipart("/temporadas").with(oidcLogin()).with(csrf())
+        mvc.perform(multipart("/temporadas").with(operario()).with(csrf())
                         .param("id", String.valueOf(id))
                         .param("cliente", "AMI")
                         .param("temporada", "H27 CORREGIDA"))
@@ -109,7 +137,7 @@ class TemporadasControllerTest {
         Long id = alta("AMI", "H28", "EAN H28.xlsx");
 
         mvc.perform(multipart("/temporadas")
-                        .file(pedido("EAN H28 v2.xlsx", "pedido corregido")).with(oidcLogin()).with(csrf())
+                        .file(pedido("EAN H28 v2.xlsx", "pedido corregido")).with(operario()).with(csrf())
                         .param("id", String.valueOf(id))
                         .param("cliente", "AMI")
                         .param("temporada", "H28"));
@@ -123,7 +151,7 @@ class TemporadasControllerTest {
     void borrarUnaTemporadaLaQuitaDelArchivo() throws Exception {
         Long id = alta("APC", "E27", "APC E27.xlsx");
 
-        mvc.perform(post("/temporadas/borrar").with(oidcLogin()).with(csrf()).param("id", String.valueOf(id)))
+        mvc.perform(post("/temporadas/borrar").with(operario()).with(csrf()).param("id", String.valueOf(id)))
                 .andExpect(redirectedUrl("/temporadas"));
 
         assertTrue(archivo.conFichero(id).isEmpty());
@@ -136,7 +164,7 @@ class TemporadasControllerTest {
         alta("APC", "E28", "APC E28.xlsx");
 
         mvc.perform(multipart("/temporadas")
-                        .file(pedido("otro.xlsx", "otro")).with(oidcLogin()).with(csrf())
+                        .file(pedido("otro.xlsx", "otro")).with(operario()).with(csrf())
                         .param("cliente", "APC")
                         .param("temporada", "e28"))
                 .andExpect(redirectedUrl("/temporadas"));
@@ -149,7 +177,7 @@ class TemporadasControllerTest {
 
     @Test
     void unaTemporadaSinExcelNoSeDaDeAlta() throws Exception {
-        mvc.perform(multipart("/temporadas").with(oidcLogin()).with(csrf())
+        mvc.perform(multipart("/temporadas").with(operario()).with(csrf())
                         .param("cliente", "AMI")
                         .param("temporada", "SIN FICHERO"))
                 .andExpect(redirectedUrl("/temporadas"));
@@ -162,7 +190,7 @@ class TemporadasControllerTest {
     @Test
     void unClienteQueNoTrabajaConExcelDePedidoNoTieneTemporadas() throws Exception {
         mvc.perform(multipart("/temporadas")
-                        .file(pedido("pedido.xlsx", "x")).with(oidcLogin()).with(csrf())
+                        .file(pedido("pedido.xlsx", "x")).with(operario()).with(csrf())
                         .param("cliente", "ACKERMANN")
                         .param("temporada", "H26"))
                 .andExpect(redirectedUrl("/temporadas"));
@@ -177,7 +205,7 @@ class TemporadasControllerTest {
         // el JS de la pantalla revienta entero, no solo esta parte.
         alta("AMI", "H31", "EAN H31.xlsx");
 
-        mvc.perform(get("/packing-list").with(oidcLogin()))
+        mvc.perform(get("/packing-list").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"temporadaGuardada\"")))
                 .andExpect(content().string(containsString("href=\"/temporadas\"")))
@@ -186,7 +214,7 @@ class TemporadasControllerTest {
 
     @Test
     void elMenuLlevaAlArchivoDeTemporadas() throws Exception {
-        mvc.perform(get("/menu").with(oidcLogin()))
+        mvc.perform(get("/menu").with(operario()))
                 .andExpect(content().string(containsString("href=\"/temporadas\"")))
                 .andExpect(content().string(containsString("Guarda Temporadas y Ficheros")));
     }
@@ -229,7 +257,7 @@ class TemporadasControllerTest {
                 .getResourceAsStream("/client-packinglist/packing_list_ami_test.json")) {
             json = new String(entrada.readAllBytes());
         }
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", cliente)
                         .param("json", json)
                         .param("temporada", "H26")

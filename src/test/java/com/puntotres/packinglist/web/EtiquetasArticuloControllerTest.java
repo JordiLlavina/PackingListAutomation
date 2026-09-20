@@ -23,8 +23,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.seguridad.Seccion;
+import com.puntotres.packinglist.seguridad.Usuario;
+import com.puntotres.packinglist.seguridad.UsuarioRepository;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel.Fila;
 
@@ -47,6 +51,30 @@ class EtiquetasArticuloControllerTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private UsuarioRepository usuarios;
+
+    /**
+     * La identidad con la que corren los tests de esta pantalla. Se da de alta
+     * con TODAS las secciones concedibles porque el interceptor lee los
+     * permisos de la base de datos, no del token, y lo que estos tests
+     * comprueban es el flujo de la pantalla, no los permisos: de eso se ocupa
+     * InterceptorPermisosTest, que los concede de uno en uno.
+     */
+    private OidcLoginRequestPostProcessor operario() {
+        usuarios.findByOidEntra("oid-test").orElseGet(() -> {
+            Usuario usuario = new Usuario("oid-test", "test@puntotres.com", "Operario de prueba");
+            for (Seccion seccion : Seccion.concedibles()) {
+                usuario.conceder(seccion);
+            }
+            return usuarios.saveAndFlush(usuario);
+        });
+        return oidcLogin().idToken(token -> token
+                .claim("oid", "oid-test")
+                .claim("name", "Operario de prueba")
+                .claim("email", "test@puntotres.com"));
+    }
+
     /** Un pedido de AMI con un "/" en la columna Made in: el dato conflictivo. */
     private static byte[] pedidoConMadeInProblematico() {
         return PedidoAmiExcel.crear("EAN H26",
@@ -59,7 +87,7 @@ class EtiquetasArticuloControllerTest {
         mvc.perform(multipart("/etiquetas-articulo-produccion/generar")
                         .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                pedidoConMadeInProblematico())).with(oidcLogin()).with(csrf())
+                                pedidoConMadeInProblematico())).with(operario()).with(csrf())
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
                         .session(sesion))
@@ -72,7 +100,7 @@ class EtiquetasArticuloControllerTest {
     void unMadeInConBarraNoRompeLaPantallaDeResultadosNiElNombreDeFichero() throws Exception {
         MockHttpSession sesion = generarConMadeInProblematico();
 
-        String html = mvc.perform(get("/etiquetas-articulo-produccion/resultados").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/etiquetas-articulo-produccion/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -90,7 +118,7 @@ class EtiquetasArticuloControllerTest {
     void unMadeInConBarraSeDescargaConElNombreSaneado() throws Exception {
         MockHttpSession sesion = generarConMadeInProblematico();
 
-        mvc.perform(get("/etiquetas-articulo-produccion/descargar/AMI CODE BARRE H26 MOROCCO_TEST.xlsx").with(oidcLogin())
+        mvc.perform(get("/etiquetas-articulo-produccion/descargar/AMI CODE BARRE H26 MOROCCO_TEST.xlsx").with(operario())
                         .session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(
@@ -101,7 +129,7 @@ class EtiquetasArticuloControllerTest {
     void unMadeInConBarraNoGeneraUnaEntradaDeZipConSubdirectorio() throws Exception {
         MockHttpSession sesion = generarConMadeInProblematico();
 
-        byte[] zip = mvc.perform(get("/etiquetas-articulo-produccion/descargar-todo").with(oidcLogin()).session(sesion))
+        byte[] zip = mvc.perform(get("/etiquetas-articulo-produccion/descargar-todo").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/zip"))
                 .andReturn().getResponse().getContentAsByteArray();
@@ -120,7 +148,7 @@ class EtiquetasArticuloControllerTest {
 
     @Test
     void laPantallaOfreceAmiDisponibleYElRestoEnDesarrollo() throws Exception {
-        mvc.perform(get("/etiquetas-articulo-produccion").with(oidcLogin()))
+        mvc.perform(get("/etiquetas-articulo-produccion").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Introducir excel del pedido de AMI")))
                 .andExpect(content().string(containsString("en desarrollo")));

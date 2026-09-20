@@ -22,7 +22,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.puntotres.packinglist.seguridad.Seccion;
+import com.puntotres.packinglist.seguridad.Usuario;
+import com.puntotres.packinglist.seguridad.UsuarioRepository;
 
 /**
  * Flujo web del procesado de escandallos con los beans reales.
@@ -41,6 +46,30 @@ class EscandallosControllerTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private UsuarioRepository usuarios;
+
+    /**
+     * La identidad con la que corren los tests de esta pantalla. Se da de alta
+     * con TODAS las secciones concedibles porque el interceptor lee los
+     * permisos de la base de datos, no del token, y lo que estos tests
+     * comprueban es el flujo de la pantalla, no los permisos: de eso se ocupa
+     * InterceptorPermisosTest, que los concede de uno en uno.
+     */
+    private OidcLoginRequestPostProcessor operario() {
+        usuarios.findByOidEntra("oid-test").orElseGet(() -> {
+            Usuario usuario = new Usuario("oid-test", "test@puntotres.com", "Operario de prueba");
+            for (Seccion seccion : Seccion.concedibles()) {
+                usuario.conceder(seccion);
+            }
+            return usuarios.saveAndFlush(usuario);
+        });
+        return oidcLogin().idToken(token -> token
+                .claim("oid", "oid-test")
+                .claim("name", "Operario de prueba")
+                .claim("email", "test@puntotres.com"));
+    }
+
     private static MockMultipartFile escandalloReal(String nombre) throws Exception {
         String ruta = "/ejemplos/escandallos/" + nombre;
         try (InputStream entrada = EscandallosControllerTest.class.getResourceAsStream(ruta)) {
@@ -55,14 +84,14 @@ class EscandallosControllerTest {
 
     @Test
     void laPantallaDeEntradaPideLosExcelsDeEscandallo() throws Exception {
-        mvc.perform(get("/clickup").with(oidcLogin()))
+        mvc.perform(get("/clickup").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Escandallos para ClickUp")));
     }
 
     @Test
     void elMenuEnlazaLaPantallaDeEscandallos() throws Exception {
-        mvc.perform(get("/menu").with(oidcLogin()))
+        mvc.perform(get("/menu").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/clickup")));
     }
@@ -71,7 +100,7 @@ class EscandallosControllerTest {
     void sinAvisosSeDescargaElExcelDirectamente() throws Exception {
         byte[] excel = mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
-                        .file(escandalloReal("ULL770 SAND.xlsx")).with(oidcLogin()).with(csrf()))
+                        .file(escandalloReal("ULL770 SAND.xlsx")).with(operario()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
                         containsString("Escandallos ICSUITE.xlsx")))
@@ -87,7 +116,7 @@ class EscandallosControllerTest {
     void conAvisosSeVuelveALaPantallaConLaListaYElBotonDeDescargar() throws Exception {
         mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
-                        .file(basura("roto.xlsx")).with(oidcLogin()).with(csrf())
+                        .file(basura("roto.xlsx")).with(operario()).with(csrf())
                         .session(new MockHttpSession()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("roto.xlsx")))
@@ -100,11 +129,11 @@ class EscandallosControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
-                        .file(basura("roto.xlsx")).with(oidcLogin()).with(csrf())
+                        .file(basura("roto.xlsx")).with(operario()).with(csrf())
                         .session(sesion))
                 .andExpect(status().isOk());
 
-        byte[] excel = mvc.perform(get("/clickup/descargar").with(oidcLogin()).session(sesion))
+        byte[] excel = mvc.perform(get("/clickup/descargar").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
 
@@ -115,7 +144,7 @@ class EscandallosControllerTest {
 
     @Test
     void siNingunFicheroEsUtilizableSeQuedaEnLaPantallaConElError() throws Exception {
-        mvc.perform(multipart("/clickup/procesar").file(basura("roto.xlsx")).with(oidcLogin()).with(csrf()))
+        mvc.perform(multipart("/clickup/procesar").file(basura("roto.xlsx")).with(operario()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("roto.xlsx")))
                 .andExpect(content().string(containsString("No se ha podido procesar")));
@@ -123,14 +152,14 @@ class EscandallosControllerTest {
 
     @Test
     void sinFicherosSeAvisaEnVezDeGenerarUnExcelVacio() throws Exception {
-        mvc.perform(multipart("/clickup/procesar").with(oidcLogin()).with(csrf()))
+        mvc.perform(multipart("/clickup/procesar").with(operario()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("ningún excel de escandallo")));
     }
 
     @Test
     void descargarSinNadaEnSesionVuelveALaPantalla() throws Exception {
-        mvc.perform(get("/clickup/descargar").with(oidcLogin()).session(new MockHttpSession()))
+        mvc.perform(get("/clickup/descargar").with(operario()).session(new MockHttpSession()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/clickup"));
     }

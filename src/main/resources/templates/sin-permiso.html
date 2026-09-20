@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Sin permiso')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Sin permiso')}"></header>
+<main>
+    <section class="tarjeta">
+        <h2 th:if="${rotuloSeccion}" th:text="|No tienes acceso a ${rotuloSeccion}|">Sin acceso</h2>
+        <h2 th:unless="${rotuloSeccion}">No tienes acceso a esta parte</h2>
+        <p>
+            Tu cuenta ha entrado bien, pero esta sección no está concedida.
+            Pídesela a quien administra la aplicación y volverá a aparecer en el menú.
+        </p>
+        <a class="boton" th:href="@{/menu}">Volver al menú</a>
+    </section>
+</main>
+</body>
+</html>

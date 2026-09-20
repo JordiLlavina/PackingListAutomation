@@ -11,7 +11,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
+
+import com.puntotres.packinglist.seguridad.Seccion;
+import com.puntotres.packinglist.seguridad.Usuario;
+import com.puntotres.packinglist.seguridad.UsuarioRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -20,16 +25,40 @@ class RutasTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private UsuarioRepository usuarios;
+
+    /**
+     * La identidad con la que corren los tests de esta pantalla. Se da de alta
+     * con TODAS las secciones concedibles porque el interceptor lee los
+     * permisos de la base de datos, no del token, y lo que estos tests
+     * comprueban es el flujo de la pantalla, no los permisos: de eso se ocupa
+     * InterceptorPermisosTest, que los concede de uno en uno.
+     */
+    private OidcLoginRequestPostProcessor operario() {
+        usuarios.findByOidEntra("oid-test").orElseGet(() -> {
+            Usuario usuario = new Usuario("oid-test", "test@puntotres.com", "Operario de prueba");
+            for (Seccion seccion : Seccion.concedibles()) {
+                usuario.conceder(seccion);
+            }
+            return usuarios.saveAndFlush(usuario);
+        });
+        return oidcLogin().idToken(token -> token
+                .claim("oid", "oid-test")
+                .claim("name", "Operario de prueba")
+                .claim("email", "test@puntotres.com"));
+    }
+
     @Test
     void laRaizLlevaAlMenu() throws Exception {
-        mvc.perform(get("/").with(oidcLogin()))
+        mvc.perform(get("/").with(operario()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/menu"));
     }
 
     @Test
     void elMenuMuestraLasDosSecciones() throws Exception {
-        mvc.perform(get("/menu").with(oidcLogin()))
+        mvc.perform(get("/menu").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("menu"))
                 // Que sean href de un enlace, no solo texto suelto en la página.
@@ -44,7 +73,7 @@ class RutasTest {
         // Sin esto el navegador se queda con la copia vieja de estilo.css tras
         // cada cambio de estilos y hay que vaciar la caché a mano: un fallo
         // invisible desde el código, que solo se nota mirando la pantalla.
-        mvc.perform(get("/menu").with(oidcLogin()))
+        mvc.perform(get("/menu").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(
                         org.hamcrest.Matchers.matchesPattern(
@@ -56,7 +85,7 @@ class RutasTest {
         // El <link> y el PNG viven en sitios distintos —plantilla y static/—,
         // así que borrar uno deja al otro apuntando al vacío y el navegador se
         // limita a poner el icono en blanco, sin decir nada.
-        mvc.perform(get("/menu").with(oidcLogin()))
+        mvc.perform(get("/menu").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(
                         org.hamcrest.Matchers.matchesPattern(
@@ -128,35 +157,35 @@ class RutasTest {
 
     @Test
     void elAsistenteDePackingListViveEnSuPropiaRuta() throws Exception {
-        mvc.perform(get("/packing-list").with(oidcLogin()))
+        mvc.perform(get("/packing-list").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("entrada"));
     }
 
     @Test
     void laPantallaDeTarasResponde() throws Exception {
-        mvc.perform(get("/taras").with(oidcLogin()))
+        mvc.perform(get("/taras").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("taras"));
     }
 
     @Test
     void elMenuEnlazaLasTaras() throws Exception {
-        mvc.perform(get("/menu").with(oidcLogin()))
+        mvc.perform(get("/menu").with(operario()))
                 .andExpect(content().string(
                         org.hamcrest.Matchers.containsString("href=\"/taras\"")));
     }
 
     @Test
     void elAjusteDelTallerSinEntregaEnCursoDevuelveALaEntrada() throws Exception {
-        mvc.perform(get("/packing-list/taller/ajuste").with(oidcLogin()))
+        mvc.perform(get("/packing-list/taller/ajuste").with(operario()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
 
     @Test
     void sinEnvioEnCursoLaRevisionVuelveAlPasoUno() throws Exception {
-        mvc.perform(get("/revision").with(oidcLogin()))
+        mvc.perform(get("/revision").with(operario()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
@@ -165,7 +194,7 @@ class RutasTest {
     void lasEtiquetasDeArticuloAbrenSuPropioMenu() throws Exception {
         // Producción es lo único hecho; SMS y prototipos se enseñan apagados
         // en vez de esconderlos, para que se vea que están contemplados.
-        mvc.perform(get("/etiquetas-articulo").with(oidcLogin()))
+        mvc.perform(get("/etiquetas-articulo").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("etiquetas-articulo"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
@@ -177,7 +206,7 @@ class RutasTest {
 
     @Test
     void laPantallaDeEtiquetasDeArticuloOfreceElFormulario() throws Exception {
-        mvc.perform(get("/etiquetas-articulo-produccion").with(oidcLogin()))
+        mvc.perform(get("/etiquetas-articulo-produccion").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("etiquetas-articulo-produccion"))
                 // El desplegable y el input del excel de pedido.
@@ -187,7 +216,7 @@ class RutasTest {
 
     @Test
     void sinNadaGeneradoLosResultadosVuelvenAlFormulario() throws Exception {
-        mvc.perform(get("/etiquetas-articulo-produccion/resultados").with(oidcLogin()))
+        mvc.perform(get("/etiquetas-articulo-produccion/resultados").with(operario()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/etiquetas-articulo-produccion"));
     }
@@ -196,7 +225,7 @@ class RutasTest {
     void laCabeceraDiceEnQueSeccionEstasYLaMarcaVuelveAlMenu() throws Exception {
         // El título de la barra era siempre el mismo, así que no informaba de
         // nada; ahora nombra la sección y el enlace de vuelta es la marca.
-        String html = mvc.perform(get("/taras").with(oidcLogin()))
+        String html = mvc.perform(get("/taras").with(operario()))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 

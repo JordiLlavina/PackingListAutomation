@@ -35,8 +35,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.seguridad.Seccion;
+import com.puntotres.packinglist.seguridad.Usuario;
+import com.puntotres.packinglist.seguridad.UsuarioRepository;
 import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
 import com.puntotres.packinglist.persistence.TaraCajaRepository;
 import com.puntotres.packinglist.service.etiquetas.AvisoEtiqueta;
@@ -68,6 +72,30 @@ class PackingListControllerTest {
     private MockMvc mvc;
 
     @Autowired
+    private UsuarioRepository usuarios;
+
+    /**
+     * La identidad con la que corren los tests de esta pantalla. Se da de alta
+     * con TODAS las secciones concedibles porque el interceptor lee los
+     * permisos de la base de datos, no del token, y lo que estos tests
+     * comprueban es el flujo de la pantalla, no los permisos: de eso se ocupa
+     * InterceptorPermisosTest, que los concede de uno en uno.
+     */
+    private OidcLoginRequestPostProcessor operario() {
+        usuarios.findByOidEntra("oid-test").orElseGet(() -> {
+            Usuario usuario = new Usuario("oid-test", "test@puntotres.com", "Operario de prueba");
+            for (Seccion seccion : Seccion.concedibles()) {
+                usuario.conceder(seccion);
+            }
+            return usuarios.saveAndFlush(usuario);
+        });
+        return oidcLogin().idToken(token -> token
+                .claim("oid", "oid-test")
+                .claim("name", "Operario de prueba")
+                .claim("email", "test@puntotres.com"));
+    }
+
+    @Autowired
     private CatalogoTarasJpa catalogo;
 
     @Autowired
@@ -94,7 +122,7 @@ class PackingListControllerTest {
 
     /** POST /importar con el JSON de fixture y cabecera válida. */
     private void importar(MockHttpSession sesion) throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI")
                         .param("json", jsonDePrueba())
                         .param("temporada", "H26")
@@ -108,7 +136,7 @@ class PackingListControllerTest {
 
     @Test
     void laPantallaDeEntradaRenderizaElFormularioConElDesplegableDeClientes() throws Exception {
-        mvc.perform(get("/packing-list").with(oidcLogin()))
+        mvc.perform(get("/packing-list").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(view().name("entrada"))
                 .andExpect(content().string(containsString("JSON del envío")))
@@ -123,7 +151,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(view().name("revision"))
                 // Los avisos de descuadre que el fixture contiene a propósito.
@@ -158,13 +186,13 @@ class PackingListControllerTest {
                    "pedido":"07713","cantidadTotal":25,
                    "cajas":[{"caja":2,"unidades":25,"pesoBruto":8.2}]}]}]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI").param("json", json)
                         .param("temporada", "H26").param("numeroFactura", "FA-26-1189")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
 
-        String html = mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -194,7 +222,7 @@ class PackingListControllerTest {
         // que ponga el papel— y el aviso saltaba sin que hubiera nada que
         // hacer con él, empujando hacia abajo los que sí hay que leer.
         MockHttpSession sesion = new MockHttpSession();
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "ACKERMANN")
                         .param("json", jsonDePrueba())
                         .param("temporada", "SPRING 25")
@@ -203,7 +231,7 @@ class PackingListControllerTest {
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("has seleccionado"))));
     }
@@ -221,7 +249,7 @@ class PackingListControllerTest {
                     "cajas": [{"cajaInicio": 1, "cajaFin": 2, "unidadesPorCaja": 50},
                               {"cajaInicio": 3, "cajaFin": 3, "unidadesPorCaja": 10}]}]}]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("modo", "FORMULARIO")
                         .param("cliente", "AMI")
                         .param("json", json)
@@ -233,7 +261,7 @@ class PackingListControllerTest {
 
         // Las 3 cajas expandidas (el rango de 1 incluido), sin avisos de
         // descuadre porque cantidadTotal cuadra (2*50 + 10 = 110).
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("PARIS")))
                 .andExpect(content().string(containsString("USL728.AL217")))
@@ -242,7 +270,7 @@ class PackingListControllerTest {
 
     @Test
     void importarEnModoFormularioVacioExplicaElErrorSinHablarDeJson() throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf())
+        mvc.perform(post("/importar").with(operario()).with(csrf())
                         .param("modo", "FORMULARIO")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -257,7 +285,7 @@ class PackingListControllerTest {
 
     @Test
     void importarSinClienteFallaLaValidacionDelCampo() throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf())
+        mvc.perform(post("/importar").with(operario()).with(csrf())
                         .param("json", "{}")
                         .param("temporada", "H26")
                         .param("numeroFactura", "FA-1")
@@ -270,7 +298,7 @@ class PackingListControllerTest {
 
     @Test
     void importarConJsonInvalidoVuelveALaEntradaConElTextoPreservado() throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf())
+        mvc.perform(post("/importar").with(operario()).with(csrf())
                         .param("cliente", "AMI")
                         .param("json", "{esto no es json")
                         .param("temporada", "H26")
@@ -285,7 +313,7 @@ class PackingListControllerTest {
 
     @Test
     void importarConFechaMalFormadaFallaLaValidacionDelCampo() throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf())
+        mvc.perform(post("/importar").with(operario()).with(csrf())
                         .param("cliente", "AMI")
                         .param("json", "{}")
                         .param("temporada", "H26")
@@ -300,7 +328,7 @@ class PackingListControllerTest {
 
     @Test
     void revisionSinEnvioEnCursoRedirigeALaEntrada() throws Exception {
-        mvc.perform(get("/revision").with(oidcLogin()))
+        mvc.perform(get("/revision").with(operario()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
@@ -313,13 +341,13 @@ class PackingListControllerTest {
         // Bruto de la caja 1 de PARIS (índice 0; 50 uds, 60x40x40, tara 0.6)
         // puesto a mano: peso unitario (50.6-0.6)/50 = 1.0 -> la caja 32
         // (47 uds) debe quedar con neto 47.0 y bruto 47.6.
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].pesoBrutoKg", "50.6"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"47.0\"")))
                 .andExpect(content().string(containsString("value=\"47.6\"")));
@@ -333,13 +361,13 @@ class PackingListControllerTest {
         // Solo el NETO de la caja 1 de PARIS: unitario 50.0/50 = 1.0 ->
         // la caja 32 (47 uds) queda igual que en el caso del bruto, y la
         // propia caja 1 completa su bruto (50.0 + tara 0.6).
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].pesoNetoKg", "50.0"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"50.6\"")))
                 .andExpect(content().string(containsString("value=\"47.0\"")));
@@ -353,7 +381,7 @@ class PackingListControllerTest {
         // En PARIS la caja 33 tiene DOS líneas (colores ROJO y NOIR): es UN
         // bulto con un solo peso, el de su primera línea (índice 32). El
         // formulario localiza la fila por posición, no por nº de caja.
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "32")
                         .param("cajas[0].pesoNetoKg", "68.0"))
@@ -390,7 +418,7 @@ class PackingListControllerTest {
                      "cajas": [{"caja": 10, "unidades": 50}]}]}
                 ]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI").param("json", json)
                         .param("temporada", "H26").param("numeroFactura", "FA-1")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
@@ -398,7 +426,7 @@ class PackingListControllerTest {
 
         // Neto a mano de la caja de PARIS (destino 0, índice 0): unitario
         // 50.0 / 50 = 1.0 kg.
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].pesoNetoKg", "50.0"))
@@ -421,7 +449,7 @@ class PackingListControllerTest {
         try (var in = getClass().getResourceAsStream("/ejemplos/envio-ami-bags-y-belts.json")) {
             json = new String(in.readAllBytes());
         }
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI").param("json", json)
                         .param("temporada", "H26").param("numeroFactura", "FA-1")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
@@ -459,13 +487,13 @@ class PackingListControllerTest {
                      "pedido": "07672", "talla": "105", "cajas": [{"caja": 5, "unidades": 3}]}
                   ]}]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI").param("json", json)
                         .param("temporada", "H26").param("numeroFactura", "FA-1")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
 
-        String html = mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -493,7 +521,7 @@ class PackingListControllerTest {
             """;
 
     private void importarCincoCajasIguales(MockHttpSession sesion) throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI").param("json", JSON_CINCO_CAJAS_IGUALES)
                         .param("temporada", "H26").param("numeroFactura", "FA-1")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
@@ -505,7 +533,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarCincoCajasIguales(sesion);
 
-        String html = mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 // El rango en la columna CAJA, y el encabezado sigue contando
                 // las 5 cajas físicas aunque solo haya una fila.
@@ -526,7 +554,7 @@ class PackingListControllerTest {
         importarCincoCajasIguales(sesion);
 
         // Lo que manda la fila "1-5": un peso y los cinco índices.
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0", "1", "2", "3", "4")
                         .param("cajas[0].pesoBrutoKg", "5.6"))
@@ -545,7 +573,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarCincoCajasIguales(sesion);
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0", "1", "2", "3", "4")
                         .param("cajas[0].codigoColor", "ROJO"))
@@ -562,7 +590,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].numeroCaja", "77")
@@ -597,7 +625,7 @@ class PackingListControllerTest {
         String referenciaOriginal = caja.getReferencia();
         int cantidadOriginal = caja.getCantidad();
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].referencia", "")
@@ -615,7 +643,7 @@ class PackingListControllerTest {
         // 99x99x99 no tiene tara: con el bruto tecleado el neto no se puede
         // derivar. El tamaño está mal leído y se corrige desde la revisión.
         importarCincoCajasIguales(sesion);
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].pesoBrutoKg", "11.0"))
@@ -625,7 +653,7 @@ class PackingListControllerTest {
         var caja = envio.getImportado().getDestinos().get(0).getDestino().getCajas().get(0);
         assertNull(caja.getPesoNetoKg());
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].tamanoCaja", "60x40x40"))
@@ -645,22 +673,22 @@ class PackingListControllerTest {
                     "medidaCaja": "60x40x40", "pedido": "P1",
                     "cajas": [{"caja": 1, "unidades": 10}, {"caja": 2, "unidades": 10}]}]}]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI").param("json", json)
                         .param("temporada", "H26").param("numeroFactura", "FA-1")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(content().string(containsString("Sin palet")));
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "1")
                         .param("cajas[0].numeroPalet", "1"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(content().string(not(containsString("Sin palet"))));
     }
 
@@ -669,14 +697,14 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarCincoCajasIguales(sesion);
 
-        mvc.perform(post("/alternar-fila").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/alternar-fila").with(operario()).with(csrf()).session(sesion)
                         .param("destino", "0").param("indice", "0")
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0", "1", "2", "3", "4")
                         .param("cajas[0].codigoColor", "ROJO"))
                 .andExpect(redirectedUrl("/revision"));
 
-        String html = mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -690,12 +718,12 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarCincoCajasIguales(sesion);
 
-        mvc.perform(post("/alternar-fila").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/alternar-fila").with(operario()).with(csrf()).session(sesion)
                         .param("destino", "0").param("indice", "0"));
-        mvc.perform(post("/alternar-fila").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/alternar-fila").with(operario()).with(csrf()).session(sesion)
                         .param("destino", "0").param("indice", "0"));
 
-        String html = mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString(">1-5<")))
                 .andReturn().getResponse().getContentAsString();
@@ -710,7 +738,7 @@ class PackingListControllerTest {
         // cambiaría el tamaño del envío en silencio por el primero de la lista.
         importarCincoCajasIguales(sesion);
 
-        String html = mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString()
                 .replaceAll("\\s+", " ");
@@ -723,7 +751,7 @@ class PackingListControllerTest {
 
     @Test
     void alternarFilaSinEnvioEnCursoRedirigeALaEntrada() throws Exception {
-        mvc.perform(post("/alternar-fila").with(oidcLogin()).with(csrf()).param("destino", "0").param("indice", "0"))
+        mvc.perform(post("/alternar-fila").with(operario()).with(csrf()).param("destino", "0").param("indice", "0"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
@@ -746,7 +774,7 @@ class PackingListControllerTest {
                     "medidaCaja": "99x99x99", "pedido": "P1",
                     "cajas": [{"caja": 1, "unidades": 10}, {"caja": 2, "unidades": 10}]}]}]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI")
                         .param("json", json)
                         .param("temporada", "H26")
@@ -757,13 +785,13 @@ class PackingListControllerTest {
 
         // Con un peso tecleado, el tamaño sin tara impide inferir: la
         // revisión debe decirlo, no callar.
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].pesoBrutoKg", "11.0"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("99x99x99")))
                 // El aviso manda a la pantalla de taras, NO a application.yml:
@@ -792,7 +820,7 @@ class PackingListControllerTest {
                     {"referencia": "R1", "color": "NOIR", "pedido": "P1",
                      "cajas": [{"caja": 2, "unidades": 10, "pesoBruto": 9.0}]}]}]}
                 """;
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "AMI")
                         .param("json", json)
                         .param("temporada", "H26")
@@ -801,13 +829,13 @@ class PackingListControllerTest {
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Cajas sin medida")))
                 .andExpect(content().string(containsString("TAMAÑO")));
 
         // Y generar NO falla: se va a resultados, no de vuelta con un error.
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"))
                 .andExpect(flash().attribute("error", (Object) null));
     }
@@ -817,11 +845,11 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
         // PARIS tiene 3 combinaciones referencia+color, JAPAN 2 y CHINA 1.
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(view().name("resultados"))
                 .andExpect(content().string(containsString(FICHERO_PARIS_USL728)))
@@ -830,7 +858,7 @@ class PackingListControllerTest {
                 .andExpect(content().string(containsString(
                         "2026.07.24_PUN_07713_USL737.ACO137.NOIR_H26_CHINA.xlsx")));
 
-        byte[] excel = mvc.perform(get("/descargar/" + FICHERO_PARIS_USL728).with(oidcLogin()).session(sesion))
+        byte[] excel = mvc.perform(get("/descargar/" + FICHERO_PARIS_USL728).with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
@@ -841,7 +869,7 @@ class PackingListControllerTest {
             assertEquals("USL728.AL217", hoja.getRow(19).getCell(2).getStringCellValue()); // C20
         }
 
-        byte[] zip = mvc.perform(get("/descargar-todo").with(oidcLogin()).session(sesion))
+        byte[] zip = mvc.perform(get("/descargar-todo").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/zip"))
                 .andReturn().getResponse().getContentAsByteArray();
@@ -860,15 +888,15 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
         // El volcado queda en sesión y expuesto a la vista de resultados.
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(model().attributeExists("volcadoErp"));
 
-        byte[] excel = mvc.perform(get("/descargar-volcado-erp").with(oidcLogin()).session(sesion))
+        byte[] excel = mvc.perform(get("/descargar-volcado-erp").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
@@ -891,7 +919,7 @@ class PackingListControllerTest {
     void descargarElVolcadoSinHaberGeneradoDevuelve404() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
-        mvc.perform(get("/descargar-volcado-erp").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/descargar-volcado-erp").with(operario()).session(sesion))
                 .andExpect(status().isNotFound());
     }
 
@@ -901,7 +929,7 @@ class PackingListControllerTest {
     private MockHttpSession sesionConEnvioGenerado() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
         return sesion;
     }
@@ -923,12 +951,12 @@ class PackingListControllerTest {
     void generarDejaLasEtiquetasListasEnResultados() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();
 
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Etiquetas_AMI_PARIS_FA-26-1189.xlsx")));
 
         byte[] excel = mvc.perform(
-                        get("/descargar-etiquetas/Etiquetas_AMI_PARIS_FA-26-1189.xlsx").with(oidcLogin())
+                        get("/descargar-etiquetas/Etiquetas_AMI_PARIS_FA-26-1189.xlsx").with(operario())
                                 .session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(
@@ -948,7 +976,7 @@ class PackingListControllerTest {
     void sinElExcelDePedidoLasEtiquetasAvisanEnVezDeGenerarse() throws Exception {
         MockHttpSession sesion = sesionConEnvioGenerado();
 
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Falta el excel del pedido de AMI")))
                 .andExpect(content().string(not(containsString("Etiquetas_AMI_"))))
@@ -964,7 +992,7 @@ class PackingListControllerTest {
     @Test
     void laTarjetaDeEtiquetasDiceConQueExcelDePedidoSeGeneraron() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("AMI EAN H26.xlsx")));
     }
@@ -973,7 +1001,7 @@ class PackingListControllerTest {
     @Test
     void elPasoIntermedioDeEtiquetasYaNoExiste() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();
-        mvc.perform(get("/etiquetas").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/etiquetas").with(operario()).session(sesion))
                 .andExpect(status().isNotFound());
     }
 
@@ -981,7 +1009,7 @@ class PackingListControllerTest {
     @Test
     void losAvisosDeEtiquetasNoLlevanPrefijo() throws Exception {
         MockHttpSession sesion = sesionConEnvioGenerado();
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(not(containsString("Etiquetas: "))));
     }
@@ -999,7 +1027,7 @@ class PackingListControllerTest {
     void losAvisosDeEtiquetasLleganAgrupadosPorDestinacion() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();
 
-        String html = mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        String html = mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -1042,13 +1070,13 @@ class PackingListControllerTest {
         mvc.perform(multipart("/importar")
                         .file(new MockMultipartFile("pedidoCliente", "AMI EAN H26.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                pedidoAmiDelFixture())).with(oidcLogin()).with(csrf())
+                                pedidoAmiDelFixture())).with(operario()).with(csrf())
                         .session(sesion)
                         .param("cliente", "AMI").param("json", jsonDePrueba())
                         .param("temporada", "H26").param("numeroFactura", "FA-26-1189")
                         .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
         return sesion;
     }
@@ -1061,10 +1089,10 @@ class PackingListControllerTest {
     void regenerarRehaceLasEtiquetasConElPedidoDeLaSesion() throws Exception {
         MockHttpSession sesion = sesionConEnvioYPedidoSubido();
 
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Etiquetas_AMI_PARIS_FA-26-1189.xlsx")));
     }
@@ -1074,7 +1102,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         // El fixture es de AMI, pero generamos como ACKERMANN (genérico):
         // avisa sin bloquear y no tiene etiquetas implementadas.
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "ACKERMANN")
                         .param("json", jsonDePrueba())
                         .param("temporada", "SPRING 25")
@@ -1082,10 +1110,10 @@ class PackingListControllerTest {
                         .param("fechaFactura", "10/07/2026")
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("En desarrollo")));
     }
@@ -1104,7 +1132,7 @@ class PackingListControllerTest {
     }
 
     private void importarApc(MockHttpSession sesion, String destino) throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "APC")
                         .param("json", jsonApcConDestino(destino))
                         .param("temporada", "E25")
@@ -1113,7 +1141,7 @@ class PackingListControllerTest {
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/revision"));
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
     }
 
@@ -1123,7 +1151,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarApc(sesion, "JAPAN");
 
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Etiquetas_APC_JAPAN_FA-26-1.xlsx")));
     }
@@ -1135,7 +1163,7 @@ class PackingListControllerTest {
         // sin etiquetas implementadas.
         importarApc(sesion, "IVRY");
 
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("sin etiquetas de APC implementadas")))
                 .andExpect(content().string(not(containsString("Etiquetas_APC_"))));
@@ -1168,7 +1196,7 @@ class PackingListControllerTest {
             """;
 
     private void importarJsonApc(MockHttpSession sesion, String json) throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "APC")
                         .param("json", json)
                         .param("temporada", "E25")
@@ -1183,11 +1211,11 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarJsonApc(sesion, JSON_APC_JAPAN_Y_DESCONOCIDA);
 
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/resultados"));
 
         // JAPAN se genera; HONG KONG sale como aviso, no como error.
-        mvc.perform(get("/resultados").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/resultados").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("PKL_APC_JAPAN_FA-26-2.xlsx")))
                 .andExpect(content().string(containsString("HONG KONG")))
@@ -1201,7 +1229,7 @@ class PackingListControllerTest {
         importarJsonApc(sesion, JSON_APC_JAPAN_Y_DESCONOCIDA
                 .replace("\"JAPAN\"", "\"SINGAPORE\""));
 
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion))
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion))
                 .andExpect(redirectedUrl("/revision"))
                 .andExpect(flash().attribute("error", containsString("packing no generado")))
                 .andExpect(flash().attribute("error", containsString("HONG KONG")));
@@ -1211,9 +1239,9 @@ class PackingListControllerTest {
     void descargarUnFicheroQueNoExisteDevuelve404() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
-        mvc.perform(post("/generar").with(oidcLogin()).with(csrf()).session(sesion));
+        mvc.perform(post("/generar").with(operario()).with(csrf()).session(sesion));
 
-        mvc.perform(get("/descargar/NO_EXISTE.xlsx").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/descargar/NO_EXISTE.xlsx").with(operario()).session(sesion))
                 .andExpect(status().isNotFound());
     }
 
@@ -1231,7 +1259,7 @@ class PackingListControllerTest {
 
     /** POST /importar de un envío de APC a Australia, una hija de WHOLESALE. */
     private void importarApcAustralia(MockHttpSession sesion) throws Exception {
-        mvc.perform(post("/importar").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/importar").with(operario()).with(csrf()).session(sesion)
                         .param("cliente", "APC").param("json", JSON_APC_AUSTRALIA)
                         .param("temporada", "E25").param("numeroFactura", "FA-1")
                         .param("fechaFactura", "28/04/2026").param("fechaEnvio", "28/04/2026"))
@@ -1239,7 +1267,7 @@ class PackingListControllerTest {
     }
 
     private String revision(MockHttpSession sesion) throws Exception {
-        return mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        return mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
     }
@@ -1248,7 +1276,7 @@ class PackingListControllerTest {
     @Test
     void soloLosClientesConPedidoDeclaradoPidenSuExcelEnLaEntrada() throws Exception {
         Map<String, Map<String, String>> clientesJs =
-                (Map<String, Map<String, String>>) mvc.perform(get("/packing-list").with(oidcLogin()))
+                (Map<String, Map<String, String>>) mvc.perform(get("/packing-list").with(operario()))
                         .andExpect(status().isOk())
                         .andReturn().getModelAndView().getModel().get("clientesJs");
 
@@ -1289,7 +1317,7 @@ class PackingListControllerTest {
         mvc.perform(multipart("/importar").file(new MockMultipartFile(
                                 "pedidoCliente", "APC_PEDIDO_FALL26.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                pedido)).with(oidcLogin()).with(csrf())
+                                pedido)).with(operario()).with(csrf())
                         .session(sesion)
                         .param("cliente", "APC").param("json", JSON_APC_AUSTRALIA)
                         .param("temporada", "E25").param("numeroFactura", "FA-1")
@@ -1312,7 +1340,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarApcAustralia(sesion);
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("destinos[0].indiceDestino", "0")
                         .param("destinos[0].livraisonCode", "PUN20260428WH3"))
                 .andExpect(redirectedUrl("/revision"));
@@ -1327,7 +1355,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importarApcAustralia(sesion);
 
-        mvc.perform(post("/recalcular").with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(post("/recalcular").with(operario()).with(csrf()).session(sesion)
                         .param("destinos[0].indiceDestino", "0")
                         .param("destinos[0].livraisonCode", ""))
                 .andExpect(redirectedUrl("/revision"));
@@ -1355,7 +1383,7 @@ class PackingListControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("<tr class=\"palet-0")))
                 .andExpect(content().string(containsString("<tr class=\"palet-1")))
@@ -1376,7 +1404,7 @@ class PackingListControllerTest {
 
         // Es un submit del formulario de la revisión: lo tecleado se aplica
         // antes de imprimir, o el papel diría una cosa y los excels otra.
-        var respuesta = mvc.perform(post("/packing-puntotres").with(oidcLogin()).with(csrf()).session(sesion)
+        var respuesta = mvc.perform(post("/packing-puntotres").with(operario()).with(csrf()).session(sesion)
                         .param("cajas[0].indiceDestino", "0")
                         .param("cajas[0].indicesCaja", "0")
                         .param("cajas[0].codigoColor", "COLOR-TECLEADO"))
@@ -1401,13 +1429,13 @@ class PackingListControllerTest {
             assertTrue(texto.contains("COLOR-TECLEADO"), "lleva el color corregido en la revisión");
         }
         // Y la edición se ha quedado en el envío, como con el recálculo.
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(content().string(containsString("COLOR-TECLEADO")));
     }
 
     @Test
     void elPackingPuntotresSinEnvioEnCursoVuelveALaEntrada() throws Exception {
-        mvc.perform(post("/packing-puntotres").with(oidcLogin()).with(csrf()))
+        mvc.perform(post("/packing-puntotres").with(operario()).with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
@@ -1421,7 +1449,7 @@ class PackingListControllerTest {
         // programa: un envío pegado ya viene empaquetado. Y al pie solo queda
         // "Generar Excels Cliente": el recálculo vive en cada fila y la salida es la
         // marca de la cabecera.
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Generar Excels Cliente")))
                 .andExpect(content().string(not(containsString("formaction=\"/packing-puntotres\""))))

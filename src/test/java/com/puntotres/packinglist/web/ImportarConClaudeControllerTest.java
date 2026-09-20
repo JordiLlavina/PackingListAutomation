@@ -26,9 +26,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.OidcLoginRequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.seguridad.Seccion;
+import com.puntotres.packinglist.seguridad.Usuario;
+import com.puntotres.packinglist.seguridad.UsuarioRepository;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
@@ -44,6 +48,30 @@ class ImportarConClaudeControllerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private UsuarioRepository usuarios;
+
+    /**
+     * La identidad con la que corren los tests de esta pantalla. Se da de alta
+     * con TODAS las secciones concedibles porque el interceptor lee los
+     * permisos de la base de datos, no del token, y lo que estos tests
+     * comprueban es el flujo de la pantalla, no los permisos: de eso se ocupa
+     * InterceptorPermisosTest, que los concede de uno en uno.
+     */
+    private OidcLoginRequestPostProcessor operario() {
+        usuarios.findByOidEntra("oid-test").orElseGet(() -> {
+            Usuario usuario = new Usuario("oid-test", "test@puntotres.com", "Operario de prueba");
+            for (Seccion seccion : Seccion.concedibles()) {
+                usuario.conceder(seccion);
+            }
+            return usuarios.saveAndFlush(usuario);
+        });
+        return oidcLogin().idToken(token -> token
+                .claim("oid", "oid-test")
+                .claim("name", "Operario de prueba")
+                .claim("email", "test@puntotres.com"));
+    }
 
     @Autowired
     private ObjectMapper mapper;
@@ -67,7 +95,7 @@ class ImportarConClaudeControllerTest {
         when(extractorClaude.extraer(anyList(), any())).thenReturn(envioDePrueba());
 
         MockHttpSession sesion = new MockHttpSession();
-        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(operario()).with(csrf()).session(sesion)
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -81,14 +109,14 @@ class ImportarConClaudeControllerTest {
         verify(extractorClaude).extraer(anyList(), eq(TipoPlantilla.AMI));
 
         // La revisión avisa de que los datos vienen de Claude.
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Datos extraídos por Claude")));
     }
 
     @Test
     void importarEnModoClaudeSinImagenesVuelveALaEntradaConError() throws Exception {
-        mvc.perform(multipart("/importar").with(oidcLogin()).with(csrf())
+        mvc.perform(multipart("/importar").with(operario()).with(csrf())
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -108,7 +136,7 @@ class ImportarConClaudeControllerTest {
                 new ClaudeEnvioExtractionService.ExtraccionException(
                         "Falta configurar la clave de la API de Claude"));
 
-        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf())
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(operario()).with(csrf())
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -133,7 +161,7 @@ class ImportarConClaudeControllerTest {
         envio.setResumenPalets(List.of(declarado));
         when(extractorClaude.extraer(anyList(), any())).thenReturn(envio);
 
-        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf())
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(operario()).with(csrf())
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -154,7 +182,7 @@ class ImportarConClaudeControllerTest {
         when(extractorClaude.extraer(anyList(), any())).thenReturn(envio);
 
         MockHttpSession sesion = new MockHttpSession();
-        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf()).session(sesion)
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(operario()).with(csrf()).session(sesion)
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -163,7 +191,7 @@ class ImportarConClaudeControllerTest {
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(status().is3xxRedirection());
 
-        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
+        mvc.perform(get("/revision").with(operario()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Lectura de las hojas:")))
                 .andExpect(content().string(containsString("dos pesos")));
@@ -171,7 +199,7 @@ class ImportarConClaudeControllerTest {
 
     @Test
     void laEntradaMuestraElSelectorDeModos() throws Exception {
-        mvc.perform(get("/packing-list").with(oidcLogin()))
+        mvc.perform(get("/packing-list").with(operario()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("botonModoJSON")))
                 .andExpect(content().string(containsString("botonModoCLAUDE")))
