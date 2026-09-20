@@ -26,6 +26,7 @@ import java.util.zip.ZipInputStream;
 
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -34,6 +35,8 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
+import com.puntotres.packinglist.persistence.TaraCajaRepository;
 import com.puntotres.packinglist.service.etiquetas.AvisoEtiqueta;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 
@@ -61,6 +64,25 @@ class PackingListControllerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private CatalogoTarasJpa catalogo;
+
+    @Autowired
+    private TaraCajaRepository taras;
+
+    /**
+     * La tabla de taras vuelve a ser exactamente la semilla de ESTE contexto
+     * antes de cada test. La base de datos en memoria la comparten todos los
+     * contextos de la suite y el esquema ya no se recrea al arrancar cada
+     * uno (lo manda Flyway), así que la siembra solo ocurre una vez por JVM
+     * y lo que pese un cartón en otro test de pantalla se quedaría aquí.
+     */
+    @BeforeEach
+    void lasTarasSonLasDeEsteTest() {
+        taras.deleteAll();
+        catalogo.sembrarSiEstaVacia();
+    }
 
     private String jsonDePrueba() throws Exception {
         try (var in = getClass().getResourceAsStream("/client-packinglist/packing_list_ami_test.json")) {

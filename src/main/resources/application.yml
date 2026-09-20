@@ -18,8 +18,21 @@ spring:
     password:
   jpa:
     hibernate:
-      ddl-auto: update
+      # El esquema lo crean las migraciones de Flyway. "validate" solo
+      # comprueba que las entidades y las tablas cuadran: si no cuadran, la
+      # aplicación no arranca, que es exactamente lo que se quiere. Volver a
+      # "update" aquí anula toda la fase 2.
+      ddl-auto: validate
     open-in-view: false
+
+  flyway:
+    # {vendor} se sustituye por "h2" o "postgresql" según el datasource. Solo
+    # el baseline está ahí; de V2 en adelante todo va en common.
+    locations: classpath:db/migration/{vendor},classpath:db/migration/common
+    # La base de datos del almacén ya tiene las tablas creadas por Hibernate:
+    # sin esto, Flyway se niega a correr sobre un esquema que no está vacío.
+    baseline-on-migrate: true
+    baseline-version: 1
 
   # El CSS y el JS se sirven con un hash del contenido en el nombre
   # (/estilo-a1b2c3.css): sin esto el navegador se queda con la copia vieja

@@ -1,0 +1,1 @@
+Las migraciones de V2 en adelante van aqui, en SQL que entienden H2 y PostgreSQL.

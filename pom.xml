@@ -56,6 +56,17 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- El esquema lo crean las migraciones, no Hibernate: con usuarios,
+             permisos e histórico dentro, ddl-auto: update no sabe cambiar una
+             columna ni volver atrás. El baseline vive en db/migration/{vendor}
+             porque el tipo binario difiere entre H2 y PostgreSQL; de V2 en
+             adelante todo va en db/migration/common, en SQL que entienden los
+             dos motores. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+
         <!-- Apache POI: lectura/escritura de .xlsx (formato OOXML).
              No la gestiona Boot, por eso lleva versión explícita. -->
         <dependency>

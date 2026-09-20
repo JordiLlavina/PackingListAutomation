@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +29,23 @@ class CatalogoTarasJpaTest {
 
     @Autowired
     private TaraProperties semilla;
+
+    @Autowired
+    private TaraCajaRepository repositorio;
+
+    /**
+     * Antes y después de cada test la tabla vuelve a ser la semilla. La base
+     * de datos en memoria la comparten todos los contextos de la suite y el
+     * esquema ya no se recrea al arrancar cada uno (lo manda Flyway), así que
+     * el 99x99x99 pesado aquí lo verían los tests de pantalla que cuentan con
+     * que ese tamaño NO tiene tara.
+     */
+    @BeforeEach
+    @AfterEach
+    void laTablaVuelveASerLaSemilla() {
+        repositorio.deleteAll();
+        catalogo.sembrarSiEstaVacia();
+    }
 
     @Test
     void alArrancarLaTablaSeSiembraConElYml() {
