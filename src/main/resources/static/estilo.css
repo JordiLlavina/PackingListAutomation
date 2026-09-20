@@ -949,3 +949,14 @@ header.cabecera .enlace-salir {
     text-decoration: underline;
     cursor: pointer;
 }
+
+/* La tabla de usuarios y permisos: siete secciones más cuatro columnas no
+   caben en un portátil. El scroll va en un contenedor propio y NUNCA en la
+   sección, que se convertiría en el contenedor de scroll y rompería las
+   cabeceras sticky del resto de pantallas. Las casillas propias van
+   atenuadas porque quien administra no puede tocarse a sí mismo. */
+.tabla-scroll { overflow-x: auto; }
+.tabla-usuarios th, .tabla-usuarios td { white-space: nowrap; text-align: center; }
+.tabla-usuarios td:first-child, .tabla-usuarios td:nth-child(2),
+.tabla-usuarios th:first-child, .tabla-usuarios th:nth-child(2) { text-align: left; }
+.tabla-usuarios input[type="checkbox"]:disabled { opacity: 0.4; }

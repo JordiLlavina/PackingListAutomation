@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Usuarios y permisos')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Usuarios y permisos')}"></header>
+<main>
+    <p class="mensaje" th:if="${mensaje}" th:text="${mensaje}">Guardado</p>
+
+    <p>
+        Quien entra con una cuenta de Puntotres queda dado de alta solo, sin ninguna sección.
+        Aquí se le conceden. No hay botón de borrar: se desactiva, y así su histórico de actividad
+        sigue diciendo quién era.
+    </p>
+
+    <form th:action="@{/administracion/usuarios}" method="post">
+        <div class="tabla-scroll">
+        <table class="tabla tabla-usuarios">
+            <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Correo</th>
+                <th>Alta</th>
+                <th>Último acceso</th>
+                <th>Activo</th>
+                <th>Administra</th>
+                <th th:each="seccion : ${secciones}" th:text="${seccion.rotulo}">Sección</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="usuario, iter : ${usuarios}">
+                <td th:text="${usuario.nombre}">Nombre</td>
+                <td th:text="${usuario.correo}">correo</td>
+                <td th:text="${#temporals.format(usuario.fechaAlta, 'dd/MM/yyyy')}">01/01/2026</td>
+                <td th:text="${usuario.ultimoAcceso == null ? '—'
+                              : #temporals.format(usuario.ultimoAcceso, 'dd/MM/yyyy HH:mm')}">—</td>
+                <td>
+                    <input type="hidden" th:name="|filas[${iter.index}].usuarioId|"
+                           th:value="${usuario.id}">
+                    <!-- Las dos casillas propias van disabled, que es lo que
+                         explica POR QUÉ no se pueden tocar; el controlador lo
+                         impide igual, porque disabled no se aplica a quien
+                         mande la petición a mano. -->
+                    <input type="checkbox" th:name="|filas[${iter.index}].activo|" value="true"
+                           th:checked="${usuario.activo}"
+                           th:disabled="${usuario.id == yo}">
+                </td>
+                <td>
+                    <input type="checkbox" th:name="|filas[${iter.index}].administrador|" value="true"
+                           th:checked="${usuario.administrador}"
+                           th:disabled="${usuario.id == yo}">
+                </td>
+                <td th:each="seccion : ${secciones}">
+                    <input type="checkbox" th:name="|filas[${iter.index}].secciones|"
+                           th:value="${seccion.name()}"
+                           th:checked="${usuario.permisos.contains(seccion)}">
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <button type="submit" class="boton">Guardar</button>
+    </form>
+</main>
+</body>
+</html>

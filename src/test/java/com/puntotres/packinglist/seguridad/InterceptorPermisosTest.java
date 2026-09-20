@@ -91,7 +91,6 @@ class InterceptorPermisosTest {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("Lo habilita la tarea 4.5")
     void administracionSoloLaAbreUnAdministrador() throws Exception {
         Usuario ana = guardar(new Usuario("oid-1", "ana@puntotres.com", "Ana"));
         Usuario jefa = new Usuario("oid-2", "jefa@puntotres.com", "Jefa");
