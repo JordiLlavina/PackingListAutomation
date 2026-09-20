@@ -2,6 +2,8 @@ package com.puntotres.packinglist.web;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -53,14 +55,14 @@ class EscandallosControllerTest {
 
     @Test
     void laPantallaDeEntradaPideLosExcelsDeEscandallo() throws Exception {
-        mvc.perform(get("/clickup"))
+        mvc.perform(get("/clickup").with(oidcLogin()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Escandallos para ClickUp")));
     }
 
     @Test
     void elMenuEnlazaLaPantallaDeEscandallos() throws Exception {
-        mvc.perform(get("/menu"))
+        mvc.perform(get("/menu").with(oidcLogin()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("/clickup")));
     }
@@ -69,7 +71,7 @@ class EscandallosControllerTest {
     void sinAvisosSeDescargaElExcelDirectamente() throws Exception {
         byte[] excel = mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
-                        .file(escandalloReal("ULL770 SAND.xlsx")))
+                        .file(escandalloReal("ULL770 SAND.xlsx")).with(oidcLogin()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
                         containsString("Escandallos ICSUITE.xlsx")))
@@ -85,7 +87,7 @@ class EscandallosControllerTest {
     void conAvisosSeVuelveALaPantallaConLaListaYElBotonDeDescargar() throws Exception {
         mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
-                        .file(basura("roto.xlsx"))
+                        .file(basura("roto.xlsx")).with(oidcLogin()).with(csrf())
                         .session(new MockHttpSession()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("roto.xlsx")))
@@ -98,11 +100,11 @@ class EscandallosControllerTest {
         MockHttpSession sesion = new MockHttpSession();
         mvc.perform(multipart("/clickup/procesar")
                         .file(escandalloReal("ULL770 NOIR.xlsx"))
-                        .file(basura("roto.xlsx"))
+                        .file(basura("roto.xlsx")).with(oidcLogin()).with(csrf())
                         .session(sesion))
                 .andExpect(status().isOk());
 
-        byte[] excel = mvc.perform(get("/clickup/descargar").session(sesion))
+        byte[] excel = mvc.perform(get("/clickup/descargar").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
 
@@ -113,7 +115,7 @@ class EscandallosControllerTest {
 
     @Test
     void siNingunFicheroEsUtilizableSeQuedaEnLaPantallaConElError() throws Exception {
-        mvc.perform(multipart("/clickup/procesar").file(basura("roto.xlsx")))
+        mvc.perform(multipart("/clickup/procesar").file(basura("roto.xlsx")).with(oidcLogin()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("roto.xlsx")))
                 .andExpect(content().string(containsString("No se ha podido procesar")));
@@ -121,14 +123,14 @@ class EscandallosControllerTest {
 
     @Test
     void sinFicherosSeAvisaEnVezDeGenerarUnExcelVacio() throws Exception {
-        mvc.perform(multipart("/clickup/procesar"))
+        mvc.perform(multipart("/clickup/procesar").with(oidcLogin()).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("ningún excel de escandallo")));
     }
 
     @Test
     void descargarSinNadaEnSesionVuelveALaPantalla() throws Exception {
-        mvc.perform(get("/clickup/descargar").session(new MockHttpSession()))
+        mvc.perform(get("/clickup/descargar").with(oidcLogin()).session(new MockHttpSession()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/clickup"));
     }

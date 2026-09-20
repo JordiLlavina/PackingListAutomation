@@ -42,6 +42,20 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Login OIDC contra Entra ID. Se usa el cliente OAuth2 estándar y
+             no el starter de Azure: el proveedor se describe entero con una
+             línea de issuer-uri, así que meter un árbol de dependencias de SDK
+             para un OIDC normal no se paga. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+        <!-- sec:authorize y sec:authentication en las plantillas. -->
+        <dependency>
+            <groupId>org.thymeleaf.extras</groupId>
+            <artifactId>thymeleaf-extras-springsecurity6</artifactId>
+        </dependency>
+
         <!-- Lo que el programa tiene que recordar entre ejecuciones: qué cartón
              y cuántas unidades por caja lleva cada referencia, y la tabla de
              taras. H2 en fichero para que sobreviva al reinicio sin instalar
@@ -100,6 +114,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

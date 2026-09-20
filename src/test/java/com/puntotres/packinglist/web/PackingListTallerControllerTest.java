@@ -3,6 +3,8 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -79,13 +81,13 @@ class PackingListTallerControllerTest {
      * autoinyectado no sería el de la sesión de MockMvc.
      */
     private String revision() throws Exception {
-        return mvc.perform(get("/revision").session(sesion))
+        return mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
     }
 
     private void revisionVacia() throws Exception {
-        mvc.perform(get("/revision").session(sesion))
+        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
@@ -94,6 +96,7 @@ class PackingListTallerControllerTest {
         MockMultipartHttpServletRequestBuilder peticion =
                 multipart("/packing-list/taller/digerir");
         peticion.session(sesion);
+        peticion.with(oidcLogin()).with(csrf());
         if (taller != null) {
             peticion.file(new MockMultipartFile("excelTaller", "PACKING TALLER.xlsx",
                     null, taller));
@@ -116,7 +119,7 @@ class PackingListTallerControllerTest {
 
     @Test
     void laEntradaOfreceElModoTaller() throws Exception {
-        mvc.perform(get("/packing-list"))
+        mvc.perform(get("/packing-list").with(oidcLogin()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-modo=\"TALLER\"")));
     }
@@ -154,7 +157,7 @@ class PackingListTallerControllerTest {
                 .andExpect(content().string(containsString("objetivos[CHINA]")));
 
         // Y lo tecleado en ellas se aplica: se genera con 12 a CHINA.
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "10")
                         .param("grupos[0].filas[0].objetivos[CHINA]", "12"))
@@ -233,7 +236,7 @@ class PackingListTallerControllerTest {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
         // 20 a CHINA con 10 por caja: dos cajas llenas de 12,5 kg.
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "10")
                         .param("grupos[0].pesoBrutoKg", "12.5"))
@@ -246,7 +249,7 @@ class PackingListTallerControllerTest {
     void laPantallaDeAjusteOfreceElPesoBrutoYNoElOrigenDelDato() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        String html = mvc.perform(get("/packing-list/taller/ajuste").session(sesion))
+        String html = mvc.perform(get("/packing-list/taller/ajuste").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -260,7 +263,7 @@ class PackingListTallerControllerTest {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
         // Solo el pedido, sin tocar la cantidad: un campo vacío es "no tocar".
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "8")
                         .param("grupos[0].filas[0].pedidos[CHINA]", "09999"))
@@ -286,7 +289,7 @@ class PackingListTallerControllerTest {
                         .param("fechaFactura", "05/09/2026").param("fechaEnvio", "05/09/2026"))
                 .andExpect(view().name("taller-ajuste"));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "10")
                         .param("grupos[0].filas[0].objetivos[CHINA]", "12")
@@ -354,7 +357,7 @@ class PackingListTallerControllerTest {
     void previsualizarDevuelveElResumenSinAvanzarDeEtapa() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/previsualizar").session(sesion)
+        mvc.perform(post("/packing-list/taller/previsualizar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "8"))
                 .andExpect(view().name("taller-ajuste"))
@@ -367,7 +370,7 @@ class PackingListTallerControllerTest {
     void loTecleadoSeConservaAlPrevisualizar() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/previsualizar").session(sesion)
+        mvc.perform(post("/packing-list/taller/previsualizar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x30")
                         .param("grupos[0].unidadesPorCaja", "4"))
                 .andExpect(content().string(containsString("60x40x30")))
@@ -378,7 +381,7 @@ class PackingListTallerControllerTest {
     void unaReferenciaSinUnidadesPorCajaBloqueaLaGeneracion() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(null));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion))
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion))
                 .andExpect(view().name("taller-ajuste"))
                 .andExpect(content().string(containsString(referencia)));
 
@@ -391,7 +394,7 @@ class PackingListTallerControllerTest {
     void generarLlevaALaRevisionConElEnvioListo() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "8"))
                 .andExpect(status().is3xxRedirection())
@@ -415,7 +418,7 @@ class PackingListTallerControllerTest {
         // (cuatro pilas de tres cajas de 40 cm en 147 cm útiles). Con dos
         // palets tienen que salir DOS bandas distintas; con una sola no se
         // vería si la banda va por palet o si está puesta a lo tonto.
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "1"))
                 .andExpect(redirectedUrl("/revision"));
@@ -430,7 +433,7 @@ class PackingListTallerControllerTest {
     void elEnvioGeneradoAvisaDeQueElRepartoNoEsDelTaller() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                 .param("grupos[0].medidaCaja", "60x40x40")
                 .param("grupos[0].unidadesPorCaja", "8"));
 
@@ -442,7 +445,7 @@ class PackingListTallerControllerTest {
     void generarRecuerdaLaReferenciaParaLaProximaEntrega() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x45")
                         .param("grupos[0].unidadesPorCaja", "9"))
                 .andExpect(redirectedUrl("/revision"));
@@ -457,7 +460,7 @@ class PackingListTallerControllerTest {
     void seVuelveAlAjusteSinResubirLosFicheros() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(get("/packing-list/taller/ajuste").session(sesion))
+        mvc.perform(get("/packing-list/taller/ajuste").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(view().name("taller-ajuste"))
                 .andExpect(model().attributeExists("digestion"));
@@ -466,17 +469,17 @@ class PackingListTallerControllerTest {
     @Test
     void volverAlAjusteConservaLoTecleado() throws Exception {
         digerirUnaEntrega(tallerConUnaReferencia(8));
-        mvc.perform(post("/packing-list/taller/previsualizar").session(sesion)
+        mvc.perform(post("/packing-list/taller/previsualizar").with(oidcLogin()).with(csrf()).session(sesion)
                 .param("grupos[0].medidaCaja", "60x40x30")
                 .param("grupos[0].unidadesPorCaja", "4"));
 
-        mvc.perform(get("/packing-list/taller/ajuste").session(sesion))
+        mvc.perform(get("/packing-list/taller/ajuste").with(oidcLogin()).session(sesion))
                 .andExpect(content().string(containsString("60x40x30")));
     }
 
     @Test
     void sinEntregaEnCursoElAjusteDevuelveALaEntrada() throws Exception {
-        mvc.perform(get("/packing-list/taller/ajuste").session(new MockHttpSession()))
+        mvc.perform(get("/packing-list/taller/ajuste").with(oidcLogin()).session(new MockHttpSession()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/packing-list"));
     }
@@ -501,7 +504,7 @@ class PackingListTallerControllerTest {
         // está en el almacén, así que el envío se queda aquí.
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "8")
                         .param("grupos[0].filas[0].objetivos[CHINA]", "20")
@@ -526,14 +529,14 @@ class PackingListTallerControllerTest {
         // después de corregirlo y la pantalla no tendría salida.
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "8")
                         .param("grupos[0].filas[0].objetivos[CHINA]", "20")
                         .param("grupos[0].filas[0].objetivos[JAPAN]", "20"))
                 .andExpect(view().name("taller-ajuste"));
 
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "8")
                         .param("grupos[0].filas[0].objetivos[CHINA]", "20")
@@ -546,7 +549,7 @@ class PackingListTallerControllerTest {
         // El packing lo ha repartido el programa y las cajas están por hacer:
         // aquí sí hay una hoja de trabajo que imprimir.
         digerirUnaEntrega(tallerConUnaReferencia(10));
-        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+        mvc.perform(post("/packing-list/taller/generar").with(oidcLogin()).with(csrf()).session(sesion)
                         .param("grupos[0].medidaCaja", "60x40x40")
                         .param("grupos[0].unidadesPorCaja", "10"))
                 .andExpect(redirectedUrl("/revision"));
@@ -557,7 +560,7 @@ class PackingListTallerControllerTest {
                 "es un submit del mismo formulario, para aplicar lo tecleado antes de imprimir");
 
         // Y el documento lleva la referencia del taller repartida en cajas.
-        byte[] documento = mvc.perform(post("/packing-puntotres").session(sesion))
+        byte[] documento = mvc.perform(post("/packing-puntotres").with(oidcLogin()).with(csrf()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
         try (var doc = new org.apache.poi.xwpf.usermodel.XWPFDocument(

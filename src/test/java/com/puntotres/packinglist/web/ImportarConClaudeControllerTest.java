@@ -7,6 +7,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -65,7 +67,7 @@ class ImportarConClaudeControllerTest {
         when(extractorClaude.extraer(anyList(), any())).thenReturn(envioDePrueba());
 
         MockHttpSession sesion = new MockHttpSession();
-        mvc.perform(multipart("/importar").file(imagenDePrueba()).session(sesion)
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf()).session(sesion)
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -79,14 +81,14 @@ class ImportarConClaudeControllerTest {
         verify(extractorClaude).extraer(anyList(), eq(TipoPlantilla.AMI));
 
         // La revisión avisa de que los datos vienen de Claude.
-        mvc.perform(get("/revision").session(sesion))
+        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Datos extraídos por Claude")));
     }
 
     @Test
     void importarEnModoClaudeSinImagenesVuelveALaEntradaConError() throws Exception {
-        mvc.perform(multipart("/importar")
+        mvc.perform(multipart("/importar").with(oidcLogin()).with(csrf())
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -106,7 +108,7 @@ class ImportarConClaudeControllerTest {
                 new ClaudeEnvioExtractionService.ExtraccionException(
                         "Falta configurar la clave de la API de Claude"));
 
-        mvc.perform(multipart("/importar").file(imagenDePrueba())
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf())
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -131,7 +133,7 @@ class ImportarConClaudeControllerTest {
         envio.setResumenPalets(List.of(declarado));
         when(extractorClaude.extraer(anyList(), any())).thenReturn(envio);
 
-        mvc.perform(multipart("/importar").file(imagenDePrueba())
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf())
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -152,7 +154,7 @@ class ImportarConClaudeControllerTest {
         when(extractorClaude.extraer(anyList(), any())).thenReturn(envio);
 
         MockHttpSession sesion = new MockHttpSession();
-        mvc.perform(multipart("/importar").file(imagenDePrueba()).session(sesion)
+        mvc.perform(multipart("/importar").file(imagenDePrueba()).with(oidcLogin()).with(csrf()).session(sesion)
                         .param("modo", "CLAUDE")
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
@@ -161,7 +163,7 @@ class ImportarConClaudeControllerTest {
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(status().is3xxRedirection());
 
-        mvc.perform(get("/revision").session(sesion))
+        mvc.perform(get("/revision").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Lectura de las hojas:")))
                 .andExpect(content().string(containsString("dos pesos")));
@@ -169,7 +171,7 @@ class ImportarConClaudeControllerTest {
 
     @Test
     void laEntradaMuestraElSelectorDeModos() throws Exception {
-        mvc.perform(get("/packing-list"))
+        mvc.perform(get("/packing-list").with(oidcLogin()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("botonModoJSON")))
                 .andExpect(content().string(containsString("botonModoCLAUDE")))

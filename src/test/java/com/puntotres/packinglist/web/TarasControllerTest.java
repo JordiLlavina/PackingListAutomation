@@ -3,6 +3,8 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -37,7 +39,7 @@ class TarasControllerTest {
     void laPantallaListaLasTarasConocidas() throws Exception {
         catalogo.guardar("77x77x77", 2.0);
 
-        mvc.perform(get("/taras"))
+        mvc.perform(get("/taras").with(oidcLogin()))
                 .andExpect(status().isOk())
                 .andExpect(model().attributeExists("taras"))
                 .andExpect(content().string(containsString("77x77x77")));
@@ -45,7 +47,7 @@ class TarasControllerTest {
 
     @Test
     void guardarUnaTaraNuevaLaDejaEnElCatalogo() throws Exception {
-        mvc.perform(post("/taras").param("medida", "50x30x20").param("taraKg", "0.9"))
+        mvc.perform(post("/taras").with(oidcLogin()).with(csrf()).param("medida", "50x30x20").param("taraKg", "0.9"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/taras"));
 
@@ -56,14 +58,14 @@ class TarasControllerTest {
     void corregirElPesoDeUnCartonYaConocidoLoActualiza() throws Exception {
         catalogo.guardar("55x35x25", 1.0);
 
-        mvc.perform(post("/taras").param("medida", "55x35x25").param("taraKg", "1.4"));
+        mvc.perform(post("/taras").with(oidcLogin()).with(csrf()).param("medida", "55x35x25").param("taraKg", "1.4"));
 
         assertEquals(1.4, catalogo.taraPara("55x35x25").orElseThrow());
     }
 
     @Test
     void unaMedidaIlegibleNoEntraEnElCatalogo() throws Exception {
-        mvc.perform(post("/taras").param("medida", "grande").param("taraKg", "1.0"))
+        mvc.perform(post("/taras").with(oidcLogin()).with(csrf()).param("medida", "grande").param("taraKg", "1.0"))
                 .andExpect(redirectedUrl("/taras"));
 
         assertTrue(catalogo.taraPara("grande").isEmpty(),
@@ -72,7 +74,7 @@ class TarasControllerTest {
 
     @Test
     void unPesoNegativoNoEntraEnElCatalogo() throws Exception {
-        mvc.perform(post("/taras").param("medida", "44x33x22").param("taraKg", "-1"));
+        mvc.perform(post("/taras").with(oidcLogin()).with(csrf()).param("medida", "44x33x22").param("taraKg", "-1"));
 
         assertTrue(catalogo.taraPara("44x33x22").isEmpty());
     }

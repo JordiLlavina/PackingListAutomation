@@ -12,3 +12,20 @@ spring:
       ddl-auto: validate
   flyway:
     baseline-on-migrate: false
+  security:
+    oauth2:
+      client:
+        registration:
+          azure:
+            client-id: cliente-de-prueba
+            client-secret: secreto-de-prueba
+            scope: openid, profile, email
+        provider:
+          azure:
+            # Puesto a mano, sin issuer-uri: con issuer-uri, Spring saldría a
+            # internet a leer el documento de descubrimiento al arrancar el
+            # contexto y la suite dependería de que haya red.
+            authorization-uri: https://login.microsoftonline.com/prueba/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/prueba/oauth2/v2.0/token
+            jwk-set-uri: https://login.microsoftonline.com/prueba/discovery/v2.0/keys
+            user-name-attribute: sub

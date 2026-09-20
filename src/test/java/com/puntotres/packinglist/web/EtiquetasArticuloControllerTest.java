@@ -3,6 +3,8 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oidcLogin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -57,7 +59,7 @@ class EtiquetasArticuloControllerTest {
         mvc.perform(multipart("/etiquetas-articulo-produccion/generar")
                         .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx",
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                pedidoConMadeInProblematico()))
+                                pedidoConMadeInProblematico())).with(oidcLogin()).with(csrf())
                         .param("cliente", "AMI")
                         .param("temporada", "H26")
                         .session(sesion))
@@ -70,7 +72,7 @@ class EtiquetasArticuloControllerTest {
     void unMadeInConBarraNoRompeLaPantallaDeResultadosNiElNombreDeFichero() throws Exception {
         MockHttpSession sesion = generarConMadeInProblematico();
 
-        String html = mvc.perform(get("/etiquetas-articulo-produccion/resultados").session(sesion))
+        String html = mvc.perform(get("/etiquetas-articulo-produccion/resultados").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -88,7 +90,7 @@ class EtiquetasArticuloControllerTest {
     void unMadeInConBarraSeDescargaConElNombreSaneado() throws Exception {
         MockHttpSession sesion = generarConMadeInProblematico();
 
-        mvc.perform(get("/etiquetas-articulo-produccion/descargar/AMI CODE BARRE H26 MOROCCO_TEST.xlsx")
+        mvc.perform(get("/etiquetas-articulo-produccion/descargar/AMI CODE BARRE H26 MOROCCO_TEST.xlsx").with(oidcLogin())
                         .session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(
@@ -99,7 +101,7 @@ class EtiquetasArticuloControllerTest {
     void unMadeInConBarraNoGeneraUnaEntradaDeZipConSubdirectorio() throws Exception {
         MockHttpSession sesion = generarConMadeInProblematico();
 
-        byte[] zip = mvc.perform(get("/etiquetas-articulo-produccion/descargar-todo").session(sesion))
+        byte[] zip = mvc.perform(get("/etiquetas-articulo-produccion/descargar-todo").with(oidcLogin()).session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType("application/zip"))
                 .andReturn().getResponse().getContentAsByteArray();
@@ -118,7 +120,7 @@ class EtiquetasArticuloControllerTest {
 
     @Test
     void laPantallaOfreceAmiDisponibleYElRestoEnDesarrollo() throws Exception {
-        mvc.perform(get("/etiquetas-articulo-produccion"))
+        mvc.perform(get("/etiquetas-articulo-produccion").with(oidcLogin()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Introducir excel del pedido de AMI")))
                 .andExpect(content().string(containsString("en desarrollo")));
