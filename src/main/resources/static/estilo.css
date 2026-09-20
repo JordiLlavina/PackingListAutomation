@@ -924,3 +924,28 @@ tr.sin-pedido td { background: #fff8e1; }
 .linea-detalle.palet strong {
     color: #372f77;
 }
+
+/* Quién ha entrado y el botón de salir, a la derecha de la cabecera, dentro
+   de la misma columna de 72rem que el título (por eso va dentro de .titulo y
+   se empuja con margin-left: auto, en vez de hacer flex a la cabecera
+   entera). El botón se pinta como enlace: es un POST (lo exige el CSRF de la
+   salida), pero para quien lo mira es un enlace más de la cabecera. */
+header.cabecera .usuario {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-left: auto;
+    font-weight: 400;
+}
+header.cabecera .usuario-nombre { font-size: 0.9rem; opacity: 0.85; }
+header.cabecera .usuario-salir { margin: 0; }
+header.cabecera .enlace-salir {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 0.9rem;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}

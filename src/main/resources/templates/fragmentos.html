@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- Fragmentos comunes a las pantallas del asistente. -->
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head th:fragment="head(titulo)">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -24,6 +25,16 @@
             <img class="marca" th:src="@{/icono-web-180.png}" alt="" aria-hidden="true">
         </a>
         <span th:text="${titulo}">título de la sección</span>
+        <!-- Quién eres y cómo salir. En un PC compartido del almacén, sin el
+             botón de salir la sesión de quien pasó antes sigue abierta ocho
+             horas y el envío siguiente queda registrado a nombre de otra
+             persona. Va dentro de .titulo para compartir su columna de 72rem. -->
+        <div class="usuario">
+            <span class="usuario-nombre" sec:authentication="principal.fullName">Nombre</span>
+            <form th:action="@{/salir}" method="post" class="usuario-salir">
+                <button type="submit" class="enlace-salir">Salir</button>
+            </form>
+        </div>
     </div>
 </header>
 </body>
