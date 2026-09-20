@@ -230,6 +230,21 @@ packing-list:
       nombre-legal: SONIA RYKIEL INTERNATIONAL
       direccion-entrega: BLECKMANN - TRB INTERNATIONAL; INDUSTRIEWEG 38C; QUAI B12; 2280 GROBBENDONK, BELGIUM
 
+server:
+  servlet:
+    session:
+      # Ocho horas y no media: la sesión CONTIENE el envío en curso, así que
+      # un timeout corto le borra a un operario el trabajo de la mañana en
+      # mitad de una revisión de doscientas cajas.
+      timeout: 8h
+      cookie:
+        http-only: true
+        # La aplicación vive detrás de Caddy con TLS. En desarrollo, sobre
+        # http://localhost, los navegadores tratan localhost como seguro y la
+        # cookie se manda igual.
+        secure: true
+        same-site: lax
+
 # El primer administrador no puede salir de la propia aplicación: no hay
 # nadie que se lo conceda. Esta lista se aplica SOLO en el alta de esos
 # usuarios, no en cada entrada; si se aplicara siempre, quitarle el
