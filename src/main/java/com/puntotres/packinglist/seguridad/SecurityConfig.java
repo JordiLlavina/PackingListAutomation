@@ -18,6 +18,12 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class SecurityConfig {
 
+    private final UsuarioOidcService usuarioOidcService;
+
+    public SecurityConfig(UsuarioOidcService usuarioOidcService) {
+        this.usuarioOidcService = usuarioOidcService;
+    }
+
     @Bean
     SecurityFilterChain cadenaDeSeguridad(HttpSecurity http) throws Exception {
         http
@@ -28,7 +34,8 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .oauth2Login(login -> login
-                        .defaultSuccessUrl("/menu"))
+                        .defaultSuccessUrl("/menu")
+                        .userInfoEndpoint(info -> info.oidcUserService(usuarioOidcService)))
                 .logout(salida -> salida
                         .logoutUrl("/salir")
                         .logoutSuccessUrl("/menu"));

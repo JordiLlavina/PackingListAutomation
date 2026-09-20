@@ -230,6 +230,14 @@ packing-list:
       nombre-legal: SONIA RYKIEL INTERNATIONAL
       direccion-entrega: BLECKMANN - TRB INTERNATIONAL; INDUSTRIEWEG 38C; QUAI B12; 2280 GROBBENDONK, BELGIUM
 
+# El primer administrador no puede salir de la propia aplicación: no hay
+# nadie que se lo conceda. Esta lista se aplica SOLO en el alta de esos
+# usuarios, no en cada entrada; si se aplicara siempre, quitarle el
+# administrador a alguien de aquí sería imposible desde la pantalla.
+seguridad:
+  administradores-iniciales:
+    - jllavinapamias@puntotres.com
+
 # El proveedor de Entra va en un documento aparte, activo en todo perfil menos
 # en "test": con el issuer-uri Spring sale a internet al arrancar a leer el
 # documento de descubrimiento de Microsoft, y la suite no puede depender de que
