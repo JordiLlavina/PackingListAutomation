@@ -1,12 +1,20 @@
 package com.puntotres.packinglist.seguridad;
 
 import java.time.OffsetDateTime;
+import java.util.EnumSet;
+import java.util.Set;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 
 /**
@@ -43,6 +51,18 @@ public class Usuario {
 
     @Column(name = "ultimo_acceso")
     private OffsetDateTime ultimoAcceso;
+
+    /**
+     * Las secciones concedidas. Se cargan en la misma consulta que el usuario
+     * porque el interceptor las necesita en cada petición y no tiene sentido
+     * pagar una segunda ida a la base de datos por algo que son media docena
+     * de cadenas.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "usuario_permiso", joinColumns = @JoinColumn(name = "usuario_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "seccion", length = 32, nullable = false)
+    private Set<Seccion> permisos = EnumSet.noneOf(Seccion.class);
 
     protected Usuario() {
         // JPA
@@ -105,5 +125,32 @@ public class Usuario {
 
     public void setUltimoAcceso(OffsetDateTime ultimoAcceso) {
         this.ultimoAcceso = ultimoAcceso;
+    }
+
+    public Set<Seccion> getPermisos() {
+        return permisos;
+    }
+
+    public void conceder(Seccion seccion) {
+        permisos.add(seccion);
+    }
+
+    public void retirar(Seccion seccion) {
+        permisos.remove(seccion);
+    }
+
+    /**
+     * ADMINISTRACION no se concede: la abre quien es administrador. Y ser
+     * administrador no abre el resto de secciones — es poder repartir
+     * permisos, no tenerlos todos.
+     */
+    public boolean puedeAbrir(Seccion seccion) {
+        if (!activo) {
+            return false;
+        }
+        if (seccion == Seccion.ADMINISTRACION) {
+            return administrador;
+        }
+        return permisos.contains(seccion);
     }
 }
