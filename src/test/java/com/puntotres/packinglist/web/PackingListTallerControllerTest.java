@@ -61,10 +61,18 @@ class PackingListTallerControllerTest {
         referencia = "REF-" + info.getTestMethod().orElseThrow().getName().toUpperCase();
     }
 
+    /**
+     * 31 unidades de una referencia, repartidas como las escribe el taller:
+     * una fila por destinación suya (20 a China y 11 a Japón). La destinación
+     * de la fila es lo que dice a qué columna del ajuste van sus unidades, así
+     * que sin ella no habría nada que enviar.
+     */
     private byte[] tallerConUnaReferencia(Integer unidadesPorCaja) {
         return PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("AMI", referencia, "KAKI", 31)
-                        .conUnidadesPorCaja(unidadesPorCaja));
+                PackingTallerExcel.Fila.de("AMI", referencia, "KAKI", 20)
+                        .conUnidadesPorCaja(unidadesPorCaja).conDestino("CH"),
+                PackingTallerExcel.Fila.de("AMI", referencia, "KAKI", 11)
+                        .conUnidadesPorCaja(unidadesPorCaja).conDestino("JA"));
     }
 
     private byte[] pedidoDeAmi() {

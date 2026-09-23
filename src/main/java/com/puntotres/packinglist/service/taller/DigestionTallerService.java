@@ -3,6 +3,7 @@ package com.puntotres.packinglist.service.taller;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -204,19 +205,13 @@ public class DigestionTallerService {
                     + ": la cantidad a enviar de cada cosa es la que ha llegado del taller, "
                     + "y hay que revisarla");
         }
-        // Lo que ha llegado de cada artículo y destinación, ya sumado entre
-        // filas repetidas. Se suma AQUÍ y no al fusionar las filas porque el
-        // objetivo tiene que ser una propiedad del artículo y la destinación
-        // —como en los clientes que sí traen pedido—, no de cada apunte del
-        // taller: así fusionar dos filas nunca duplica lo que se envía.
-        Map<String, Integer> llegado = new LinkedHashMap<>();
-        for (LineaTaller linea : lineas) {
-            llegado.merge(claveArticuloDestino(clienteClave, linea), linea.cantidad(),
-                    Integer::sum);
-        }
+        // Cada fila con lo suyo y su destinación. Ya no se pre-suman las
+        // filas repetidas del mismo artículo: eso lo hace la fusión, que es
+        // donde se juntan, desde que lo que se enseña es lo que manda el
+        // taller y no lo que pide el cliente.
         for (LineaTaller linea : lineas) {
             resultado.anadir(linea, new ObjetivoDestino(destinoDelTaller(clienteClave, linea),
-                    llegado.get(claveArticuloDestino(clienteClave, linea)), null));
+                    linea.cantidad(), null));
         }
         return resultado;
     }
@@ -240,11 +235,6 @@ public class DigestionTallerService {
                 .orElse(linea.destinoTaller());
     }
 
-    private String claveArticuloDestino(String clienteClave, LineaTaller linea) {
-        return String.join("|", linea.referencia(), linea.color(), linea.talla(),
-                destinoDelTaller(clienteClave, linea));
-    }
-
     // --- Montaje de la tabla ---
 
     private void montarGrupos(String clienteClave, List<LineaTaller> lineas,
@@ -256,10 +246,17 @@ public class DigestionTallerService {
         // última. Por eso se resuelve antes de recorrerlas.
         Map<String, CajaDelTaller> cajas = cajasDelTaller(lineas);
 
+        // Lo que pide el pedido de cada fila, para poder decirlo después: en
+        // la tabla se enseña lo que manda el taller, así que el número del
+        // pedido no se ve en ningún sitio.
+        Map<FilaDigerida, Map<String, Integer>> pedidoDeCadaFila = new LinkedHashMap<>();
+
         for (LineaTaller linea : lineas) {
-            List<ObjetivoDestino> suyos = objetivos.objetivosDe(linea);
-            suyos.forEach(objetivo -> destinos.add(objetivo.destino()));
-            avisarSiElTallerDiceOtraDestinacion(clienteClave, linea, suyos, digestion);
+            List<ObjetivoDestino> delPedido = objetivos.objetivosDe(linea);
+            delPedido.forEach(objetivo -> destinos.add(objetivo.destino()));
+            avisarSiElTallerDiceOtraDestinacion(clienteClave, linea, delPedido, digestion);
+            List<ObjetivoDestino> suyos = loQueMandaLaLinea(clienteClave, linea, delPedido,
+                    digestion);
 
             GrupoReferencia grupo = grupos.computeIfAbsent(linea.referencia(),
                     referencia -> nuevoGrupo(clienteClave, referencia,
@@ -272,12 +269,15 @@ public class DigestionTallerService {
             // El mismo artículo escrito en varias filas del taller es UNA fila
             // aquí: una por destinación suya, o dos entregas del mismo color.
             FilaDigerida yaEsta = filaDe(grupo, linea.color(), linea.talla());
+            FilaDigerida fila = yaEsta;
             if (yaEsta != null) {
                 yaEsta.fusionar(linea.cantidad(), suyos, sinPedido);
             } else {
-                grupo.getFilas().add(new FilaDigerida(linea.color(), linea.talla(),
-                        linea.cantidad(), suyos, sinPedido));
+                fila = new FilaDigerida(linea.color(), linea.talla(),
+                        linea.cantidad(), suyos, sinPedido);
+                grupo.getFilas().add(fila);
             }
+            anotarLoPedido(pedidoDeCadaFila, fila, delPedido);
         }
 
         if (destinos.isEmpty()) {
@@ -287,8 +287,132 @@ public class DigestionTallerService {
             // el cliente tiene declaradas.
             destinos.addAll(destinacionesDeclaradasDe(clienteClave));
         }
+        // Al final y no dentro del bucle: una fila no está entera hasta que se
+        // han fusionado todas sus apariciones en la hoja del taller.
+        avisarDeLoQuePideElPedido(grupos.values(), pedidoDeCadaFila, digestion);
         digestion.getGrupos().addAll(grupos.values());
         digestion.getDestinosActivos().addAll(destinos);
+    }
+
+    /**
+     * Las unidades de UNA fila del taller puestas en <b>su</b> destinación.
+     *
+     * La tabla del ajuste enseña lo que ha mandado el taller, no lo que pide
+     * el cliente. Del pedido se conservan la destinación y el número, que es
+     * lo que el taller no sabe; la cantidad la dice la hoja del taller, que es
+     * lo que de verdad ha llegado al almacén.
+     *
+     * <p><b>Cada fila va entera a su destinación y no se reparte.</b> La hoja
+     * del taller trae una fila por destinación —su columna DESTINATION en AMI,
+     * su CODE en APC— así que no hay nada que repartir: repartir lo recibido
+     * entre las destinaciones del pedido pondría en la casilla de un sitio
+     * unidades que el taller ha mandado a otro, y quien lo lea no tiene forma
+     * de saber de dónde ha salido ese número.
+     *
+     * <p>Las demás destinaciones de esa referencia se quedan a <b>cero y no
+     * desaparecen</b>: son las columnas donde se teclea lo que vaya en otra
+     * entrega, y llevan ya puesto su número de pedido.
+     */
+    private List<ObjetivoDestino> loQueMandaLaLinea(String clienteClave, LineaTaller linea,
+                                                    List<ObjetivoDestino> delPedido,
+                                                    DigestionTaller digestion) {
+        if (delPedido.isEmpty()) {
+            return List.of();
+        }
+        int suya = indiceDeSuDestinacion(clienteClave, linea, delPedido);
+        if (suya < 0) {
+            digestion.avisarDe(linea.referencia(), "En la fila " + linea.fila() + ", "
+                    + linea.referencia() + " " + linea.color() + " no dice a qué destinación va, "
+                    + "y el pedido la tiene para " + destinacionesDe(delPedido)
+                    + ": hay que escribir a mano cuánto va a cada una");
+        }
+        List<ObjetivoDestino> suyos = new ArrayList<>();
+        for (int i = 0; i < delPedido.size(); i++) {
+            ObjetivoDestino objetivo = delPedido.get(i);
+            suyos.add(new ObjetivoDestino(objetivo.destino(),
+                    i == suya ? linea.cantidad() : 0, objetivo.pedido()));
+        }
+        return suyos;
+    }
+
+    /**
+     * Cuál de las destinaciones del pedido es la de esta fila.
+     *
+     * Con una sola no hay nada que decidir, y es el caso de APC: su CODE es un
+     * "Document d'achat", que ya es una destinación. Con varias —en AMI una
+     * referencia puede estar pedida para tres— manda la columna DESTINATION de
+     * la hoja, que el taller escribe abreviada. Si no lo dice o no casa con
+     * ninguna, se devuelve -1: nadie inventa a dónde va un bulto.
+     */
+    private int indiceDeSuDestinacion(String clienteClave, LineaTaller linea,
+                                      List<ObjetivoDestino> delPedido) {
+        if (delPedido.size() == 1) {
+            return 0;
+        }
+        String delTaller = linea.destinoTaller();
+        if (delTaller.isBlank()) {
+            return -1;
+        }
+        for (int i = 0; i < delPedido.size(); i++) {
+            String destino = delPedido.get(i).destino();
+            if (destino.startsWith(delTaller) || delTaller.startsWith(destino)
+                    || mismoDestinoDelCatalogo(clienteClave, delTaller, destino)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static String destinacionesDe(List<ObjetivoDestino> objetivos) {
+        return String.join(" y ", objetivos.stream()
+                .map(ObjetivoDestino::destino)
+                .distinct()
+                .toList());
+    }
+
+    /** Lo que el pedido pide de una fila, por destinación y sin sumar dos veces. */
+    private static void anotarLoPedido(Map<FilaDigerida, Map<String, Integer>> pedidoDeCadaFila,
+                                       FilaDigerida fila, List<ObjetivoDestino> delPedido) {
+        // putIfAbsent y no suma: lo pedido a una destinación es una propiedad
+        // del artículo y del sitio, no de cuántas veces lo haya escrito el
+        // taller. Sumarlo multiplicaría el pedido por el número de filas.
+        Map<String, Integer> suyo = pedidoDeCadaFila.computeIfAbsent(fila,
+                clave -> new LinkedHashMap<>());
+        for (ObjetivoDestino objetivo : delPedido) {
+            suyo.putIfAbsent(objetivo.destino(), objetivo.cantidad());
+        }
+    }
+
+    /**
+     * Dice cuánto pedía el cliente cuando no es lo que ha llegado.
+     *
+     * En la tabla se ve lo que manda el taller, así que el número del pedido
+     * no sale por ningún sitio, y es el que dice cuánto queda por servir —o
+     * cuánto se está enviando de más—. Salta en los dos sentidos y no bloquea:
+     * una entrega parcial es normal, y que el taller mande de más también
+     * pasa; lo que no puede es no verse.
+     */
+    private static void avisarDeLoQuePideElPedido(
+            Collection<GrupoReferencia> grupos,
+            Map<FilaDigerida, Map<String, Integer>> pedidoDeCadaFila,
+            DigestionTaller digestion) {
+        for (GrupoReferencia grupo : grupos) {
+            for (FilaDigerida fila : grupo.getFilas()) {
+                int pedido = pedidoDeCadaFila.getOrDefault(fila, Map.of()).values().stream()
+                        .mapToInt(Integer::intValue).sum();
+                if (pedido == fila.getRecibido() || pedido == 0) {
+                    continue;
+                }
+                digestion.avisarDe(grupo.getReferencia(), grupo.getReferencia() + " "
+                        + fila.getColor() + tallaDe(fila) + ": el pedido pide " + pedido
+                        + " y del taller han llegado " + fila.getRecibido()
+                        + ". Se envía lo que ha llegado");
+            }
+        }
+    }
+
+    private static String tallaDe(FilaDigerida fila) {
+        return "U".equals(fila.getTalla()) ? "" : " talla " + fila.getTalla();
     }
 
     /**

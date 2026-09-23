@@ -235,6 +235,36 @@ public final class ApcPedidoExcel {
         return Optional.ofNullable(comandas.get(pedido.trim()));
     }
 
+    /**
+     * Los colores que lleva un número de pedido, en el orden del fichero y ya
+     * en mayúsculas.
+     *
+     * Sirve para comprobar que la fila del taller y la del pedido hablan del
+     * mismo artículo: el código de tres dígitos identifica el
+     * "Document d'achat", pero si el color no es el suyo es que uno de los dos
+     * está mal escrito, y empaquetar por el pedido equivocado manda el bulto a
+     * otro sitio con el número de otro.
+     *
+     * Devuelve <b>varios</b> a propósito: aunque un Document d'achat suele ser
+     * un artículo y un color, en el fichero real hay pedidos con dos
+     * (4100128685 lleva LZZ y GAU), así que basta con que el color case con
+     * uno. Vacío = el fichero no trae columna "Couleur" y no hay nada que
+     * comprobar.
+     */
+    public Set<String> coloresDe(String pedido) {
+        if (pedido == null || pedido.isBlank()) {
+            return Set.of();
+        }
+        String buscado = pedido.trim();
+        Set<String> colores = new LinkedHashSet<>();
+        for (LineaCatalogo linea : catalogo) {
+            if (linea.pedido().equals(buscado) && !linea.color().isBlank()) {
+                colores.add(linea.color().trim().toUpperCase(Locale.ROOT));
+            }
+        }
+        return colores;
+    }
+
     /** Avisos de nivel de fichero (claves ambiguas). Nunca null. */
     public List<String> avisos() {
         return avisos;

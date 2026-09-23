@@ -91,38 +91,74 @@ public class RepartoDestinaciones {
 
     private void repartirFila(String clienteClave, FilaAjustada fila, boolean exigePrioridad,
                               ResultadoReparto resultado) {
-        // Lo asignado se lleva por POSICIÓN del objetivo, nunca por nombre de
-        // destinación. El mismo artículo puede estar pedido dos veces para el
-        // mismo sitio en dos pedidos distintos, y con una entrada por
-        // destinación los dos objetivos leerían la suma de los dos y cada uno
-        // se la llevaría entera: se empaquetaría el doble de género, y como
-        // "servido >= pedido" se cumple de sobra, ningún aviso saltaría.
-        int[] asignado = new int[fila.objetivos().size()];
-        int restante = fila.recibido();
+        int[] asignado = repartir(clienteClave, fila.objetivos(), fila.recibido(), exigePrioridad);
+        int restante = fila.recibido() - suma(asignado);
 
-        for (List<Integer> escalon : porEscalones(clienteClave, fila, exigePrioridad)) {
+        avisarDeLoQueFaltaOSobra(fila, asignado, restante, resultado);
+        volcarArticulos(fila, asignado, resultado);
+    }
+
+    /**
+     * Cuántas unidades se lleva cada objetivo de un artículo del que han
+     * llegado {@code recibido} unidades: los escalones de más prioridad
+     * enteros, el que se queda a medias en proporción a lo pedido, y los de
+     * abajo a cero.
+     *
+     * <p>Es público porque lo usa también la <b>pantalla de ajuste</b>, que
+     * enseña de antemano lo que se va a enviar a cada sitio. Tiene que ser
+     * este mismo cálculo y no uno parecido: si la pantalla repartiera de una
+     * forma y la generación de otra, el packing saldría distinto de lo que se
+     * vio al darle al botón y nadie lo notaría hasta comparar los documentos.
+     *
+     * @return lo asignado a cada objetivo, en el mismo orden que la lista
+     */
+    public int[] repartir(String clienteClave, List<ObjetivoDestino> objetivos, int recibido) {
+        return repartir(clienteClave, objetivos, recibido,
+                reglas.clienteTaller(clienteClave).isPresent());
+    }
+
+    /**
+     * Lo asignado se lleva por POSICIÓN del objetivo, nunca por nombre de
+     * destinación. El mismo artículo puede estar pedido dos veces para el
+     * mismo sitio en dos pedidos distintos, y con una entrada por destinación
+     * los dos objetivos leerían la suma de los dos y cada uno se la llevaría
+     * entera: se empaquetaría el doble de género, y como "servido >= pedido"
+     * se cumple de sobra, ningún aviso saltaría.
+     */
+    private int[] repartir(String clienteClave, List<ObjetivoDestino> objetivos, int recibido,
+                           boolean exigePrioridad) {
+        int[] asignado = new int[objetivos.size()];
+        int restante = Math.max(0, recibido);
+
+        for (List<Integer> escalon : porEscalones(clienteClave, objetivos, exigePrioridad)) {
             if (restante <= 0) {
                 break;
             }
             int pedidoDelEscalon = escalon.stream()
-                    .mapToInt(indice -> fila.objetivos().get(indice).cantidad())
+                    .mapToInt(indice -> objetivos.get(indice).cantidad())
                     .sum();
             if (pedidoDelEscalon <= 0) {
                 continue;
             }
             if (restante >= pedidoDelEscalon) {
                 for (int indice : escalon) {
-                    asignado[indice] += fila.objetivos().get(indice).cantidad();
+                    asignado[indice] += objetivos.get(indice).cantidad();
                 }
                 restante -= pedidoDelEscalon;
             } else {
-                repartirProporcional(fila, escalon, restante, asignado);
+                repartirProporcional(objetivos, escalon, restante, asignado);
                 restante = 0;
             }
         }
+        return asignado;
+    }
 
-        avisarDeLoQueFaltaOSobra(fila, asignado, restante, resultado);
-        volcarArticulos(fila, asignado, resultado);
+    private static int suma(int[] asignado) {
+        int total = 0;
+        for (int parte : asignado) {
+            total += parte;
+        }
+        return total;
     }
 
     /**
@@ -130,12 +166,12 @@ public class RepartoDestinaciones {
      * urgente a la menos. Sin reglas de cliente todos comparten escalón, que
      * es lo correcto cuando no hay norma que diga lo contrario.
      */
-    private List<List<Integer>> porEscalones(String clienteClave, FilaAjustada fila,
+    private List<List<Integer>> porEscalones(String clienteClave, List<ObjetivoDestino> objetivos,
                                              boolean exigePrioridad) {
         Map<Integer, List<Integer>> porPrioridad = new LinkedHashMap<>();
-        for (int indice = 0; indice < fila.objetivos().size(); indice++) {
+        for (int indice = 0; indice < objetivos.size(); indice++) {
             OptionalInt prioridad = exigePrioridad
-                    ? reglas.prioridadDe(clienteClave, fila.objetivos().get(indice).destino())
+                    ? reglas.prioridadDe(clienteClave, objetivos.get(indice).destino())
                     : OptionalInt.empty();
             porPrioridad.computeIfAbsent(prioridad.orElse(Integer.MAX_VALUE),
                     clave -> new ArrayList<>()).add(indice);
@@ -152,14 +188,14 @@ public class RepartoDestinaciones {
      * la que más pide: dejar a una en cero mientras otra va completa sería
      * peor, y sin criterio el resultado dependería del orden de las filas.
      */
-    private static void repartirProporcional(FilaAjustada fila, List<Integer> escalon,
+    private static void repartirProporcional(List<ObjetivoDestino> objetivos, List<Integer> escalon,
                                              int disponible, int[] asignado) {
         int pedido = escalon.stream()
-                .mapToInt(indice -> fila.objetivos().get(indice).cantidad())
+                .mapToInt(indice -> objetivos.get(indice).cantidad())
                 .sum();
         int repartido = 0;
         for (int indice : escalon) {
-            int parte = (int) ((long) fila.objetivos().get(indice).cantidad() * disponible / pedido);
+            int parte = (int) ((long) objetivos.get(indice).cantidad() * disponible / pedido);
             asignado[indice] += parte;
             repartido += parte;
         }
@@ -167,7 +203,7 @@ public class RepartoDestinaciones {
         if (resto <= 0) {
             return;
         }
-        asignado[elQueMasPideDe(fila, escalon)] += resto;
+        asignado[elQueMasPideDe(objetivos, escalon)] += resto;
     }
 
     /**
@@ -176,11 +212,11 @@ public class RepartoDestinaciones {
      * mientras sea fijo; lo que no vale es que dependa del orden de las filas,
      * porque entonces el reparto no se puede comprobar.
      */
-    private static int elQueMasPideDe(FilaAjustada fila, List<Integer> escalon) {
+    private static int elQueMasPideDe(List<ObjetivoDestino> objetivos, List<Integer> escalon) {
         int mayor = escalon.get(0);
         for (int indice : escalon) {
-            ObjetivoDestino candidato = fila.objetivos().get(indice);
-            ObjetivoDestino actual = fila.objetivos().get(mayor);
+            ObjetivoDestino candidato = objetivos.get(indice);
+            ObjetivoDestino actual = objetivos.get(mayor);
             if (candidato.cantidad() > actual.cantidad()
                     || (candidato.cantidad() == actual.cantidad()
                             && candidato.destino().compareTo(actual.destino()) < 0)) {

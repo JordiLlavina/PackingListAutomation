@@ -273,19 +273,19 @@ class DigestionTallerServiceTest {
      */
     private static byte[] tallerApcConAbreviaturas() {
         return PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "LZZ", 20)
                         .conCode("721").conUnidadesPorCaja(10).conDestino("WH"),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("719").conUnidadesPorCaja(10).conDestino("WH"),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "NOIR", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("706").conUnidadesPorCaja(10).conDestino("UST"),
-                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "GAE", 20)
                         .conCode("681").conUnidadesPorCaja(10).conDestino("JPT"),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "BEIGE", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("689").conUnidadesPorCaja(10).conDestino("KRT"),
-                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "NOIR", 20)
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "GAE", 20)
                         .conCode("694").conUnidadesPorCaja(10).conDestino("RT"),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "KAKI", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("718").conUnidadesPorCaja(10).conDestino("WH"));
     }
 
@@ -308,7 +308,7 @@ class DigestionTallerServiceTest {
         // La otra mitad: resolver las abreviaturas no puede acabar dando todo
         // por bueno. JPT es JAPAN, y ese pedido va a Retail.
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "NOIR", 20)
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "GAE", 20)
                         .conCode("694").conUnidadesPorCaja(10).conDestino("JPT"));
 
         DigestionTaller resultado = digestion.digerir("APC", taller, pedidoRealDeApc());
@@ -322,15 +322,18 @@ class DigestionTallerServiceTest {
     @Test
     void lasDestinacionesActivasSalenDelPedido() throws Exception {
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("AMI", "BAG-A", "NOIR", 31).conUnidadesPorCaja(10));
+                PackingTallerExcel.Fila.de("AMI", "BAG-A", "NOIR", 31)
+                        .conUnidadesPorCaja(10).conDestino("CH"));
         byte[] pedido = PedidoAmiExcel.crear("EAN H26",
                 PedidoAmiExcel.Fila.pedida("BAG-A", "NOIR", "U", "07001 CH", 20),
                 PedidoAmiExcel.Fila.pedida("BAG-A", "NOIR", "U", "07002 JP", 10));
 
         DigestionTaller resultado = digerir(taller, pedido);
 
+        // Las columnas son las del pedido; lo que se escribe en ellas es lo
+        // que manda el taller, y esta fila va entera a CHINA.
         assertEquals(List.of("CHINA", "JAPAN"), resultado.getDestinosActivos());
-        assertEquals(20, resultado.getGrupos().get(0).getFilas().get(0).cantidadPara("CHINA"));
+        assertEquals(31, resultado.getGrupos().get(0).getFilas().get(0).cantidadPara("CHINA"));
     }
 
     @Test
@@ -397,14 +400,14 @@ class DigestionTallerServiceTest {
     }
 
     @Test
-    void enApcLaDestinacionYLaCantidadSalenDelPedidoYNoDeLaHojaDelTaller() throws Exception {
+    void enApcLaDestinacionSaleDelPedidoYLaCantidadDeLaHojaDelTaller() throws Exception {
         // El lector de APC estaba escrito y probado pero no cableado, así que
         // en la aplicación no se usaba nunca: el envío caía al camino
         // genérico y se quedaba con lo que hubiera apuntado el taller. Este
         // test va por el contenedor real, que es donde se ve.
         // 4100128681 va a "Japan" en el fichero real de pedido.
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("APC", "F63023", "CAMEL", 30)
+                PackingTallerExcel.Fila.de("APC", "F63023", "GAE", 30)
                         .conCode("681").conDestino("PARIS").conUnidadesPorCaja(10));
 
         DigestionTaller resultado = digestion.digerir("APC", taller, pedidoRealDeApc());
@@ -413,6 +416,8 @@ class DigestionTallerServiceTest {
                 "la destinación es la del Document d'achat, no el 'PARIS' de la hoja");
         assertEquals("4100128681", resultado.getGrupos().get(0).getFilas().get(0)
                 .getObjetivos().get(0).pedido());
+        assertEquals(30, resultado.getGrupos().get(0).getFilas().get(0).totalObjetivo(),
+                "la cantidad, en cambio, es la que ha mandado el taller");
     }
 
     @Test
@@ -424,19 +429,19 @@ class DigestionTallerServiceTest {
         // lector nadie recorría este camino, y a AUSTRALIA y DOUANES USA les
         // faltaba la norma.
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "LZZ", 20)
                         .conCode("721").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("719").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "NOIR", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("706").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "GAE", 20)
                         .conCode("681").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "BEIGE", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("689").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "NOIR", 20)
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "GAE", 20)
                         .conCode("694").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "KAKI", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("718").conUnidadesPorCaja(10));
 
         DigestionTaller digerido = digestion.digerir("APC", taller, pedidoRealDeApc());
@@ -454,11 +459,11 @@ class DigestionTallerServiceTest {
         // (Crosslog) y salen en el mismo fichero; la hija solo sobrevive en
         // la columna DESTINATION. DOUANES USA es la hija única de D. USA.
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "CAMEL", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "LZZ", 20)
                         .conCode("721").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "KAKI", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("718").conUnidadesPorCaja(10),
-                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "NOIR", 20)
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "LZZ", 20)
                         .conCode("706").conUnidadesPorCaja(10));
 
         DigestionTaller digerido = digestion.digerir("APC", taller, pedidoRealDeApc());
@@ -834,6 +839,118 @@ class DigestionTallerServiceTest {
 
         assertEquals(50, fila.getRecibido());
         assertEquals(50, fila.cantidadPara("BARCELONA"));
+    }
+
+    // --- La tabla se rellena con lo que ha llegado, no con lo pedido ---
+
+    @Test
+    void lasCasillasSeRellenanConLoQueHaMandadoElTallerYNoConLoPedido() throws Exception {
+        // El caso real: el pedido pide 326 y del taller han llegado 8. Con las
+        // casillas rellenas con el pedido, la pantalla salía bloqueada nada
+        // más abrirla y había que teclear a mano destinación por destinación
+        // la cuenta que el programa ya sabe hacer.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "LLEGAN-POCAS", "BLACK", 8)
+                        .conUnidadesPorCaja(4));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("LLEGAN-POCAS", "BLACK", 326));
+
+        assertEquals(8, resultado.getGrupos().get(0).getFilas().get(0).totalObjetivo());
+        assertEquals(List.of(), resultado.repartosImposibles());
+        assertTrue(resultado.sePuedeGenerar(), "y se puede generar sin tocar nada");
+    }
+
+    @Test
+    void alRecortarSeDiceCuantoPedíaElPedido() throws Exception {
+        // El número del pedido desaparece de la pantalla al recortar, y es lo
+        // que dice cuánto queda por servir en la siguiente entrega.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "SE-RECORTA", "BLACK", 8).conUnidadesPorCaja(4));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("SE-RECORTA", "BLACK", 326));
+
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("326") && aviso.contains("8")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void cadaFilaVaEnteraASuDestinacionYNoSeRepartePorPrioridad() throws Exception {
+        // La fila ya dice a dónde va, así que no hay nada que repartir:
+        // repartirla entre las destinaciones del pedido pondría en la casilla
+        // de un sitio unidades que el taller ha mandado a otro, y quien lo lea
+        // no tiene forma de saber de dónde ha salido ese número.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "A-SU-SITIO", "BLACK", 30)
+                        .conUnidadesPorCaja(10).conDestino("CH"));
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                PedidoAmiExcel.Fila.pedida("A-SU-SITIO", "BLACK", "U", "07001 CH", 30),
+                PedidoAmiExcel.Fila.pedida("A-SU-SITIO", "BLACK", "U", "07002 JP", 30));
+
+        FilaDigerida fila = digerir(taller, pedido).getGrupos().get(0).getFilas().get(0);
+
+        assertEquals(30, fila.cantidadPara("CHINA"));
+        assertEquals(0, fila.cantidadPara("JAPAN"), "la columna se queda para otra entrega");
+    }
+
+    @Test
+    void dosFilasDelMismoArticuloACadaSitioLlenanCadaUnaSuColumna() throws Exception {
+        // Es como escribe el taller: una fila por destinación, y a veces dos
+        // apuntes de la misma. Las dos del mismo sitio se suman.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "DOS-SITIOS", "BLACK", 64)
+                        .conUnidadesPorCaja(10).conDestino("CH"),
+                PackingTallerExcel.Fila.de("AMI", "DOS-SITIOS", "BLACK", 5)
+                        .conUnidadesPorCaja(10).conDestino("CH"),
+                PackingTallerExcel.Fila.de("AMI", "DOS-SITIOS", "BLACK", 24)
+                        .conUnidadesPorCaja(10).conDestino("JA"));
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                PedidoAmiExcel.Fila.pedida("DOS-SITIOS", "BLACK", "U", "07001 CH", 200),
+                PedidoAmiExcel.Fila.pedida("DOS-SITIOS", "BLACK", "U", "07002 JP", 200));
+
+        FilaDigerida fila = digerir(taller, pedido).getGrupos().get(0).getFilas().get(0);
+
+        assertEquals(69, fila.cantidadPara("CHINA"));
+        assertEquals(24, fila.cantidadPara("JAPAN"));
+        assertEquals(93, fila.getRecibido(), "y el total sigue siendo lo que ha llegado");
+        assertEquals(93, fila.totalObjetivo(), "ni una unidad más de las que hay");
+    }
+
+    @Test
+    void siElTallerMandaMasDeLoPedidoTambienSeDice() throws Exception {
+        // El aviso salta en los dos sentidos: lo que falta por servir y lo que
+        // se está enviando de más. En la tabla solo se ve lo que ha llegado.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "DE-SOBRA", "BLACK", 100)
+                        .conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("DE-SOBRA", "BLACK", 40));
+        FilaDigerida fila = resultado.getGrupos().get(0).getFilas().get(0);
+
+        assertEquals(100, fila.cantidadPara("CHINA"), "se envía lo que ha llegado");
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("pide 40") && aviso.contains("llegado 100")),
+                resultado.getAvisos().toString());
+    }
+
+    @Test
+    void unaFilaQueNoDiceADondeVaSeQuedaEnCeroYSeAvisa() throws Exception {
+        // Con dos destinaciones posibles y sin columna DESTINATION no hay
+        // forma de saber a cuál va: nadie inventa el destino de un bulto.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "SIN-DESTINO", "BLACK", 30)
+                        .conUnidadesPorCaja(10));
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                PedidoAmiExcel.Fila.pedida("SIN-DESTINO", "BLACK", "U", "07001 CH", 20),
+                PedidoAmiExcel.Fila.pedida("SIN-DESTINO", "BLACK", "U", "07002 JP", 10));
+
+        DigestionTaller resultado = digerir(taller, pedido);
+        FilaDigerida fila = resultado.getGrupos().get(0).getFilas().get(0);
+
+        assertEquals(0, fila.totalObjetivo());
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("no dice a qué destinación va")),
+                resultado.getAvisos().toString());
     }
 
     // --- No se puede enviar más de lo que ha llegado ---

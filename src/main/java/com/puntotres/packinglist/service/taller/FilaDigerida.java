@@ -75,18 +75,17 @@ public class FilaDigerida {
     /**
      * Se traga otra fila del taller del mismo artículo.
      *
-     * Lo <b>recibido sí se suma</b> —son unidades físicas que han llegado en
-     * dos apuntes—, pero los <b>objetivos de una destinación no</b>: la
-     * cantidad objetivo la dice el pedido del cliente, que habla de la
-     * referencia y la destinación, no de cuántas veces la haya escrito el
-     * taller. Sumarlos pediría el doble de lo pedido. Las destinaciones que
-     * la otra fila trae y esta no, se añaden: es el caso del cliente sin
-     * excel de pedido, donde cada fila del taller lleva su propia
-     * destinación.
+     * Se <b>suman las dos cosas</b>, lo recibido y lo que va a cada
+     * destinación, porque las dos son unidades físicas de la hoja del taller:
+     * dos filas del mismo artículo al mismo sitio son dos apuntes de la misma
+     * entrega, y dos filas a sitios distintos llenan cada una su columna.
      *
-     * Una destinación repetida con cantidad cero sí cede: es lo que vale una
-     * sugerencia (en AMI, el PO que se copia de una fila hermana), y dejarla
-     * ganar borraría una cantidad de verdad.
+     * <p>Ojo, que esto no siempre fue así: mientras el objetivo fue la
+     * cantidad PEDIDA, sumarlo pedía el doble de lo pedido —en la hoja real,
+     * 466 unidades recibidas contra 932 repartidas—, porque lo pedido a una
+     * destinación es una propiedad del artículo y del sitio, no de cuántas
+     * veces lo haya escrito el taller. Desde que la tabla enseña lo que manda
+     * el taller, cada fila aporta solo lo suyo y sumar es lo correcto.
      */
     public void fusionar(int masRecibido, List<ObjetivoDestino> masObjetivos,
                          boolean otraSinPedido) {
@@ -98,9 +97,14 @@ public class FilaDigerida {
             int ya = indiceDe(otro.destino());
             if (ya < 0) {
                 objetivos.add(otro);
-            } else if (objetivos.get(ya).cantidad() == 0 && otro.cantidad() > 0) {
-                objetivos.set(ya, otro);
+                continue;
             }
+            ObjetivoDestino actual = objetivos.get(ya);
+            // El número de pedido no se suma: se conserva el que haya, y si no
+            // había ninguno se coge el de la otra fila.
+            objetivos.set(ya, new ObjetivoDestino(actual.destino(),
+                    actual.cantidad() + otro.cantidad(),
+                    actual.pedido() != null ? actual.pedido() : otro.pedido()));
         }
     }
 
@@ -137,6 +141,22 @@ public class FilaDigerida {
 
     public void corregirCantidad(String destino, int cantidad) {
         corregirObjetivo(destino, cantidad, null);
+    }
+
+    /**
+     * Deja en cada objetivo las unidades que de verdad se van a enviar,
+     * conservando su destinación y su número de pedido.
+     *
+     * Va por POSICIÓN y no por destinación porque el mismo artículo puede
+     * estar pedido dos veces para el mismo sitio en dos pedidos distintos, y
+     * entonces las dos entradas se llevarían la misma cantidad.
+     */
+    public void fijarCantidades(int[] cantidades) {
+        for (int i = 0; i < objetivos.size() && i < cantidades.length; i++) {
+            ObjetivoDestino actual = objetivos.get(i);
+            objetivos.set(i, new ObjetivoDestino(actual.destino(),
+                    Math.max(0, cantidades[i]), actual.pedido()));
+        }
     }
 
     /**

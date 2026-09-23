@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -82,6 +83,9 @@ public class ObjetivosPedidoApc implements ObjetivosPedido {
                         + "hay que decir a mano cuánto se envía y a dónde");
                 continue;
             }
+            if (!casaElColor(linea, candidatas.get(0), pedido, resultado)) {
+                continue;
+            }
             Optional<ApcPedidoExcel.Comanda> comanda =
                     pedido.comandaDe(candidatas.get(0).pedido());
             if (comanda.isEmpty() || comanda.get().destino().isBlank()) {
@@ -95,6 +99,46 @@ public class ObjetivosPedidoApc implements ObjetivosPedido {
                     comanda.get().pedido()));
         }
         return resultado;
+    }
+
+    /**
+     * El color de la fila del taller tiene que ser uno de los del pedido.
+     *
+     * El código de tres dígitos identifica el "Document d'achat", y con eso
+     * bastaba mientras el color no se pudiera comparar. Se puede: el taller
+     * escribe el mismo código que el pedido ("LAW", "GAU"), así que un color
+     * que no es el de ese pedido significa que uno de los dos está mal —en el
+     * fichero real, una fila de F67080 con el pedido 701 puesta como LAW
+     * cuando ese pedido es GAU—. Dar esa fila por buena empaqueta el artículo
+     * con el número y la destinación de <b>otro</b> color, y eso no se ve
+     * hasta que el bulto llega al cliente.
+     *
+     * No casar es lo mismo que no encontrar la fila: se avisa, la fila se
+     * queda sin cantidad y el usuario decide. No bloquea porque se arregla
+     * escribiendo, y el color bueno lo sabe quien tiene la pieza delante.
+     *
+     * Se perdona lo tipográfico —mayúsculas y espacios— y que el taller
+     * escriba el código con su nombre detrás ("GAU CAMEL"). Lo que no se
+     * inventa es una traducción de nombres de color: si el taller escribe
+     * solo "CAMEL", no hay con qué compararlo y la fila no casa.
+     */
+    private static boolean casaElColor(LineaTaller linea, ApcPedidoExcel.FilaPedido candidata,
+                                       ApcPedidoExcel pedido, ResultadoObjetivos resultado) {
+        Set<String> colores = pedido.coloresDe(candidata.pedido());
+        if (colores.isEmpty()) {
+            // El fichero no trae columna de color: no hay nada que comprobar.
+            return true;
+        }
+        String delTaller = linea.color().trim().toUpperCase(Locale.ROOT);
+        String primeraPalabra = delTaller.split("\\s+")[0];
+        if (colores.contains(delTaller) || colores.contains(primeraPalabra)) {
+            return true;
+        }
+        resultado.avisarDe(linea.referencia(), "En la fila " + linea.fila() + ", el pedido "
+                + candidata.pedido() + " de " + linea.referencia() + " es del color "
+                + String.join(" o ", colores) + " y la hoja del taller dice '" + linea.color()
+                + "': no es el mismo artículo, hay que decir a mano cuánto se envía y a dónde");
+        return false;
     }
 
     /**

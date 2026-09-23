@@ -18,7 +18,9 @@
         <li>El <strong>cartón</strong> y el <strong>peso</strong> salen de la hoja del taller si
             los trae, y si no de lo que se usó la última vez.</li>
         <li><strong>Cantidad taller</strong> es lo que ha mandado el taller y no se usa.</li>
-        <li><strong>Cantidad para Cliente</strong> es lo que se usa para generar el packing.</li>
+        <li><strong>Cantidad para Cliente</strong> es lo que se usa para generar el packing.
+            Viene rellena con lo que ha mandado el taller: si no llega para todo lo pedido,
+            se reparte por prioridad de destinación.</li>
     </ul>
 
     <section class="tarjeta alerta error" th:if="${!bloqueos.isEmpty()}">
