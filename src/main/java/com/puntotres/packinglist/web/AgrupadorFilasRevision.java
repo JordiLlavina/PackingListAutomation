@@ -173,7 +173,11 @@ public final class AgrupadorFilasRevision {
                 && Objects.equals(a.getNumeroPalet(), b.getNumeroPalet())
                 && Objects.equals(a.getPesoNetoKg(), b.getPesoNetoKg())
                 && Objects.equals(a.getPesoBrutoKg(), b.getPesoBrutoKg())
-                && Objects.equals(a.getTalla(), b.getTalla());
+                && Objects.equals(a.getTalla(), b.getTalla())
+                // El canal es la destinación HIJA, y la pantalla la pinta como
+                // título de su tabla: un tramo que cruzara dos hijas quedaría
+                // bajo el nombre de una sola.
+                && Objects.equals(a.getCanal(), b.getCanal());
     }
 
     /** "4-8" para un tramo; "4" a secas para una caja suelta, nunca "4-4". */

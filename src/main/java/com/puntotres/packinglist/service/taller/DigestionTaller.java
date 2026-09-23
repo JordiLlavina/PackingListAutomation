@@ -97,7 +97,7 @@ public class DigestionTaller {
                 if (fila.repartoImposible()) {
                     imposibles.add("De " + grupo.getReferencia() + " " + fila.getColor()
                             + tallaDe(fila) + " han llegado " + fila.getRecibido()
-                            + " unidades y se están repartiendo " + fila.totalObjetivo()
+                            + " unidades y en el pedido hay " + fila.totalObjetivo()
                             + ": no se puede enviar más de lo que ha llegado del taller");
                 }
             }

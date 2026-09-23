@@ -10,7 +10,7 @@
     <!-- Selector del modo de entrada: solo uno activo a la vez. -->
     <div class="selector-modo" role="tablist">
         <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CON IMAGEN</button>
-        <button type="button" id="botonModoTALLER" data-modo="TALLER">PACKING LIST TALLER</button>
+        <button type="button" id="botonModoTALLER" data-modo="TALLER">CON EXCEL DE TALLER</button>
         <button type="button" id="botonModoJSON" data-modo="JSON">CON TEXTO</button>
     </div>
 
@@ -48,17 +48,6 @@
                 <select id="temporadaGuardada" name="temporadaGuardadaId"
                         th:attr="data-seleccionada=*{temporadaGuardadaId}"></select>
                 <p class="ayuda" id="ayudaTemporadaGuardada"></p>
-            </div>
-        </div>
-
-        <div id="camposAmi" class="campos-cabecera">
-            <div>
-                <label for="ciudadProveedor">Ciudad del proveedor</label>
-                <input type="text" id="ciudadProveedor" th:field="*{ciudadProveedor}" placeholder="Badalona">
-            </div>
-            <div>
-                <label for="paisProveedor">País del proveedor</label>
-                <input type="text" id="paisProveedor" th:field="*{paisProveedor}" placeholder="Spain">
             </div>
         </div>
 
@@ -115,6 +104,21 @@
                     AMI y APC tienen una altura por destinación y no se puede cambiar aquí.</p>
                 <input type="number" id="alturaMaximaPaletCm" min="20" max="300"
                        th:field="*{alturaMaximaPaletCm}" placeholder="168">
+            </div>
+        </div>
+
+        <!-- Ciudad y país del proveedor: solo los pide la plantilla de AMI, y
+             van al final de los bloques de entrada para no separar el fichero
+             que se sube de su explicación. Se ven en los tres modos: son de la
+             cabecera del packing list, no del packing del taller. -->
+        <div id="camposAmi" class="campos-cabecera">
+            <div>
+                <label for="ciudadProveedor">Ciudad del proveedor</label>
+                <input type="text" id="ciudadProveedor" th:field="*{ciudadProveedor}" placeholder="Badalona">
+            </div>
+            <div>
+                <label for="paisProveedor">País del proveedor</label>
+                <input type="text" id="paisProveedor" th:field="*{paisProveedor}" placeholder="Spain">
             </div>
         </div>
 

@@ -799,10 +799,55 @@ public class PackingListController {
             // El Livraison code es de la destinación entera: todas sus cajas
             // llevan el mismo, así que basta con mirar la primera.
             String livraisonCode = cajas.isEmpty() ? null : cajas.get(0).getLivraisonCode();
-            vista.add(new DestinoVista(i, destinos.get(i).getDestino().getNombreDestino(),
-                    filas, contarCajasFisicas(cajas), livraisonCode));
+            String nombre = destinos.get(i).getDestino().getNombreDestino();
+            vista.add(new DestinoVista(i, nombre, bloquesPorHija(filas, cajas, nombre),
+                    contarCajasFisicas(cajas), livraisonCode));
         }
         return vista;
+    }
+
+    /**
+     * Reparte las filas de una destinación entre sus destinaciones HIJAS, en
+     * el orden en que aparecen.
+     *
+     * La hija de una caja es su canal, que es donde sobrevive después de que
+     * {@code ResolutorDestinosPadre} la funda con sus hermanas; una caja que
+     * va al padre directamente no lleva canal y se queda con el nombre de la
+     * destinación. Un cliente sin hijas sale con un bloque único, que es la
+     * tabla de siempre.
+     *
+     * Se reparte DESPUÉS de compactar y no antes: los índices de una fila son
+     * posiciones dentro de la lista de la destinación entera, y agrupar sobre
+     * sublistas los desplazaría —lo tecleado acabaría en la caja de al lado—.
+     * Que un tramo compactado no cruce dos hijas lo garantiza
+     * {@code AgrupadorFilasRevision}, que parte el grupo al cambiar el canal.
+     */
+    private static List<DestinoVista.Bloque> bloquesPorHija(List<FilaCaja> filas,
+                                                            List<CajaData> cajas, String nombre) {
+        Map<String, List<FilaCaja>> porHija = new LinkedHashMap<>();
+        for (FilaCaja fila : filas) {
+            String canal = fila.caja().getCanal();
+            String hija = canal == null || canal.isBlank() ? nombre : canal.trim();
+            porHija.computeIfAbsent(hija, clave -> new ArrayList<>()).add(fila);
+        }
+        List<DestinoVista.Bloque> bloques = new ArrayList<>();
+        porHija.forEach((hija, suyas) -> bloques.add(
+                new DestinoVista.Bloque(hija, suyas, contarCajasFisicasDe(suyas, cajas))));
+        return bloques;
+    }
+
+    /**
+     * Los bultos de un bloque: números de caja DISTINTOS entre las cajas que
+     * representan sus filas. Ni las filas ni sus índices valen para contarlos,
+     * porque una fila compactada vale por varias cajas y un bulto mixto ocupa
+     * varias líneas sin dejar de ser un bulto.
+     */
+    private static int contarCajasFisicasDe(List<FilaCaja> filas, List<CajaData> cajas) {
+        return (int) filas.stream()
+                .flatMap(fila -> fila.indicesEnDestino().stream())
+                .map(indice -> cajas.get(indice).getNumeroCaja())
+                .distinct()
+                .count();
     }
 
     /** Bultos reales de la destinación: las filas ya no los cuentan (van compactadas). */

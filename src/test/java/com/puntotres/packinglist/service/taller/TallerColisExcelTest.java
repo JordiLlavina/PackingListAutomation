@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.taller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,8 +25,19 @@ class TallerColisExcelTest {
 
     private static final String FICHERO_REAL = "/ejemplos/taller/Packing List Taller Exemple.xlsx";
 
+    /** La plantilla con las dos columnas de caja que el taller añadió después. */
+    private static final String CON_CAJA_MEDIDA =
+            "/ejemplos/taller/plantilla-taller-con-peso-y-medida.xlsx";
+
     private static TallerColisExcel real() throws IOException, TallerColisExcel.TallerExcelException {
         try (InputStream in = TallerColisExcelTest.class.getResourceAsStream(FICHERO_REAL)) {
+            return TallerColisExcel.desdeBytes(in.readAllBytes());
+        }
+    }
+
+    private static TallerColisExcel conCajaMedida()
+            throws IOException, TallerColisExcel.TallerExcelException {
+        try (InputStream in = TallerColisExcelTest.class.getResourceAsStream(CON_CAJA_MEDIDA)) {
             return TallerColisExcel.desdeBytes(in.readAllBytes());
         }
     }
@@ -282,6 +294,72 @@ class TallerColisExcelTest {
         assertEquals(2, TallerColisExcel.desdeBytes(libroConCabeceraYFilas("LISTE DE COLIS",
                 List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "QUANTITE"),
                 List.of(List.of("AMI", "PROD", "ULL1", "KAKI", "64")))).lineas().get(0).fila());
+    }
+
+    // --- Las dos columnas de la caja: peso bruto y dimensiones ---
+
+    @Test
+    void elPesoYLaMedidaDeLaCajaSeLeenDeLaPlantillaConLasColumnasNuevas() throws Exception {
+        // Los títulos vienen partidos en dos líneas dentro de la celda, igual
+        // que "QTITE / COLIS": "POIDS BRUT\nCAISSE" y "DIMENSIONS \nCAISSE".
+        List<LineaTaller> lineas = conCajaMedida().lineas();
+
+        assertEquals("ULL163.AL0052", lineas.get(0).referencia());
+        assertEquals(10.0, lineas.get(0).pesoBrutoCajaKg());
+        assertEquals("60X60X40", lineas.get(0).medidaCajaTaller());
+    }
+
+    @Test
+    void elTotalDePesoDeDebajoDeLaTablaNoSeConfundeConLaColumna() throws Exception {
+        // Bajo la tabla hay un total titulado "Poids Brut (Kg)". Es el motivo
+        // de que POIDS BRUT CAISSE no tenga un sinónimo suelto "POIDS BRUT".
+        TallerColisExcel excel = conCajaMedida();
+
+        assertEquals(List.of(), excel.avisos());
+        assertTrue(excel.lineas().stream().noneMatch(l -> l.referencia().contains("POIDS")));
+    }
+
+    @Test
+    void elPesoDeLaCajaAdmiteDecimalesConComa() throws Exception {
+        // La celda de verdad es numérica, pero alguien puede teclearla a mano.
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "QUANTITE",
+                        "POIDS BRUT CAISSE", "DIMENSIONS CAISSE"),
+                List.of(List.of("AMI", "PROD", "ULL1", "KAKI", "64", "10,5", "60x40x40")));
+
+        LineaTaller linea = TallerColisExcel.desdeBytes(libro).lineas().get(0);
+
+        assertEquals(10.5, linea.pesoBrutoCajaKg());
+        assertEquals("60X40X40", linea.medidaCajaTaller());
+    }
+
+    @Test
+    void unPesoQueNoSeEntiendeSeQuedaEnNadaYNoEnCero() throws Exception {
+        // El peso es opcional en todo el programa: un cero acabaría escrito en
+        // el packing list que lee el cliente, y un hueco no.
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "QUANTITE",
+                        "POIDS BRUT CAISSE"),
+                List.of(List.of("AMI", "PROD", "ULL1", "KAKI", "64", "unos 10 kilos")));
+
+        assertNull(TallerColisExcel.desdeBytes(libro).lineas().get(0).pesoBrutoCajaKg());
+    }
+
+    @Test
+    void unaHojaSinLasColumnasDeCajaSeSigueLeyendoIgual() throws Exception {
+        // Son las últimas columnas en llegar: las hojas anteriores a ellas
+        // siguen valiendo, y el peso y el cartón salen de la memoria.
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "QUANTITE"),
+                List.of(List.of("AMI", "PROD", "ULL1", "KAKI", "64")));
+
+        TallerColisExcel excel = TallerColisExcel.desdeBytes(libro);
+
+        assertNull(excel.lineas().get(0).pesoBrutoCajaKg());
+        assertEquals("", excel.lineas().get(0).medidaCajaTaller());
+        assertTrue(excel.opcionalesAusentes()
+                .contains(TallerColisExcel.Columna.POIDS_BRUT_CAISSE));
+        assertEquals(List.of(), excel.avisos(), "y no se avisa: no las traía nadie");
     }
 
     // --- Constructores de libros de prueba ---

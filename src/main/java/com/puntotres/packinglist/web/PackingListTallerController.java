@@ -278,7 +278,11 @@ public class PackingListTallerController {
                 .clientePara(tallerEnCurso.getClaveCliente())
                 .map(ClienteConfig::getEtiquetaPedido).orElse("Nº pedido"));
         model.addAttribute("destinos", digestion.getDestinosActivos());
-        model.addAttribute("tamanosCaja", tamanosParaElDesplegable(digestion));
+        List<String> tamanos = tamanosParaElDesplegable(digestion);
+        model.addAttribute("tamanosCaja", tamanos);
+        model.addAttribute("tamanosSinTara", tamanos.stream()
+                .filter(tamano -> catalogoTaras.taraPara(tamano).isEmpty())
+                .toList());
 
         // Los avisos que hablan de una referencia se pintan encima de su
         // tabla; los del envío o del fichero entero, en la lista de arriba.

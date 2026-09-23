@@ -79,7 +79,17 @@ public final class TallerColisExcel {
                 "EXPEDITION PUNTOTRES"),
         QTITE_COLIS(false, "QTITE/COLIS", "QTE/COLIS", "QTITE COLIS", "QTE COLIS"),
         QUANTITE(true, "QUANTITE", "QUANTITE TOTALE", "QTE TOTALE"),
-        NUM_COLIS(false, "N DE COLIS", "NO DE COLIS", "COLIS");
+        NUM_COLIS(false, "N DE COLIS", "NO DE COLIS", "COLIS"),
+        // Las dos últimas en llegar: el taller pesa y mide la caja y lo
+        // apunta aquí, así que el peso y el cartón de una referencia ya no
+        // hay que teclearlos a mano. Los sinónimos son ajustados a propósito:
+        // bajo la tabla hay un total titulado "Poids Brut (Kg)", y un
+        // sinónimo suelto como "POIDS BRUT" lo pondría a tiro de la búsqueda
+        // de cabecera.
+        POIDS_BRUT_CAISSE(false, "POIDS BRUT CAISSE", "POIDS BRUT/CAISSE", "POIDS BRUT COLIS",
+                "PESO BRUTO CAJA"),
+        DIMENSIONS_CAISSE(false, "DIMENSIONS CAISSE", "DIMENSION CAISSE", "DIMENSIONS/CAISSE",
+                "DIMENSIONS COLIS", "DIMENSIONES CAJA", "MEDIDA CAJA");
 
         private final boolean obligatoria;
         private final List<String> nombres;
@@ -289,7 +299,9 @@ public final class TallerColisExcel {
                 mayusculas(texto(fila, columnas.get(Columna.CODE))),
                 mayusculas(texto(fila, columnas.get(Columna.NUM_EXPEDICION))),
                 enteroOpcional(texto(fila, columnas.get(Columna.QTITE_COLIS))),
-                cantidad(cantidadCruda, referencia, indiceFila + 1, avisos));
+                cantidad(cantidadCruda, referencia, indiceFila + 1, avisos),
+                decimalOpcional(texto(fila, columnas.get(Columna.POIDS_BRUT_CAISSE))),
+                mayusculas(texto(fila, columnas.get(Columna.DIMENSIONS_CAISSE))));
     }
 
     /**
@@ -313,6 +325,28 @@ public final class TallerColisExcel {
                     + "' no se entiende ('" + crudo.trim() + "'): se deja en 0 y hay que teclearla"));
         }
         return 0;
+    }
+
+    /**
+     * Un peso: null si la celda está vacía o si no hay forma de leerla como
+     * número. Los decimales llegan con coma cuando alguien los teclea a mano
+     * ("10,5"), aunque la celda de verdad sea numérica.
+     *
+     * Un valor que no se entiende se devuelve como null y no como cero: el
+     * peso es opcional en todo el programa, y un cero se escribiría en el
+     * packing list que lee el cliente.
+     */
+    private static Double decimalOpcional(String crudo) {
+        String limpio = crudo.trim().replace(',', '.');
+        if (limpio.isEmpty()) {
+            return null;
+        }
+        try {
+            double valor = new BigDecimal(limpio).doubleValue();
+            return valor > 0 ? valor : null;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static Integer enteroOpcional(String crudo) {

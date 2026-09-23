@@ -116,7 +116,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 textarea.json {
-    min-height: 18rem;
+    min-height: 11rem;
     font-family: Consolas, monospace;
     font-size: 0.85rem;
 }
@@ -262,6 +262,27 @@ section.destino thead th {
     position: sticky;
     top: 3.2rem;
     z-index: 2;
+}
+
+/* Título de una destinación HIJA dentro de su destinación padre (APC:
+   AUSTRALIA, CHINE FRANCH y WHOLESALE viajan bajo WHOLESALE). Solo sale
+   cuando hay más de una, así que tiene que leerse como una división DENTRO
+   de la sección y no como otra sección: de ahí el tamaño menor que el h2 y
+   el filete de arriba.
+
+   NO lleva sticky a propósito, como el Livraison code: el h2 y el thead se
+   anclan a 0 y 3.2rem, y una tercera capa fija obligaría a recalcular esos
+   dos offsets, que además cambiarían según haya título de hija o no. */
+section.destino .bloque-hija + .bloque-hija {
+    margin-top: 1.4rem;
+}
+
+section.destino h3.titulo-hija {
+    margin: 0 0 0.4rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid var(--borde);
+    font-size: 1rem;
+    opacity: 0.85;
 }
 
 /* Livraison code de la destinación. NO lleva sticky a propósito: el h2 y el

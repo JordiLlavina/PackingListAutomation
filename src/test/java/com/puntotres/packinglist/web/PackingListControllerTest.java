@@ -1258,14 +1258,67 @@ class PackingListControllerTest {
         assertEquals("false", clientesJs.get("ACKERMANN").get("pedidoCliente"));
     }
 
+    private static final String JSON_APC_DOS_HIJAS = """
+            {"cliente": "APC", "destinos": [
+              {"destino": "Australia",
+               "palets": [{"palet": 1, "cajaInicio": 1, "cajaFin": 1}],
+               "referencias": [
+                 {"referencia": "PXBHZ-H65077", "color": "LZZ-NOIR",
+                  "medidaCaja": "40x30x20", "pedido": "721",
+                  "cajas": [{"caja": 1, "unidades": 3, "pesoBruto": 4.2}]}
+               ]},
+              {"destino": "Chine franch",
+               "palets": [{"palet": 2, "cajaInicio": 2, "cajaFin": 2}],
+               "referencias": [
+                 {"referencia": "PXBHZ-F65101", "color": "LZZ-NOIR",
+                  "medidaCaja": "40x30x20", "pedido": "719",
+                  "cajas": [{"caja": 2, "unidades": 3, "pesoBruto": 4.2}]}
+               ]}
+            ]}
+            """;
+
     @Test
-    void unaHijaDeApcSeRevisaBajoSuDestinoPadre() throws Exception {
+    void unaHijaDeApcSeRevisaBajoSuDestinoPadreYConSuNombre() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importarApcAustralia(sesion);
 
-        // La sección de la revisión es la del padre; "Australia" solo
-        // sobrevive en el canal, que esta tabla no muestra.
-        assertTrue(revision(sesion).contains("WHOLESALE"));
+        // La sección es la del padre, que es el fichero que va a salir, pero
+        // el material es de AUSTRALIA y eso hay que poder leerlo: si no, la
+        // pantalla dice que va a un sitio al que no va.
+        String html = revision(sesion);
+
+        assertTrue(html.contains("WHOLESALE"));
+        assertTrue(html.contains("AUSTRALIA (1 cajas)"));
+    }
+
+    @Test
+    void lasHijasDeUnaMismaDestinacionSeRevisanCadaUnaEnSuTabla() throws Exception {
+        // AUSTRALIA y CHINE FRANCH salen en el mismo fichero (WHOLESALE) pero
+        // no comparten bulto ni palet. Con una sola tabla titulada "WHOLESALE"
+        // se veían dos cajas en dos palets distintos sin nada que dijera por
+        // qué.
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "APC").param("json", JSON_APC_DOS_HIJAS)
+                        .param("temporada", "E25").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "28/04/2026").param("fechaEnvio", "28/04/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        String html = revision(sesion);
+
+        assertTrue(html.contains("WHOLESALE (2 cajas)"), "la sección sigue siendo el fichero");
+        assertTrue(html.contains("AUSTRALIA (1 cajas)"));
+        assertTrue(html.contains("CHINE FRANCH (1 cajas)"));
+    }
+
+    @Test
+    void unaDestinacionSinHijasNoRepiteSuNombreEncimaDeLaTabla() throws Exception {
+        // AMI no tiene destinaciones hijas: el título de la hija sería el de
+        // la sección otra vez.
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        assertFalse(revision(sesion).contains("titulo-hija"));
     }
 
     @Test

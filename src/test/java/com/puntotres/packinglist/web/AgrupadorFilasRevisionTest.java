@@ -125,6 +125,25 @@ class AgrupadorFilasRevisionTest {
     }
 
     @Test
+    void unCanalDistintoParteElGrupoPorqueEsOtraDestinacion() {
+        // El canal es la destinación HIJA (AUSTRALIA y CHINE FRANCH viajan
+        // las dos bajo WHOLESALE), y la revisión la pinta como título de su
+        // tabla: un tramo "4-5" que cruzara las dos quedaría bajo el nombre
+        // de una sola, diciendo que esas cajas van a un sitio al que no van.
+        CajaData australia = caja(4, "PXBHZ-H65077", "LZZ", "4100128721", 3, "40x30x20",
+                1, 5.0, 5.6);
+        australia.setCanal("AUSTRALIA");
+        CajaData chine = caja(5, "PXBHZ-H65077", "LZZ", "4100128721", 3, "40x30x20",
+                1, 5.0, 5.6);
+        chine.setCanal("CHINE FRANCH");
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(List.of(australia, chine), 0);
+
+        assertEquals(List.of("4", "5"),
+                filas.stream().map(FilaCaja::rangoCajas).toList());
+    }
+
+    @Test
     void unNumeroDeCajaNoCorrelativoParteElGrupo() {
         // Las cajas 4, 5 y 9 son idénticas, pero un rango "4-9" prometería
         // seis cajas y solo representaría tres.

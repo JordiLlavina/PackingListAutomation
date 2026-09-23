@@ -123,6 +123,200 @@ class DigestionTallerServiceTest {
         assertEquals(8, resultado.getGrupos().get(0).getUnidadesPorCaja());
     }
 
+    // --- El cartón y el peso que escribe el taller en su hoja ---
+
+    @Test
+    void elCartonYElPesoDelTallerGananALaMemoria() throws Exception {
+        // La hoja del taller describe el bulto que acaba de salir de allí y
+        // el peso que alguien acaba de poner en la báscula; la memoria, el
+        // envío anterior. Las unidades por caja no cambian de fuente: siguen
+        // siendo las de la memoria, que es lo que una persona dio por bueno.
+        memoria.recordar("AMI", "CAJA-TALLER", "60x40x30", 6);
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "CAJA-TALLER", "NOIR", 20)
+                        .conUnidadesPorCaja(6)
+                        .conMedidaCaja("60X40X40")
+                        .conPesoBrutoCaja(12.0));
+
+        GrupoReferencia grupo = digerir(taller, pedidoDe("CAJA-TALLER", "NOIR", 20))
+                .getGrupos().get(0);
+
+        assertEquals("60x40x40", grupo.getMedidaCaja(), "en la forma del catálogo de taras");
+        assertEquals(12.0, grupo.getPesoBrutoKg());
+        assertEquals(6, grupo.getUnidadesPorCaja());
+    }
+
+    @Test
+    void siElTallerYLaMemoriaNoCuadranSeAvisaEnLaReferencia() throws Exception {
+        memoria.recordar("AMI", "NO-CUADRA", "60x40x30", 6, 5.0);
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "NO-CUADRA", "NOIR", 20)
+                        .conUnidadesPorCaja(6)
+                        .conMedidaCaja("60x40x40")
+                        .conPesoBrutoCaja(12.0));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("NO-CUADRA", "NOIR", 20));
+
+        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("cartón")),
+                "el cartón cambia la tara, el volumen y las cajas que caben en un palet");
+        assertTrue(resultado.getAvisos().stream().anyMatch(a -> a.contains("pesa la caja")));
+        assertTrue(resultado.getDetalle().stream()
+                .allMatch(aviso -> "NO-CUADRA".equals(aviso.referencia())),
+                "y van a la tarjeta de su referencia, no a la lista general");
+    }
+
+    @Test
+    void siElTallerYLaMemoriaDicenLoMismoNoSeAvisaDeNada() throws Exception {
+        // Lo normal es que coincidan, y un aviso que sale siempre entierra a
+        // los que sí hay que leer.
+        memoria.recordar("AMI", "CUADRA", "60x40x40", 6);
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "CUADRA", "NOIR", 20)
+                        .conUnidadesPorCaja(6)
+                        .conMedidaCaja("60X40X40"));
+
+        assertEquals(List.of(), digerir(taller, pedidoDe("CUADRA", "NOIR", 20)).getAvisos());
+    }
+
+    @Test
+    void elPesoSaleDeLaCajaMasLlenaYLaMedidaDeEsaMismaFila() throws Exception {
+        // Una referencia ocupa varias filas y no todas esas cajas van llenas:
+        // la última de un color lleva lo que sobra. La que describe a la
+        // referencia es la de más unidades por caja.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "MAS-LLENA", "NOIR", 5)
+                        .conUnidadesPorCaja(5).conMedidaCaja("60x40x30").conPesoBrutoCaja(7.0),
+                PackingTallerExcel.Fila.de("AMI", "MAS-LLENA", "BEIGE", 8)
+                        .conUnidadesPorCaja(8).conMedidaCaja("60x40x40").conPesoBrutoCaja(12.0));
+        byte[] pedido = PedidoAmiExcel.crear("EAN H26",
+                PedidoAmiExcel.Fila.pedida("MAS-LLENA", "NOIR", "U", "07001 CH", 5),
+                PedidoAmiExcel.Fila.pedida("MAS-LLENA", "BEIGE", "U", "07001 CH", 8));
+
+        GrupoReferencia grupo = digerir(taller, pedido).getGrupos().get(0);
+
+        assertEquals(12.0, grupo.getPesoBrutoKg());
+        assertEquals("60x40x40", grupo.getMedidaCaja(), "el cartón es el de la fila del peso");
+        assertEquals(8, grupo.getUnidadesPorCaja());
+    }
+
+    @Test
+    void siElPesoEsDeUnaCajaQueNoLlevaLasUnidadesQueVanAIrSeAvisa() throws Exception {
+        // El peso que se enseña es el de una caja LLENA y el programa escala
+        // con él las que van a medias. Si la fila pesada llevaba otra
+        // cantidad, no es un peso de menos: es el de otro bulto.
+        memoria.recordar("AMI", "PESO-A-MEDIAS", "60x40x40", 10);
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "PESO-A-MEDIAS", "NOIR", 6)
+                        .conUnidadesPorCaja(6).conPesoBrutoCaja(9.0));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("PESO-A-MEDIAS", "NOIR", 6));
+
+        assertEquals(9.0, resultado.getGrupos().get(0).getPesoBrutoKg(), "se enseña igual");
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(a -> a.contains("caja de 6") && a.contains("10")));
+    }
+
+    @Test
+    void sinPesoEnLaHojaMandaElDeLaMemoria() throws Exception {
+        digestion.memorizar("AMI", pesada("SOLO-MEMORIA", 12.5));
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "SOLO-MEMORIA", "NOIR", 20)
+                        .conMedidaCaja("60x40x40"));
+
+        GrupoReferencia grupo = digerir(taller, pedidoDe("SOLO-MEMORIA", "NOIR", 20))
+                .getGrupos().get(0);
+
+        assertEquals(12.5, grupo.getPesoBrutoKg(), 0.011);
+    }
+
+    @Test
+    void unCartonDelTallerSinMemoriaYaNoEsUnValorPorDefecto() throws Exception {
+        // Antes de estas columnas, sin memoria el cartón era el estándar y
+        // nadie lo había mirado. Ahora lo dice quien ha hecho la caja.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "SOLO-TALLER", "NOIR", 20)
+                        .conUnidadesPorCaja(8).conMedidaCaja("60X40X45").conPesoBrutoCaja(9.0));
+
+        GrupoReferencia grupo = digerir(taller, pedidoDe("SOLO-TALLER", "NOIR", 20))
+                .getGrupos().get(0);
+
+        assertEquals("60x40x45", grupo.getMedidaCaja());
+        assertEquals(9.0, grupo.getPesoBrutoKg());
+        assertEquals(OrigenDato.TALLER, grupo.getOrigen());
+    }
+
+    @Test
+    void laPlantillaRealDelTallerLlegaConSuPesoYSuCartonALaPantalla() throws Exception {
+        // De punta a punta contra el fichero que manda el taller: sus dos
+        // columnas nuevas tienen que acabar en las casillas que se ven en el
+        // ajuste, sin teclear nada.
+        byte[] taller;
+        try (var in = DigestionTallerServiceTest.class
+                .getResourceAsStream("/ejemplos/taller/plantilla-taller-con-peso-y-medida.xlsx")) {
+            taller = in.readAllBytes();
+        }
+
+        DigestionTaller resultado = digestion.digerir("AMI", taller, null);
+        GrupoReferencia grupo = resultado.getGrupos().get(0);
+
+        assertEquals("ULL163.AL0052", grupo.getReferencia());
+        assertEquals(10.0, grupo.getPesoBrutoKg());
+        assertEquals("60x60x40", grupo.getMedidaCaja());
+        assertEquals(8, grupo.getUnidadesPorCaja());
+    }
+
+    // --- Las abreviaturas de destinación del taller ---
+
+    /**
+     * Las siete destinaciones del pedido real con la abreviatura que el taller
+     * escribe para cada una: la de su destino PADRE. Es la tabla del cliente.
+     */
+    private static byte[] tallerApcConAbreviaturas() {
+        return PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-H65077", "CAMEL", 20)
+                        .conCode("721").conUnidadesPorCaja(10).conDestino("WH"),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "CAMEL", 20)
+                        .conCode("719").conUnidadesPorCaja(10).conDestino("WH"),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "NOIR", 20)
+                        .conCode("706").conUnidadesPorCaja(10).conDestino("UST"),
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "CAMEL", 20)
+                        .conCode("681").conUnidadesPorCaja(10).conDestino("JPT"),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "BEIGE", 20)
+                        .conCode("689").conUnidadesPorCaja(10).conDestino("KRT"),
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "NOIR", 20)
+                        .conCode("694").conUnidadesPorCaja(10).conDestino("RT"),
+                PackingTallerExcel.Fila.de("APC", "PXBHZ-F65101", "KAKI", 20)
+                        .conCode("718").conUnidadesPorCaja(10).conDestino("WH"));
+    }
+
+    @Test
+    void laAbreviaturaDelTallerYLaDestinacionDelPedidoSonElMismoSitio() throws Exception {
+        // El taller escribe la abreviatura del destino PADRE ("UST", "WH") y
+        // el pedido nombra la destinación HIJA ("Douanes USA", "Australia").
+        // Comparando el texto saltaba un aviso por fila diciendo que no cuadra
+        // lo que sí cuadra, y un aviso que sale siempre entierra a los demás.
+        DigestionTaller resultado = digestion.digerir("APC", tallerApcConAbreviaturas(),
+                pedidoRealDeApc());
+
+        assertEquals(List.of(), resultado.getAvisos().stream()
+                .filter(aviso -> aviso.contains("Manda el pedido"))
+                .toList());
+    }
+
+    @Test
+    void unaAbreviaturaQueDeVerdadEsDeOtroSitioSiAvisa() throws Exception {
+        // La otra mitad: resolver las abreviaturas no puede acabar dando todo
+        // por bueno. JPT es JAPAN, y ese pedido va a Retail.
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("APC", "PXCBC-F63023", "NOIR", 20)
+                        .conCode("694").conUnidadesPorCaja(10).conDestino("JPT"));
+
+        DigestionTaller resultado = digestion.digerir("APC", taller, pedidoRealDeApc());
+
+        assertTrue(resultado.getAvisos().stream()
+                .anyMatch(aviso -> aviso.contains("'JPT'") && aviso.contains("RETAIL")));
+    }
+
     // --- Cruce con el pedido ---
 
     @Test

@@ -48,6 +48,15 @@
                        th:name="|destinos[${destino.indice}].livraisonCode|"
                        th:value="${destino.livraisonCode}">
             </div>
+            <!-- Una tabla por destinación HIJA. Las hijas comparten fichero,
+                 hoja y dirección —por eso están en la misma sección— pero no
+                 comparten bulto ni palet, así que una sola tabla enseñaba las
+                 cajas de dos sitios repartidas en palets distintos sin decir
+                 en ningún sitio por qué. El título solo se calla cuando la
+                 única hija se llama igual que la sección. -->
+            <div class="bloque-hija" th:each="bloque : ${destino.bloques}">
+            <h3 class="titulo-hija" th:if="${destino.muestraNombreDeHija()}"
+                th:text="|${bloque.nombre} (${bloque.totalCajas} cajas)|"></h3>
             <table>
                 <thead>
                 <tr>
@@ -79,7 +88,7 @@
                      así el cambio de palet se ve sin leer la columna— y, si la
                      caja no tiene los dos pesos, el amarillo de pendiente, que
                      el CSS pinta encima de la banda. -->
-                <tr th:each="fila : ${destino.filas}"
+                <tr th:each="fila : ${bloque.filas}"
                     th:classappend="${fila.claseBandaPalet}
                                     + (${fila.cajaPendiente} ? ' pendiente' : '')">
                     <!-- El triángulo va fuera de la tabla de datos, en su
@@ -184,6 +193,7 @@
                 </tr>
                 </tbody>
             </table>
+            </div>
         </section>
 
         <!-- Sin "Recalcular pesos" al pie: cada fila ya tiene su "recalcula

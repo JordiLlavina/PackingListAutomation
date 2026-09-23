@@ -124,9 +124,22 @@ public class ClienteConfig {
 
     /**
      * Destino del catálogo bajo el que va la destinación indicada: ella misma
-     * si es una clave del catálogo, o su padre si es una hija. Se mira primero
-     * como clave para que un destino que además se lista como hija de sí mismo
+     * si es una clave del catálogo, su padre si es una hija, y el destino al
+     * que pertenece si lo que llega es una ABREVIATURA. Se mira primero como
+     * clave para que un destino que además se lista como hija de sí mismo
      * (WHOLESALE) se resuelva a sí mismo sin recorrer nada.
+     *
+     * <p><b>Por qué también la abreviatura.</b> En los papeles de dentro de
+     * casa —el packing list del taller, una hoja manuscrita— la destinación
+     * se escribe abreviada: "WH", "UST", "JPT". Son las mismas abreviaturas
+     * del Livraison code, y son del destino PADRE, mientras que el excel de
+     * pedido del cliente nombra la destinación HIJA ("Australia", "Douanes
+     * USA"). Sin resolverlas, un "UST" del taller y el "DOUANES USA" del
+     * pedido parecen dos sitios distintos siendo el mismo.
+     *
+     * <p>Va la última de las tres a propósito: una abreviatura es un nombre
+     * corto y podría chocar con el nombre de otra destinación, así que un
+     * nombre de verdad —clave o hija— gana siempre.
      */
     public Optional<DestinoResuelto> destinoPadrePara(String destino) {
         if (destino == null) {
@@ -142,6 +155,12 @@ public class ClienteConfig {
                 if (normalizar(hija).equals(buscado)) {
                     return Optional.of(new DestinoResuelto(entrada.getKey(), entrada.getValue()));
                 }
+            }
+        }
+        for (Map.Entry<String, DestinoClienteConfig> entrada : destinos.entrySet()) {
+            String abreviatura = entrada.getValue().getAbreviatura();
+            if (abreviatura != null && normalizar(abreviatura).equals(buscado)) {
+                return Optional.of(new DestinoResuelto(entrada.getKey(), entrada.getValue()));
             }
         }
         return Optional.empty();

@@ -15,6 +15,8 @@
     <ul class="ayuda lista-ayuda">
         <li>El <strong>peso bruto</strong> es opcional y es el de una caja llena, con el cartón:
             las cajas a medias se calculan a partir de él.</li>
+        <li>El <strong>cartón</strong> y el <strong>peso</strong> salen de la hoja del taller si
+            los trae, y si no de lo que se usó la última vez.</li>
         <li><strong>Cantidad taller</strong> es lo que ha mandado el taller y no se usa.</li>
         <li><strong>Cantidad para Cliente</strong> es lo que se usa para generar el packing.</li>
     </ul>
@@ -66,10 +68,16 @@
                  th:classappend="${grupo.estaPendiente()} ? 'fila-bloqueada' : ''">
             <div class="cabecera-grupo">
                 <h3 class="titulo-seccion" th:text="${grupo.referencia}">ULL164.AL0052</h3>
+                <!-- Un cartón que no esté en la tabla de taras se ofrece
+                     igual —el taller puede haber usado uno nuevo— pero
+                     marcado: sin tara no se puede separar el cartón de la
+                     mercancía, y ese peso ni se escribe entero ni se recuerda. -->
                 <label>Cartón
                     <select th:name="|grupos[${iterGrupo.index}].medidaCaja|">
                         <option th:each="tamano : ${tamanosCaja}"
-                                th:value="${tamano}" th:text="${tamano}"
+                                th:value="${tamano}"
+                                th:text="${tamanosSinTara.contains(tamano)}
+                                         ? |${tamano} (sin tara)| : ${tamano}"
                                 th:selected="${tamano == grupo.medidaCaja}"></option>
                     </select>
                 </label>

@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.service.taller;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -194,9 +195,9 @@ public class DigestionTallerService {
         return lector.get().objetivosPara(lineas, excelPedido);
     }
 
-    private static ResultadoObjetivos objetivosDelPropioTaller(String clienteClave,
-                                                               List<LineaTaller> lineas,
-                                                               boolean faltaElPedido) {
+    private ResultadoObjetivos objetivosDelPropioTaller(String clienteClave,
+                                                        List<LineaTaller> lineas,
+                                                        boolean faltaElPedido) {
         ResultadoObjetivos resultado = new ResultadoObjetivos();
         if (faltaElPedido) {
             resultado.avisar("No se ha subido el excel de pedido de " + clienteClave
@@ -220,14 +221,26 @@ public class DigestionTallerService {
         return resultado;
     }
 
-    /** Un cliente de destino único no escribe destinación: es su propio nombre. */
-    private static String destinoDelTaller(String clienteClave, LineaTaller linea) {
-        return linea.destinoTaller().isBlank()
-                ? clienteClave.toUpperCase(Locale.ROOT)
-                : linea.destinoTaller();
+    /**
+     * La destinación de una fila cuando no hay pedido que la diga.
+     *
+     * Un cliente de destino único no escribe destinación: es su propio
+     * nombre. Y lo que escriba se pasa por el catálogo del cliente, porque el
+     * taller la abrevia ("WH", "UST") y ese nombre corto no está declarado en
+     * ningún sitio: sin resolverlo, la destinación se quedaría sin norma de
+     * reparto y bloquearía el envío entero por un nombre.
+     */
+    private String destinoDelTaller(String clienteClave, LineaTaller linea) {
+        if (linea.destinoTaller().isBlank()) {
+            return clienteClave.toUpperCase(Locale.ROOT);
+        }
+        return clientes.clientePara(clienteClave)
+                .flatMap(cliente -> cliente.destinoPadrePara(linea.destinoTaller()))
+                .map(ClienteConfig.DestinoResuelto::nombrePadre)
+                .orElse(linea.destinoTaller());
     }
 
-    private static String claveArticuloDestino(String clienteClave, LineaTaller linea) {
+    private String claveArticuloDestino(String clienteClave, LineaTaller linea) {
         return String.join("|", linea.referencia(), linea.color(), linea.talla(),
                 destinoDelTaller(clienteClave, linea));
     }
@@ -238,14 +251,19 @@ public class DigestionTallerService {
                               ResultadoObjetivos objetivos, DigestionTaller digestion) {
         Map<String, GrupoReferencia> grupos = new LinkedHashMap<>();
         Set<String> destinos = new LinkedHashSet<>();
+        // La caja de una referencia se lee de TODAS sus filas y no de la
+        // primera: la que la describe es la más llena, y esa puede estar la
+        // última. Por eso se resuelve antes de recorrerlas.
+        Map<String, CajaDelTaller> cajas = cajasDelTaller(lineas);
 
         for (LineaTaller linea : lineas) {
             List<ObjetivoDestino> suyos = objetivos.objetivosDe(linea);
             suyos.forEach(objetivo -> destinos.add(objetivo.destino()));
-            avisarSiElTallerDiceOtraDestinacion(linea, suyos, digestion);
+            avisarSiElTallerDiceOtraDestinacion(clienteClave, linea, suyos, digestion);
 
             GrupoReferencia grupo = grupos.computeIfAbsent(linea.referencia(),
-                    referencia -> nuevoGrupo(clienteClave, referencia, linea));
+                    referencia -> nuevoGrupo(clienteClave, referencia,
+                            cajas.getOrDefault(referencia, CajaDelTaller.VACIA), digestion));
             // "Sin pedido" lo dice el lector, no el que la fila tenga o no
             // objetivos: en AMI una fila que el pedido no reconoce recibe el PO
             // de sus hermanas de referencia con cantidad cero, así que TIENE
@@ -299,49 +317,175 @@ public class DigestionTallerService {
                 .orElseGet(() -> List.of(clienteClave.toUpperCase(Locale.ROOT)));
     }
 
+    /** Lo que la hoja del taller dice de la caja de cada referencia. */
+    private static Map<String, CajaDelTaller> cajasDelTaller(List<LineaTaller> lineas) {
+        Map<String, List<LineaTaller>> porReferencia = new LinkedHashMap<>();
+        for (LineaTaller linea : lineas) {
+            porReferencia.computeIfAbsent(linea.referencia(), r -> new ArrayList<>()).add(linea);
+        }
+        Map<String, CajaDelTaller> cajas = new LinkedHashMap<>();
+        porReferencia.forEach((referencia, suyas) -> cajas.put(referencia, CajaDelTaller.de(suyas)));
+        return cajas;
+    }
+
     /**
-     * La cascada del cartón: lo que se usó la última vez, lo que sugiere el
-     * taller, y por último el cartón estándar con las unidades sin rellenar.
+     * La cascada de la caja de una referencia: cartón, unidades por caja y
+     * peso bruto de una caja llena.
+     *
+     * <p><b>El cartón y el peso los manda el taller.</b> Desde que su hoja
+     * trae "DIMENSIONS CAISSE" y "POIDS BRUT CAISSE", ese es el bulto que
+     * acaba de salir de allí y el peso que alguien acaba de poner en la
+     * báscula; la memoria dice lo del envío anterior, que es lo que vale
+     * cuando la hoja no lo trae. Si los dos lo dicen y no coinciden se avisa
+     * en vez de elegir a escondidas: un cartón distinto cambia la tara, el
+     * volumen y cuántas cajas caben en un palet.
+     *
+     * <p><b>Las unidades por caja siguen siendo de la memoria</b>, que es
+     * donde está lo que una persona dio por bueno; las del taller son una
+     * sugerencia. Esa regla es anterior a estas columnas y no cambia.
      */
-    private GrupoReferencia nuevoGrupo(String clienteClave, String referencia, LineaTaller linea) {
+    private GrupoReferencia nuevoGrupo(String clienteClave, String referencia,
+                                       CajaDelTaller taller, DigestionTaller digestion) {
         Optional<MemoriaReferencias.DatosCaja> recordado =
                 memoria.buscar(clienteClave, referencia);
-        if (recordado.isPresent()) {
-            return new GrupoReferencia(referencia, recordado.get().medidaCaja(),
-                    recordado.get().unidadesPorCaja(),
-                    brutoDe(recordado.get().pesoNetoKg(), recordado.get().medidaCaja()),
-                    OrigenDato.MEMORIA);
+        String medidaTaller = normalizada(taller.medidaCaja());
+
+        String medida = medidaTaller != null ? medidaTaller
+                : recordado.map(MemoriaReferencias.DatosCaja::medidaCaja)
+                        .orElse(reglas.getMedidaCajaPorDefecto());
+        Integer unidades = recordado.map(MemoriaReferencias.DatosCaja::unidadesPorCaja)
+                .orElse(taller.unidadesPorCaja());
+        // El peso de la memoria se guarda en neto, así que hay que volver a
+        // ponerle el cartón, y el de AHORA: si la referencia ha cambiado de
+        // caja, la tara de la anterior ya no es la suya.
+        Double pesoMemoria = brutoDe(recordado.map(MemoriaReferencias.DatosCaja::pesoNetoKg)
+                .orElse(null), medida);
+        Double peso = taller.pesoBrutoKg() != null ? taller.pesoBrutoKg() : pesoMemoria;
+
+        avisarSiNoCuadranTallerYMemoria(referencia, taller, medidaTaller, recordado.orElse(null),
+                pesoMemoria, unidades, digestion);
+
+        return new GrupoReferencia(referencia, medida, unidades, peso,
+                origenDe(recordado.isPresent(), taller));
+    }
+
+    /**
+     * De dónde sale lo que se enseña. La memoria manda mientras exista, y el
+     * taller cuenta en cuanto dice algo de la caja —no solo unidades por
+     * caja, como antes de que su hoja trajera el cartón y el peso—.
+     */
+    private static OrigenDato origenDe(boolean hayMemoria, CajaDelTaller taller) {
+        if (hayMemoria) {
+            return OrigenDato.MEMORIA;
         }
-        if (linea.unidadesPorCajaTaller() != null && linea.unidadesPorCajaTaller() > 0) {
-            return new GrupoReferencia(referencia, reglas.getMedidaCajaPorDefecto(),
-                    linea.unidadesPorCajaTaller(), OrigenDato.TALLER);
+        return taller.noDiceNada() ? OrigenDato.POR_DEFECTO : OrigenDato.TALLER;
+    }
+
+    /**
+     * Los avisos de la caja: breves, porque se leen encima de la tarjeta de
+     * su referencia y allí ya se ve lo que ha quedado puesto.
+     *
+     * Son tres cosas distintas y por eso son tres frases: el cartón no cuadra,
+     * el peso no cuadra, o el peso que trae la hoja es de una caja que no iba
+     * llena —y ese no se arregla eligiendo otra fuente, porque no hay ninguna
+     * otra: hay que mirarlo—.
+     */
+    private static void avisarSiNoCuadranTallerYMemoria(String referencia, CajaDelTaller taller,
+                                                        String medidaTaller,
+                                                        MemoriaReferencias.DatosCaja recordado,
+                                                        Double pesoMemoria, Integer unidades,
+                                                        DigestionTaller digestion) {
+        if (recordado != null && medidaTaller != null
+                && !medidaTaller.equals(normalizada(recordado.medidaCaja()))) {
+            digestion.avisarDe(referencia, referencia + ": el taller dice cartón " + medidaTaller
+                    + " y la última vez fue " + recordado.medidaCaja()
+                    + ". Se usa el del taller");
         }
-        return new GrupoReferencia(referencia, reglas.getMedidaCajaPorDefecto(),
-                null, OrigenDato.POR_DEFECTO);
+        if (taller.pesoBrutoKg() != null && pesoMemoria != null
+                && !enKilos(taller.pesoBrutoKg()).equals(enKilos(pesoMemoria))) {
+            digestion.avisarDe(referencia, referencia + ": el taller pesa la caja en "
+                    + enKilos(taller.pesoBrutoKg()) + " kg y la última vez fueron "
+                    + enKilos(pesoMemoria) + " kg. Se usa el del taller");
+        }
+        // El peso que se enseña es el de una caja LLENA, y el programa escala
+        // con él las que van a medias. Si la fila de la que sale llevaba
+        // menos unidades de las que van a ir por caja, no es un peso de menos:
+        // es el peso de otro bulto, y escalarlo daría un número inventado.
+        if (taller.pesoBrutoKg() != null && unidades != null
+                && taller.unidadesDeLaPesada() != null
+                && !taller.unidadesDeLaPesada().equals(unidades)) {
+            digestion.avisarDe(referencia, referencia + ": el peso del taller es de una caja de "
+                    + taller.unidadesDeLaPesada() + " y aquí van " + unidades
+                    + " por caja. Compruébalo");
+        }
+    }
+
+    /** Un peso en kilos tal como se lee en español: "10", "9,5". */
+    private static String enKilos(double kilos) {
+        return BigDecimal.valueOf(Math.round(kilos * 100.0) / 100.0)
+                .stripTrailingZeros().toPlainString().replace('.', ',');
+    }
+
+    /**
+     * El cartón escrito por el taller, con la forma del catálogo de taras:
+     * allí es "60x40x40" y en la hoja puede venir "60X40X40". Sin esto el
+     * desplegable de la pantalla de ajuste no encontraría la opción y el
+     * navegador elegiría la primera, cambiando el cartón en silencio.
+     */
+    private static String normalizada(String medidaCaja) {
+        return medidaCaja == null || medidaCaja.isBlank()
+                ? null : CatalogoTaras.normalizar(medidaCaja);
     }
 
     /**
      * La columna DESTINATION del taller es informativa: manda el pedido del
      * cliente. Pero si no coinciden conviene decirlo, porque suele significar
      * que el taller ha etiquetado el material pensando en otro sitio.
+     *
+     * <p>Lo que hay que comparar es el SITIO, no el texto. El taller escribe
+     * la abreviatura del destino padre ("UST", "WH") y el pedido nombra la
+     * destinación hija ("Douanes USA", "Australia"), así que las dos se
+     * resuelven contra el catálogo del cliente y se comparan los padres. Sin
+     * eso saltaba un aviso por fila diciendo que no cuadra lo que sí cuadra,
+     * y un aviso que sale siempre entierra a los que hay que leer.
+     *
+     * <p>El prefijo sigue valiendo para los clientes sin catálogo de
+     * destinos: en AMI el taller apunta "CH", "JA" y "PA" y el pedido dice
+     * CHINA, JAPAN y PARIS.
      */
-    private static void avisarSiElTallerDiceOtraDestinacion(LineaTaller linea,
-                                                            List<ObjetivoDestino> objetivos,
-                                                            DigestionTaller digestion) {
+    private void avisarSiElTallerDiceOtraDestinacion(String clienteClave, LineaTaller linea,
+                                                     List<ObjetivoDestino> objetivos,
+                                                     DigestionTaller digestion) {
         String delTaller = linea.destinoTaller();
         if (delTaller.isBlank() || objetivos.isEmpty()) {
             return;
         }
         List<String> delPedido = objetivos.stream().map(ObjetivoDestino::destino).toList();
         boolean cuadra = delPedido.stream()
-                .anyMatch(destino -> destino.startsWith(delTaller) || delTaller.startsWith(destino));
+                .anyMatch(destino -> destino.startsWith(delTaller) || delTaller.startsWith(destino)
+                        || mismoDestinoDelCatalogo(clienteClave, delTaller, destino));
         if (!cuadra) {
             digestion.avisarDe(linea.referencia(), "En la fila " + linea.fila()
-                    + ", el taller apunta '"
+                    + ", el excel tiene destino '"
                     + delTaller + "' para " + linea.referencia() + " " + linea.color()
-                    + ", y el pedido la manda a " + String.join(" y ", delPedido)
+                    + ", y el pedido tiene destino " + String.join(" y ", delPedido)
                     + ". Manda el pedido");
         }
+    }
+
+    /**
+     * Los dos nombres apuntan al mismo destino del catálogo del cliente, sea
+     * cada uno una clave, una hija o una abreviatura. Un cliente sin catálogo
+     * (AMI, los genéricos) no resuelve nada y decide el prefijo.
+     */
+    private boolean mismoDestinoDelCatalogo(String clienteClave, String unNombre, String otro) {
+        return clientes.clientePara(clienteClave)
+                .flatMap(cliente -> cliente.destinoPadrePara(unNombre)
+                        .map(ClienteConfig.DestinoResuelto::nombrePadre)
+                        .flatMap(padre -> cliente.destinoPadrePara(otro)
+                                .map(ClienteConfig.DestinoResuelto::nombrePadre)
+                                .map(padre::equals)))
+                .orElse(false);
     }
 
     /**
