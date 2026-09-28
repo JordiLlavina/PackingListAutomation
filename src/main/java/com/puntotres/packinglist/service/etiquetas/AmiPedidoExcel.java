@@ -90,6 +90,18 @@ public class AmiPedidoExcel {
                                 String talla, String poNumerico, String poSufijo) {
     }
 
+    /**
+     * Una fila del pedido con su cantidad, para los documentos del corte:
+     * cuántos bolsos de cada referencia y color hay que cortar. El color va
+     * con código y nombre ("001 BLACK"), que es como sale en la etiqueta y
+     * como lo reconoce quien corta.
+     *
+     * Va aparte de {@link LineaCatalogo} a propósito: el catálogo que se le
+     * enseña a Claude no debe llevar cantidades (ver su javadoc).
+     */
+    public record LineaConCantidad(String referencia, String color, int cantidad) {
+    }
+
     private final List<FilaCruda> filas;
     private final List<String> avisos;
 
@@ -257,6 +269,16 @@ public class AmiPedidoExcel {
         return filas.stream()
                 .map(fila -> new LineaCatalogo(fila.article(), fila.coloris(), fila.libelle(),
                         fila.taille(), fila.poNumerico(), fila.poSufijo()))
+                .toList();
+    }
+
+    /** Una por fila del fichero (o sea, por talla y PO), en su orden. */
+    public List<LineaConCantidad> lineasConCantidad() {
+        return filas.stream()
+                .map(fila -> new LineaConCantidad(fila.article(),
+                        fila.libelle().isBlank() ? fila.coloris()
+                                : (fila.coloris() + " " + fila.libelle()).trim(),
+                        fila.commande()))
                 .toList();
     }
 

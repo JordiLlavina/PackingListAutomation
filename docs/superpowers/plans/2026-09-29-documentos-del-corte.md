@@ -58,7 +58,7 @@ Cada bloque de código de un fichero nuevo va precedido de `<!-- fichero: ruta -
 
 ---
 
-### Tarea 1: del pedido a los artículos de corte
+### Task 1: del pedido a los artículos de corte
 
 **Files:**
 - Modify: `src/main/java/com/puntotres/packinglist/service/etiquetas/AmiPedidoExcel.java` (método `lineasConCantidad()`)
@@ -660,7 +660,7 @@ git commit -m "el pedido se parte en modelo, piel y bolsos por color para el cor
 
 ---
 
-### Tarea 2: lectura del zip de fotos
+### Task 2: lectura del zip de fotos
 
 **Files:**
 - Create: `service/corte/FotoModelo.java`, `FotosTemporada.java`, `LectorZipFotos.java`
@@ -1137,7 +1137,7 @@ git commit -m "el zip de la temporada se reparte por modelo sin fiarse de sus ru
 
 ---
 
-### Tarea 3: conversión de fotos (HEIC y JPG → JPEG reducido)
+### Task 3: conversión de fotos (HEIC y JPG → JPEG reducido)
 
 **Files:**
 - Modify: `pom.xml` (repositorio de Aspose, `openize-heic`, `metadata-extractor`)
@@ -2339,7 +2339,7 @@ git commit -m "las fotos del zip se convierten a jpeg reducido en segundo plano,
 
 ---
 
-### Tarea 4: memoria de pieles
+### Task 4: memoria de pieles
 
 **Files:**
 - Create: `persistence/MemoriaPiel.java`, `MemoriaPielId.java`, `MemoriaPielRepository.java`, `MemoriaPielesArticulo.java`, `MemoriaPielesArticuloId.java`, `MemoriaPielesArticuloRepository.java`, `MemoriaPieles.java`
@@ -2768,7 +2768,7 @@ git commit -m "los nombres de piel se recuerdan por piel y el forro y las combin
 
 ---
 
-### Tarea 5: el Word de órdenes de corte
+### Task 5: el Word de órdenes de corte
 
 **Files:**
 - Create: `service/corte/WordCorte.java`, `Imagen.java`, `PielesArticulo.java`, `OrdenCorte.java`, `OrdenCorteDocBuilder.java`
@@ -3451,7 +3451,7 @@ git commit -m "orden de corte apaisada con la foto, los datos en grande y un rec
 
 ---
 
-### Tarea 6: el Word de fotos del artículo
+### Task 6: el Word de fotos del artículo
 
 **Files:**
 - Create: `service/corte/FotosCorte.java`, `FotosCorteDocBuilder.java`
@@ -3729,7 +3729,7 @@ git commit -m "word de fotos con seis por hoja y los datos del articulo en la ca
 
 ---
 
-### Tarea 7: de las filas de la pantalla a los documentos
+### Task 7: de las filas de la pantalla a los documentos
 
 **Files:**
 - Create: `service/corte/FilaCorte.java`, `DocumentoCorte.java`, `ResultadoCorte.java`
@@ -4198,7 +4198,7 @@ git commit -m "de la tabla de pieles salen las ordenes de corte y un word de fot
 
 ---
 
-### Tarea 8: el flujo web
+### Task 8: el flujo web
 
 **Files:**
 - Create: `web/CorteEnCurso.java`, `web/PielesForm.java`, `web/FilaPielesVista.java`, `web/DocumentosCorteController.java`
@@ -5550,7 +5550,7 @@ git commit -m "seccion documentos del corte en el menu: entrada, tabla de pieles
 
 ---
 
-### Tarea 9: documentación y verificación final
+### Task 9: documentación y verificación final
 
 **Files:**
 - Modify: `CLAUDE.md` (sección "Documentos del Corte" y comando de los Word de ejemplo), `src/test/resources/ejemplos/README.md` (procedencia del HEIC de prueba), spec (estado y la regla de la fila sin bolsos)

@@ -99,17 +99,32 @@ public final class ApcPedidoExcel {
     public record Comanda(String pedido, String destino, int cantidad) {
     }
 
+    /**
+     * Una fila del pedido con su cantidad, para los documentos del corte:
+     * cuántos bolsos de cada referencia y color hay que cortar. El color es
+     * el código de la columna Couleurs ("LZZ"): el pedido de APC no trae su
+     * nombre.
+     *
+     * Va aparte de {@link LineaCatalogo} a propósito: el catálogo que se le
+     * enseña a Claude no debe llevar cantidades (ver su javadoc).
+     */
+    public record LineaConCantidad(String referencia, String color, int cantidad) {
+    }
+
     /** Filas únicas (referencia + pedido), en el orden del fichero. */
     private final List<FilaPedido> filas;
     private final Map<String, Comanda> comandas;
     private final List<LineaCatalogo> catalogo;
+    private final List<LineaConCantidad> lineasConCantidad;
     private final List<String> avisos;
 
     private ApcPedidoExcel(List<FilaPedido> filas, Map<String, Comanda> comandas,
-                           List<LineaCatalogo> catalogo, List<String> avisos) {
+                           List<LineaCatalogo> catalogo, List<LineaConCantidad> lineasConCantidad,
+                           List<String> avisos) {
         this.filas = List.copyOf(filas);
         this.comandas = Map.copyOf(comandas);
         this.catalogo = List.copyOf(catalogo);
+        this.lineasConCantidad = List.copyOf(lineasConCantidad);
         this.avisos = List.copyOf(avisos);
     }
 
@@ -131,6 +146,7 @@ public final class ApcPedidoExcel {
 
             List<FilaPedido> filas = new ArrayList<>();
             List<LineaCatalogo> catalogo = new ArrayList<>();
+            List<LineaConCantidad> lineasConCantidad = new ArrayList<>();
             Set<FilaPedido> vistas = new LinkedHashSet<>();
             Map<String, String> pedidoPorClave = new LinkedHashMap<>();
             Set<String> ambiguas = new LinkedHashSet<>();
@@ -151,6 +167,9 @@ public final class ApcPedidoExcel {
                         textoOpcional(hoja, fila, colDesignacion),
                         textoOpcional(hoja, fila, colColor),
                         textoOpcional(hoja, fila, colTalla)));
+                lineasConCantidad.add(new LineaConCantidad(entrada.referencia(),
+                        textoOpcional(hoja, fila, colColor),
+                        colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad))));
                 acumularComanda(comandas, destinosMezclados, entrada.pedido(),
                         colDestino < 0 ? "" : texto(hoja, fila, colDestino),
                         colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)));
@@ -176,7 +195,7 @@ public final class ApcPedidoExcel {
                 avisos.add("El excel de pedido no tiene la columna 'Quantité échéancée': "
                         + "las cantidades a enviar hay que teclearlas a mano");
             }
-            return new ApcPedidoExcel(filas, comandas, catalogo, avisos);
+            return new ApcPedidoExcel(filas, comandas, catalogo, lineasConCantidad, avisos);
         }
     }
 
@@ -277,6 +296,11 @@ public final class ApcPedidoExcel {
      */
     public List<LineaCatalogo> catalogo() {
         return catalogo;
+    }
+
+    /** Una por fila del fichero (o sea, por talla), en su orden. */
+    public List<LineaConCantidad> lineasConCantidad() {
+        return lineasConCantidad;
     }
 
     /**
