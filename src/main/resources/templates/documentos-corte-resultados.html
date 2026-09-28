@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Documentos del Corte generados')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte')}"></header>
+<main>
+    <p class="resumen-envio">
+        Cliente <strong th:text="${cliente}"></strong> ·
+        Temporada <strong th:text="${temporada}"></strong> ·
+        <span th:text="${#lists.size(documentos)}"></span> documento(s)
+    </p>
+
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
+        <summary th:text="|${#lists.size(avisos)} aviso(s)|"></summary>
+        <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+    </details>
+
+    <section class="tarjeta seccion-salida">
+        <h3 class="titulo-seccion">✂️ Documentos</h3>
+        <table>
+            <thead>
+            <tr>
+                <th>Contenido</th>
+                <th>Fichero</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="documento : ${documentos}">
+                <td th:text="${documento.descripcion}"></td>
+                <td th:text="${documento.nombreFichero}"></td>
+                <td>
+                    <a th:href="@{/documentos-corte/descargar/{nombre}(nombre=${documento.nombreFichero})}">
+                        Descargar</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <a class="boton" th:if="${!#lists.isEmpty(documentos)}"
+           th:href="@{/documentos-corte/descargar-todo}">Descargar todo (ZIP)</a>
+        <a class="boton secundario" th:href="@{/documentos-corte/pieles}">Volver a las pieles</a>
+        <a class="boton secundario" th:href="@{/documentos-corte/nuevo}">Otra temporada</a>
+        <a class="boton secundario" th:href="@{/menu}">Volver al menú</a>
+    </section>
+</main>
+</body>
+</html>

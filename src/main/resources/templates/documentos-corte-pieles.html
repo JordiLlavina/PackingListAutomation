@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Pieles · Documentos del Corte')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte')}"></header>
+<main class="ancho-completo">
+    <p class="resumen-envio">
+        Cliente <strong th:text="${cliente}"></strong> ·
+        Temporada <strong th:text="${temporada}"></strong> ·
+        <span th:text="${#lists.size(filas)}"></span> referencias
+    </p>
+
+    <p class="aviso-procesando" id="progresoFotos"
+       th:attr="data-terminada=${fotosTerminadas}">
+        <span id="textoProgreso"
+              th:text="${fotosTerminadas} ? |Fotos preparadas: ${fotosTotal}|
+                       : |Preparando fotos: ${fotosHechas} de ${fotosTotal}|"></span>
+    </p>
+
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+    <div class="alerta error" th:each="mensaje : ${errores}" th:text="${mensaje}"></div>
+
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
+        <summary th:text="|${#lists.size(avisos)} aviso(s)|"></summary>
+        <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+    </details>
+
+    <form class="tarjeta" id="formPieles" method="post" th:action="@{/documentos-corte/generar}">
+        <p class="ayuda">
+            Los nombres valen para todos los colores de la referencia. Una combinación o un forro en
+            blanco es que no lleva. Un color con 0 bolsos no saca orden de corte.
+        </p>
+        <div class="tabla-desplazable">
+            <table class="tabla-pieles">
+                <thead>
+                <tr>
+                    <th>Modelo</th>
+                    <th>Piel</th>
+                    <th>Bolsos por color</th>
+                    <th>Nombre de la piel</th>
+                    <th>Forro de piel</th>
+                    <th th:each="numero : ${columnas}" th:text="|Combinación ${numero}|"></th>
+                    <th>Foto principal</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="fila : ${filas}">
+                    <td class="c-modelo" th:text="${fila.modelo}"></td>
+                    <td class="c-piel" th:text="${fila.piel}"></td>
+                    <td class="c-bolsos">
+                        <div class="color-bolsos" th:each="color, estado : ${fila.colores}">
+                            <label th:for="|bolsos-${fila.indice}-${estado.index}|"
+                                   th:text="${color.color}"></label>
+                            <input type="number" min="0"
+                                   th:id="|bolsos-${fila.indice}-${estado.index}|"
+                                   th:name="|filas[${fila.indice}].bolsos[${estado.index}]|"
+                                   th:value="${color.bolsos}">
+                        </div>
+                    </td>
+                    <td>
+                        <input type="text" class="c-nombre-piel"
+                               th:name="|filas[${fila.indice}].nombrePiel|"
+                               th:value="${fila.nombrePiel}" th:attr="data-piel=${fila.piel}">
+                    </td>
+                    <td>
+                        <input type="text" th:name="|filas[${fila.indice}].forro|"
+                               th:value="${fila.forro}">
+                    </td>
+                    <td th:each="combinacion, estado : ${fila.combinaciones}">
+                        <input type="text"
+                               th:name="|filas[${fila.indice}].combinaciones[${estado.index}]|"
+                               th:value="${combinacion}">
+                    </td>
+                    <td>
+                        <select th:if="${!#lists.isEmpty(fila.fotos)}"
+                                th:name="|filas[${fila.indice}].fotoPrincipal|">
+                            <option th:each="foto, estado : ${fila.fotos}"
+                                    th:value="${estado.index}" th:text="${foto}"
+                                    th:selected="${estado.index == fila.fotoPrincipal}"></option>
+                        </select>
+                        <span class="sin-fotos" th:if="${#lists.isEmpty(fila.fotos)}">sin fotos</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="acciones-corte">
+            <button type="submit" class="secundario" th:if="${puedeAnadirColumna}"
+                    th:formaction="@{/documentos-corte/pieles/combinacion}">+ combinación</button>
+            <button type="submit" id="botonGenerar">Generar documentos</button>
+            <a class="boton secundario" th:href="@{/documentos-corte/nuevo}">Empezar de nuevo</a>
+        </div>
+    </form>
+    <p id="avisoGenerando" class="aviso-procesando" style="display: none">
+        Generando... si las fotos aún se están preparando, espera a que acaben.
+    </p>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const URL_PROGRESO = /*[[@{/documentos-corte/progreso}]]*/ '/documentos-corte/progreso';
+        /*]]>*/
+        (function () {
+            const progreso = document.getElementById('progresoFotos');
+            const texto = document.getElementById('textoProgreso');
+
+            function consultar() {
+                fetch(URL_PROGRESO).then(function (respuesta) {
+                    return respuesta.json();
+                }).then(function (estado) {
+                    if (estado.terminada) {
+                        texto.textContent = 'Fotos preparadas: ' + estado.total;
+                    } else {
+                        texto.textContent = 'Preparando fotos: ' + estado.hechas + ' de ' + estado.total;
+                        setTimeout(consultar, 2000);
+                    }
+                }).catch(function () {
+                    setTimeout(consultar, 5000);
+                });
+            }
+            if (progreso.dataset.terminada !== 'true') {
+                setTimeout(consultar, 2000);
+            }
+
+            // Un nombre de piel vale para todas las filas con la misma ref de
+            // piel: se copia a las que siguen vacías, nunca encima de otro.
+            const nombres = document.querySelectorAll('input.c-nombre-piel');
+            nombres.forEach(function (input) {
+                input.addEventListener('change', function () {
+                    const valor = input.value.trim();
+                    if (!valor || !input.dataset.piel) {
+                        return;
+                    }
+                    nombres.forEach(function (otro) {
+                        if (otro !== input && otro.dataset.piel === input.dataset.piel
+                                && !otro.value.trim()) {
+                            otro.value = valor;
+                        }
+                    });
+                });
+            });
+
+            document.getElementById('botonGenerar').addEventListener('click', function () {
+                document.getElementById('avisoGenerando').style.display = '';
+            });
+        })();
+    </script>
+</main>
+</body>
+</html>

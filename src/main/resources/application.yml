@@ -1,12 +1,14 @@
 # Configuración del generador de packing lists.
 #
 # Límites de subida de ficheros: las fotos de packing lists del móvil
-# superan de sobra el 1MB por defecto de Spring.
+# superan de sobra el 1MB por defecto de Spring, y el zip de fotos de una
+# temporada (documentos del corte, fotos de iPhone de 24 MP) pesa cientos de
+# megas.
 spring:
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 60MB
+      max-file-size: 1GB
+      max-request-size: 1GB
 
   # Base de datos embebida en fichero: la memoria de referencias y la tabla
   # de taras tienen que sobrevivir al reinicio. El fichero vive junto al

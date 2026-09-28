@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Documentos del Corte')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <form class="tarjeta" id="formCorte" th:action="@{/documentos-corte/cargar}" method="post"
+          enctype="multipart/form-data">
+        <h3 class="titulo-seccion">✂️ Documentos del Corte</h3>
+        <p class="ayuda">
+            Del pedido de la temporada sale una orden de corte por referencia, piel y color, y de las
+            fotos de cada modelo un Word de fotos por referencia. Los nombres de las pieles se ponen en
+            la pantalla siguiente.
+        </p>
+
+        <label for="cliente">Cliente</label>
+        <select id="cliente" name="cliente" required>
+            <option th:each="entrada : ${clientes}"
+                    th:value="${entrada.key}"
+                    th:text="${entrada.value.disponible ? entrada.value.nombre
+                              : entrada.value.nombre + ' — en desarrollo'}"
+                    th:disabled="${!entrada.value.disponible}"></option>
+        </select>
+
+        <label for="temporadaGuardada" class="etiqueta-con-accion">
+            <span>Temporada guardada</span>
+            <a class="lapiz" th:href="@{/temporadas}"
+               title="Añadir, editar o borrar temporadas guardadas"
+               aria-label="Editar las temporadas guardadas">&#9998;</a>
+        </label>
+        <select id="temporadaGuardada" name="temporadaGuardadaId"></select>
+        <p class="ayuda" id="ayudaTemporadaGuardada"></p>
+
+        <!-- Con una temporada guardada elegida, su nombre y su excel ya están: estos dos
+             campos se esconden para que no haya dos "Temporada" a la vez. -->
+        <div id="bloqueSinGuardada">
+            <label for="temporada">Temporada</label>
+            <input type="text" id="temporada" name="temporada" placeholder="H26">
+            <label for="pedido">Excel de pedido del cliente</label>
+            <input type="file" id="pedido" name="pedido" accept=".xlsx">
+        </div>
+
+        <label for="fotos">Carpeta de fotos de la temporada (zip)</label>
+        <input type="file" id="fotos" name="fotos" accept=".zip" required>
+        <p class="ayuda">
+            Una subcarpeta por modelo, con el nombre de la referencia del bolso (ULL712, F67008), y
+            dentro sus fotos en HEIC, JPG o JPEG. La foto vale para todas las pieles del modelo.
+        </p>
+
+        <button type="submit" id="botonCargar">Cargar</button>
+        <a class="boton secundario" th:href="@{/menu}">Volver</a>
+    </form>
+    <p id="avisoSubiendo" class="aviso-procesando" style="display: none">
+        Subiendo el zip... con muchas fotos tarda un rato; no cierres la página.
+    </p>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const TEMPORADAS = /*[[${temporadasJs}]]*/ {};
+        /*]]>*/
+        (function () {
+            const cliente = document.getElementById('cliente');
+            const guardada = document.getElementById('temporadaGuardada');
+            const ayuda = document.getElementById('ayudaTemporadaGuardada');
+            const bloqueSinGuardada = document.getElementById('bloqueSinGuardada');
+
+            function temporadasDelCliente() {
+                return TEMPORADAS[cliente.value] || [];
+            }
+
+            // Se rehace al cambiar de cliente: una temporada elegida de otro
+            // cliente se enviaría igual aunque ya no se vea.
+            function rellenar() {
+                guardada.innerHTML = '';
+                const suelta = document.createElement('option');
+                suelta.value = '';
+                suelta.textContent = '-- otra temporada: subir el excel --';
+                guardada.appendChild(suelta);
+                temporadasDelCliente().forEach(function (temporada) {
+                    const opcion = document.createElement('option');
+                    opcion.value = temporada.id;
+                    opcion.textContent = temporada.temporada;
+                    guardada.appendChild(opcion);
+                });
+                aplicar();
+            }
+
+            function aplicar() {
+                const elegida = temporadasDelCliente().filter(function (temporada) {
+                    return String(temporada.id) === guardada.value;
+                })[0];
+                bloqueSinGuardada.style.display = elegida ? 'none' : '';
+                ayuda.textContent = elegida ? 'Excel de pedido guardado: ' + elegida.fichero : '';
+                if (elegida) {
+                    document.getElementById('temporada').value = '';
+                    document.getElementById('pedido').value = '';
+                }
+            }
+
+            cliente.addEventListener('change', rellenar);
+            guardada.addEventListener('change', aplicar);
+            document.getElementById('formCorte').addEventListener('submit', function () {
+                document.getElementById('avisoSubiendo').style.display = '';
+            });
+            rellenar();
+        })();
+    </script>
+</main>
+</body>
+</html>

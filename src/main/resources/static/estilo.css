@@ -957,3 +957,25 @@ tr.sin-pedido td { background: #fff8e1; }
 .linea-detalle.palet strong {
     color: #372f77;
 }
+
+/* --- Documentos del corte: tabla de pieles ---
+   Puede ser ancha (hasta cuatro combinaciones), así que la pantalla se deja
+   ensanchar y la tabla se desplaza dentro de su tarjeta en vez de desbordar. */
+main.ancho-completo { max-width: 96rem; }
+.tabla-desplazable { overflow-x: auto; }
+.tabla-pieles td { vertical-align: top; }
+.tabla-pieles td.c-modelo, .tabla-pieles td.c-piel { white-space: nowrap; font-weight: 600; }
+.tabla-pieles .color-bolsos {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+.tabla-pieles .color-bolsos + .color-bolsos { margin-top: 0.3rem; }
+.tabla-pieles .color-bolsos label { display: inline; margin: 0; font-weight: normal; }
+.tabla-pieles td input[type="number"] { width: 5rem; }
+.tabla-pieles td input[type="text"] { width: 100%; min-width: 9rem; }
+.tabla-pieles select { max-width: 12rem; }
+.tabla-pieles .sin-fotos { color: var(--gris-fuerte); font-style: italic; }
+.acciones-corte { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
