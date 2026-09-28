@@ -63,3 +63,9 @@ traído un fixture inventado. Las referencias y las cantidades son de relleno.
 
     cp "docs/Packing Lists/Packing List Taller/Packing List Taller Exemple.xlsx" \
        "src/test/resources/ejemplos/taller/Packing List Taller Exemple.xlsx"
+
+`corte/gimp_rgb_420_with_alpha.heic` es el HEIC de prueba de los documentos del
+corte: 430×430 px y 8 KB, sacado del repositorio de Openize.HEIC
+(`TestsData/samples/`, con la licencia de ese repo). **No es una foto de
+producto ni personal**, y así tiene que seguir: en el repo no entra ninguna foto
+real. Las demás imágenes de esos tests las dibuja `FotosDePrueba`.

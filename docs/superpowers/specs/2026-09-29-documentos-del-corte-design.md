@@ -1,6 +1,11 @@
 # Documentos del Corte — diseño
 
-Fecha: 2026-09-29. Estado: aprobado, en implementación (rama `documentos-del-corte`).
+Fecha: 2026-09-29. Estado: implementado en la rama `documentos-del-corte`.
+
+Añadido al implementar: una referencia sin ningún bolso (todos sus colores a 0) no saca
+orden ni Word de fotos; las tablas de los dos Word llevan margen de celda solo a los lados,
+porque Word suma el de arriba y el de abajo a las filas de alto exacto y la orden se iba de
+página; los nombres de piel de más de 24 letras van a 14 pt.
 
 ## 1. Qué se construye
 
