@@ -1,0 +1,121 @@
+package com.puntotres.packinglist.service.corte;
+
+import static com.puntotres.packinglist.testutil.WordDePrueba.altoEmu;
+import static com.puntotres.packinglist.testutil.WordDePrueba.anchoEmu;
+import static com.puntotres.packinglist.testutil.WordDePrueba.fotosDe;
+import static com.puntotres.packinglist.testutil.WordDePrueba.saltosDePagina;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.awt.Color;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFPicture;
+import org.apache.poi.xwpf.usermodel.XWPFTable;
+import org.junit.jupiter.api.Test;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
+
+import com.puntotres.packinglist.testutil.FotosDePrueba;
+
+class FotosCorteDocBuilderTest {
+
+    private static final PielesArticulo PIELES =
+            new PielesArticulo("Box calf", "Tela", List.of("Ante"));
+
+    @Test
+    void seisFotosPorA4EnDosColumnasYTresFilas() throws IOException {
+        XWPFDocument doc = generar(fotos(7));
+
+        CTPageSz pagina = doc.getDocument().getBody().getSectPr().getPgSz();
+        assertEquals(BigInteger.valueOf(11906), pagina.getW());
+        assertEquals(BigInteger.valueOf(16838), pagina.getH());
+        assertNull(pagina.getOrient(), "vertical");
+        assertEquals(2, doc.getTables().size(), "7 fotos son dos hojas");
+        assertEquals(3, doc.getTables().get(0).getRows().size());
+        assertEquals(2, doc.getTables().get(0).getRow(0).getTableCells().size());
+        assertEquals(1, doc.getTables().get(1).getRows().size());
+        assertEquals(6, fotosDe(doc.getTables().get(0)).size());
+        assertEquals(1, fotosDe(doc.getTables().get(1)).size());
+        assertEquals(1, saltosDePagina(doc));
+    }
+
+    @Test
+    void laRejillaLlenaLaPaginaYCadaFotoCabeEnSuCelda() throws IOException {
+        XWPFDocument doc = generar(fotos(6));
+
+        XWPFTable rejilla = doc.getTables().get(0);
+        int alto = rejilla.getRows().stream().mapToInt(fila -> fila.getHeight()).sum();
+        assertTrue(alto <= FotosCorteDocBuilder.ALTO_UTIL);
+        assertTrue(alto >= FotosCorteDocBuilder.ALTO_UTIL - 200, "llena la hoja, sin franja vacía abajo");
+        for (XWPFPicture foto : fotosDe(rejilla)) {
+            assertTrue(anchoEmu(foto) <= (long) FotosCorteDocBuilder.ANCHO_CELDA * WordCorte.EMU_POR_TWIP);
+            assertTrue(altoEmu(foto) <= (long) FotosCorteDocBuilder.ALTO_CELDA * WordCorte.EMU_POR_TWIP);
+        }
+    }
+
+    @Test
+    void laRejillaNoLlevaMargenDeCeldaArribaNiAbajo() throws IOException {
+        // Word suma el margen de arriba y de abajo a las filas de alto exacto
+        // (medido con la orden de corte): tres filas con 0,1 cm por lado
+        // empujarían la última a otra hoja.
+        XWPFTable rejilla = generar(fotos(6)).getTables().get(0);
+
+        assertEquals(0, rejilla.getCellMarginTop());
+        assertEquals(0, rejilla.getCellMarginBottom());
+    }
+
+    @Test
+    void laCabeceraDeCadaHojaLlevaTemporadaReferenciaYPieles() throws IOException {
+        XWPFDocument doc = generar(fotos(1));
+
+        String cabecera = doc.getHeaderList().get(0).getText();
+        for (String esperado : List.of("H26", "ULL729.AL0103", "Piel: Box calf",
+                "Combinación: Ante", "Forro: Tela")) {
+            assertTrue(cabecera.contains(esperado), "falta '" + esperado + "' en: " + cabecera);
+        }
+    }
+
+    @Test
+    void lasPartesVaciasNoSalenEnLaCabecera() {
+        assertEquals("Piel: Box  ·  Combinación 1: A  ·  Combinación 2: B",
+                FotosCorteDocBuilder.describirPieles(new PielesArticulo("Box", "", List.of("A", "B"))));
+        assertEquals("", FotosCorteDocBuilder.describirPieles(new PielesArticulo("", "", List.of())));
+    }
+
+    @Test
+    void dejaUnEjemploEnTargetParaRevisarAOjo() throws IOException {
+        byte[] word = new FotosCorteDocBuilder().generar(new FotosCorte("H26", "ULL729.AL0103",
+                new PielesArticulo("Vachette grainée", "Cabretilla", List.of("Ante")), fotos(8)));
+
+        Path destino = Path.of("target", "Fotos ejemplo.docx");
+        Files.createDirectories(destino.getParent());
+        Files.write(destino, word);
+        assertTrue(Files.size(destino) > 0);
+    }
+
+    private static XWPFDocument generar(List<Imagen> fotos) throws IOException {
+        return new XWPFDocument(new ByteArrayInputStream(new FotosCorteDocBuilder()
+                .generar(new FotosCorte("H26", "ULL729.AL0103", PIELES, fotos))));
+    }
+
+    /** Alterna apaisadas y verticales, para ver cómo encaja cada una. */
+    private static List<Imagen> fotos(int cuantas) {
+        List<Imagen> fotos = new ArrayList<>();
+        for (int i = 1; i <= cuantas; i++) {
+            boolean apaisada = i % 2 == 1;
+            int ancho = apaisada ? 1600 : 1200;
+            int alto = apaisada ? 1200 : 1600;
+            fotos.add(new Imagen(FotosDePrueba.relleno(ancho, alto, "FOTO " + i,
+                    new Color(70 + 15 * i, 90, 110)), ancho, alto));
+        }
+        return fotos;
+    }
+}
