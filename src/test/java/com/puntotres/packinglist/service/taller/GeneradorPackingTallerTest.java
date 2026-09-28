@@ -211,6 +211,52 @@ class GeneradorPackingTallerTest {
                 .allMatch(d -> d.getPalets().get(0).getPalet() == 1));
     }
 
+    // --- Las cajas de un modelo van seguidas ---
+
+    /** Qué referencia lleva cada número de caja de la destinación. */
+    private static java.util.Map<Integer, String> referenciaPorCaja(
+            EnvioInput.DestinoInput destino) {
+        java.util.Map<Integer, String> porCaja = new java.util.TreeMap<>();
+        for (EnvioInput.ReferenciaInput referencia : destino.getReferencias()) {
+            for (EnvioInput.CajaRangoInput caja : referencia.getCajas()) {
+                int desde = caja.esRango() ? caja.getCajaInicio() : caja.getCaja();
+                int hasta = caja.esRango() ? caja.getCajaFin() : caja.getCaja();
+                IntStream.rangeClosed(desde, hasta)
+                        .forEach(n -> porCaja.put(n, referencia.getReferencia()));
+            }
+        }
+        return porCaja;
+    }
+
+    @Test
+    void lasCajasDeUnModeloSeNumeranSeguidasYNoAlternandoConElOtro() {
+        // El caso real de una hoja de trabajo: JAPAN con 17 cajas en 2 palets,
+        // 4 de un modelo y 13 del otro. Las cajas se generan modelo a modelo,
+        // pero dentro del palet se reparten entre las cuatro pilas, así que
+        // numerándolas pila a pila salían 1 M, 2-3 F, 4 M, 5-6 F... y preparar
+        // el palet obligaba a ir y venir entre dos montones por cada caja.
+        List<FilaAjustada> filas = List.of(
+                new FilaAjustada("PXCBC-M67115", "ALPACA BLACK", "U", 27, "60x40x40", 7,
+                        List.of(new ObjetivoDestino("JAPAN", 27, "4100000001"))),
+                new FilaAjustada("PXCBC-F67008", "ALPACA BLACK", "U", 143, "60x40x40", 11,
+                        List.of(new ObjetivoDestino("JAPAN", 143, "4100000002"))));
+
+        EnvioInput.DestinoInput destino = destino(
+                generador.generar("APC", filas, null).getEnvio(), "JAPAN");
+
+        assertEquals(17, numerosDeCaja(destino).size());
+        assertEquals(2, destino.getPalets().size());
+        // Cada modelo ocupa un tramo seguido de números: como mucho hay tantos
+        // cambios de referencia como modelos, uno al pasar del primero al
+        // segundo. El palet no cuenta: el segundo empieza donde acabó el
+        // primero.
+        List<String> enOrden = referenciaPorCaja(destino).values().stream().toList();
+        long cambios = IntStream.range(1, enOrden.size())
+                .filter(i -> !enOrden.get(i).equals(enOrden.get(i - 1)))
+                .count();
+        assertEquals(1, cambios, "las cajas de cada modelo van seguidas: " + enOrden);
+    }
+
     // --- Destinaciones hijas ---
 
     /** Las destinaciones hijas de las cajas que caen dentro de un palet. */
@@ -231,12 +277,11 @@ class GeneradorPackingTallerTest {
     }
 
     @Test
-    void dosHijasDelMismoPadreNoCompartenPalet() {
-        // WHOLESALE y CHINE FRANCH viajan al mismo almacén y salen en el mismo
-        // excel, pero allí se reciben por separado: un palet mixto habría que
-        // deshacerlo al llegar. Las dos cajas cabrían de sobra en un solo
-        // palet —caben cuatro pilas de 157 cm y estas miden 40—, y aun así
-        // salen dos.
+    void dosHijasDelMismoPadreCompartenPalet() {
+        // WHOLESALE y CHINE FRANCH viajan al mismo almacén, así que se mandan
+        // juntas: las dos cajas caben de sobra en un palet —cuatro pilas de
+        // 157 cm y estas miden 40— y sale uno solo. Apilando cada hija por su
+        // lado salían dos palets a medio llenar.
         List<FilaAjustada> filas = List.of(
                 new FilaAjustada("PXCBC-F67008", "CAMEL", "U", 10, "60x40x40", 10,
                         List.of(new ObjetivoDestino("WHOLESALE", 5, "4100000001"),
@@ -245,19 +290,33 @@ class GeneradorPackingTallerTest {
         EnvioInput.DestinoInput destino = destino(
                 generador.generar("APC", filas, null).getEnvio(), "WHOLESALE");
 
-        assertEquals(2, destino.getPalets().size(), "un palet por hija");
-        for (EnvioInput.PaletInput palet : destino.getPalets()) {
-            assertEquals(1, hijasDe(destino, palet).size(),
-                    "ningún palet mezcla dos destinaciones hijas");
-        }
+        assertEquals(1, destino.getPalets().size(), "las hijas se apilan juntas");
+        assertEquals(2, hijasDe(destino, destino.getPalets().get(0)).size(),
+                "y en ese palet van las cajas de las dos");
     }
 
     @Test
-    void lasHijasSiguenSaliendoEnUnSoloFicheroYConNumeracionSeguida() {
-        // Lo que NO cambia: fichero, hoja y dirección son del padre, así que
-        // las dos hijas van en una sola destinación del envío y sus cajas se
-        // numeran seguidas. Cada palet sigue siendo un rango contiguo, que es
-        // lo que después permite reasignar los palets al importar.
+    void lasCajasSiguenSinMezclarDosHijas() {
+        // Lo que no cambia al compartir palet: un bulto es lo que se abre en
+        // destino. Con mezcla LIBRE y 4+4 unidades de a 10 por caja, las dos
+        // hijas cabrían en un cartón y aun así salen dos.
+        List<FilaAjustada> filas = List.of(
+                new FilaAjustada("PXCBC-F67008", "CAMEL", "U", 8, "60x40x40", 10,
+                        List.of(new ObjetivoDestino("WHOLESALE", 4, "4100000001"),
+                                new ObjetivoDestino("CHINE FRANCH", 4, "4100000002"))));
+
+        EnvioInput.DestinoInput destino = destino(
+                generador.generar("APC", filas, null).getEnvio(), "WHOLESALE");
+
+        assertEquals(List.of(1, 2), numerosDeCaja(destino), "una caja por hija");
+    }
+
+    @Test
+    void lasHijasSalenEnUnSoloFicheroYConNumeracionSeguida() {
+        // Fichero, hoja y dirección son del padre, así que las dos hijas van
+        // en una sola destinación del envío y sus cajas se numeran seguidas.
+        // Cada palet es un rango contiguo, que es lo que después permite
+        // reasignar los palets al importar.
         List<FilaAjustada> filas = List.of(
                 new FilaAjustada("PXCBC-F67008", "CAMEL", "U", 10, "60x40x40", 10,
                         List.of(new ObjetivoDestino("WHOLESALE", 5, "4100000001"),
@@ -267,8 +326,10 @@ class GeneradorPackingTallerTest {
 
         assertEquals(1, envio.getDestinos().size());
         assertEquals(List.of(1, 2), numerosDeCaja(destino(envio, "WHOLESALE")));
-        assertEquals(List.of(1, 2), destino(envio, "WHOLESALE").getPalets().stream()
+        assertEquals(List.of(1), destino(envio, "WHOLESALE").getPalets().stream()
                 .map(EnvioInput.PaletInput::getCajaInicio).toList());
+        assertEquals(List.of(2), destino(envio, "WHOLESALE").getPalets().stream()
+                .map(EnvioInput.PaletInput::getCajaFin).toList());
     }
 
     // --- Peso bruto declarado en el ajuste ---

@@ -28,11 +28,12 @@ import com.puntotres.packinglist.model.EnvioInput;
  *
  * <b>Hijas y padres.</b> El reparto y la prioridad trabajan sobre la
  * destinación HIJA (CHINE FRANCH se sirve de las primeras). El fichero, la
- * hoja, la dirección y la numeración van por destinación PADRE (WHOLESALE),
- * que es la que acaba en el packing list. Pero las CAJAS y los PALETS van por
- * hija: dos hijas del mismo padre viajan al mismo almacén y salen en el mismo
- * excel, y aun así no comparten ni bulto ni palet, porque allí se reciben por
- * separado y un palet mixto habría que deshacerlo al llegar.
+ * hoja, la dirección, la numeración y los PALETS van por destinación PADRE
+ * (WHOLESALE), que es la que acaba en el packing list: las hijas viajan al
+ * mismo almacén, así que se mandan juntas en el mismo palet y no se gastan
+ * palets a medio llenar. Lo único que sigue yendo por hija son las CAJAS: un
+ * bulto es lo que se abre en destino, y mezclar dos canales dentro de un
+ * cartón obligaría a repartir su contenido allí.
  *
  * <b>La numeración es lo último.</b> Se numera palet a palet, y dentro de cada
  * palet pila a pila, de modo que cada palet ocupa un rango contiguo de números
@@ -99,8 +100,9 @@ public class GeneradorPackingTaller {
 
             List<CajaGenerada> cajas = agrupador.agrupar(
                     articulos, reglas.mezclaDe(clienteClave, padre));
-            ResultadoApilado apilado = apilarPorDestinoHijo(
-                    clienteClave, padre, cajas, alturaTecleadaCm);
+            int alturaUtil = alturaUtilDe(clienteClave, padre, articulos, alturaTecleadaCm);
+            ResultadoApilado apilado = apilador.apilar(
+                    cajas, alturaUtil, reglas.getPosicionesPalet());
             resultado.getBloqueos().addAll(apilado.getBloqueos());
             if (!resultado.sePuedeGenerar()) {
                 continue;
@@ -111,8 +113,7 @@ public class GeneradorPackingTaller {
             EnvioInput.DestinoInput destino = montarDestino(padre, articulos,
                     apilado.getPalets(), primeraCaja, primerPalet, resultado.getAvisos());
             envio.getDestinos().add(destino);
-            resultado.getResumen().add(resumenDe(padre, articulos, apilado,
-                    alturaUtilDe(clienteClave, padre, articulos, alturaTecleadaCm)));
+            resultado.getResumen().add(resumenDe(padre, articulos, apilado, alturaUtil));
 
             contadorCajas = primeraCaja + apilado.getPalets().stream()
                     .mapToInt(palet -> palet.cajas().size()).sum();
@@ -151,50 +152,16 @@ public class GeneradorPackingTaller {
     }
 
     /**
-     * Apila las cajas del padre, pero <b>un palet por destinación hija</b>.
+     * La altura útil con la que se apila la destinación padre entera, y la que
+     * se enseña en su línea del resumen.
      *
-     * Las hijas comparten fichero, hoja y dirección —por eso van juntas en el
-     * packing list—, pero no comparten bulto ni palet: el almacén las recibe
-     * por separado y un palet mixto habría que deshacerlo al llegar. Cuesta
-     * palets (dos hijas con tres cajas cada una llenan dos palets donde cabría
-     * uno) y es a propósito.
-     *
-     * Cada hija se apila con SU altura útil y no con la más baja de todas: al
-     * no compartir palet, lo que aguante una no limita a la otra.
-     *
-     * Los palets salen en el orden en que aparecen las hijas, así que cada
-     * hija ocupa palets consecutivos y, con ellos, un rango de números de caja
-     * contiguo: es lo que después permite a {@code PaletAssignmentService}
-     * reasignar los palets al importar el JSON generado.
-     */
-    private ResultadoApilado apilarPorDestinoHijo(String clienteClave, String padre,
-                                                  List<CajaGenerada> cajas,
-                                                  Integer alturaTecleadaCm) {
-        ResultadoApilado total = new ResultadoApilado();
-        for (Map.Entry<String, List<CajaGenerada>> hija : porDestinoHijo(cajas).entrySet()) {
-            ResultadoApilado suyo = apilador.apilar(hija.getValue(),
-                    reglas.alturaUtilCm(clienteClave, hija.getKey(), padre, alturaTecleadaCm),
-                    reglas.getPosicionesPalet());
-            total.getPalets().addAll(suyo.getPalets());
-            total.getBloqueos().addAll(suyo.getBloqueos());
-        }
-        return total;
-    }
-
-    /** Las cajas por destinación hija, en orden de primera aparición. */
-    private static Map<String, List<CajaGenerada>> porDestinoHijo(List<CajaGenerada> cajas) {
-        Map<String, List<CajaGenerada>> porHija = new LinkedHashMap<>();
-        for (CajaGenerada caja : cajas) {
-            porHija.computeIfAbsent(caja.destino(), clave -> new ArrayList<>()).add(caja);
-        }
-        return porHija;
-    }
-
-    /**
-     * La altura útil que se enseña en el resumen, que tiene una sola línea por
-     * destinación padre. Es la más baja de sus hijas: cada una se apila con la
-     * suya, así que la más restrictiva es la única que se puede afirmar de la
-     * destinación entera sin engañar a nadie.
+     * Es la <b>más baja</b> de sus hijas. Como las hijas comparten palet, una
+     * pila puede llevar cajas de las dos y la única altura que se puede
+     * afirmar de todas ellas es la más restrictiva; con la más alta se
+     * montarían pilas que no caben en la hija que menos aguanta. Antes cada
+     * hija se apilaba por su lado y con la suya, pero eso gastaba palets a
+     * medio llenar —dos hijas con tres cajas cada una ocupaban dos palets
+     * donde cabía uno— y las dos van al mismo almacén.
      */
     private int alturaUtilDe(String clienteClave, String padre, List<ArticuloDestinado> articulos,
                              Integer alturaTecleadaCm) {

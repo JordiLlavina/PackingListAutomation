@@ -55,7 +55,9 @@ packing-list:
   #   entre artículos del mismo pedido) o LIBRE.
   # altura-max-cm: la de la destinación. Una hija que no la declare hereda la
   #   de su padre, y si tampoco, altura-palet-por-defecto-cm. Por eso
-  #   CHINE FRANCH no la lleva: viaja al almacén de WHOLESALE.
+  #   CHINE FRANCH no la lleva: viaja al almacén de WHOLESALE. Como las hijas
+  #   de un padre comparten palet, la pila se monta con la MÁS BAJA de las que
+  #   van en él: es la única altura cierta para un palet mixto.
   # numeracion-cajas: CONTINUA numera seguido entre destinaciones (AMI);
   #   POR_DESTINACION reinicia en cada una (APC y el resto).
   #

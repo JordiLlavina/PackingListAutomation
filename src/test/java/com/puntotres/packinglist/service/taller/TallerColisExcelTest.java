@@ -296,6 +296,45 @@ class TallerColisExcelTest {
                 List.of(List.of("AMI", "PROD", "ULL1", "KAKI", "64")))).lineas().get(0).fila());
     }
 
+    // --- Una fila sin referencia no es un artículo ---
+
+    @Test
+    void laFilaDeTotalesNoEsUnArticuloAunqueTraigaCantidad() throws Exception {
+        // El "TOTALE" que el taller escribe debajo de la tabla pone su suma
+        // dentro de la columna QUANTITE. Leído como artículo entraba al envío
+        // una línea sin referencia, sin color y sin código, y en APC eso
+        // bloqueaba la generación ("la fila 3 () no trae CODE").
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "CODE", "QUANTITE"),
+                List.of(List.of("APC", "PROD", "F67008", "LAW", "863", "8"),
+                        List.of("", "", "", "", "", "8")));
+
+        TallerColisExcel excel = TallerColisExcel.desdeBytes(libro);
+
+        assertEquals(1, excel.lineas().size());
+        assertEquals("F67008", excel.lineas().get(0).referencia());
+        assertEquals(List.of(), excel.avisos(),
+                "y no se avisa: los totales están en todas las hojas");
+    }
+
+    @Test
+    void unaFilaConColorYCodigoPeroSinReferenciaSeDejaFueraConAviso() throws Exception {
+        // Aquí sí se está quedando fuera mercancía que alguien apuntó, así que
+        // se dice. La fila sigue sin entrar: sin referencia no hay nada que
+        // empaquetar.
+        byte[] libro = libroConCabeceraYFilas("LISTE DE COLIS",
+                List.of("CLIENT", "MOTIF", "REFERENCE", "COULEUR", "CODE", "QUANTITE"),
+                List.of(List.of("APC", "PROD", "F67008", "LAW", "863", "8"),
+                        List.of("APC", "PROD", "", "GAU", "701", "8")));
+
+        TallerColisExcel excel = TallerColisExcel.desdeBytes(libro);
+
+        assertEquals(1, excel.lineas().size());
+        assertTrue(excel.avisos().stream()
+                .anyMatch(a -> a.contains("fila 3") && a.contains("GAU") && a.contains("701")),
+                excel.avisos().toString());
+    }
+
     // --- Las dos columnas de la caja: peso bruto y dimensiones ---
 
     @Test

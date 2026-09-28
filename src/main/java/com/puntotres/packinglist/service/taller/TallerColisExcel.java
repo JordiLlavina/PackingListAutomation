@@ -268,21 +268,56 @@ public final class TallerColisExcel {
         for (int f = primeraFilaDatos; f <= hoja.getLastRowNum(); f++) {
             Row fila = hoja.getRow(f);
             String referencia = texto(fila, columnas.get(Columna.REFERENCE));
-            String cantidadCruda = texto(fila, columnas.get(Columna.QUANTITE));
 
-            // Fila vacía = sin referencia y sin cantidad. Con este criterio los
-            // totales de abajo ("Soit : 40 colis", "Poids Brut") también cuentan
-            // como vacías, que es lo que se quiere: no son artículos.
-            if (referencia.isBlank() && cantidadCruda.isBlank()) {
+            // Un artículo es una fila CON REFERENCIA, y una cantidad suelta no
+            // basta. Debajo de la tabla el taller escribe sus totales, y la
+            // suma de "TOTALE" cae dentro de la columna QUANTITE: contando esa
+            // fila como artículo entraba al envío una línea sin referencia, sin
+            // color y sin código, que en APC además bloquea la generación
+            // ("la fila 30 () no trae CODE"). Sin referencia no hay nada que
+            // empaquetar, así que la fila no es del packing.
+            if (referencia.isBlank()) {
+                avisarSiSePierdeUnArticulo(fila, columnas, f + 1, avisos);
                 if (++vaciasSeguidas >= FILAS_VACIAS_PARA_PARAR) {
                     break;
                 }
                 continue;
             }
             vaciasSeguidas = 0;
-            lineas.add(leerLinea(fila, f, columnas, referencia, cantidadCruda, avisos));
+            lineas.add(leerLinea(fila, f, columnas, referencia,
+                    texto(fila, columnas.get(Columna.QUANTITE)), avisos));
         }
         return lineas;
+    }
+
+    /**
+     * Una fila sin referencia se descarta, pero si tiene pinta de artículo se
+     * dice: ahí se está quedando fuera mercancía que alguien apuntó.
+     *
+     * "Pinta de artículo" es traer cantidad <b>y además</b> alguno de los
+     * datos que solo tienen los artículos —color, destinación o código—. Los
+     * totales del pie no traen ninguno, y por eso no avisan: un aviso que sale
+     * en todas las hojas no informa de nada y empuja hacia abajo los que sí
+     * hay que leer.
+     */
+    private static void avisarSiSePierdeUnArticulo(Row fila, Map<Columna, Integer> columnas,
+                                                   int numeroFila, List<AvisoTaller> avisos) {
+        if (enteroOpcional(texto(fila, columnas.get(Columna.QUANTITE))) == null) {
+            return;
+        }
+        List<String> senales = new ArrayList<>();
+        for (Columna columna : List.of(Columna.COULEUR, Columna.DESTINATION, Columna.CODE)) {
+            String valor = texto(fila, columnas.get(columna)).trim();
+            if (!valor.isBlank()) {
+                senales.add(columna.rotulo() + " '" + valor + "'");
+            }
+        }
+        if (senales.isEmpty()) {
+            return;
+        }
+        avisos.add(AvisoTaller.general("En la fila " + numeroFila
+                + " la hoja del taller trae cantidad y " + String.join(", ", senales)
+                + " pero no dice de qué referencia son: esa fila se queda fuera del envío"));
     }
 
     private static LineaTaller leerLinea(Row fila, int indiceFila, Map<Columna, Integer> columnas,
