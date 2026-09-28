@@ -31,6 +31,12 @@ import com.puntotres.packinglist.service.ResultadoDestinos;
 
 class ApcEtiquetasGeneradorTest {
 
+    // Casi todas las aserciones son sobre JAPAN: las filas se le piden al
+    // layout y no se escriben a mano, porque cada plantilla de APC tiene la
+    // suya y el cliente las mueve al reajustar el reparto en el A4.
+    private static final ApcEtiquetaLayout J = ApcEtiquetaLayout.JAPAN;
+    private static final ApcEtiquetaLayout.Palet PALET = J.palet();
+
     private final ApcEtiquetasGenerador generador =
             new ApcEtiquetasGenerador(new ApcEtiquetasExcelBuilder());
 
@@ -110,8 +116,8 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
 
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("4100128725", texto(hoja, 9, 2));    // Order N°
-        assertEquals("PUN20260717WH1", texto(hoja, 10, 2)); // Livraison
+        assertEquals("4100128725", texto(hoja, J.filaOrder(), 2));    // Order N°
+        assertEquals("PUN20260717WH1", texto(hoja, J.filaLivraison(), 2)); // Livraison
     }
 
     @Test
@@ -121,14 +127,14 @@ class ApcEtiquetasGeneradorTest {
                                 caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("NOT FOUND", texto(hoja, 9, 2));   // Order N°
-        assertEquals("NOT FOUND", texto(hoja, 10, 2));  // Livraison
-        assertEquals("PXCBC-F67008", texto(hoja, 11, 2));
-        assertEquals("LZZ-NOIR", texto(hoja, 12, 2));
-        assertEquals("U", texto(hoja, 13, 2));          // bolso: sin talla
-        assertEquals("11", texto(hoja, 14, 2));
-        assertEquals("1 / 1", texto(hoja, 17, 2));
-        assertEquals("7,60 Kg", texto(hoja, 18, 2));
+        assertEquals("NOT FOUND", texto(hoja, J.filaOrder(), 2));   // Order N°
+        assertEquals("NOT FOUND", texto(hoja, J.filaLivraison(), 2));  // Livraison
+        assertEquals("PXCBC-F67008", texto(hoja, J.filaReferencia(), 2));
+        assertEquals("LZZ-NOIR", texto(hoja, J.filaColor(), 2));
+        assertEquals("U", texto(hoja, J.filaTalla(), 2));          // bolso: sin talla
+        assertEquals("11", texto(hoja, J.filaPiezas(), 2));
+        assertEquals("1 / 1", texto(hoja, J.filaColisage(), 2));
+        assertEquals("7,60 Kg", texto(hoja, J.filaPeso(), 2));
     }
 
     @Test
@@ -149,19 +155,20 @@ class ApcEtiquetasGeneradorTest {
             XSSFSheet hoja = libro.getSheet(ApcEtiquetaLayout.RETAIL.hojaCajas());
             assertNotNull(hoja);
             assertNotNull(libro.getSheet(ApcEtiquetaLayout.RETAIL.hojaPalet()));
-            // RETAIL comparte coordenadas con WHOLESALE, así que este estático
-            // de la plantilla es lo ÚNICO que distingue haber abierto una u
-            // otra: sin él, apuntar RETAIL al fichero de Crosslog pasaría
-            // todas las demás aserciones.
-            assertEquals("RETAIL", texto(hoja, 10, 2));
-            assertEquals("PUN20260717RT1", texto(hoja, 11, 2)); // ASN N°
-            assertEquals("4100128725", texto(hoja, 12, 2));     // Order N°
-            assertEquals("PXCBS-F67066", texto(hoja, 13, 2));
-            assertEquals("LZZ-NOIR", texto(hoja, 14, 2));
-            assertEquals("U", texto(hoja, 15, 2));
-            assertEquals("2", texto(hoja, 16, 2));
-            assertEquals("1 / 1", texto(hoja, 18, 2));
-            assertEquals("3,00 Kg", texto(hoja, 19, 2));
+            // RETAIL y WHOLESALE van al mismo almacén y el cliente solo partió
+            // la plantilla para que se imprima una palabra u otra en
+            // DESTINATION: ese estático es lo que dice qué fichero se ha
+            // abierto. Va justo encima del ASN.
+            ApcEtiquetaLayout r = ApcEtiquetaLayout.RETAIL;
+            assertEquals("RETAIL", texto(hoja, r.filaLivraison() - 1, 2));
+            assertEquals("PUN20260717RT1", texto(hoja, r.filaLivraison(), 2)); // ASN N°
+            assertEquals("4100128725", texto(hoja, r.filaOrder(), 2));
+            assertEquals("PXCBS-F67066", texto(hoja, r.filaReferencia(), 2));
+            assertEquals("LZZ-NOIR", texto(hoja, r.filaColor(), 2));
+            assertEquals("U", texto(hoja, r.filaTalla(), 2));
+            assertEquals("2", texto(hoja, r.filaPiezas(), 2));
+            assertEquals("1 / 1", texto(hoja, r.filaColisage(), 2));
+            assertEquals("3,00 Kg", texto(hoja, r.filaPeso(), 2));
         }
     }
 
@@ -174,14 +181,14 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
 
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("PXCBC-F67008 / PXCBC-F67009", texto(hoja, 11, 2));
-        assertEquals("LZZ-NOIR / LZZ-BLANC", texto(hoja, 12, 2));
+        assertEquals("PXCBC-F67008 / PXCBC-F67009", texto(hoja, J.filaReferencia(), 2));
+        assertEquals("LZZ-NOIR / LZZ-BLANC", texto(hoja, J.filaColor(), 2));
         // SIZE no se concatena: "U / U" no dice nada.
-        assertEquals("U", texto(hoja, 13, 2));
-        assertEquals("3 / 5", texto(hoja, 14, 2));
+        assertEquals("U", texto(hoja, J.filaTalla(), 2));
+        assertEquals("3 / 5", texto(hoja, J.filaPiezas(), 2));
         // Peso y colisage son de la caja, no del artículo.
-        assertEquals("7,60 Kg", texto(hoja, 18, 2));
-        assertEquals("1 / 1", texto(hoja, 17, 2));
+        assertEquals("7,60 Kg", texto(hoja, J.filaPeso(), 2));
+        assertEquals("1 / 1", texto(hoja, J.filaColisage(), 2));
         // La etiqueta ya muestra todos los artículos: no hay nada que avisar.
         assertTrue(resultado.getAvisos().isEmpty());
     }
@@ -194,9 +201,9 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
 
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("PXCBC-F67008", texto(hoja, 11, 2));
-        assertEquals("LZZ-NOIR", texto(hoja, 12, 2));
-        assertEquals("11", texto(hoja, 14, 2));
+        assertEquals("PXCBC-F67008", texto(hoja, J.filaReferencia(), 2));
+        assertEquals("LZZ-NOIR", texto(hoja, J.filaColor(), 2));
+        assertEquals("11", texto(hoja, J.filaPiezas(), 2));
     }
 
     @Test
@@ -210,11 +217,11 @@ class ApcEtiquetasGeneradorTest {
                                 caja(3, "PXBHZ-H65077", "LZZ-NOIR", "85", 5, null, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("85-90", texto(hoja, 13, 2));
-        assertEquals("12-85,8-90", texto(hoja, 14, 2));
+        assertEquals("85-90", texto(hoja, J.filaTalla(), 2));
+        assertEquals("12-85,8-90", texto(hoja, J.filaPiezas(), 2));
         // El peso de la caja entera viene una sola vez, en su primera línea.
-        assertEquals("6,00 Kg", texto(hoja, 18, 2));
-        assertEquals("1 / 1", texto(hoja, 17, 2));
+        assertEquals("6,00 Kg", texto(hoja, J.filaPeso(), 2));
+        assertEquals("1 / 1", texto(hoja, J.filaColisage(), 2));
     }
 
     /**
@@ -230,8 +237,8 @@ class ApcEtiquetasGeneradorTest {
                                 caja(3, "PXBHZ-H65078", "LZZ-NOIR", "90", 8, null, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("PXBHZ-H65077 / PXBHZ-H65078", texto(hoja, 11, 2));
-        assertEquals("85", texto(hoja, 13, 2));
+        assertEquals("PXBHZ-H65077 / PXBHZ-H65078", texto(hoja, J.filaReferencia(), 2));
+        assertEquals("85", texto(hoja, J.filaTalla(), 2));
         assertTrue(resultado.getAvisos().contains("JAPAN: Caja 3. Mezcla de referencias/colores. "
                         + "SIZE y PIECES BY SIZE son solo de PXBHZ-H65077 LZZ-NOIR"),
                 resultado.getAvisos().toString());
@@ -255,10 +262,10 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
 
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("4100128710 / 4100128711", texto(hoja, 9, 2));
-        assertEquals("PXCBC-F63024 / PXCBC-F63024", texto(hoja, 11, 2));
-        assertEquals("LIQUEN / NOIR", texto(hoja, 12, 2));
-        assertEquals("3 / 16", texto(hoja, 14, 2));
+        assertEquals("4100128710 / 4100128711", texto(hoja, J.filaOrder(), 2));
+        assertEquals("PXCBC-F63024 / PXCBC-F63024", texto(hoja, J.filaReferencia(), 2));
+        assertEquals("LIQUEN / NOIR", texto(hoja, J.filaColor(), 2));
+        assertEquals("3 / 16", texto(hoja, J.filaPiezas(), 2));
     }
 
     /**
@@ -282,8 +289,8 @@ class ApcEtiquetasGeneradorTest {
 
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
         // Las dos tallas del cinturón son UN artículo (referencia + color).
-        assertEquals("4100128715 / 4100128710", texto(hoja, 9, 2));
-        assertEquals("PXBHZ-F65101 / PXCBC-F63024", texto(hoja, 11, 2));
+        assertEquals("4100128715 / 4100128710", texto(hoja, J.filaOrder(), 2));
+        assertEquals("PXBHZ-F65101 / PXCBC-F63024", texto(hoja, J.filaReferencia(), 2));
     }
 
     /**
@@ -301,7 +308,7 @@ class ApcEtiquetasGeneradorTest {
                 envio(), Map.of());
 
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("4100128710 / NOT FOUND", texto(hoja, 9, 2));
+        assertEquals("4100128710 / NOT FOUND", texto(hoja, J.filaOrder(), 2));
     }
 
     /**
@@ -389,10 +396,10 @@ class ApcEtiquetasGeneradorTest {
         try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
                 resultado.getExcels().get(0).getContenido()))) {
             XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
-            assertEquals(2, palet.getRow(ApcEtiquetaLayout.FILA_PALET_NUM_CAJAS)
+            assertEquals(2, palet.getRow(PALET.filaNumCajas())
                     .getCell(ApcEtiquetaLayout.COL_VALOR).getNumericCellValue(), 0.001);
             // Y el peso, el de esas dos más la tara: 7 + 8 + 8.
-            assertEquals("23,00 Kg", texto(palet, ApcEtiquetaLayout.FILA_PALET_PESO,
+            assertEquals("23,00 Kg", texto(palet, PALET.filaPeso(),
                     ApcEtiquetaLayout.COL_VALOR));
         }
     }
@@ -408,7 +415,7 @@ class ApcEtiquetasGeneradorTest {
         try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
                 resultado.getExcels().get(0).getContenido()))) {
             XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
-            assertEquals("14,04 Kg", texto(palet, 13, 2)); // 6.0 + 8.04 de tara
+            assertEquals("14,04 Kg", texto(palet, PALET.filaPeso(), PALET.colValor())); // 6.0 + 8.04 de tara
         }
         assertTrue(resultado.getAvisos().stream().noneMatch(a -> a.contains("sin peso")));
     }
@@ -420,8 +427,8 @@ class ApcEtiquetasGeneradorTest {
                                 caja(1, "PXBHZ-H65077", "LZZ-NOIR", "85", 7, 2.0, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("85", texto(hoja, 13, 2));
-        assertEquals("7", texto(hoja, 14, 2));
+        assertEquals("85", texto(hoja, J.filaTalla(), 2));
+        assertEquals("7", texto(hoja, J.filaPiezas(), 2));
     }
 
     @Test
@@ -431,7 +438,7 @@ class ApcEtiquetasGeneradorTest {
                                 caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, null, 1))),
                 envio(), Map.of());
         XSSFSheet hoja = hojaCajas(resultado.getExcels().get(0).getContenido());
-        assertEquals("", texto(hoja, 18, 2));
+        assertEquals("", texto(hoja, J.filaPeso(), 2));
         assertEquals(1, resultado.getExcels().get(0).getCajasPendientes().size());
     }
 
@@ -448,11 +455,14 @@ class ApcEtiquetasGeneradorTest {
                 resultado.getExcels().get(0).getContenido()))) {
             XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
             // Palet 1: 2 cajas, 7.6 + 8.2 + 8.04 de tara = 23.84.
-            assertEquals(2, palet.getRow(12).getCell(2).getNumericCellValue(), 0.001);
-            assertEquals("23,84 Kg", texto(palet, 13, 2));
+            assertEquals(2, palet.getRow(PALET.filaNumCajas()).getCell(PALET.colValor())
+                    .getNumericCellValue(), 0.001);
+            assertEquals("23,84 Kg", texto(palet, PALET.filaPeso(), PALET.colValor()));
             // Palet 2: 1 caja, 2.0 + 10 de tara por defecto = 12.00.
-            assertEquals(1, palet.getRow(12 + 14).getCell(2).getNumericCellValue(), 0.001);
-            assertEquals("12,00 Kg", texto(palet, 13 + 14, 2));
+            assertEquals(1, palet.getRow(PALET.filaNumCajas() + PALET.altura())
+                    .getCell(PALET.colValor()).getNumericCellValue(), 0.001);
+            assertEquals("12,00 Kg",
+                    texto(palet, PALET.filaPeso() + PALET.altura(), PALET.colValor()));
         }
     }
 
@@ -465,7 +475,7 @@ class ApcEtiquetasGeneradorTest {
         try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
                 resultado.getExcels().get(0).getContenido()))) {
             XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
-            assertEquals("", texto(palet, 13, 2));
+            assertEquals("", texto(palet, PALET.filaPeso(), PALET.colValor()));
         }
         assertTrue(resultado.getAvisos().stream()
                 .anyMatch(a -> a.contains("Palet 1") && a.contains("sin peso")));

@@ -11,43 +11,54 @@ import java.util.Optional;
  * caja i-ésima se escribe desplazada i*alturaBloque y la segunda etiqueta
  * del par a +offsetSegundaEtiqueta. Los valores van en la columna C.
  *
- * La hoja de palet es uniforme en las 4 plantillas: etiqueta modelo en las
- * filas 0..13, nº de cajas en C13 y peso en C14 (1-based).
- *
- * filaLivraison: en WH CROSSLOG y en RETAIL es la fila "ASN N°" (esas
+ * <p>filaLivraison: en WH CROSSLOG y en RETAIL es la fila "ASN N°" (esas
  * plantillas no tienen Livraison); recibe el mismo valor.
  *
- * NO cambiar estas coordenadas sin revisar la plantilla, y viceversa.
+ * <p>Las cinco plantillas están maquetadas cada una por su lado, así que
+ * NADA de esto se puede compartir entre destinaciones: ni el alto del
+ * bloque, ni dónde cae cada campo, ni la geometría de la hoja de palet. La
+ * segunda etiqueta del par suele estar recortada por abajo respecto de la
+ * primera (por eso alturaBloque no es 2*offsetSegundaEtiqueta), y eso es
+ * correcto: el bloque se copia entero, recorte incluido.
+ *
+ * <p>NO cambiar estas coordenadas sin revisar la plantilla, y viceversa:
+ * ApcEtiquetaLayoutTest las ancla contra los ficheros reales.
  */
 record ApcEtiquetaLayout(
         String rutaPlantilla, String hojaCajas, String hojaPalet,
         int alturaBloque, int offsetSegundaEtiqueta,
         int filaOrder, int filaLivraison, int filaReferencia, int filaColor,
-        int filaTalla, int filaPiezas, int filaColisage, int filaPeso) {
+        int filaTalla, int filaPiezas, int filaColisage, int filaPeso,
+        Palet palet) {
 
-    public static final int COL_VALOR = 2;          // columna C
     /**
-     * La columna A es el margen izquierdo de la etiqueta y las cinco
-     * plantillas la traen en anchos distintos (de 3,3 a 5,7 caracteres). Se
-     * iguala a 18,5 en las dos hojas del libro: es un ajuste del área de
-     * impresión hecho viendo la etiqueta impresa, no algo que se deduzca de
-     * las plantillas. En unidades de POI: 1/256 de carácter.
+     * Geometría de la hoja de etiquetas de palet, que también es distinta en
+     * cada plantilla. colValor es casi siempre la columna C, pero en
+     * WHOLESALE el cliente trabaja sin la columna A y los valores caen en la
+     * B: escribir en la C dejaría la etiqueta con el número de cajas y el
+     * peso fuera del recuadro, en una columna que ni siquiera se imprime.
      */
-    public static final int COL_MARGEN = 0;         // columna A
-    public static final int ANCHO_COL_MARGEN = (int) Math.round(18.5 * 256);
-    public static final int ALTURA_BLOQUE_PALET = 14;
-    public static final int FILA_PALET_NUM_CAJAS = 12; // C13
-    public static final int FILA_PALET_PESO = 13;      // C14
+    record Palet(int altura, int filaNumCajas, int filaPeso, int colValor) {
+    }
+
+    /** Columna C: los valores de la hoja de cajas en las cinco plantillas. */
+    public static final int COL_VALOR = 2;
+
+    public int colValor() {
+        return COL_VALOR;
+    }
 
     public static final ApcEtiquetaLayout JAPAN = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-japan.xlsx",
             "Etiquette colis Bolloré ", "Etiquette Palette Bolloré",
-            42, 21, 9, 10, 11, 12, 13, 14, 17, 18);
+            36, 18, 8, 9, 10, 11, 12, 13, 16, 17,
+            new Palet(14, 10, 11, COL_VALOR));
 
     public static final ApcEtiquetaLayout KOREA = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-korea.xlsx",
             "Etiquette colis FC Logistique", "Etiquette Palette FC logistique",
-            44, 22, 11, 12, 13, 14, 15, 16, 19, 20);
+            36, 19, 7, 8, 9, 10, 11, 12, 15, 16,
+            new Palet(14, 10, 11, COL_VALOR));
 
     /**
      * filaReferencia = 11 y no 12: en esta plantilla la celda de valor de
@@ -60,24 +71,29 @@ record ApcEtiquetaLayout(
     public static final ApcEtiquetaLayout USA = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-usa.xlsx",
             "ETIQUETTE COLIS", "PALET",
-            46, 23, 9, 10, 11, 13, 14, 15, 18, 19);
+            41, 21, 9, 10, 11, 13, 14, 15, 18, 19,
+            new Palet(19, 12, 13, COL_VALOR));
 
     public static final ApcEtiquetaLayout WH_CROSSLOG = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-wh-crosslog.xlsx",
             "Etiquette colis Crosslog", "Etiquette Palette Crosslog",
-            40, 20, 12, 11, 13, 14, 15, 16, 18, 19);
+            37, 19, 10, 9, 11, 12, 13, 14, 16, 17,
+            new Palet(14, 10, 11, 1));
 
     /**
-     * Mismas coordenadas que WH_CROSSLOG: las dos etiquetas van al mismo
-     * almacén (Crosslog) y el cliente solo partió la plantilla para que se
-     * imprima RETAIL o WHOLESALE en la línea DESTINATION. Aun así son DOS
-     * ficheros distintos y ese estático es lo único que los diferencia, así
-     * que confundirlos no rompe nada visible: lo ancla ApcEtiquetaLayoutTest.
+     * RETAIL y WHOLESALE van al mismo almacén (Crosslog) y el cliente solo
+     * partió la plantilla para que se imprima RETAIL o WHOLESALE en la línea
+     * DESTINATION, pero desde que se ajustó el reparto en el A4 sus dos
+     * ficheros YA NO comparten maquetación: aquí el bloque son 39 filas y
+     * allí 37, y cada campo cae en una fila distinta. Antes se copiaban las
+     * coordenadas de WH_CROSSLOG; hacerlo ahora escribiría cada valor una o
+     * dos filas por encima de su rótulo.
      */
     public static final ApcEtiquetaLayout RETAIL = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-retail.xlsx",
             "Etiquette colis Retail", "Etiquette Palette Retail",
-            40, 20, 12, 11, 13, 14, 15, 16, 18, 19);
+            39, 20, 11, 10, 12, 13, 14, 15, 17, 18,
+            new Palet(14, 10, 11, COL_VALOR));
 
     /**
      * Se aceptan la clave del catálogo de packing (D. USA, WHOLESALE) y el

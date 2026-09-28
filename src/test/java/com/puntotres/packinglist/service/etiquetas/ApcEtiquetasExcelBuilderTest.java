@@ -35,21 +35,24 @@ class ApcEtiquetasExcelBuilderTest {
             XSSFSheet cajas = libro.getSheet("Etiquette colis Bolloré ");
             assertNotNull(cajas);
             assertNotNull(libro.getSheet("Etiquette Palette Bolloré"));
+            ApcEtiquetaLayout j = ApcEtiquetaLayout.JAPAN;
+            int offset = j.offsetSegundaEtiqueta();
             // Etiqueta 1 (los códigos pisan los valores de ejemplo).
-            assertEquals("NOT FOUND", texto(cajas, 9, 2));
-            assertEquals("NOT FOUND", texto(cajas, 10, 2));
-            assertEquals("PXCBC-F67008", texto(cajas, 11, 2));
-            assertEquals("LZZ-NOIR", texto(cajas, 12, 2));
-            assertEquals("U", texto(cajas, 13, 2));
-            assertEquals("11", texto(cajas, 14, 2));
-            assertEquals("1 / 1", texto(cajas, 17, 2));
-            assertEquals("7,60 Kg", texto(cajas, 18, 2));
-            // Etiqueta 2 = mismas celdas + offset 21.
-            assertEquals("NOT FOUND", texto(cajas, 9 + 21, 2));
-            assertEquals("PXCBC-F67008", texto(cajas, 11 + 21, 2));
-            assertEquals("7,60 Kg", texto(cajas, 18 + 21, 2));
-            // Los estáticos de la plantilla no se tocan (DESTINATION = TOKYO).
-            assertEquals("TOKYO", texto(cajas, 8, 2));
+            assertEquals("NOT FOUND", texto(cajas, j.filaOrder(), 2));
+            assertEquals("NOT FOUND", texto(cajas, j.filaLivraison(), 2));
+            assertEquals("PXCBC-F67008", texto(cajas, j.filaReferencia(), 2));
+            assertEquals("LZZ-NOIR", texto(cajas, j.filaColor(), 2));
+            assertEquals("U", texto(cajas, j.filaTalla(), 2));
+            assertEquals("11", texto(cajas, j.filaPiezas(), 2));
+            assertEquals("1 / 1", texto(cajas, j.filaColisage(), 2));
+            assertEquals("7,60 Kg", texto(cajas, j.filaPeso(), 2));
+            // Etiqueta 2 = mismas celdas + offset.
+            assertEquals("NOT FOUND", texto(cajas, j.filaOrder() + offset, 2));
+            assertEquals("PXCBC-F67008", texto(cajas, j.filaReferencia() + offset, 2));
+            assertEquals("7,60 Kg", texto(cajas, j.filaPeso() + offset, 2));
+            // Los estáticos de la plantilla no se tocan: DESTINATION = TOKYO,
+            // la fila justo encima del Order N°.
+            assertEquals("TOKYO", texto(cajas, j.filaOrder() - 1, 2));
         }
     }
 
@@ -59,17 +62,19 @@ class ApcEtiquetasExcelBuilderTest {
                 etiqueta("1 / 2", "7,60 Kg"), etiqueta("2 / 2", null)), List.of());
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet cajas = libro.getSheet("Etiquette colis Bolloré ");
-            // Caja 2 = bloque desplazado 42 filas, con sus estáticos copiados.
-            assertEquals("NOT FOUND", texto(cajas, 9 + 42, 2));
-            assertEquals("2 / 2", texto(cajas, 17 + 42, 2));
-            assertEquals("", texto(cajas, 18 + 42, 2));
-            assertEquals("TOKYO", texto(cajas, 8 + 42, 2));
+            ApcEtiquetaLayout j = ApcEtiquetaLayout.JAPAN;
+            int bloque = j.alturaBloque();
+            // Caja 2 = bloque desplazado, con sus estáticos copiados.
+            assertEquals("NOT FOUND", texto(cajas, j.filaOrder() + bloque, 2));
+            assertEquals("2 / 2", texto(cajas, j.filaColisage() + bloque, 2));
+            assertEquals("", texto(cajas, j.filaPeso() + bloque, 2));
+            assertEquals("TOKYO", texto(cajas, j.filaOrder() - 1 + bloque, 2));
             // Cada par en su A4.
             assertTrue(cajas.getRowBreaks().length >= 1);
-            assertEquals(41, cajas.getRowBreaks()[0]);
+            assertEquals(bloque - 1, cajas.getRowBreaks()[0]);
             // El bloque copiado conserva los altos de fila de la plantilla.
             assertEquals(cajas.getRow(6).getHeightInPoints(),
-                    cajas.getRow(6 + 42).getHeightInPoints(), 0.01);
+                    cajas.getRow(6 + bloque).getHeightInPoints(), 0.01);
         }
     }
 
@@ -92,16 +97,19 @@ class ApcEtiquetasExcelBuilderTest {
                 List.of(new EtiquetaPaletApc(9, "64,58 Kg"), new EtiquetaPaletApc(3, null)));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet palet = libro.getSheet("Etiquette Palette Bolloré");
-            // Palet 1: nº de cajas numérico en C13 y peso en C14.
-            assertEquals(9, palet.getRow(12).getCell(2).getNumericCellValue(), 0.001);
-            assertEquals("64,58 Kg", texto(palet, 13, 2));
-            // Palet 2 = bloque desplazado 14 filas; peso null en blanco.
-            assertEquals(3, palet.getRow(12 + 14).getCell(2).getNumericCellValue(), 0.001);
-            assertEquals("", texto(palet, 13 + 14, 2));
+            ApcEtiquetaLayout.Palet geo = ApcEtiquetaLayout.JAPAN.palet();
+            // Palet 1: nº de cajas numérico y peso debajo.
+            assertEquals(9, palet.getRow(geo.filaNumCajas()).getCell(geo.colValor())
+                    .getNumericCellValue(), 0.001);
+            assertEquals("64,58 Kg", texto(palet, geo.filaPeso(), geo.colValor()));
+            // Palet 2 = bloque desplazado; peso null en blanco.
+            assertEquals(3, palet.getRow(geo.filaNumCajas() + geo.altura()).getCell(geo.colValor())
+                    .getNumericCellValue(), 0.001);
+            assertEquals("", texto(palet, geo.filaPeso() + geo.altura(), geo.colValor()));
             // Estáticos copiados y salto de página entre palets.
-            assertEquals("TOKYO", texto(palet, 9 + 14, 2));
+            assertEquals("TOKYO", texto(palet, 7 + geo.altura(), geo.colValor()));
             assertTrue(palet.getRowBreaks().length >= 1);
-            assertEquals(13, palet.getRowBreaks()[0]);
+            assertEquals(geo.altura() - 1, palet.getRowBreaks()[0]);
             // La celda suelta del contador manual de la fila 1 se limpia
             // (en la plantilla de JAPAN es E1).
             assertEquals("", texto(palet, 0, 4));
@@ -129,26 +137,81 @@ class ApcEtiquetasExcelBuilderTest {
     }
 
     /**
-     * La columna A es el margen izquierdo de la etiqueta y las cinco
-     * plantillas la traen en anchos distintos (de 3,3 a 5,7 caracteres): se
-     * iguala a 18,5 en las DOS hojas de cada libro. No se deduce de la
-     * plantilla, es el ajuste del área de impresión que pidió el cliente.
+     * El área de impresión de la plantilla cubre su único bloque: sin
+     * estirarla, un envío de varias cajas imprimiría solo la primera. Se
+     * estira hasta la última fila escrita CONSERVANDO las columnas que eligió
+     * el cliente, que no son las mismas en todas las hojas (en la de palet de
+     * WHOLESALE llega hasta la B, porque ahí no existe la columna A).
      */
     @Test
-    void elMargenIzquierdoSaleIgualEnLasDosHojasDeLasCincoPlantillas() throws IOException {
+    void elAreaDeImpresionCubreTodosLosBloquesYRespetaLasColumnasDeCadaPlantilla()
+            throws IOException {
         for (ApcEtiquetaLayout layout : List.of(ApcEtiquetaLayout.JAPAN, ApcEtiquetaLayout.KOREA,
                 ApcEtiquetaLayout.USA, ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.RETAIL)) {
-            byte[] excel = builder.generar(layout, List.of(etiqueta("1 / 1", "7,60 Kg")),
-                    List.of(new EtiquetaPaletApc(1, "17,60 Kg")));
+            byte[] excel = builder.generar(layout,
+                    List.of(etiqueta("1 / 3", "7,60 Kg"), etiqueta("2 / 3", "7,60 Kg"),
+                            etiqueta("3 / 3", "6,20 Kg")),
+                    List.of(new EtiquetaPaletApc(2, "25,20 Kg"),
+                            new EtiquetaPaletApc(1, "16,20 Kg")));
             try (XSSFWorkbook libro = abrir(excel)) {
-                assertEquals(2, libro.getNumberOfSheets(), layout.rutaPlantilla());
-                for (int i = 0; i < libro.getNumberOfSheets(); i++) {
-                    assertEquals(18.5,
-                            libro.getSheetAt(i).getColumnWidth(0) / 256.0, 0.01,
-                            layout.rutaPlantilla() + " / " + libro.getSheetName(i));
-                }
+                String donde = layout.rutaPlantilla() + ": ";
+                assertEquals(3 * layout.alturaBloque() - 1,
+                        ultimaFilaDelArea(libro, 0), donde + "hoja de cajas");
+                assertEquals(2 * layout.palet().altura() - 1,
+                        ultimaFilaDelArea(libro, 1), donde + "hoja de palet");
+                // Y sobre todo: la columna donde se escribe el valor cae
+                // DENTRO del área. En la hoja de palet de WHOLESALE el área
+                // acaba en la B, así que escribir en la C (como las otras
+                // cuatro) dejaría el número de cajas y el peso sin imprimir.
+                assertTrue(ultimaColumnaDelArea(libro, 1) >= layout.palet().colValor(),
+                        donde + "el valor del palet cae fuera del área de impresión");
             }
         }
+    }
+
+    /**
+     * Las plantillas vienen con "ajustar todas las filas en una página", que
+     * sobre su único bloque es justo lo que se quiere pero sobre N le pediría
+     * a Excel meter TODAS las etiquetas en un solo A4. Se traduce a la escala
+     * fija que hace que quepa UN bloque, así que el resultado no depende de
+     * cuántas cajas lleve el envío.
+     */
+    @Test
+    void cadaBloqueOcupaSuPaginaSeaUnaCajaOVeinte() throws IOException {
+        for (ApcEtiquetaLayout layout : List.of(ApcEtiquetaLayout.JAPAN, ApcEtiquetaLayout.KOREA,
+                ApcEtiquetaLayout.USA, ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.RETAIL)) {
+            short escalaDeUna = escalaDeLaHojaDeCajas(layout, 1);
+            short escalaDeVeinte = escalaDeLaHojaDeCajas(layout, 20);
+            String donde = layout.rutaPlantilla() + ": ";
+            assertEquals(escalaDeUna, escalaDeVeinte, donde + "la escala depende del nº de cajas");
+            assertTrue(escalaDeUna > 0 && escalaDeUna <= 100,
+                    donde + "escala fuera de rango: " + escalaDeUna);
+        }
+    }
+
+    private short escalaDeLaHojaDeCajas(ApcEtiquetaLayout layout, int numCajas) throws IOException {
+        List<EtiquetaCajaApc> cajas = new java.util.ArrayList<>();
+        for (int i = 1; i <= numCajas; i++) {
+            cajas.add(etiqueta(i + " / " + numCajas, "7,60 Kg"));
+        }
+        try (XSSFWorkbook libro = abrir(builder.generar(layout, cajas,
+                List.of(new EtiquetaPaletApc(1, "17,60 Kg"))))) {
+            XSSFSheet hoja = libro.getSheetAt(0);
+            assertTrue(!hoja.getFitToPage(),
+                    layout.rutaPlantilla() + ": sigue con 'ajustar a una página', que con varias"
+                            + " cajas mete todas las etiquetas en un solo A4");
+            return hoja.getPrintSetup().getScale();
+        }
+    }
+
+    private static int ultimaFilaDelArea(XSSFWorkbook libro, int indiceHoja) {
+        return new org.apache.poi.ss.util.AreaReference(libro.getPrintArea(indiceHoja),
+                org.apache.poi.ss.SpreadsheetVersion.EXCEL2007).getLastCell().getRow();
+    }
+
+    private static int ultimaColumnaDelArea(XSSFWorkbook libro, int indiceHoja) {
+        return new org.apache.poi.ss.util.AreaReference(libro.getPrintArea(indiceHoja),
+                org.apache.poi.ss.SpreadsheetVersion.EXCEL2007).getLastCell().getCol();
     }
 
     static XSSFWorkbook abrir(byte[] contenido) throws IOException {

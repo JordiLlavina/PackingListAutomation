@@ -6,8 +6,11 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.poi.ss.SpreadsheetVersion;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.ClientAnchor;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.AreaReference;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
@@ -28,6 +31,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class ApcEtiquetasExcelBuilder {
 
+    /** A4 en puntos (1/72"), que es la unidad de los altos de fila de POI. */
+    private static final double ALTO_A4_PT = 841.89;
+    private static final double ANCHO_A4_PT = 595.28;
+    private static final double PUNTOS_POR_PULGADA = 72;
+    /** POI mide los anchos de columna en píxeles a 96 ppp. */
+    private static final double PUNTOS_POR_PIXEL = 72.0 / 96.0;
+
     /** Datos ya formateados de la etiqueta de una caja. null = en blanco. */
     public record EtiquetaCajaApc(String orderNumber, String livraisonCode, String referencia,
                                   String colour, String size, String piecesBySize,
@@ -43,20 +53,22 @@ public class ApcEtiquetasExcelBuilder {
         try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
              XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
             AjusteFuente ajuste = new AjusteFuente(libro);
-            escribirHojaCajas(hoja(libro, layout.hojaCajas(), layout), layout, cajas, ajuste);
+            XSSFSheet hojaCajas = hoja(libro, layout.hojaCajas(), layout);
+            escribirHojaCajas(hojaCajas, layout, cajas, ajuste);
             // Sin ningún palet que etiquetar la hoja no se conserva: la
             // etiqueta modelo de la plantilla se imprimiría en blanco y se
             // pegaría en un bulto igual que una buena.
+            XSSFSheet hojaPalet = palets.isEmpty() ? null : hoja(libro, layout.hojaPalet(), layout);
             if (palets.isEmpty()) {
                 quitarHojaPalets(libro, layout);
             } else {
-                escribirHojaPalets(hoja(libro, layout.hojaPalet(), layout), palets);
+                escribirHojaPalets(hojaPalet, layout, palets);
             }
-            // Después de quitar la hoja de palets: solo se toca lo que queda
-            // vivo en el libro.
-            for (int i = 0; i < libro.getNumberOfSheets(); i++) {
-                libro.getSheetAt(i).setColumnWidth(ApcEtiquetaLayout.COL_MARGEN,
-                        ApcEtiquetaLayout.ANCHO_COL_MARGEN);
+            // Al final y sobre lo que queda vivo en el libro: quitar una hoja
+            // remapea los índices, y el área de impresión se pide por índice.
+            ajustarImpresion(libro, hojaCajas, layout.alturaBloque(), cajas.size());
+            if (hojaPalet != null) {
+                ajustarImpresion(libro, hojaPalet, layout.palet().altura(), palets.size());
             }
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             libro.write(salida);
@@ -97,30 +109,33 @@ public class ApcEtiquetasExcelBuilder {
     private static void escribirEtiquetaCaja(XSSFSheet hoja, ApcEtiquetaLayout layout,
                                              int base, EtiquetaCajaApc etiqueta,
                                              AjusteFuente ajuste) {
+        int col = layout.colValor();
         // El Order N° también lleva un valor por artículo desde que una caja
         // mixta los enseña todos, así que encoge igual que la referencia.
-        ajuste.ajustar(escribir(hoja, base + layout.filaOrder(), etiqueta.orderNumber()));
-        escribir(hoja, base + layout.filaLivraison(), etiqueta.livraisonCode());
+        ajuste.ajustar(escribir(hoja, base + layout.filaOrder(), col, etiqueta.orderNumber()));
+        escribir(hoja, base + layout.filaLivraison(), col, etiqueta.livraisonCode());
         // Estas tres pueden llevar varios artículos concatenados y crecer.
-        ajuste.ajustar(escribir(hoja, base + layout.filaReferencia(), etiqueta.referencia()));
-        ajuste.ajustar(escribir(hoja, base + layout.filaColor(), etiqueta.colour()));
-        escribir(hoja, base + layout.filaTalla(), etiqueta.size());
-        ajuste.ajustar(escribir(hoja, base + layout.filaPiezas(), etiqueta.piecesBySize()));
-        escribir(hoja, base + layout.filaColisage(), etiqueta.colisage());
-        escribir(hoja, base + layout.filaPeso(), etiqueta.poidsBrut());
+        ajuste.ajustar(escribir(hoja, base + layout.filaReferencia(), col, etiqueta.referencia()));
+        ajuste.ajustar(escribir(hoja, base + layout.filaColor(), col, etiqueta.colour()));
+        escribir(hoja, base + layout.filaTalla(), col, etiqueta.size());
+        ajuste.ajustar(escribir(hoja, base + layout.filaPiezas(), col, etiqueta.piecesBySize()));
+        escribir(hoja, base + layout.filaColisage(), col, etiqueta.colisage());
+        escribir(hoja, base + layout.filaPeso(), col, etiqueta.poidsBrut());
     }
 
-    private static Cell escribir(XSSFSheet hoja, int fila, String valor) {
-        XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
-        Cell celda = f.getCell(ApcEtiquetaLayout.COL_VALOR) != null
-                ? f.getCell(ApcEtiquetaLayout.COL_VALOR)
-                : f.createCell(ApcEtiquetaLayout.COL_VALOR);
+    private static Cell escribir(XSSFSheet hoja, int fila, int col, String valor) {
+        Cell celda = celda(hoja, fila, col);
         if (valor == null || valor.isBlank()) {
             celda.setBlank();
         } else {
             celda.setCellValue(valor);
         }
         return celda;
+    }
+
+    private static Cell celda(XSSFSheet hoja, int fila, int col) {
+        XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
+        return f.getCell(col) != null ? f.getCell(col) : f.createCell(col);
     }
 
     /**
@@ -167,22 +182,22 @@ public class ApcEtiquetasExcelBuilder {
         libro.setActiveSheet(0);
     }
 
-    private static void escribirHojaPalets(XSSFSheet hoja, List<EtiquetaPaletApc> palets) {
+    private static void escribirHojaPalets(XSSFSheet hoja, ApcEtiquetaLayout layout,
+                                           List<EtiquetaPaletApc> palets) {
+        ApcEtiquetaLayout.Palet geo = layout.palet();
         limpiarContadorManual(hoja);
-        BloqueEtiquetaModelo modelo =
-                BloqueEtiquetaModelo.capturar(hoja, ApcEtiquetaLayout.ALTURA_BLOQUE_PALET);
+        BloqueEtiquetaModelo modelo = BloqueEtiquetaModelo.capturar(hoja, geo.altura());
         for (int i = 1; i < palets.size(); i++) {
-            modelo.copiarEn(hoja, i * ApcEtiquetaLayout.ALTURA_BLOQUE_PALET);
+            modelo.copiarEn(hoja, i * geo.altura());
         }
-        replicarImagenes(hoja, ApcEtiquetaLayout.ALTURA_BLOQUE_PALET, palets.size());
+        replicarImagenes(hoja, geo.altura(), palets.size());
         for (int i = 0; i < palets.size(); i++) {
-            int base = i * ApcEtiquetaLayout.ALTURA_BLOQUE_PALET;
-            escribirNumero(hoja, base + ApcEtiquetaLayout.FILA_PALET_NUM_CAJAS,
-                    palets.get(i).numeroCajas());
-            escribir(hoja, base + ApcEtiquetaLayout.FILA_PALET_PESO,
-                    palets.get(i).poidsBrut());
+            int base = i * geo.altura();
+            celda(hoja, base + geo.filaNumCajas(), geo.colValor())
+                    .setCellValue(palets.get(i).numeroCajas());
+            escribir(hoja, base + geo.filaPeso(), geo.colValor(), palets.get(i).poidsBrut());
             if (i < palets.size() - 1) {
-                hoja.setRowBreak(base + ApcEtiquetaLayout.ALTURA_BLOQUE_PALET - 1);
+                hoja.setRowBreak(base + geo.altura() - 1);
             }
         }
     }
@@ -197,11 +212,69 @@ public class ApcEtiquetasExcelBuilder {
         }
     }
 
-    private static void escribirNumero(XSSFSheet hoja, int fila, int valor) {
-        XSSFRow f = hoja.getRow(fila) != null ? hoja.getRow(fila) : hoja.createRow(fila);
-        Cell celda = f.getCell(ApcEtiquetaLayout.COL_VALOR) != null
-                ? f.getCell(ApcEtiquetaLayout.COL_VALOR)
-                : f.createCell(ApcEtiquetaLayout.COL_VALOR);
-        celda.setCellValue(valor);
+    /**
+     * Deja la hoja imprimiendo UN bloque por A4, que es lo que se ajustó a
+     * mano sobre las plantillas y lo que hay que reproducir con N bloques.
+     *
+     * <p>Dos cosas, y ninguna se puede copiar tal cual de la plantilla:
+     *
+     * <p>El <b>área de impresión</b> de la plantilla cubre su único bloque,
+     * así que se estira hasta la última fila escrita conservando las
+     * columnas que eligió el cliente (en WHOLESALE la hoja de palet llega
+     * hasta la B y las demás hasta la D). Sin esto solo se imprimiría la
+     * primera caja.
+     *
+     * <p>El <b>ajuste de página</b> de la plantilla es "ajustar todas las
+     * filas en una página", que sobre un bloque es justo lo que se quiere
+     * pero sobre N le pide a Excel que meta TODAS las etiquetas en un solo
+     * A4, y de paso ignora los saltos de página. Se traduce a la escala fija
+     * que hace que quepa un bloque, calculada de las medidas reales del
+     * bloque y de los márgenes de la hoja; los saltos por bloque ya están
+     * puestos. No se amplía por encima del 100%, como tampoco lo hace Excel.
+     *
+     * <p>La escala mira el <b>alto y el ancho</b>, y hace falta mirar los
+     * dos: en las hojas de cajas manda el alto (el par de etiquetas llena la
+     * página a lo largo), pero en las de palet la etiqueta sobra de alto y lo
+     * que se sale es el ancho, así que con solo el alto saldría al 100% y se
+     * partiría en dos hojas por el lado derecho.
+     */
+    private static void ajustarImpresion(XSSFWorkbook libro, XSSFSheet hoja,
+                                         int alturaBloque, int numBloques) {
+        if (numBloques <= 0) {
+            return;
+        }
+        int indice = libro.getSheetIndex(hoja);
+        String areaActual = libro.getPrintArea(indice);
+        if (areaActual == null) {
+            return;
+        }
+        AreaReference area = new AreaReference(areaActual, SpreadsheetVersion.EXCEL2007);
+        int primeraCol = area.getFirstCell().getCol();
+        int ultimaCol = area.getLastCell().getCol();
+        libro.setPrintArea(indice, primeraCol, ultimaCol,
+                area.getFirstCell().getRow(), numBloques * alturaBloque - 1);
+
+        double alto = 0;
+        for (int f = 0; f < alturaBloque; f++) {
+            alto += hoja.getRow(f) != null
+                    ? hoja.getRow(f).getHeightInPoints() : hoja.getDefaultRowHeightInPoints();
+        }
+        double ancho = 0;
+        for (int c = primeraCol; c <= ultimaCol; c++) {
+            ancho += hoja.getColumnWidthInPixels(c) * PUNTOS_POR_PIXEL;
+        }
+        if (alto <= 0 || ancho <= 0) {
+            return;
+        }
+        boolean apaisado = hoja.getPrintSetup().getLandscape();
+        double utilAlto = (apaisado ? ANCHO_A4_PT : ALTO_A4_PT)
+                - (hoja.getMargin(Sheet.TopMargin)
+                        + hoja.getMargin(Sheet.BottomMargin)) * PUNTOS_POR_PULGADA;
+        double utilAncho = (apaisado ? ALTO_A4_PT : ANCHO_A4_PT)
+                - (hoja.getMargin(Sheet.LeftMargin)
+                        + hoja.getMargin(Sheet.RightMargin)) * PUNTOS_POR_PULGADA;
+        int escala = (int) Math.floor(100 * Math.min(utilAlto / alto, utilAncho / ancho));
+        hoja.setFitToPage(false);
+        hoja.getPrintSetup().setScale((short) Math.max(10, Math.min(100, escala)));
     }
 }

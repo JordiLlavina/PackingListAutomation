@@ -40,28 +40,90 @@ class ApcEtiquetaLayoutTest {
         assertTrue(ApcEtiquetaLayout.paraDestino(null).isEmpty());
     }
 
+    /**
+     * RETAIL y WHOLESALE van al mismo almacén (Crosslog) y el cliente solo
+     * partió la plantilla para que se imprima RETAIL o WHOLESALE en la línea
+     * DESTINATION, pero desde que se ajustó el reparto en el A4 sus dos
+     * ficheros YA NO comparten maquetación. Antes RETAIL copiaba las
+     * coordenadas de WH_CROSSLOG y eso era correcto; copiarlas hoy escribiría
+     * cada valor una o dos filas por encima de su rótulo.
+     */
     @Test
-    void retailYWholesaleCompartenCoordenadasPeroNoPlantilla() {
-        // Las dos etiquetas van al mismo almacén (Crosslog) y el cliente solo
-        // partió la plantilla para que se imprima RETAIL o WHOLESALE: la
-        // maquetación es idéntica. Se ancla aquí porque, siendo iguales las
-        // coordenadas, ninguna aserción de celdas detectaría que RETAIL apunta
-        // al fichero equivocado.
+    void retailYWholesaleYaNoCompartenCoordenadasNiPlantilla() {
         ApcEtiquetaLayout retail = ApcEtiquetaLayout.RETAIL;
         ApcEtiquetaLayout wholesale = ApcEtiquetaLayout.WH_CROSSLOG;
-        assertEquals(wholesale.alturaBloque(), retail.alturaBloque());
-        assertEquals(wholesale.offsetSegundaEtiqueta(), retail.offsetSegundaEtiqueta());
-        assertEquals(wholesale.filaOrder(), retail.filaOrder());
-        assertEquals(wholesale.filaLivraison(), retail.filaLivraison());
-        assertEquals(wholesale.filaReferencia(), retail.filaReferencia());
-        assertEquals(wholesale.filaColor(), retail.filaColor());
-        assertEquals(wholesale.filaTalla(), retail.filaTalla());
-        assertEquals(wholesale.filaPiezas(), retail.filaPiezas());
-        assertEquals(wholesale.filaColisage(), retail.filaColisage());
-        assertEquals(wholesale.filaPeso(), retail.filaPeso());
+        assertNotEquals(wholesale.alturaBloque(), retail.alturaBloque());
+        assertNotEquals(wholesale.offsetSegundaEtiqueta(), retail.offsetSegundaEtiqueta());
+        assertNotEquals(wholesale.filaOrder(), retail.filaOrder());
         assertNotEquals(wholesale.rutaPlantilla(), retail.rutaPlantilla());
         assertNotEquals(wholesale.hojaCajas(), retail.hojaCajas());
         assertNotEquals(wholesale.hojaPalet(), retail.hojaPalet());
+    }
+
+    /**
+     * El bloque de cada plantilla cubre el par de etiquetas entero y la
+     * segunda arranca donde dice offsetSegundaEtiqueta. La segunda suele venir
+     * recortada por abajo (alturaBloque &lt; 2*offset) porque es donde acaba la
+     * página: el bloque se copia entero, recorte incluido, así que lo que se
+     * exige es que quepan las dos y que la segunda no se salga del bloque.
+     */
+    @Test
+    void elBloqueCubreElParYLaSegundaEtiquetaArrancaDentro() throws IOException {
+        for (ApcEtiquetaLayout layout : TODOS) {
+            String donde = layout.rutaPlantilla() + ": ";
+            assertTrue(layout.offsetSegundaEtiqueta() < layout.alturaBloque(),
+                    donde + "la segunda etiqueta arranca fuera del bloque");
+            assertTrue(layout.alturaBloque() <= 2 * layout.offsetSegundaEtiqueta(),
+                    donde + "el bloque es más alto que las dos etiquetas");
+            assertTrue(layout.filaPeso() + layout.offsetSegundaEtiqueta() < layout.alturaBloque(),
+                    donde + "el peso de la segunda etiqueta cae fuera del bloque");
+            try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
+                 XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
+                // La plantilla trae UN bloque y nada más: un segundo par
+                // dentro saldría duplicado en cada libro generado.
+                assertEquals(layout.alturaBloque() - 1,
+                        libro.getSheet(layout.hojaCajas()).getLastRowNum(),
+                        donde + "la hoja de cajas no es exactamente un bloque");
+            }
+        }
+    }
+
+    /**
+     * La hoja de palet también está maquetada distinta en cada plantilla, y
+     * en WHOLESALE el cliente trabaja sin la columna A: los valores caen en la
+     * B y los rótulos en la A. Escribir en la C dejaría el número de cajas y
+     * el peso fuera del recuadro y fuera del área de impresión.
+     */
+    @Test
+    void cadaHojaDePaletEscribeEnLaFilaYLaColumnaDeSuRotulo() throws IOException {
+        for (ApcEtiquetaLayout layout : TODOS) {
+            ApcEtiquetaLayout.Palet geo = layout.palet();
+            String donde = layout.rutaPlantilla() + ": ";
+            try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
+                 XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
+                XSSFSheet hoja = libro.getSheet(layout.hojaPalet());
+                assertEquals(filaDeRotulo(hoja, geo.colValor() - 1, "Nombre total de colis"),
+                        geo.filaNumCajas(), donde + "nº de cajas del palet");
+                assertEquals(filaDeRotulo(hoja, geo.colValor() - 1, "Poids brut"),
+                        geo.filaPeso(), donde + "peso del palet");
+                assertTrue(hoja.getLastRowNum() < geo.altura(),
+                        donde + "la hoja de palet trae más de un bloque modelo");
+            }
+        }
+        assertEquals(1, ApcEtiquetaLayout.WH_CROSSLOG.palet().colValor(),
+                "en WHOLESALE los valores del palet van en la columna B");
+    }
+
+    private static int filaDeRotulo(XSSFSheet hoja, int colRotulo, String rotulo) {
+        for (int fila = 0; fila <= hoja.getLastRowNum(); fila++) {
+            Row f = hoja.getRow(fila);
+            Cell etiqueta = (f == null) ? null : f.getCell(colRotulo);
+            if (etiqueta != null && etiqueta.getCellType() == CellType.STRING
+                    && etiqueta.getStringCellValue().trim().startsWith(rotulo)) {
+                return fila;
+            }
+        }
+        throw new AssertionError("La hoja no tiene el rótulo '" + rotulo + "'");
     }
 
     /**
