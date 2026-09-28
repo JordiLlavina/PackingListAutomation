@@ -22,6 +22,15 @@
         <java.version>17</java.version>
     </properties>
 
+    <!-- Openize.HEIC no está en Maven Central: lo publica Aspose en su repositorio. -->
+    <repositories>
+        <repository>
+            <id>aspose</id>
+            <name>Aspose (Openize.HEIC)</name>
+            <url>https://releases.aspose.com/java/repo/</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <!-- Web MVC con servidor embebido: el asistente de generación de
              packing lists (pegar JSON -> revisar -> descargar excels). -->
@@ -70,6 +79,23 @@
             <groupId>net.sf.barcode4j</groupId>
             <artifactId>barcode4j</artifactId>
             <version>2.1</version>
+        </dependency>
+
+        <!-- Documentos del corte: las fotos del iPhone llegan en HEIC y ni
+             ImageIO ni POI saben leerlo. Java puro para que funcione igual en
+             el PC del almacén y en el servidor Linux; en Windows se prueba
+             antes el decodificador del sistema, que es más rápido. -->
+        <dependency>
+            <groupId>com.aspose</groupId>
+            <artifactId>openize-heic</artifactId>
+            <version>26.5</version>
+        </dependency>
+
+        <!-- Orientación EXIF de los JPG: sin ella las fotos de móvil salen tumbadas. -->
+        <dependency>
+            <groupId>com.drewnoakes</groupId>
+            <artifactId>metadata-extractor</artifactId>
+            <version>2.20.0</version>
         </dependency>
 
         <!-- Jackson: parseo del JSON de entrada (versión gestionada por Boot) -->
