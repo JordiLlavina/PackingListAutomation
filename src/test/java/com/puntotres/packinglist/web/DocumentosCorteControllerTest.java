@@ -250,6 +250,23 @@ class DocumentosCorteControllerTest {
     }
 
     @Test
+    void laTablaTraeElBotonDeMarcarTodasEnGrisJuntoAlProgresoYLosTextosNuevos() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL116"), zipFotos("ULL116")));
+
+        String pagina = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+
+        String progreso = pagina.substring(pagina.indexOf("class=\"fila-progreso\""),
+                pagina.indexOf("id=\"formPieles\""));
+        assertTrue(progreso.contains("id=\"progresoFotos\"") && progreso.contains("id=\"botonTodas\"")
+                && progreso.contains("boton neutro"), progreso);
+        assertTrue(pagina.contains("Los campos se pueden dejar vacíos. Se puede generar sin fotografías."));
+        assertTrue(!pagina.contains("Los nombres valen para todos los colores"));
+        assertTrue(pagina.contains("<th>Foto para Orden de Corte</th>")
+                && !pagina.contains("Foto principal"), "cabecera de la columna de la foto");
+    }
+
+    @Test
     void elBotonDeCombinacionDiceQueEsUnaPiel() throws Exception {
         mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL115"), zipFotos("ULL115")));
 

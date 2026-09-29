@@ -10,12 +10,17 @@
         <span th:text="${#lists.size(filas)}"></span> referencias
     </p>
 
-    <p class="aviso-procesando" id="progresoFotos"
-       th:attr="data-terminada=${fotosTerminadas}">
-        <span id="textoProgreso"
-              th:text="${fotosTerminadas} ? |Fotos preparadas: ${fotosTotal}|
-                       : |Preparando fotos: ${fotosHechas} de ${fotosTotal}|"></span>
-    </p>
+    <!-- El progreso de las fotos y, al otro extremo, marcar o desmarcar todas
+         las filas: en gris, porque no es lo que se ha venido a hacer aquí. -->
+    <div class="fila-progreso">
+        <p class="aviso-procesando" id="progresoFotos"
+           th:attr="data-terminada=${fotosTerminadas}">
+            <span id="textoProgreso"
+                  th:text="${fotosTerminadas} ? |Fotos preparadas: ${fotosTotal}|
+                           : |Preparando fotos: ${fotosHechas} de ${fotosTotal}|"></span>
+        </p>
+        <button type="button" class="boton neutro" id="botonTodas">Desmarcar todas</button>
+    </div>
 
     <div class="alerta error" th:if="${error}" th:text="${error}"></div>
     <div class="alerta error" th:each="mensaje : ${errores}" th:text="${mensaje}"></div>
@@ -26,11 +31,7 @@
     </details>
 
     <form class="tarjeta" id="formPieles" method="post" th:action="@{/documentos-corte/generar}">
-        <p class="ayuda">
-            Los nombres valen para todos los colores de la referencia. Una combinación o un forro en
-            blanco es que no lleva. Un color con 0 bolsos no saca orden de corte, y una referencia
-            desmarcada no sale en ningún documento.
-        </p>
+        <p class="ayuda">Los campos se pueden dejar vacíos. Se puede generar sin fotografías.</p>
         <div class="tabla-desplazable">
             <table class="tabla-pieles">
                 <thead>
@@ -42,7 +43,7 @@
                     <th>Nombre de la piel</th>
                     <th>Forro de piel</th>
                     <th th:each="numero : ${columnas}" th:text="|Combinación ${numero}|"></th>
-                    <th>Foto principal</th>
+                    <th>Foto para Orden de Corte</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -168,12 +169,36 @@
                 });
             });
 
-            // La casilla de incluir apaga la fila en gris al momento.
-            document.querySelectorAll('input.casilla-incluir').forEach(function (casilla) {
+            // La casilla de incluir apaga la fila en gris al momento, y el botón
+            // de todas dice lo que hará: desmarcar si ya están todas marcadas.
+            const casillas = document.querySelectorAll('input.casilla-incluir');
+            const botonTodas = document.getElementById('botonTodas');
+            function pintarCasilla(casilla) {
+                casilla.closest('tr').classList.toggle('fila-excluida', !casilla.checked);
+            }
+            function todasMarcadas() {
+                return Array.prototype.every.call(casillas, function (casilla) {
+                    return casilla.checked;
+                });
+            }
+            function rotularBotonTodas() {
+                botonTodas.textContent = todasMarcadas() ? 'Desmarcar todas' : 'Marcar todas';
+            }
+            casillas.forEach(function (casilla) {
                 casilla.addEventListener('change', function () {
-                    casilla.closest('tr').classList.toggle('fila-excluida', !casilla.checked);
+                    pintarCasilla(casilla);
+                    rotularBotonTodas();
                 });
             });
+            botonTodas.addEventListener('click', function () {
+                const marcar = !todasMarcadas();
+                casillas.forEach(function (casilla) {
+                    casilla.checked = marcar;
+                    pintarCasilla(casilla);
+                });
+                rotularBotonTodas();
+            });
+            rotularBotonTodas();
 
             document.getElementById('botonGenerar').addEventListener('click', function () {
                 document.getElementById('avisoGenerando').style.display = '';
