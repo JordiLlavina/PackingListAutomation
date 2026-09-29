@@ -678,6 +678,14 @@ header.cabecera .enlace-menu:hover {
 /* Icono dibujado dentro de un título de sección (la piel de los Documentos del Corte). */
 .icono-titulo { width: 1.2em; height: 1.2em; vertical-align: -0.25em; color: var(--marca); }
 
+/* Entrada de los Documentos del Corte: título con aire debajo y, en la isla de
+   las fotos, la carpeta y el zip uno al lado del otro. */
+.titulo-entrada-corte { margin-bottom: 1rem; }
+.fila-fotos { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
+.fila-fotos > div { flex: 1 1 16rem; }
+.fila-fotos label { margin-top: 0; }
+.isla-fotos .ayuda { margin: 0.8rem 0 0; }
+
 .form-tara {
     display: flex;
     align-items: flex-end;

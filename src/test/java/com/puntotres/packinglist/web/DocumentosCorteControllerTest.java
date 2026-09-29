@@ -81,6 +81,24 @@ class DocumentosCorteControllerTest {
     }
 
     @Test
+    void laEntradaVaEnDosIslasConElIconoDePielYLaCarpetaYElZipEnUnaFila() throws Exception {
+        String pagina = mvc.perform(get("/documentos-corte"))
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(pagina.contains("class=\"icono-titulo\"") && !pagina.contains("✂"), "icono de piel");
+        int pedido = pagina.indexOf("id=\"cliente\"");
+        int fotos = pagina.indexOf("class=\"tarjeta isla-fotos\"");
+        assertTrue(pedido > 0 && fotos > pedido, "cliente y temporada en una isla, las fotos en otra");
+        String islaFotos = pagina.substring(fotos);
+        assertTrue(!islaFotos.substring(0, islaFotos.indexOf("</div>")).contains("<h3"),
+                "la isla de las fotos no lleva título");
+        assertTrue(islaFotos.contains("class=\"fila-fotos\"") && islaFotos.contains("id=\"carpeta\"")
+                && islaFotos.contains("id=\"fotos\""), "carpeta y zip en la misma fila");
+        assertTrue(islaFotos.contains("<strong>Estructura</strong>: Una carpeta con el nombre de la "
+                + "temporada"), islaFotos);
+    }
+
+    @Test
     void unClienteGenericoNoPasa() throws Exception {
         mvc.perform(cargar("ACKERMANN", "H26", pedidoAmi("ULL100"), zipFotos("ULL100")))
                 .andExpect(redirectedUrl("/documentos-corte"))

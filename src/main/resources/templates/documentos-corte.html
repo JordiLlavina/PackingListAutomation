@@ -6,13 +6,19 @@
 <main>
     <div class="alerta error" th:if="${error}" th:text="${error}"></div>
 
-    <form class="tarjeta" id="formCorte" th:action="@{/documentos-corte/cargar}" method="post"
+    <!-- Dos islas en un solo formulario: el pedido (cliente y temporada) y las
+         fotos. La de las fotos no lleva título: se entiende por lo que pide. -->
+    <form id="formCorte" th:action="@{/documentos-corte/cargar}" method="post"
           enctype="multipart/form-data">
-        <h3 class="titulo-seccion">✂️ Documentos del Corte</h3>
+      <div class="tarjeta">
+        <h3 class="titulo-seccion titulo-entrada-corte">
+            <svg th:replace="~{fragmentos :: iconoPiel('icono-titulo')}"></svg>
+            Documentos del Corte
+        </h3>
         <p class="ayuda">
             Del pedido de la temporada sale una orden de corte por referencia, piel y color, y de las
-            fotos de cada modelo un Word de fotos por referencia. Los nombres de las pieles se ponen en
-            la pantalla siguiente.
+            fotos de cada modelo un Word de fotos. Los nombres de las pieles se ponen en la pantalla
+            siguiente.
         </p>
 
         <!-- Cliente y temporada juntos, como en el packing list: la temporada es
@@ -48,16 +54,26 @@
             <label for="pedido">Excel de pedido del cliente</label>
             <input type="file" id="pedido" name="pedido" accept=".xlsx">
         </div>
+      </div>
 
-        <label for="carpeta">Carpeta de fotos de la temporada</label>
-        <input type="file" id="carpeta" name="carpeta" webkitdirectory multiple>
-        <label for="fotos">o la misma carpeta en zip</label>
-        <input type="file" id="fotos" name="fotos" accept=".zip">
+      <div class="tarjeta isla-fotos">
+        <div class="fila-fotos">
+            <div>
+                <label for="carpeta">Carpeta de fotos de la temporada</label>
+                <input type="file" id="carpeta" name="carpeta" webkitdirectory multiple>
+            </div>
+            <div>
+                <label for="fotos">o la misma carpeta en zip</label>
+                <input type="file" id="fotos" name="fotos" accept=".zip">
+            </div>
+        </div>
         <p class="ayuda">
-            Una subcarpeta por modelo, con el nombre del modelo o de una de sus referencias (ULL712 o
-            ULL712.AL0103, F67008 o PXCBC-F67008), y dentro sus fotos en HEIC, JPG o PNG. La foto
-            vale para todas las pieles del modelo.
+            <strong>Estructura</strong>: Una carpeta con el nombre de la temporada, que contenga varias
+            subcarpetas, una por modelo. Cada subcarpeta debe tener la referencia completa o parcial
+            del modelo (ULL712 o ULL712.AL0103, F67008 o PXCBC-F67008). Dentro de cada subcarpeta, pon
+            las fotos del modelo.
         </p>
+      </div>
 
         <button type="submit" id="botonCargar">Cargar</button>
         <a class="boton secundario" th:href="@{/menu}">Volver</a>
