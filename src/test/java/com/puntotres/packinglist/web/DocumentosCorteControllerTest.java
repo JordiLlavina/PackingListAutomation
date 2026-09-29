@@ -139,6 +139,7 @@ class DocumentosCorteControllerTest {
     @Test
     void generarDejaLasDescargas() throws Exception {
         mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL105"), zipFotos("ULL105")));
+        esperarFotos();
 
         mvc.perform(post("/documentos-corte/generar").session(sesion)
                         .param("filas[0].nombrePiel", "Box calf")
@@ -208,9 +209,11 @@ class DocumentosCorteControllerTest {
     @Test
     void losNombresDePielSeRecuerdanParaLaSiguienteVez() throws Exception {
         mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL109", "AL0909"), zipFotos("ULL109")));
+        esperarFotos();
         mvc.perform(post("/documentos-corte/generar").session(sesion)
-                .param("filas[0].nombrePiel", "Vachette recordada")
-                .param("filas[0].forro", "Cabretilla recordada"));
+                        .param("filas[0].nombrePiel", "Vachette recordada")
+                        .param("filas[0].forro", "Cabretilla recordada"))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
         mvc.perform(get("/documentos-corte/nuevo").session(sesion));
 
         mvc.perform(cargar("AMI", "H27", pedidoAmi("ULL109", "AL0909"), zipFotos("ULL109")));
@@ -229,6 +232,23 @@ class DocumentosCorteControllerTest {
                 .andExpect(content().string(containsString("\"total\":2")));
     }
 
+    /**
+     * Generar ya no espera a las fotos dentro de la petición (el botón se
+     * enciende al acabar), así que el test espera como lo haría la pantalla:
+     * preguntando por el progreso.
+     */
+    private void esperarFotos() throws Exception {
+        for (int intento = 0; intento < 300; intento++) {
+            String estado = mvc.perform(get("/documentos-corte/progreso").session(sesion))
+                    .andReturn().getResponse().getContentAsString();
+            if (estado.contains("\"terminada\":true")) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError("las fotos no han acabado de prepararse en 30 s");
+    }
+
     private MockMultipartHttpServletRequestBuilder cargar(String cliente, String temporada,
                                                          byte[] pedido, byte[] fotos) {
         return (MockMultipartHttpServletRequestBuilder) multipart("/documentos-corte/cargar")
@@ -240,11 +260,11 @@ class DocumentosCorteControllerTest {
     }
 
     /** Un modelo con dos colores y ULL745, que no trae carpeta de fotos. */
-    private static byte[] pedidoAmi(String modelo) {
+    static byte[] pedidoAmi(String modelo) {
         return pedidoAmi(modelo, "AL0103");
     }
 
-    private static byte[] pedidoAmi(String modelo, String piel) {
+    static byte[] pedidoAmi(String modelo, String piel) {
         return PedidoAmiExcel.crear("EAN H26",
                 new Fila("SPAIN", modelo + "." + piel, "001", "BLACK", "U", "07704 CH", null, null, 4),
                 new Fila("SPAIN", modelo + "." + piel, "001", "BLACK", "U", 7665, null, null, 6),
@@ -253,7 +273,7 @@ class DocumentosCorteControllerTest {
     }
 
     /** Dos fotos del modelo y una carpeta que no está en el pedido. */
-    private static byte[] zipFotos(String modelo) throws IOException {
+    static byte[] zipFotos(String modelo) throws IOException {
         Map<String, byte[]> entradas = new LinkedHashMap<>();
         entradas.put("H26/" + modelo + "/b.jpg", FotosDePrueba.jpeg(300, 200, Color.BLUE));
         entradas.put("H26/" + modelo + "/a.jpg", FotosDePrueba.jpeg(200, 300, Color.RED));

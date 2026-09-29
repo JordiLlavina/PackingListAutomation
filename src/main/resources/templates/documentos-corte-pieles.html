@@ -88,12 +88,15 @@
         <div class="acciones-corte">
             <button type="submit" class="secundario" th:if="${puedeAnadirColumna}"
                     th:formaction="@{/documentos-corte/pieles/combinacion}">+ combinación</button>
-            <button type="submit" id="botonGenerar">Generar documentos</button>
+            <!-- Apagado hasta que acaban las fotos: generar no espera dentro de la
+                 petición (en el camino Java puede ser media hora). -->
+            <button type="submit" id="botonGenerar" th:disabled="${!fotosTerminadas}"
+                    title="Se activa en cuanto acaben de prepararse las fotos">Generar documentos</button>
             <a class="boton secundario" th:href="@{/documentos-corte/nuevo}">Empezar de nuevo</a>
         </div>
     </form>
     <p id="avisoGenerando" class="aviso-procesando" style="display: none">
-        Generando... si las fotos aún se están preparando, espera a que acaben.
+        Generando los documentos...
     </p>
 
     <script th:inline="javascript">
@@ -110,6 +113,7 @@
                 }).then(function (estado) {
                     if (estado.terminada) {
                         texto.textContent = 'Fotos preparadas: ' + estado.total;
+                        document.getElementById('botonGenerar').disabled = false;
                     } else {
                         texto.textContent = 'Preparando fotos: ' + estado.hechas + ' de ' + estado.total;
                         setTimeout(consultar, 2000);

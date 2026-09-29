@@ -234,6 +234,16 @@ public class DocumentosCorteController {
             redirect.addFlashAttribute("errores", errores);
             return "redirect:/documentos-corte/pieles";
         }
+        ConversionFotos conversion = enCurso.getConversion();
+        if (!conversion.terminada()) {
+            // No se espera dentro de la petición: en el camino Java una
+            // temporada de HEIC puede ser media hora, más de lo que aguantan
+            // un proxy o el navegador. Lo tecleado ya está aplicado.
+            redirect.addFlashAttribute("error", "Las fotos aún se están preparando ("
+                    + conversion.hechas() + " de " + conversion.total()
+                    + "): el botón de generar se activa en cuanto acaben");
+            return "redirect:/documentos-corte/pieles";
+        }
         for (FilaCorte fila : enCurso.getFilas()) {
             memoria.recordar(enCurso.getClaveCliente(), fila.referencia().piel(),
                     fila.referencia().referencia(), fila.getNombrePiel(), fila.getForro(),
