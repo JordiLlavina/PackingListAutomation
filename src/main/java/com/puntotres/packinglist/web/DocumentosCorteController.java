@@ -145,7 +145,7 @@ public class DocumentosCorteController {
         enCurso.reiniciar();
         Path directorio = null;
         try {
-            directorio = Files.createTempDirectory("documentos-corte-");
+            directorio = Files.createTempDirectory(CorteEnCurso.PREFIJO_DIRECTORIO);
             Path zip = directorio.resolve("temporada.zip");
             fotos.transferTo(zip);
             FotosTemporada leidas;

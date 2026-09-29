@@ -33,6 +33,9 @@ import jakarta.annotation.PreDestroy;
 @SessionScope
 public class CorteEnCurso {
 
+    /** Prefijo del directorio temporal de cada carga; por él lo reconoce LimpiezaDirectoriosCorte. */
+    static final String PREFIJO_DIRECTORIO = "documentos-corte-";
+
     private String claveCliente;
     private String nombreCliente;
     private String temporada;
