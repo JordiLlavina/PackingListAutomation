@@ -224,6 +224,28 @@ class DocumentosCorteControllerTest {
     }
 
     @Test
+    void siLaSesionHaCaducadoSeDiceEnVezDeVolverALaEntradaSinMas() throws Exception {
+        // Rellenar la tabla de una temporada no hace ninguna petición: tras
+        // media hora sin actividad la sesión caducaba, y generar mandaba a la
+        // entrada sin decir por qué, con todo lo tecleado perdido.
+        mvc.perform(post("/documentos-corte/generar").session(sesion)
+                        .param("filas[0].nombrePiel", "Box"))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("caducado")));
+        mvc.perform(post("/documentos-corte/pieles/combinacion").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("caducado")));
+    }
+
+    @Test
+    void laTablaDePielesMantieneVivaLaSesionMientrasEstaAbierta() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL111"), zipFotos("ULL111")));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("MANTENER_SESION_MS")));
+    }
+
+    @Test
     void elProgresoDeLasFotosSeConsultaSinRecargar() throws Exception {
         mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL110"), zipFotos("ULL110")));
 

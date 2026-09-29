@@ -126,6 +126,14 @@
                 setTimeout(consultar, 2000);
             }
 
+            // Rellenar la tabla de una temporada no hace ninguna petición, y
+            // tras media hora sin actividad la sesión caducaba con las fotos y
+            // lo tecleado dentro. Mientras la pantalla esté abierta, un latido.
+            const MANTENER_SESION_MS = 5 * 60 * 1000;
+            setInterval(function () {
+                fetch(URL_PROGRESO).catch(function () { });
+            }, MANTENER_SESION_MS);
+
             // Un nombre de piel vale para todas las filas con la misma ref de
             // piel: se copia a las que siguen vacías, nunca encima de otro.
             const nombres = document.querySelectorAll('input.c-nombre-piel');

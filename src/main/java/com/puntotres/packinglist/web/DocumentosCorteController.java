@@ -63,6 +63,14 @@ public class DocumentosCorteController {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     private static final String PEDIDO_ILEGIBLE =
             "no tiene el formato esperado: revisa que sea el excel de pedido de ese cliente";
+    /**
+     * Un envío de la tabla sin nada cargado es una sesión caducada (o el
+     * servidor reiniciado): se dice, porque volver a la entrada sin más
+     * parecía un fallo y lo tecleado se había perdido sin explicación.
+     */
+    private static final String SESION_CADUCADA = "La sesión ha caducado (o se ha reiniciado la "
+            + "aplicación) y se ha perdido lo cargado: vuelve a subir el pedido y las fotos. Los "
+            + "nombres de piel solo se guardan al generar";
 
     /** Un cliente del desplegable: los que no tienen documentos del corte salen deshabilitados. */
     public record OpcionCliente(String nombre, boolean disponible) {
@@ -201,7 +209,7 @@ public class DocumentosCorteController {
     @PostMapping("/documentos-corte/pieles/combinacion")
     public String anadirCombinacion(@ModelAttribute PielesForm form, RedirectAttributes redirect) {
         if (!enCurso.tieneCarga()) {
-            return "redirect:/documentos-corte";
+            return error(redirect, SESION_CADUCADA);
         }
         List<String> errores = aplicar(form);
         if (!errores.isEmpty()) {
@@ -225,7 +233,7 @@ public class DocumentosCorteController {
     @PostMapping("/documentos-corte/generar")
     public String generar(@ModelAttribute PielesForm form, RedirectAttributes redirect) {
         if (!enCurso.tieneCarga()) {
-            return "redirect:/documentos-corte";
+            return error(redirect, SESION_CADUCADA);
         }
         List<String> errores = aplicar(form);
         if (!errores.isEmpty()) {
