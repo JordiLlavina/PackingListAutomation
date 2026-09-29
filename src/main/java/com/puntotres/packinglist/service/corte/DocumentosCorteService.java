@@ -89,7 +89,7 @@ public class DocumentosCorteService {
                 String nombre = sanear("Fotos " + modelo.getKey() + ".docx");
                 Path fichero = destino.resolve(nombre);
                 Files.write(fichero, albumes.generar(album));
-                documentosFotos.add(new DocumentoCorte("Fotos de " + album.titulo() + " ("
+                documentosFotos.add(new DocumentoCorte(DocumentoCorte.Tipo.FOTOS, "Fotos de " + album.titulo() + " ("
                         + imagenes.size() + (imagenes.size() == 1 ? " foto)" : " fotos)"),
                         nombre, fichero));
             }
@@ -103,7 +103,7 @@ public class DocumentosCorteService {
             String nombre = sanear("Ordenes de corte " + cliente + " " + temporada + ".docx");
             Path fichero = destino.resolve(nombre);
             Files.write(fichero, ordenes.generar(paginas));
-            documentos.add(new DocumentoCorte("Órdenes de corte (" + paginas.size()
+            documentos.add(new DocumentoCorte(DocumentoCorte.Tipo.ORDENES, "Órdenes de corte (" + paginas.size()
                     + (paginas.size() == 1 ? " página)" : " páginas)"), nombre, fichero));
         }
         documentos.addAll(documentosFotos);

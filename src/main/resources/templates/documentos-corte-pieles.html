@@ -96,7 +96,7 @@
 
         <div class="acciones-corte">
             <button type="submit" class="secundario" th:if="${puedeAnadirColumna}"
-                    th:formaction="@{/documentos-corte/pieles/combinacion}">+ combinación</button>
+                    th:formaction="@{/documentos-corte/pieles/combinacion}">+ piel combinación</button>
             <!-- Apagado hasta que acaban las fotos: generar no espera dentro de la
                  petición (en el camino Java puede ser media hora). -->
             <button type="submit" id="botonGenerar" th:disabled="${!fotosTerminadas}"

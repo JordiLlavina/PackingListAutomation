@@ -198,9 +198,11 @@ public class DocumentosCorteController {
     // --- Paso 2: pieles ---
 
     @GetMapping("/documentos-corte/pieles")
-    public String pieles(Model model) {
+    public String pieles(Model model, RedirectAttributes redirect) {
         if (!enCurso.tieneCarga()) {
-            return "redirect:/documentos-corte";
+            // Se llega aquí desde "volver a las pieles" o un enlace guardado: sin
+            // decirlo, volver a la entrada parecía que el botón llevaba a otro sitio.
+            return error(redirect, SESION_CADUCADA);
         }
         ConversionFotos conversion = enCurso.getConversion();
         model.addAttribute("cliente", enCurso.getNombreCliente());
@@ -300,7 +302,8 @@ public class DocumentosCorteController {
         avisos.addAll(enCurso.getResultado().avisos());
         model.addAttribute("cliente", enCurso.getNombreCliente());
         model.addAttribute("temporada", enCurso.getTemporada());
-        model.addAttribute("documentos", enCurso.getResultado().documentos());
+        model.addAttribute("ordenes", enCurso.getResultado().ordenes());
+        model.addAttribute("fotos", enCurso.getResultado().fotos());
         model.addAttribute("avisos", avisos);
         return "documentos-corte-resultados";
     }
@@ -323,20 +326,21 @@ public class DocumentosCorteController {
                 .body(Files.readAllBytes(documento.get().fichero()));
     }
 
-    @GetMapping("/documentos-corte/descargar-todo")
-    public ResponseEntity<byte[]> descargarTodo() throws IOException {
-        if (enCurso.getResultado() == null || enCurso.getResultado().documentos().isEmpty()) {
+    /** Todos los Word de fotos en un zip: el de órdenes es uno solo y tiene su botón. */
+    @GetMapping("/documentos-corte/descargar-fotos")
+    public ResponseEntity<byte[]> descargarFotos() throws IOException {
+        if (enCurso.getResultado() == null || enCurso.getResultado().fotos().isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         ByteArrayOutputStream salida = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(salida)) {
-            for (DocumentoCorte documento : enCurso.getResultado().documentos()) {
+            for (DocumentoCorte documento : enCurso.getResultado().fotos()) {
                 zip.putNextEntry(new ZipEntry(documento.nombreFichero()));
                 zip.write(Files.readAllBytes(documento.fichero()));
                 zip.closeEntry();
             }
         }
-        String nombreZip = ("Documentos del corte " + enCurso.getNombreCliente() + " "
+        String nombreZip = ("Fotos de articulo " + enCurso.getNombreCliente() + " "
                 + enCurso.getTemporada() + ".zip").replaceAll("[\\\\/:*?\"<>|]+", "_");
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/zip"))

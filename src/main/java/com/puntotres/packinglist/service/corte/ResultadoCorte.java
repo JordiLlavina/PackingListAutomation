@@ -9,4 +9,16 @@ public record ResultadoCorte(List<DocumentoCorte> documentos, List<String> aviso
         documentos = List.copyOf(documentos);
         avisos = List.copyOf(avisos);
     }
+
+    public List<DocumentoCorte> ordenes() {
+        return delTipo(DocumentoCorte.Tipo.ORDENES);
+    }
+
+    public List<DocumentoCorte> fotos() {
+        return delTipo(DocumentoCorte.Tipo.FOTOS);
+    }
+
+    private List<DocumentoCorte> delTipo(DocumentoCorte.Tipo tipo) {
+        return documentos.stream().filter(documento -> documento.tipo() == tipo).toList();
+    }
 }

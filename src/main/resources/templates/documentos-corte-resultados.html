@@ -4,31 +4,62 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('Documentos del Corte')}"></header>
 <main>
-    <p class="resumen-envio">
-        Cliente <strong th:text="${cliente}"></strong> ·
-        Temporada <strong th:text="${temporada}"></strong> ·
-        <span th:text="${#lists.size(documentos)}"></span> documento(s)
-    </p>
+    <!-- Ficha de la temporada, como la del envío en los resultados del packing list. -->
+    <ul class="ficha-envio">
+        <li><span class="rotulo">Cliente</span>
+            <strong th:text="${cliente}"></strong></li>
+        <li><span class="rotulo">Temporada</span>
+            <strong th:text="${temporada}"></strong></li>
+        <li><span class="rotulo">Word de fotos</span>
+            <strong th:text="${#lists.size(fotos)}"></strong></li>
+    </ul>
 
     <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
         <summary th:text="|${#lists.size(avisos)} aviso(s)|"></summary>
         <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
     </details>
 
+    <!-- Sección 1: las órdenes de corte, un solo Word con una página por orden. -->
     <section class="tarjeta seccion-salida">
-        <h3 class="titulo-seccion">✂️ Documentos</h3>
-        <table>
+        <h3 class="titulo-seccion">
+            <svg th:replace="~{fragmentos :: iconoPiel('icono-titulo')}"></svg>
+            Ordenes de Corte
+        </h3>
+        <p th:if="${#lists.isEmpty(ordenes)}">Ninguna referencia tiene bolsos que cortar.</p>
+        <table th:unless="${#lists.isEmpty(ordenes)}">
+            <thead>
+            <tr>
+                <th>Fichero</th>
+                <th>Contenido</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="documento : ${ordenes}">
+                <td th:text="${documento.nombreFichero}"></td>
+                <td th:text="${documento.descripcion}"></td>
+            </tr>
+            </tbody>
+        </table>
+        <a class="boton" th:each="documento : ${ordenes}"
+           th:href="@{/documentos-corte/descargar/{nombre}(nombre=${documento.nombreFichero})}">Descargar</a>
+        <button th:if="${#lists.isEmpty(ordenes)}" type="button" disabled>Descargar</button>
+    </section>
+
+    <!-- Sección 2: un Word de fotos por modelo. El nombre del fichero no se
+         enseña: repetía el modelo que ya dice el contenido. -->
+    <section class="tarjeta seccion-salida">
+        <h3 class="titulo-seccion">📷 Fotos de Artículo</h3>
+        <p th:if="${#lists.isEmpty(fotos)}">Ningún modelo con bolsos ha traído fotos.</p>
+        <table th:unless="${#lists.isEmpty(fotos)}">
             <thead>
             <tr>
                 <th>Contenido</th>
-                <th>Fichero</th>
                 <th></th>
             </tr>
             </thead>
             <tbody>
-            <tr th:each="documento : ${documentos}">
+            <tr th:each="documento : ${fotos}">
                 <td th:text="${documento.descripcion}"></td>
-                <td th:text="${documento.nombreFichero}"></td>
                 <td>
                     <a th:href="@{/documentos-corte/descargar/{nombre}(nombre=${documento.nombreFichero})}">
                         Descargar</a>
@@ -36,13 +67,18 @@
             </tr>
             </tbody>
         </table>
-
-        <a class="boton" th:if="${!#lists.isEmpty(documentos)}"
-           th:href="@{/documentos-corte/descargar-todo}">Descargar todo (ZIP)</a>
-        <a class="boton secundario" th:href="@{/documentos-corte/pieles}">Volver a las pieles</a>
-        <a class="boton secundario" th:href="@{/documentos-corte/nuevo}">Otra temporada</a>
-        <a class="boton secundario" th:href="@{/menu}">Volver al menú</a>
+        <a class="boton" th:unless="${#lists.isEmpty(fotos)}"
+           th:href="@{/documentos-corte/descargar-fotos}">Descargar todo (ZIP)</a>
+        <button th:if="${#lists.isEmpty(fotos)}" type="button" disabled>Descargar todo (ZIP)</button>
     </section>
+
+    <!-- Salir de la pantalla no es una descarga más: al pie y en gris, como en
+         los resultados del packing list. -->
+    <div class="salidas-pantalla">
+        <a class="boton neutro" th:href="@{/menu}">Volver al menú</a>
+        <a class="boton neutro" th:href="@{/documentos-corte/pieles}">Volver a las pieles</a>
+        <a class="boton neutro" th:href="@{/documentos-corte/nuevo}">Otra temporada</a>
+    </div>
 </main>
 </body>
 </html>

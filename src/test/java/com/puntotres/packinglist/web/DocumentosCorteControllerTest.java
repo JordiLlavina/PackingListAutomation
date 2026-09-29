@@ -188,10 +188,26 @@ class DocumentosCorteControllerTest {
                         .param("filas[1].bolsos[0]", "5"))
                 .andExpect(redirectedUrl("/documentos-corte/resultados"));
 
-        mvc.perform(get("/documentos-corte/resultados").session(sesion))
+        String resultados = mvc.perform(get("/documentos-corte/resultados").session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Ordenes de corte AMI H26.docx")))
-                .andExpect(content().string(containsString("Fotos ULL105.docx")));
+                .andReturn().getResponse().getContentAsString();
+        // Dos apartados, como en los resultados del packing list: órdenes y fotos.
+        int ordenes = resultados.indexOf("Ordenes de Corte");
+        int fotos = resultados.indexOf("Fotos de Artículo");
+        assertTrue(ordenes > 0 && fotos > ordenes, resultados);
+        String apartadoOrdenes = resultados.substring(ordenes, fotos);
+        String apartadoFotos = resultados.substring(fotos);
+        assertTrue(apartadoOrdenes.contains("Ordenes de corte AMI H26.docx"), apartadoOrdenes);
+        assertTrue(apartadoFotos.contains("Fotos de ULL105 (2 fotos)"), apartadoFotos);
+        assertTrue(!apartadoFotos.contains("<th>Fichero</th>"), "el fichero es redundante con el contenido");
+        assertTrue(apartadoFotos.contains("href=\"/documentos-corte/descargar-fotos\""), apartadoFotos);
+        // Salir de la pantalla, al pie y en gris: menú, pieles y otra temporada.
+        String pie = resultados.substring(resultados.indexOf("salidas-pantalla"));
+        for (String salida : List.of("href=\"/menu\"", "href=\"/documentos-corte/pieles\"",
+                "href=\"/documentos-corte/nuevo\"")) {
+            assertTrue(pie.contains(salida), "falta " + salida + " en el pie");
+        }
+        assertEquals(3, pie.split("boton neutro", -1).length - 1);
 
         byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
                         .session(sesion))
@@ -202,10 +218,42 @@ class DocumentosCorteControllerTest {
         assertEquals('P', word[0]);
         assertEquals('K', word[1]);
 
-        byte[] zip = mvc.perform(get("/documentos-corte/descargar-todo").session(sesion))
+        byte[] zip = mvc.perform(get("/documentos-corte/descargar-fotos").session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
-        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL105.docx"), entradas(zip));
+        assertEquals(List.of("Fotos ULL105.docx"), entradas(zip), "solo los Word de fotos");
+    }
+
+    @Test
+    void volverALasPielesConLaSesionPerdidaLoDiceEnVezDeIrseSinMas() throws Exception {
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("caducado")));
+    }
+
+    @Test
+    void elBotonDeCombinacionDiceQueEsUnaPiel() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL115"), zipFotos("ULL115")));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString(">+ piel combinación</button>")));
+    }
+
+    @Test
+    void desdeLosResultadosSeVuelveALasPielesConLoTecleado() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL114"), zipFotos("ULL114")));
+        esperarFotos();
+        mvc.perform(post("/documentos-corte/generar").session(sesion)
+                        .param("filas[0].nombrePiel", "Box de vuelta"))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        String resultados = mvc.perform(get("/documentos-corte/resultados").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(resultados.contains("href=\"/documentos-corte/pieles\""), resultados);
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("value=\"Box de vuelta\"")));
     }
 
     @Test

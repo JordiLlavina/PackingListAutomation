@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFPicture;
@@ -51,6 +52,7 @@ class FotosCorteDocBuilderTest {
 
         XWPFTable rejilla = doc.getTables().get(0);
         int alto = rejilla.getRows().stream().mapToInt(fila -> fila.getHeight()).sum();
+        alto += FotosCorteDocBuilder.ALTO_TITULO;
         assertTrue(alto <= FotosCorteDocBuilder.ALTO_UTIL);
         assertTrue(alto >= FotosCorteDocBuilder.ALTO_UTIL - 200, "llena la hoja, sin franja vacía abajo");
         for (XWPFPicture foto : fotosDe(rejilla)) {
@@ -71,16 +73,25 @@ class FotosCorteDocBuilderTest {
     }
 
     @Test
-    void laCabeceraDeCadaHojaEsSoloElModeloEnEstiloTituloA22() throws IOException {
-        XWPFDocument doc = generar(fotos(1));
+    void cadaHojaEmpiezaPorElModeloEnTitulo1NegritaCentradoYNegro() throws IOException {
+        // En el cuerpo y no en la cabecera de página: Word pinta la cabecera en
+        // gris mientras se edita el documento, y el usuario la quiere a todo color.
+        XWPFDocument doc = generar(fotos(7));
 
-        var cabecera = doc.getHeaderList().get(0);
-        assertEquals("ULL729", cabecera.getText().trim(), "ni temporada ni pieles");
-        XWPFParagraph titulo = cabecera.getParagraphs().get(0);
-        assertEquals("Title", titulo.getStyleID());
-        assertEquals("Title", doc.getStyles().getStyle("Title").getName(),
-                "el estilo integrado de Word, que en español se ve como Título");
-        assertEquals(22.0, titulo.getRuns().get(0).getFontSizeAsDouble());
+        assertTrue(doc.getHeaderList().isEmpty());
+        List<XWPFParagraph> titulos = doc.getParagraphs().stream()
+                .filter(parrafo -> "Heading1".equals(parrafo.getStyleID())).toList();
+        assertEquals(2, titulos.size(), "uno por hoja");
+        XWPFParagraph titulo = titulos.get(0);
+        assertEquals(titulo, doc.getParagraphs().get(0), "lo primero de la hoja");
+        assertEquals("ULL729", titulo.getText(), "ni temporada ni pieles");
+        assertEquals("heading 1", doc.getStyles().getStyle("Heading1").getName(),
+                "el estilo integrado de Word, que en español se ve como Título 1");
+        assertEquals(ParagraphAlignment.CENTER, titulo.getAlignment());
+        var texto = titulo.getRuns().get(0);
+        assertEquals(22.0, texto.getFontSizeAsDouble());
+        assertTrue(texto.isBold());
+        assertEquals("000000", texto.getColor());
     }
 
     @Test

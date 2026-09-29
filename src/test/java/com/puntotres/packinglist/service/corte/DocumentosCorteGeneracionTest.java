@@ -115,7 +115,7 @@ class DocumentosCorteGeneracionTest {
         ResultadoCorte resultado = generar("H26", List.of(conNombre));
 
         XWPFDocument album = abrir(resultado.documentos().get(1));
-        assertEquals("ULL027 - Sac Le Neige", album.getHeaderList().get(0).getText().trim());
+        assertEquals("ULL027 - Sac Le Neige", album.getParagraphs().get(0).getText());
     }
 
     @Test

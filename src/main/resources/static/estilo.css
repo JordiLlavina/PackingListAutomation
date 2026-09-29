@@ -675,6 +675,9 @@ header.cabecera .enlace-menu:hover {
 
 .titulo-seccion { margin: 0 0 0.6rem; font-size: 1.05rem; }
 
+/* Icono dibujado dentro de un título de sección (la piel de los Documentos del Corte). */
+.icono-titulo { width: 1.2em; height: 1.2em; vertical-align: -0.25em; color: var(--marca); }
+
 .form-tara {
     display: flex;
     align-items: flex-end;

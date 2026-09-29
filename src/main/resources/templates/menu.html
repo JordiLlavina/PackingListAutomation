@@ -64,18 +64,13 @@
 
         <section class="tarjeta menu-tarjeta">
             <h2 class="menu-titulo">
-                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
-                    <circle cx="6" cy="6" r="3"/>
-                    <circle cx="6" cy="18" r="3"/>
-                    <path d="M8.6 7.6 20 18M8.6 16.4 20 6"/>
-                </svg>
+                <svg th:replace="~{fragmentos :: iconoPiel('menu-icono')}"></svg>
                 Documentos del Corte
             </h2>
             <p class="menu-entrada">Necesitas el pedido de la temporada y las fotos de cada modelo.</p>
             <ul class="menu-lista">
                 <li>Una orden de corte por referencia, piel y color</li>
-                <li>Un Word de fotos por referencia</li>
+                <li>Un Word de fotos por modelo</li>
                 <li>AMI y APC — genéricos en desarrollo</li>
             </ul>
             <a class="boton" th:href="@{/documentos-corte}">Empezar</a>
