@@ -48,9 +48,21 @@ public class CorteEnCurso {
         return conversion != null && !filas.isEmpty();
     }
 
-    public void cargar(String claveCliente, String nombreCliente, String temporada, Path directorio,
-                       PedidoCorte pedido, FotosTemporada fotos, ConversionFotos conversion,
-                       List<String> avisos) {
+    /**
+     * Sustituye lo que hubiera. Si había otra carga —dos pestañas que cargan
+     * a la vez en la misma sesión, la segunda después de que la primera ya
+     * pasara por reiniciar()—, su conversión se cancela y su directorio se
+     * borra aquí: si no, se quedaban trabajando y ocupando disco sin dueño.
+     */
+    public synchronized void cargar(String claveCliente, String nombreCliente, String temporada,
+                                    Path directorio, PedidoCorte pedido, FotosTemporada fotos,
+                                    ConversionFotos conversion, List<String> avisos) {
+        if (this.conversion != null && this.conversion != conversion) {
+            this.conversion.cancelar();
+        }
+        if (this.directorio != null && !this.directorio.equals(directorio)) {
+            borrar(this.directorio);
+        }
         this.claveCliente = claveCliente;
         this.nombreCliente = nombreCliente;
         this.temporada = temporada;
@@ -80,7 +92,7 @@ public class CorteEnCurso {
         }
     }
 
-    public void reiniciar() {
+    public synchronized void reiniciar() {
         if (conversion != null) {
             conversion.cancelar();
         }
