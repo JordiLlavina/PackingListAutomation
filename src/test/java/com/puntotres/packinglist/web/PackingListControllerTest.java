@@ -95,6 +95,36 @@ class PackingListControllerTest {
     }
 
     @Test
+    void laEntradaVaEnCuatroIslasConSuContenidoCadaUna() throws Exception {
+        String pagina = mvc.perform(get("/packing-list"))
+                .andReturn().getResponse().getContentAsString();
+
+        // Pedido (cliente, temporada y excel) → fichero del envío → datos de
+        // cabecera → volcado del albarán, cada uno en su tarjeta.
+        List<String> islas = List.of("isla-pedido", "isla-envio", "isla-campos", "isla-volcado");
+        List<Integer> posiciones = islas.stream()
+                .map(isla -> pagina.indexOf("class=\"tarjeta " + isla + "\"")).toList();
+        for (int i = 0; i < islas.size(); i++) {
+            assertTrue(posiciones.get(i) > 0, "falta la isla " + islas.get(i));
+            assertTrue(i == 0 || posiciones.get(i) > posiciones.get(i - 1), "fuera de orden: " + islas.get(i));
+        }
+        String pedido = pagina.substring(posiciones.get(0), posiciones.get(1));
+        String envio = pagina.substring(posiciones.get(1), posiciones.get(2));
+        String campos = pagina.substring(posiciones.get(2), posiciones.get(3));
+        String volcado = pagina.substring(posiciones.get(3));
+        assertTrue(pedido.contains("id=\"cliente\"") && pedido.contains("id=\"temporadaGuardada\"")
+                && pedido.contains("id=\"pedidoCliente\""), pedido);
+        assertTrue(envio.contains("id=\"bloqueJson\"") && envio.contains("id=\"bloqueClaude\"")
+                && envio.contains("id=\"bloqueTaller\""), envio);
+        assertTrue(campos.contains("id=\"numeroFactura\"") && campos.contains("id=\"ciudadProveedor\""), campos);
+        // El número de comanda, a la derecha de su rótulo.
+        assertTrue(volcado.contains("class=\"campo-en-linea\"")
+                && volcado.contains(">Numero Comanda ICSUITE:</label>"), volcado);
+        // Con una temporada guardada el bloque del excel entero se esconde: ya no dice nada.
+        assertFalse(pagina.contains("Fichero cargado con éxito"));
+    }
+
+    @Test
     void importarConJsonValidoLlevaALaRevisionConSusAvisos() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
         importar(sesion);

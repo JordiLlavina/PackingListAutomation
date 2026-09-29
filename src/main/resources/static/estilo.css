@@ -686,6 +686,17 @@ header.cabecera .enlace-menu:hover {
 .fila-fotos label { margin-top: 0; }
 .isla-fotos .ayuda { margin: 0.8rem 0 0; }
 
+/* Entrada del packing list en islas. El primer rótulo de cada una no lleva el
+   margen de arriba: el de la tarjeta ya separa, y sumados lo dejaban bajo. */
+.isla-pedido .fila-cliente label,
+.isla-envio > div > label:first-child,
+.isla-campos > .campos-cabecera:first-child label { margin-top: 0; }
+
+/* Rótulo y campo en la misma línea, con aire entre los dos. */
+.campo-en-linea { display: flex; align-items: center; gap: 0.8rem; }
+.campo-en-linea label { margin: 0; white-space: nowrap; }
+.campo-en-linea input { flex: 1; }
+
 .form-tara {
     display: flex;
     align-items: flex-end;

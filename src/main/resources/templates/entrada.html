@@ -14,11 +14,16 @@
         <button type="button" id="botonModoJSON" data-modo="JSON">CON TEXTO</button>
     </div>
 
-    <form id="formEntrada" class="tarjeta" th:action="@{/importar}" th:object="${envioForm}"
+    <!-- Un solo formulario en cuatro islas: el pedido (cliente, temporada y su
+         excel), el fichero del envío, los datos de cabecera y el volcado del
+         albarán. Separadas se ve de un vistazo qué parte falta. -->
+    <form id="formEntrada" th:action="@{/importar}" th:object="${envioForm}"
           method="post" enctype="multipart/form-data"
           th:data-accion-importar="@{/importar}"
           th:data-accion-taller="@{/packing-list/taller/digerir}">
         <input type="hidden" id="modo" th:field="*{modo}">
+
+      <div class="tarjeta isla-pedido">
 
         <!-- Cliente y temporada, juntos y pegados: la temporada es la del
              cliente que se acaba de elegir, y repartidos por el ancho de la
@@ -62,7 +67,9 @@
                 del taller)</p>
             <input type="file" id="pedidoCliente" name="pedidoCliente" accept=".xlsx">
         </div>
+      </div>
 
+      <div class="tarjeta isla-envio">
         <div id="bloqueJson">
             <label for="json">JSON del envío</label>
             <textarea id="json" class="json" th:field="*{json}"
@@ -106,6 +113,9 @@
                        th:field="*{alturaMaximaPaletCm}" placeholder="168">
             </div>
         </div>
+      </div>
+
+      <div class="tarjeta isla-campos">
 
         <!-- Ciudad y país del proveedor: solo los pide la plantilla de AMI, y
              van al final de los bloques de entrada para no separar el fichero
@@ -147,15 +157,18 @@
                 <p class="error-campo" th:errors="*{fechaEnvio}"></p>
             </div>
         </div>
+      </div>
 
         <!-- Dato que no sale del JSON ni de las imágenes: lo teclea el
              usuario y solo viaja hasta la columna "Comanda" del volcado. -->
-        <section class="tarjeta seccion-salida">
+      <section class="tarjeta isla-volcado">
             <h3 class="titulo-seccion">📊 Volcado Albarán ICSUITE</h3>
-            <label for="numeroComanda">Numero Comanda ICSUITE</label>
-            <input type="text" id="numeroComanda" th:field="*{numeroComanda}"
-                   placeholder="Opcional: si lo dejas vacío, la columna sale en blanco">
-        </section>
+            <div class="campo-en-linea">
+                <label for="numeroComanda">Numero Comanda ICSUITE:</label>
+                <input type="text" id="numeroComanda" th:field="*{numeroComanda}"
+                       placeholder="Opcional: si lo dejas vacío, la columna sale en blanco">
+            </div>
+      </section>
 
         <button type="submit" id="botonImportar">Importar y revisar</button>
     </form>
@@ -214,24 +227,28 @@
             const ayudaPedido = document.getElementById('ayudaPedidoCliente');
             const bloqueLibre = document.getElementById('bloqueTemporadaLibre');
 
-            // Con una temporada guardada el excel ya está ahí: el input de
-            // fichero se esconde (no hay nada que subir) y su sitio lo ocupa
-            // la confirmación de que ya hay uno cargado.
-            const inputPedido = document.getElementById('pedidoCliente');
+            // Con una temporada guardada el excel ya está ahí: el bloque del
+            // excel entero se esconde (no hay nada que subir), y cuál es lo
+            // dice ya la línea de debajo de la temporada.
+            const bloquePedido = document.getElementById('bloquePedidoCliente');
+            const config = CLIENTES[document.getElementById('cliente').value];
+            const usaPedido = config && config.pedidoCliente === 'true';
 
             if (elegida) {
                 document.getElementById('temporada').value = elegida.temporada;
                 bloqueLibre.style.display = 'none';
                 ayudaTemporada.textContent = 'Excel de pedido guardado: ' + elegida.fichero;
-                inputPedido.style.display = 'none';
-                ayudaPedido.textContent = 'Fichero cargado con éxito';
+                bloquePedido.style.display = 'none';
+                // Un fichero elegido antes de escoger la temporada se enviaría
+                // escondido y mandaría sobre el guardado.
+                document.getElementById('pedidoCliente').value = '';
             } else {
                 bloqueLibre.style.display = '';
                 // Sin temporada elegida no se dice nada: el desplegable y el
                 // lápiz de al lado ya enseñan lo que hay que hacer, y una línea
                 // de texto bajo el campo movía de sitio todo lo de debajo.
                 ayudaTemporada.textContent = '';
-                inputPedido.style.display = '';
+                bloquePedido.style.display = usaPedido ? '' : 'none';
                 ayudaPedido.textContent = AYUDA_PEDIDO_SUELTO;
             }
         }
