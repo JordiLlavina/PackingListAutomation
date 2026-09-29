@@ -2,10 +2,12 @@ package com.puntotres.packinglist.service.corte;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +42,21 @@ class ConversorHeicWindowsTest {
         assumeTrue(pendientes.isEmpty(), "este Windows no trae el códec HEIF/HEVC");
         assertEquals(1, convertidos.size());
         assertEquals(430, ImageIO.read(salida.toFile()).getWidth());
+    }
+
+    @Test
+    void unPowerShellColgadoSeMataYSusFotosVuelvenComoPendientes(@TempDir Path dir) {
+        // Un códec de HEVC que se cuelga con un fichero raro dejaba el lote
+        // esperando para siempre: la salida solo acaba cuando PowerShell sale.
+        Path heic = dir.resolve("a.heic");
+        ConversorHeicWindows colgado = new ConversorHeicWindows("/corte/cuelga.ps1",
+                Duration.ofSeconds(3), Duration.ZERO);
+
+        List<Trabajo> pendientes = assertTimeoutPreemptively(Duration.ofSeconds(60),
+                () -> colgado.convertir(List.of(new Trabajo(heic, dir.resolve("a.jpg"))), dir,
+                        proceso -> { }, trabajo -> { }));
+
+        assertEquals(1, pendientes.size());
     }
 
     @Test

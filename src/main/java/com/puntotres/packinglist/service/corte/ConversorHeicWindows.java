@@ -8,11 +8,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -33,7 +35,30 @@ public class ConversorHeicWindows {
     }
 
     private static final String SCRIPT = "/corte/heic-a-jpeg.ps1";
-    private static final long MINUTOS_MAXIMOS = 30;
+
+    /**
+     * Tiempo que se le da a un lote: un minuto de arranque y otro por foto,
+     * quince veces lo medido con las de 24 MP. Pasado, el proceso se mata y
+     * sus fotos vuelven como pendientes para el camino Java: un códec que se
+     * cuelga con un fichero raro dejaría el lote esperando para siempre,
+     * porque la salida solo se acaba cuando PowerShell sale.
+     */
+    private static final Duration ARRANQUE = Duration.ofMinutes(1);
+    private static final Duration POR_FOTO = Duration.ofMinutes(1);
+
+    private final String script;
+    private final Duration arranque;
+    private final Duration porFoto;
+
+    public ConversorHeicWindows() {
+        this(SCRIPT, ARRANQUE, POR_FOTO);
+    }
+
+    ConversorHeicWindows(String script, Duration arranque, Duration porFoto) {
+        this.script = script;
+        this.arranque = arranque;
+        this.porFoto = porFoto;
+    }
 
     public static boolean disponible() {
         return System.getProperty("os.name", "").toLowerCase(Locale.ROOT).startsWith("windows");
@@ -54,9 +79,9 @@ public class ConversorHeicWindows {
         Path script = Files.createTempFile(carpeta, "heic-a-jpeg-", ".ps1");
         Path lista = Files.createTempFile(carpeta, "heic-lista-", ".txt");
         try {
-            try (InputStream contenido = ConversorHeicWindows.class.getResourceAsStream(SCRIPT)) {
+            try (InputStream contenido = ConversorHeicWindows.class.getResourceAsStream(this.script)) {
                 if (contenido == null) {
-                    throw new IOException("falta el script " + SCRIPT);
+                    throw new IOException("falta el script " + this.script);
                 }
                 Files.copy(contenido, script, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -72,6 +97,9 @@ public class ConversorHeicWindows {
                     .redirectErrorStream(true)
                     .start();
             registrar.accept(proceso);
+            Duration limite = arranque.plus(porFoto.multipliedBy(trabajos.size()));
+            CompletableFuture<Void> vigilante = CompletableFuture.runAsync(() -> matar(proceso),
+                    CompletableFuture.delayedExecutor(limite.toMillis(), TimeUnit.MILLISECONDS));
 
             Set<Integer> convertidas = new HashSet<>();
             try (BufferedReader lector = new BufferedReader(
@@ -87,9 +115,12 @@ public class ConversorHeicWindows {
                 }
             } catch (IOException e) {
                 // Salida cortada (proceso cancelado o muerto): lo no confirmado vuelve como pendiente.
+            } finally {
+                vigilante.cancel(false);
             }
-            if (!proceso.waitFor(MINUTOS_MAXIMOS, TimeUnit.MINUTES)) {
-                proceso.destroyForcibly();
+            // La salida ya se ha cerrado, así que el proceso está saliendo o muerto.
+            if (!proceso.waitFor(1, TimeUnit.MINUTES)) {
+                matar(proceso);
             }
 
             List<Trabajo> pendientes = new ArrayList<>();
@@ -103,6 +134,12 @@ public class ConversorHeicWindows {
             Files.deleteIfExists(lista);
             Files.deleteIfExists(script);
         }
+    }
+
+    /** Con sus hijos: en Windows matar al padre no mata a los hijos. */
+    private static void matar(Process proceso) {
+        proceso.descendants().forEach(ProcessHandle::destroyForcibly);
+        proceso.destroyForcibly();
     }
 
     /** "OK<TAB>n" → n-1; cualquier otra línea → -1. */
