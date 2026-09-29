@@ -22,6 +22,8 @@ public class PielesForm {
         private List<String> combinaciones = new ArrayList<>();
         private List<String> bolsos = new ArrayList<>();
         private Integer fotoPrincipal;
+        /** null = no ha llegado ni la casilla ni su marcador "_": se deja como estaba. */
+        private Boolean incluir;
 
         public String getNombrePiel() { return nombrePiel; }
         public void setNombrePiel(String nombrePiel) { this.nombrePiel = nombrePiel; }
@@ -33,5 +35,7 @@ public class PielesForm {
         public void setBolsos(List<String> bolsos) { this.bolsos = bolsos; }
         public Integer getFotoPrincipal() { return fotoPrincipal; }
         public void setFotoPrincipal(Integer fotoPrincipal) { this.fotoPrincipal = fotoPrincipal; }
+        public Boolean getIncluir() { return incluir; }
+        public void setIncluir(Boolean incluir) { this.incluir = incluir; }
     }
 }

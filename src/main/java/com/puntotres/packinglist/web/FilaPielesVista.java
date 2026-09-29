@@ -9,7 +9,7 @@ import com.puntotres.packinglist.service.corte.ColorCorte;
  * vienen con una casilla por columna, y las fotos son los nombres de las de
  * su modelo, en el orden del desplegable.
  */
-public record FilaPielesVista(int indice, String referencia, String modelo, String piel,
+public record FilaPielesVista(int indice, boolean incluida, String referencia, String modelo, String piel,
                               List<ColorCorte> colores, String nombrePiel, String forro,
                               List<String> combinaciones, List<String> fotos, int fotoPrincipal) {
 }

@@ -103,12 +103,12 @@ public final class ApcPedidoExcel {
      * Una fila del pedido con su cantidad, para los documentos del corte:
      * cuántos bolsos de cada referencia y color hay que cortar. El color es
      * el código de la columna Couleurs ("LZZ"): el pedido de APC no trae su
-     * nombre.
+     * nombre. La designación ("sac Le Neige") es el nombre del bolso.
      *
      * Va aparte de {@link LineaCatalogo} a propósito: el catálogo que se le
      * enseña a Claude no debe llevar cantidades (ver su javadoc).
      */
-    public record LineaConCantidad(String referencia, String color, int cantidad) {
+    public record LineaConCantidad(String referencia, String color, int cantidad, String designacion) {
     }
 
     /** Filas únicas (referencia + pedido), en el orden del fichero. */
@@ -169,7 +169,8 @@ public final class ApcPedidoExcel {
                         textoOpcional(hoja, fila, colTalla)));
                 lineasConCantidad.add(new LineaConCantidad(entrada.referencia(),
                         textoOpcional(hoja, fila, colColor),
-                        colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad))));
+                        colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)),
+                        textoOpcional(hoja, fila, colDesignacion)));
                 acumularComanda(comandas, destinosMezclados, entrada.pedido(),
                         colDestino < 0 ? "" : texto(hoja, fila, colDestino),
                         colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)));

@@ -22,9 +22,9 @@ class PedidoCorteRealTest {
     void amiSumaCadaColorSinMirarDestinacionNiTalla() throws IOException {
         PedidoCorte pedido = new AmiCorte().leerPedido(leer("EAN PUNTOTRES H26.xlsx"));
 
-        assertEquals(Map.of("001 BLACK", 169, "718 VANILLA CREAM", 102, "A237 MOCHA", 31),
+        assertEquals(Map.of("BLACK", 169, "VANILLA CREAM", 102, "MOCHA", 31),
                 bolsosDe(pedido, "ULL729.AL0103"));
-        assertEquals(Map.of("001 BLACK", 1995, "A184 MASTIC BEIGE", 381, "A236 TRUFFLE", 809),
+        assertEquals(Map.of("BLACK", 1995, "MASTIC BEIGE", 381, "TRUFFLE", 809),
                 bolsosDe(pedido, "USL728.AL0217"));
     }
 
@@ -39,13 +39,26 @@ class PedidoCorteRealTest {
     }
 
     @Test
-    void amiSalenTodasLasReferenciasCinturonesIncluidos() throws IOException {
+    void amiSalenTodasLasReferenciasMenosLosCinturones() throws IOException {
+        // Los cinturones (UBL) se cortan con otro proceso: 25 referencias, 6 de cinturón.
         PedidoCorte pedido = new AmiCorte().leerPedido(leer("EAN PUNTOTRES H26.xlsx"));
 
-        assertEquals(25, pedido.articulos().size());
+        assertEquals(19, pedido.articulos().size());
         assertTrue(pedido.articulos().stream()
-                .anyMatch(articulo -> articulo.referencia().referencia().equals("UBL029.AL0104")));
+                .noneMatch(articulo -> articulo.referencia().modelo().startsWith("UBL")));
         assertTrue(pedido.avisos().isEmpty(), pedido.avisos().toString());
+    }
+
+    @Test
+    void amiNoTraeNombreDeBolsoYApcSiEnSuDesignacion() throws IOException {
+        PedidoCorte ami = new AmiCorte().leerPedido(leer("EAN PUNTOTRES H26.xlsx"));
+        PedidoCorte apc = new ApcCorte().leerPedido(leer("APC_PEDIDO_FALL26.xlsx"));
+
+        assertTrue(ami.articulos().stream().allMatch(articulo -> articulo.nombreModelo().isEmpty()));
+        assertTrue(apc.articulos().stream().allMatch(articulo -> !articulo.nombreModelo().isBlank()));
+        assertEquals("le neige clou", apc.articulos().stream()
+                .filter(articulo -> articulo.referencia().modelo().equals("F67043"))
+                .findFirst().orElseThrow().nombreModelo().toLowerCase(java.util.Locale.ROOT));
     }
 
     @Test

@@ -28,10 +28,14 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
     public static PedidoCorte agrupar(List<LineaCorte> lineas,
                                       Function<String, ReferenciaCorte> partir) {
         Map<String, Map<String, Integer>> porReferencia = new LinkedHashMap<>();
+        Map<String, String> nombres = new LinkedHashMap<>();
         for (LineaCorte linea : lineas) {
             String referencia = ReferenciaCorte.normalizar(linea.referencia());
             if (referencia.isEmpty()) {
                 continue;
+            }
+            if (!linea.nombreModelo().isEmpty()) {
+                nombres.putIfAbsent(referencia, linea.nombreModelo());
             }
             String color = linea.color() == null ? "" : linea.color().trim();
             porReferencia.computeIfAbsent(referencia, clave -> new LinkedHashMap<>())
@@ -47,7 +51,7 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
             }
             articulos.add(new ArticuloCorte(partida, colores.entrySet().stream()
                     .map(color -> new ColorCorte(color.getKey(), color.getValue()))
-                    .toList()));
+                    .toList(), nombres.getOrDefault(referencia, "")));
         });
         articulos.sort(Comparator
                 .comparing((ArticuloCorte articulo) -> articulo.referencia().modelo())

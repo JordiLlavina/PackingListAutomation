@@ -1,7 +1,6 @@
 package com.puntotres.packinglist.service.corte;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -12,6 +11,10 @@ import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
+import org.apache.poi.xwpf.usermodel.XWPFStyle;
+import org.apache.poi.xwpf.usermodel.XWPFStyles;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyle;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STStyleType;
 
 /**
  * Escribe el Word de fotos de una referencia: todas las fotos de su modelo,
@@ -19,9 +22,11 @@ import org.apache.poi.xwpf.usermodel.XWPFTableCell;
  * con márgenes estrechos, sin pie de foto (el nombre del fichero no dice
  * nada). Tantas hojas como hagan falta.
  *
- * Temporada, referencia y pieles van en la CABECERA de página y no en el
- * cuerpo: así se repiten en cada hoja, que se separan al imprimir, y la
- * cuadrícula tiene el cuerpo entero para ella. Sin plantilla .docx: la
+ * El título —el modelo y, si el pedido lo trae, el nombre del bolso— va en la
+ * CABECERA de página y no en el cuerpo: así se repite en cada hoja, que se
+ * separan al imprimir, y la cuadrícula tiene el cuerpo entero para ella. Va
+ * en el estilo integrado Title de Word (Título en español) y a 22 pt; ni
+ * temporada ni pieles, que el Word es del modelo y vale para todas. Sin plantilla .docx: la
  * maquetación son las constantes de esta clase.
  */
 public class FotosCorteDocBuilder {
@@ -43,6 +48,8 @@ public class FotosCorteDocBuilder {
     static final int ALTO_CELDA = (ALTO_UTIL - RESERVA) / FILAS;
     /** Aire alrededor de cada foto: 0,1 cm. */
     static final int HUECO = 57;
+    private static final String ESTILO_TITULO = "Title";
+    private static final int TAMANO_TITULO = 22;
 
     public byte[] generar(FotosCorte fotos) throws IOException {
         try (XWPFDocument doc = new XWPFDocument()) {
@@ -60,34 +67,32 @@ public class FotosCorteDocBuilder {
         }
     }
 
-    /** "Piel: X · Combinación: Y · Forro: Z", sin las partes vacías. */
-    static String describirPieles(PielesArticulo pieles) {
-        List<String> partes = new ArrayList<>();
-        if (!pieles.nombrePiel().isEmpty()) {
-            partes.add("Piel: " + pieles.nombrePiel());
-        }
-        List<String> combinaciones = pieles.combinaciones();
-        for (int i = 0; i < combinaciones.size(); i++) {
-            partes.add((combinaciones.size() == 1 ? "Combinación: " : "Combinación " + (i + 1) + ": ")
-                    + combinaciones.get(i));
-        }
-        if (pieles.tieneForro()) {
-            partes.add("Forro: " + pieles.forro());
-        }
-        return String.join("  ·  ", partes);
-    }
-
     private void escribirCabecera(XWPFDocument doc, FotosCorte fotos) {
+        crearEstiloTitulo(doc);
         XWPFHeader cabecera = doc.createHeader(HeaderFooterType.DEFAULT);
         XWPFParagraph titulo = cabecera.createParagraph();
+        titulo.setStyle(ESTILO_TITULO);
         WordCorte.sinEspacio(titulo);
-        WordCorte.texto(titulo, fotos.temporada() + " · " + fotos.referencia(), 12, true, "000000");
-        String pieles = describirPieles(fotos.pieles());
-        if (!pieles.isEmpty()) {
-            XWPFParagraph detalle = cabecera.createParagraph();
-            WordCorte.sinEspacio(detalle);
-            WordCorte.texto(detalle, pieles, 9, false, "404040");
+        WordCorte.texto(titulo, fotos.titulo(), TAMANO_TITULO, false, "000000");
+    }
+
+    /**
+     * El estilo integrado "Title" de Word: con ese id y ese nombre Word lo
+     * reconoce como el suyo y lo enseña traducido (Título). Un documento
+     * nuevo de POI no trae estilos, así que hay que declararlo.
+     */
+    private static void crearEstiloTitulo(XWPFDocument doc) {
+        XWPFStyles estilos = doc.createStyles();
+        if (estilos.styleExist(ESTILO_TITULO)) {
+            return;
         }
+        CTStyle estilo = CTStyle.Factory.newInstance();
+        estilo.setStyleId(ESTILO_TITULO);
+        estilo.setType(STStyleType.PARAGRAPH);
+        estilo.addNewName().setVal(ESTILO_TITULO);
+        estilo.addNewQFormat();
+        estilo.addNewRPr().addNewSz().setVal(java.math.BigInteger.valueOf(2L * TAMANO_TITULO));
+        estilos.addStyle(new XWPFStyle(estilo, estilos));
     }
 
     private void escribirRejilla(XWPFDocument doc, List<Imagen> imagenes) throws IOException {

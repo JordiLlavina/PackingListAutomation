@@ -44,18 +44,18 @@ class DocumentosCorteGeneracionTest {
     }
 
     @Test
-    void unaOrdenPorColorConBolsosYUnWordDeFotosPorReferenciaConFotos() throws IOException {
+    void unaOrdenPorColorConBolsosYUnWordDeFotosPorModeloConFotos() throws IOException {
         ResultadoCorte resultado = generar("H26", List.of(
                 fila("ULL027.AL0103", 10, 0),
                 fila("ULL712.AL0103", 5),
                 fila("ULL999.AL0001", 0)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL027.AL0103.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL027.docx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
         XWPFDocument ordenes = abrir(resultado.documentos().get(0));
         assertEquals(4, ordenes.getTables().size(), "ULL027 en negro y ULL712: dos órdenes");
         String texto = texto(ordenes);
-        assertTrue(texto.contains("ULL027.AL0103") && texto.contains("ULL712.AL0103"));
+        assertTrue(texto.contains("ULL027") && texto.contains("ULL712"));
         assertTrue(!texto.contains("ULL999"), "sin bolsos no hay orden");
         XWPFDocument album = abrir(resultado.documentos().get(1));
         assertEquals(2, fotosDe(album.getTables().get(0)).size());
@@ -86,13 +86,36 @@ class DocumentosCorteGeneracionTest {
     }
 
     @Test
-    void laFotoEsDelModeloYValeParaTodasSusPieles() throws IOException {
+    void laFotoEsDelModeloYSaleUnSoloWordDeFotosParaTodasSusPieles() throws IOException {
         ResultadoCorte resultado = generar("H26", List.of(
                 fila("ULL027.AL0103", 1), fila("ULL027.AL0216", 1)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL027.AL0103.docx",
-                        "Fotos ULL027.AL0216.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL027.docx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
+    }
+
+    @Test
+    void unaFilaDesmarcadaNoSacaOrdenesNiWordDeFotos() throws IOException {
+        FilaCorte fuera = fila("ULL027.AL0103", 10);
+        fuera.setIncluida(false);
+
+        ResultadoCorte resultado = generar("H26", List.of(fuera, fila("ULL712.AL0103", 5)));
+
+        assertEquals(List.of("Ordenes de corte AMI H26.docx"),
+                resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
+        String texto = texto(abrir(resultado.documentos().get(0)));
+        assertTrue(texto.contains("ULL712") && !texto.contains("ULL027"), texto);
+    }
+
+    @Test
+    void elWordDeFotosSeTitulaConElModeloYElNombreDelBolsoSiElPedidoLoTrae() throws IOException {
+        FilaCorte conNombre = new FilaCorte(new ArticuloCorte(ReferenciaCorte.deAmi("ULL027.AL0103"),
+                List.of(new ColorCorte("BLACK", 1)), "Sac Le Neige"));
+
+        ResultadoCorte resultado = generar("H26", List.of(conNombre));
+
+        XWPFDocument album = abrir(resultado.documentos().get(1));
+        assertEquals("ULL027 - Sac Le Neige", album.getHeaderList().get(0).getText().trim());
     }
 
     @Test

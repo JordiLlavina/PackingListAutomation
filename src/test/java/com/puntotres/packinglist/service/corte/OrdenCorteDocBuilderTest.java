@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
@@ -47,13 +48,14 @@ class OrdenCorteDocBuilderTest {
 
     @Test
     void llevaLosDatosQueElCortadorTieneQueVer() throws IOException {
-        String texto = texto(generar(List.of(orden("ULL729.AL0103", "001 BLACK", 169,
+        String texto = texto(generar(List.of(orden("ULL729", "BLACK", 169,
                 new PielesArticulo("Box calf", "Cabretilla", List.of("Ante", "Charol")), APAISADA))));
 
-        for (String esperado : List.of("AMI · H26", "ULL729.AL0103", "001 BLACK", "169",
+        for (String esperado : List.of("AMI | Temporada H26", "ULL729", "Color", "BLACK", "Bolsos", "169",
                 "Box calf", "COMBINACIÓN 1", "Ante", "COMBINACIÓN 2", "Charol", "FORRO", "Cabretilla")) {
             assertTrue(texto.contains(esperado), "falta '" + esperado + "' en:\n" + texto);
         }
+        assertTrue(!texto.contains("a cortar") && !texto.contains("·"), texto);
     }
 
     @Test
@@ -69,7 +71,7 @@ class OrdenCorteDocBuilderTest {
     }
 
     @Test
-    void laFotoPrincipalEncajaEnSuHuecoSinDeformarseYSinFotoLoDice() throws IOException {
+    void laFotoPrincipalEncajaEnSuHuecoSinDeformarseYSinFotoElHuecoQuedaVacio() throws IOException {
         XWPFDocument doc = generar(List.of(
                 orden("A.P1", "001", 1, sinCombinaciones(), VERTICAL),
                 orden("B.P1", "001", 1, sinCombinaciones(), null)));
@@ -82,7 +84,8 @@ class OrdenCorteDocBuilderTest {
         assertTrue(alto <= (long) OrdenCorteDocBuilder.ALTO_BANDA * WordCorte.EMU_POR_TWIP);
         assertEquals(1200.0 / 1600.0, (double) ancho / alto, 0.01);
         assertTrue(fotosDe(doc.getTables().get(2)).isEmpty());
-        assertTrue(texto(doc).contains("Sin foto del modelo"));
+        assertTrue(doc.getTables().get(2).getRow(0).getCell(0).getText().isBlank(),
+                "sin foto no se escribe nada");
     }
 
     @Test
@@ -100,18 +103,43 @@ class OrdenCorteDocBuilderTest {
     }
 
     @Test
-    void unNombreDePielLargoSeEscribeMasPequenoParaQueNoSeCorte() throws IOException {
-        // Con seis pieles cada renglón mide 1,45 cm: un nombre largo a 20 pt
-        // se parte en dos líneas y la segunda queda fuera de la fila exacta.
-        XWPFDocument doc = generar(List.of(orden("A.P1", "001", 1,
-                new PielesArticulo("Vachette grainée pleine fleur tannage végétal", "", List.of("Ante")),
-                null)));
+    void lasPielesVanALaDerechaConElRotuloA14YElNombreA28EnNegrita() throws IOException {
+        // El formato que el usuario dejó en la primera página del ejemplo.
+        XWPFDocument doc = generar(List.of(orden("A", "001", 1,
+                new PielesArticulo("Vachette grainée", "Cabretilla", List.of("Ante")), null)));
 
         var pieles = doc.getTables().get(1);
-        var largo = pieles.getRow(0).getCell(0).getParagraphs().get(1).getRuns().get(0);
-        var corto = pieles.getRow(2).getCell(0).getParagraphs().get(1).getRuns().get(0);
-        assertEquals(20.0, corto.getFontSizeAsDouble());
-        assertTrue(largo.getFontSizeAsDouble() < 20.0);
+        var celda = pieles.getRow(0).getCell(0);
+        assertEquals(ParagraphAlignment.RIGHT, celda.getParagraphs().get(0).getAlignment());
+        assertEquals(ParagraphAlignment.RIGHT, celda.getParagraphs().get(1).getAlignment());
+        assertEquals("PIEL", celda.getParagraphs().get(0).getText());
+        assertEquals(14.0, celda.getParagraphs().get(0).getRuns().get(0).getFontSizeAsDouble());
+        var nombre = celda.getParagraphs().get(1).getRuns().get(0);
+        assertEquals(28.0, nombre.getFontSizeAsDouble());
+        assertTrue(nombre.isBold());
+        assertEquals(OrdenCorteDocBuilder.ANCHO_NOMBRE,
+                Integer.parseInt(String.valueOf(pieles.getCTTbl().getTblGrid().getGridColArray(0).getW())));
+        assertEquals(5670, OrdenCorteDocBuilder.ANCHO_NOMBRE);
+    }
+
+    @Test
+    void elNombreDeLaPielEncogeLoJustoParaCaberEnSuRenglon() {
+        // Con seis pieles cada renglón mide 1,45 cm: a 28 pt ni siquiera cabe
+        // una línea debajo del rótulo, y lo que no cabe en una fila de alto
+        // exacto no se ve. Se comprueba además abriendo el ejemplo en Word.
+        String largo = "Vachette grainée pleine fleur tannage végétal";
+        for (int pieles = 1; pieles <= 6; pieles++) {
+            int alto = OrdenCorteDocBuilder.altoPiel(pieles);
+            for (String nombre : List.of("Box", "Vachette grainée", largo)) {
+                int tamano = OrdenCorteDocBuilder.tamanoNombre(nombre, alto);
+                assertTrue(OrdenCorteDocBuilder.altoNecesario(nombre, tamano) <= alto,
+                        nombre + " a " + tamano + " pt no cabe con " + pieles + " pieles");
+            }
+        }
+        assertEquals(28, OrdenCorteDocBuilder.tamanoNombre("Box", OrdenCorteDocBuilder.altoPiel(3)));
+        assertTrue(OrdenCorteDocBuilder.tamanoNombre("Box", OrdenCorteDocBuilder.altoPiel(6)) < 28);
+        assertTrue(OrdenCorteDocBuilder.tamanoNombre(largo, OrdenCorteDocBuilder.altoPiel(3))
+                < OrdenCorteDocBuilder.tamanoNombre("Box", OrdenCorteDocBuilder.altoPiel(3)));
     }
 
     @Test
@@ -132,11 +160,16 @@ class OrdenCorteDocBuilderTest {
     @Test
     void dejaUnEjemploEnTargetParaRevisarAOjo() throws IOException {
         byte[] word = new OrdenCorteDocBuilder().generar(List.of(
-                orden("ULL729.AL0103", "001 BLACK", 169,
+                orden("ULL729", "BLACK", 169,
                         new PielesArticulo("Vachette grainée", "Cabretilla", List.of("Ante")), APAISADA),
-                orden("ULL745.AL0103", "001 BLACK", 45, sinCombinaciones(), null),
-                orden("ULL027.AL0216", "2221 CHOCOLATE BROWN", 135,
-                        new PielesArticulo("Box calf", "", List.of("Ante", "Charol", "Nappa")), VERTICAL)));
+                orden("ULL745", "BLACK", 45, sinCombinaciones(), null),
+                orden("ULL027", "CHOCOLATE BROWN", 135,
+                        new PielesArticulo("Box calf", "", List.of("Ante", "Charol", "Nappa")), VERTICAL),
+                // El peor caso: seis pieles y nombres largos.
+                orden("ULL754", "MASTIC BEIGE", 12,
+                        new PielesArticulo("Vachette grainée pleine fleur tannage végétal",
+                                "Cabretilla doublure", List.of("Ante velours", "Charol", "Nappa agneau",
+                                        "Box calf")), APAISADA)));
 
         Path destino = Path.of("target", "Ordenes de corte ejemplo.docx");
         Files.createDirectories(destino.getParent());
@@ -148,9 +181,9 @@ class OrdenCorteDocBuilderTest {
         return new XWPFDocument(new ByteArrayInputStream(new OrdenCorteDocBuilder().generar(ordenes)));
     }
 
-    private static OrdenCorte orden(String referencia, String color, int bolsos,
+    private static OrdenCorte orden(String modelo, String color, int bolsos,
                                     PielesArticulo pieles, Imagen foto) {
-        return new OrdenCorte("AMI", "H26", referencia, color, bolsos, pieles, foto);
+        return new OrdenCorte("AMI", "H26", modelo, color, bolsos, pieles, foto);
     }
 
     private static PielesArticulo sinCombinaciones() {

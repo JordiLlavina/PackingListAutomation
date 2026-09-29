@@ -15,23 +15,30 @@
             la pantalla siguiente.
         </p>
 
-        <label for="cliente">Cliente</label>
-        <select id="cliente" name="cliente" required>
-            <option th:each="entrada : ${clientes}"
-                    th:value="${entrada.key}"
-                    th:text="${entrada.value.disponible ? entrada.value.nombre
-                              : entrada.value.nombre + ' — en desarrollo'}"
-                    th:disabled="${!entrada.value.disponible}"></option>
-        </select>
-
-        <label for="temporadaGuardada" class="etiqueta-con-accion">
-            <span>Temporada guardada</span>
-            <a class="lapiz" th:href="@{/temporadas}"
-               title="Añadir, editar o borrar temporadas guardadas"
-               aria-label="Editar las temporadas guardadas">&#9998;</a>
-        </label>
-        <select id="temporadaGuardada" name="temporadaGuardadaId"></select>
-        <p class="ayuda" id="ayudaTemporadaGuardada"></p>
+        <!-- Cliente y temporada juntos, como en el packing list: la temporada es
+             la del cliente que se acaba de elegir. El lápiz lleva a mantenerlas. -->
+        <div class="fila-cliente">
+            <div>
+                <label for="cliente">Cliente</label>
+                <select id="cliente" name="cliente" required>
+                    <option th:each="entrada : ${clientes}"
+                            th:value="${entrada.key}"
+                            th:text="${entrada.value.disponible ? entrada.value.nombre
+                                      : entrada.value.nombre + ' — en desarrollo'}"
+                            th:disabled="${!entrada.value.disponible}"></option>
+                </select>
+            </div>
+            <div>
+                <label for="temporadaGuardada" class="etiqueta-con-accion">
+                    <span>Temporada</span>
+                    <a class="lapiz" th:href="@{/temporadas}"
+                       title="Añadir, editar o borrar temporadas guardadas"
+                       aria-label="Editar las temporadas guardadas">&#9998;</a>
+                </label>
+                <select id="temporadaGuardada" name="temporadaGuardadaId"></select>
+                <p class="ayuda" id="ayudaTemporadaGuardada"></p>
+            </div>
+        </div>
 
         <!-- Con una temporada guardada elegida, su nombre y su excel ya están: estos dos
              campos se esconden para que no haya dos "Temporada" a la vez. -->

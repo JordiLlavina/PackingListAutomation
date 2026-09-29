@@ -21,6 +21,7 @@ public class FilaCorte {
     private String forro = "";
     private final List<String> combinaciones = new ArrayList<>();
     private int fotoPrincipal;
+    private boolean incluida = true;
 
     public FilaCorte(ArticuloCorte articulo) {
         this.articulo = articulo;
@@ -29,6 +30,23 @@ public class FilaCorte {
 
     public ReferenciaCorte referencia() {
         return articulo.referencia();
+    }
+
+    /** El nombre del bolso si el pedido lo trae, o vacío. */
+    public String nombreModelo() {
+        return articulo.nombreModelo();
+    }
+
+    /**
+     * La casilla de la tabla: una fila desmarcada no saca órdenes ni Word de
+     * fotos, aunque tenga bolsos. Arranca marcada.
+     */
+    public boolean isIncluida() {
+        return incluida;
+    }
+
+    public void setIncluida(boolean incluida) {
+        this.incluida = incluida;
     }
 
     /** Los colores con los bolsos que hay ahora, tecleados o del pedido. */

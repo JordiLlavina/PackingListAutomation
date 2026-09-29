@@ -373,6 +373,9 @@ public class DocumentosCorteController {
             if (datos.getFotoPrincipal() != null) {
                 fila.setFotoPrincipal(datos.getFotoPrincipal());
             }
+            if (datos.getIncluir() != null) {
+                fila.setIncluida(datos.getIncluir());
+            }
             List<String> bolsos = datos.getBolsos();
             for (int color = 0; color < Math.min(bolsos.size(), fila.colores().size()); color++) {
                 String valor = bolsos.get(color) == null ? "" : bolsos.get(color).trim();
@@ -404,7 +407,7 @@ public class DocumentosCorteController {
             }
             List<String> fotos = enCurso.getFotos().de(fila.referencia().modelo()).stream()
                     .map(FotoModelo::nombreOriginal).toList();
-            vista.add(new FilaPielesVista(i, fila.referencia().referencia(),
+            vista.add(new FilaPielesVista(i, fila.isIncluida(), fila.referencia().referencia(),
                     fila.referencia().modelo(), fila.referencia().piel(), fila.colores(),
                     fila.getNombrePiel(), fila.getForro(),
                     combinaciones.subList(0, Math.min(combinaciones.size(), columnas)), fotos,

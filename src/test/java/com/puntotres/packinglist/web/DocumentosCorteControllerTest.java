@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -151,9 +152,9 @@ class DocumentosCorteControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("ULL103")))
                 .andExpect(content().string(containsString("AL0103")))
-                .andExpect(content().string(containsString("001 BLACK")))
+                .andExpect(content().string(containsString("BLACK")))
                 .andExpect(content().string(containsString("value=\"10\"")))
-                .andExpect(content().string(containsString("718 VANILLA CREAM")))
+                .andExpect(content().string(containsString("VANILLA CREAM")))
                 .andExpect(content().string(containsString("a.jpg")))
                 .andExpect(content().string(containsString("sin fotos")))
                 .andExpect(content().string(containsString("ULL999")))
@@ -190,7 +191,7 @@ class DocumentosCorteControllerTest {
         mvc.perform(get("/documentos-corte/resultados").session(sesion))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Ordenes de corte AMI H26.docx")))
-                .andExpect(content().string(containsString("Fotos ULL105.AL0103.docx")));
+                .andExpect(content().string(containsString("Fotos ULL105.docx")));
 
         byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
                         .session(sesion))
@@ -204,7 +205,34 @@ class DocumentosCorteControllerTest {
         byte[] zip = mvc.perform(get("/documentos-corte/descargar-todo").session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
-        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL105.AL0103.docx"), entradas(zip));
+        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL105.docx"), entradas(zip));
+    }
+
+    @Test
+    void unaFilaDesmarcadaNoSaleEnLosDocumentosYLaCasillaRecuerdaComoQuedo() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL113"), zipFotos("ULL113")));
+        esperarFotos();
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(matchesPattern(
+                        "(?s).*name=\"filas\\[0\\]\\.incluir\"[^>]*checked.*")));
+
+        // Una casilla desmarcada no se envía: solo llega su marcador "_".
+        mvc.perform(post("/documentos-corte/generar").session(sesion)
+                        .param("_filas[0].incluir", "on")
+                        .param("filas[1].incluir", "true").param("_filas[1].incluir", "on"))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        mvc.perform(get("/documentos-corte/resultados").session(sesion))
+                .andExpect(content().string(not(containsString("Fotos ULL113"))));
+        byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
+                .session(sesion)).andReturn().getResponse().getContentAsByteArray();
+        String texto = com.puntotres.packinglist.testutil.WordDePrueba.texto(
+                new org.apache.poi.xwpf.usermodel.XWPFDocument(new ByteArrayInputStream(word)));
+        assertTrue(texto.contains("ULL745") && !texto.contains("ULL113"), texto);
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(matchesPattern(
+                        "(?s).*<tr class=\"fila-excluida\">.*")));
     }
 
     @Test

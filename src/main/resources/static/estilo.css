@@ -978,4 +978,9 @@ main.ancho-completo { max-width: 96rem; }
 .tabla-pieles td input[type="text"] { width: 100%; min-width: 9rem; }
 .tabla-pieles select { max-width: 12rem; }
 .tabla-pieles .sin-fotos { color: var(--gris-fuerte); font-style: italic; }
+/* Incluir o no una referencia en los documentos: casilla en gris y, desmarcada, la fila apagada. */
+.tabla-pieles .c-incluir { text-align: center; width: 1%; }
+.tabla-pieles input.casilla-incluir { accent-color: var(--gris-fuerte); width: 1.1rem; height: 1.1rem; cursor: pointer; }
+.tabla-pieles tr.fila-excluida td { background: #eceef0; color: #9aa3ab; }
+.tabla-pieles tr.fila-excluida td:not(.c-incluir) > * { opacity: 0.55; }
 .acciones-corte { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }

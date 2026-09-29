@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFPicture;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.junit.jupiter.api.Test;
@@ -26,9 +27,6 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
 import com.puntotres.packinglist.testutil.FotosDePrueba;
 
 class FotosCorteDocBuilderTest {
-
-    private static final PielesArticulo PIELES =
-            new PielesArticulo("Box calf", "Tela", List.of("Ante"));
 
     @Test
     void seisFotosPorA4EnDosColumnasYTresFilas() throws IOException {
@@ -73,27 +71,27 @@ class FotosCorteDocBuilderTest {
     }
 
     @Test
-    void laCabeceraDeCadaHojaLlevaTemporadaReferenciaYPieles() throws IOException {
+    void laCabeceraDeCadaHojaEsSoloElModeloEnEstiloTituloA22() throws IOException {
         XWPFDocument doc = generar(fotos(1));
 
-        String cabecera = doc.getHeaderList().get(0).getText();
-        for (String esperado : List.of("H26", "ULL729.AL0103", "Piel: Box calf",
-                "Combinación: Ante", "Forro: Tela")) {
-            assertTrue(cabecera.contains(esperado), "falta '" + esperado + "' en: " + cabecera);
-        }
+        var cabecera = doc.getHeaderList().get(0);
+        assertEquals("ULL729", cabecera.getText().trim(), "ni temporada ni pieles");
+        XWPFParagraph titulo = cabecera.getParagraphs().get(0);
+        assertEquals("Title", titulo.getStyleID());
+        assertEquals("Title", doc.getStyles().getStyle("Title").getName(),
+                "el estilo integrado de Word, que en español se ve como Título");
+        assertEquals(22.0, titulo.getRuns().get(0).getFontSizeAsDouble());
     }
 
     @Test
-    void lasPartesVaciasNoSalenEnLaCabecera() {
-        assertEquals("Piel: Box  ·  Combinación 1: A  ·  Combinación 2: B",
-                FotosCorteDocBuilder.describirPieles(new PielesArticulo("Box", "", List.of("A", "B"))));
-        assertEquals("", FotosCorteDocBuilder.describirPieles(new PielesArticulo("", "", List.of())));
+    void conElNombreDelBolsoElTituloEsModeloGuionNombre() {
+        assertEquals("F67043 - Sac Le Neige", new FotosCorte("F67043", "Sac Le Neige", List.of()).titulo());
+        assertEquals("F67043", new FotosCorte("F67043", "", List.of()).titulo());
     }
 
     @Test
     void dejaUnEjemploEnTargetParaRevisarAOjo() throws IOException {
-        byte[] word = new FotosCorteDocBuilder().generar(new FotosCorte("H26", "ULL729.AL0103",
-                new PielesArticulo("Vachette grainée", "Cabretilla", List.of("Ante")), fotos(8)));
+        byte[] word = new FotosCorteDocBuilder().generar(new FotosCorte("ULL729", "", fotos(8)));
 
         Path destino = Path.of("target", "Fotos ejemplo.docx");
         Files.createDirectories(destino.getParent());
@@ -103,7 +101,7 @@ class FotosCorteDocBuilderTest {
 
     private static XWPFDocument generar(List<Imagen> fotos) throws IOException {
         return new XWPFDocument(new ByteArrayInputStream(new FotosCorteDocBuilder()
-                .generar(new FotosCorte("H26", "ULL729.AL0103", PIELES, fotos))));
+                .generar(new FotosCorte("ULL729", "", fotos))));
     }
 
     /** Alterna apaisadas y verticales, para ver cómo encaja cada una. */

@@ -39,6 +39,18 @@ class PedidoCorteTest {
     }
 
     @Test
+    void elNombreDelBolsoEsElPrimeroQueTraigaElPedido() {
+        PedidoCorte pedido = PedidoCorte.agrupar(List.of(
+                new LineaCorte("PXCBC-F67008", "LZZ", 1, ""),
+                new LineaCorte("PXCBC-F67008", "LAW", 1, " Sac Le Neige "),
+                new LineaCorte("PXCBC-F67008", "LAW", 1, "Otro nombre"),
+                new LineaCorte("PXCDS-F67043", "LZZ", 1)), ReferenciaCorte::deApc);
+
+        assertEquals("Sac Le Neige", pedido.articulos().get(0).nombreModelo());
+        assertEquals("", pedido.articulos().get(1).nombreModelo());
+    }
+
+    @Test
     void unaReferenciaSinPielSaleIgualPeroSeAvisa() {
         PedidoCorte pedido = PedidoCorte.agrupar(List.of(
                 new LineaCorte("MUESTRA", "001", 3)), ReferenciaCorte::deAmi);

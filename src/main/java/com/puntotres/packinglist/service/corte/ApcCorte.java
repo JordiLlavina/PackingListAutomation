@@ -26,7 +26,8 @@ public class ApcCorte implements ClienteCorte {
     @Override
     public PedidoCorte leerPedido(byte[] excel) throws IOException {
         List<LineaCorte> lineas = ApcPedidoExcel.desdeBytes(excel).lineasConCantidad().stream()
-                .map(linea -> new LineaCorte(linea.referencia(), linea.color(), linea.cantidad()))
+                .map(linea -> new LineaCorte(linea.referencia(), linea.color(), linea.cantidad(),
+                        linea.designacion()))
                 .toList();
         return PedidoCorte.agrupar(lineas, this::partir);
     }

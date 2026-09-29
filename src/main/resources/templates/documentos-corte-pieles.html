@@ -28,12 +28,14 @@
     <form class="tarjeta" id="formPieles" method="post" th:action="@{/documentos-corte/generar}">
         <p class="ayuda">
             Los nombres valen para todos los colores de la referencia. Una combinación o un forro en
-            blanco es que no lleva. Un color con 0 bolsos no saca orden de corte.
+            blanco es que no lleva. Un color con 0 bolsos no saca orden de corte, y una referencia
+            desmarcada no sale en ningún documento.
         </p>
         <div class="tabla-desplazable">
             <table class="tabla-pieles">
                 <thead>
                 <tr>
+                    <th class="c-incluir" title="Desmarcada, la referencia no saca órdenes de corte ni Word de fotos">Incluir</th>
                     <th>Modelo</th>
                     <th>Piel</th>
                     <th>Bolsos por color</th>
@@ -44,7 +46,14 @@
                 </tr>
                 </thead>
                 <tbody>
-                <tr th:each="fila : ${filas}">
+                <tr th:each="fila : ${filas}" th:classappend="${!fila.incluida} ? 'fila-excluida'">
+                    <td class="c-incluir">
+                        <!-- Una casilla desmarcada no se envía: el marcador "_" dice que estaba. -->
+                        <input type="hidden" th:name="|_filas[${fila.indice}].incluir|" value="on">
+                        <input type="checkbox" class="casilla-incluir" value="true"
+                               th:name="|filas[${fila.indice}].incluir|" th:checked="${fila.incluida}"
+                               th:attr="aria-label=|Incluir ${fila.referencia}|">
+                    </td>
                     <td class="c-modelo" th:text="${fila.modelo}"></td>
                     <td class="c-piel" th:text="${fila.piel}"></td>
                     <td class="c-bolsos">
@@ -135,20 +144,34 @@
             }, MANTENER_SESION_MS);
 
             // Un nombre de piel vale para todas las filas con la misma ref de
-            // piel: se copia a las que siguen vacías, nunca encima de otro.
+            // piel: se copia a las que están vacías y a las que decían lo
+            // mismo que este campo antes de editarlo, que es corregirlo en
+            // todas. Una fila con un nombre distinto se deja: alguien lo puso.
             const nombres = document.querySelectorAll('input.c-nombre-piel');
             nombres.forEach(function (input) {
-                input.addEventListener('change', function () {
+                let anterior = input.value.trim();
+                input.addEventListener('focus', function () {
+                    anterior = input.value.trim();
+                });
+                input.addEventListener('input', function () {
                     const valor = input.value.trim();
-                    if (!valor || !input.dataset.piel) {
-                        return;
+                    if (input.dataset.piel) {
+                        nombres.forEach(function (otro) {
+                            const suyo = otro.value.trim();
+                            if (otro !== input && otro.dataset.piel === input.dataset.piel
+                                    && (!suyo || suyo === anterior)) {
+                                otro.value = input.value;
+                            }
+                        });
                     }
-                    nombres.forEach(function (otro) {
-                        if (otro !== input && otro.dataset.piel === input.dataset.piel
-                                && !otro.value.trim()) {
-                            otro.value = valor;
-                        }
-                    });
+                    anterior = valor;
+                });
+            });
+
+            // La casilla de incluir apaga la fila en gris al momento.
+            document.querySelectorAll('input.casilla-incluir').forEach(function (casilla) {
+                casilla.addEventListener('change', function () {
+                    casilla.closest('tr').classList.toggle('fila-excluida', !casilla.checked);
                 });
             });
 

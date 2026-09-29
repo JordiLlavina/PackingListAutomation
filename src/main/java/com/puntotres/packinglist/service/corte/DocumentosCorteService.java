@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,9 +19,9 @@ import org.springframework.stereotype.Service;
  * lo tecleado en la pantalla de pieles, los Word que salen.
  *
  * Salen un Word de órdenes con una página por referencia y color con bolsos,
- * y un Word de fotos por referencia con bolsos cuyo modelo tenga fotos. La
- * foto es del MODELO: la carpeta ULL027 vale para ULL027.AL0103 y para
- * ULL027.AL0216, así que las dos llevan su Word con las mismas fotos.
+ * y un Word de fotos por MODELO con bolsos y fotos: la carpeta ULL027 vale
+ * para ULL027.AL0103 y para ULL027.AL0216, y sin pieles en su cabecera los
+ * dos Word serían el mismo. Una fila desmarcada en la tabla no saca nada.
  */
 @Service
 public class DocumentosCorteService {
@@ -59,30 +60,36 @@ public class DocumentosCorteService {
         List<OrdenCorte> paginas = new ArrayList<>();
         List<DocumentoCorte> documentosFotos = new ArrayList<>();
 
+        // Modelo → nombre del bolso, en el orden de las filas: un Word de fotos por modelo.
+        Map<String, String> modelos = new LinkedHashMap<>();
         for (FilaCorte fila : filas) {
-            if (!fila.tieneBolsos()) {
+            if (!fila.isIncluida() || !fila.tieneBolsos()) {
                 continue;
             }
-            String referencia = fila.referencia().referencia();
-            List<FotoModelo> delModelo = fotos.de(fila.referencia().modelo());
+            String modelo = fila.referencia().modelo();
+            List<FotoModelo> delModelo = fotos.de(modelo);
             Imagen principal = principal(delModelo, fila.getFotoPrincipal(), reducida, leidas, avisos);
             for (ColorCorte color : fila.colores()) {
                 if (color.bolsos() > 0) {
-                    paginas.add(new OrdenCorte(cliente, temporada, referencia, color.color(),
+                    paginas.add(new OrdenCorte(cliente, temporada, modelo, color.color(),
                             color.bolsos(), fila.pieles(), principal));
                 }
             }
+            modelos.merge(modelo, fila.nombreModelo(),
+                    (anterior, nuevo) -> anterior.isEmpty() ? nuevo : anterior);
+        }
 
+        for (Map.Entry<String, String> modelo : modelos.entrySet()) {
             List<Imagen> imagenes = new ArrayList<>();
-            for (FotoModelo foto : delModelo) {
+            for (FotoModelo foto : fotos.de(modelo.getKey())) {
                 imagen(foto, reducida, leidas, avisos).ifPresent(imagenes::add);
             }
             if (!imagenes.isEmpty()) {
-                String nombre = sanear("Fotos " + referencia + ".docx");
+                FotosCorte album = new FotosCorte(modelo.getKey(), modelo.getValue(), imagenes);
+                String nombre = sanear("Fotos " + modelo.getKey() + ".docx");
                 Path fichero = destino.resolve(nombre);
-                Files.write(fichero, albumes.generar(
-                        new FotosCorte(temporada, referencia, fila.pieles(), imagenes)));
-                documentosFotos.add(new DocumentoCorte("Fotos de " + referencia + " ("
+                Files.write(fichero, albumes.generar(album));
+                documentosFotos.add(new DocumentoCorte("Fotos de " + album.titulo() + " ("
                         + imagenes.size() + (imagenes.size() == 1 ? " foto)" : " fotos)"),
                         nombre, fichero));
             }
