@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.corte;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -27,11 +28,17 @@ class DecodificadorHeicJavaTest {
     }
 
     @Test
-    void conUnPresupuestoMinimoLaFotoSaleIgualAunqueVayaSola(@TempDir Path dir) throws Exception {
+    void unaFotoQueNoCabeEnElPresupuestoNiSeIntentaYSeDiceComoArreglarlo(@TempDir Path dir)
+            throws Exception {
+        // Intentarla igual acababa en un OutOfMemoryError que puede caer en
+        // cualquier hilo de la aplicación, no solo en el de la foto.
         Path heic = dir.resolve("a.heic");
         Files.write(heic, FotosDePrueba.heicDePrueba());
 
-        assertEquals(430, new DecodificadorHeicJava(1).decodificar(heic).getWidth());
+        IOException error = assertThrows(IOException.class,
+                () -> new DecodificadorHeicJava(1).decodificar(heic));
+        assertTrue(error.getMessage().contains("-Xmx"), error.getMessage());
+        assertTrue(error.getMessage().contains("JPG"), error.getMessage());
     }
 
     @Test

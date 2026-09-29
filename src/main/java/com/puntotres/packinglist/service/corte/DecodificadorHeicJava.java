@@ -20,9 +20,13 @@ import openize.io.IOMode;
  * cuadrícula entera. Por eso cuántas fotos se decodifican a la vez lo decide
  * un presupuesto de memoria —un semáforo en MB sobre el heap máximo menos una
  * reserva para el resto de la aplicación—, que es COMPARTIDO por todas las
- * sesiones: dos personas convirtiendo a la vez no pueden sumar el doble. Una
- * foto que pide más que el presupuesto entero se decodifica sola, y si aun
- * así no cabe sale como error de esa foto, no como caída de la aplicación.
+ * sesiones: dos personas convirtiendo a la vez no pueden sumar el doble.
+ *
+ * Una foto que pide MÁS que el presupuesto entero ni se intenta: Openize llena
+ * el heap poco a poco y el OutOfMemoryError puede caer en cualquier hilo
+ * (una petición de otra persona, la base de datos), no solo en el de la foto.
+ * Sale como aviso de esa foto diciendo cómo arreglarlo: más memoria a la
+ * aplicación (con -Xmx3g ya caben las de 24 MP) o la foto en JPG.
  */
 public class DecodificadorHeicJava {
 
@@ -53,8 +57,13 @@ public class DecodificadorHeicJava {
             HeicImage imagen = HeicImage.load(flujo);
             int ancho = (int) imagen.getWidth();
             int alto = (int) imagen.getHeight();
-            int necesarios = (int) Math.min(presupuestoMb,
-                    Math.max(1, (long) ancho * alto * BYTES_POR_PIXEL / (1024 * 1024)));
+            long estimados = Math.max(1, (long) ancho * alto * BYTES_POR_PIXEL / (1024 * 1024));
+            if (estimados > presupuestoMb) {
+                throw new FotoDemasiadoGrande("necesita unos " + estimados + " MB de memoria y la "
+                        + "aplicación solo tiene " + presupuestoMb + " MB para fotos: arráncala con "
+                        + "más memoria (-Xmx) o pasa la foto a JPG");
+            }
+            int necesarios = (int) estimados;
             presupuesto.acquire(necesarios);
             try {
                 int[] pixeles = imagen.getInt32Array(PixelFormat.Argb32);
@@ -67,10 +76,19 @@ public class DecodificadorHeicJava {
             } finally {
                 presupuesto.release(necesarios);
             }
+        } catch (FotoDemasiadoGrande e) {
+            throw new IOException(e.getMessage());
         } catch (RuntimeException e) {
             // Las excepciones de Openize (openize.io.IOException incluida) son de tiempo de ejecución.
             throw new IOException("no es un HEIC legible"
                     + (e.getMessage() != null ? ": " + e.getMessage() : ""), e);
+        }
+    }
+
+    /** Sale de dentro del try para no confundirse con un fallo de lectura de Openize. */
+    private static final class FotoDemasiadoGrande extends RuntimeException {
+        FotoDemasiadoGrande(String mensaje) {
+            super(mensaje);
         }
     }
 }
