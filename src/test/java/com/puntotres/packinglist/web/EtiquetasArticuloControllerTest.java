@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -23,6 +24,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel.Fila;
 
@@ -44,6 +46,9 @@ class EtiquetasArticuloControllerTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private ArchivoTemporadas archivoTemporadas;
 
     /** Un pedido de AMI con un "/" en la columna Made in: el dato conflictivo. */
     private static byte[] pedidoConMadeInProblematico() {
@@ -114,6 +119,45 @@ class EtiquetasArticuloControllerTest {
         // Ninguna entrada trae "/": una entrada con barra crearía un
         // subdirectorio dentro del ZIP en vez de un fichero suelto.
         assertTrue(entradas.stream().noneMatch(nombre -> nombre.contains("/")), entradas.toString());
+    }
+
+    @Test
+    void laEntradaVaComoLaDelPackingListConLaTemporadaALaDerechaDelCliente() throws Exception {
+        String pagina = mvc.perform(get("/etiquetas-articulo-produccion"))
+                .andReturn().getResponse().getContentAsString();
+
+        String isla = pagina.substring(pagina.indexOf("class=\"tarjeta isla-pedido\""));
+        String fila = isla.substring(isla.indexOf("class=\"fila-cliente\""), isla.indexOf("id=\"bloquePedido\""));
+        assertTrue(fila.indexOf("id=\"cliente\"") < fila.indexOf("id=\"temporadaGuardada\""),
+                "la temporada guardada, a la derecha del cliente");
+        assertTrue(fila.contains("href=\"/temporadas\""), "el lápiz que lleva a mantenerlas");
+        assertTrue(pagina.contains("const TEMPORADAS"), "el desplegable se rehace al cambiar de cliente");
+    }
+
+    @Test
+    void conUnaTemporadaGuardadaNoHaceFaltaSubirElExcel() throws Exception {
+        Long id = archivoTemporadas.guardar(null, "AMI", "H31", "EAN PUNTOTRES H31.xlsx",
+                PedidoAmiExcel.crear("EAN H31", new Fila("SPAIN", "USL738.AL0137", "A236", "TRUFFLE",
+                        "U", "07714 CH", EAN_VALIDO))).getId();
+        MockHttpSession sesion = new MockHttpSession();
+
+        mvc.perform(multipart("/etiquetas-articulo-produccion/generar")
+                        .param("cliente", "AMI").param("temporadaGuardadaId", String.valueOf(id))
+                        .session(sesion))
+                .andExpect(redirectedUrl("/etiquetas-articulo-produccion/resultados"));
+
+        mvc.perform(get("/etiquetas-articulo-produccion/resultados").session(sesion))
+                .andExpect(content().string(containsString("H31")));
+    }
+
+    @Test
+    void unaTemporadaGuardadaDeOtroClienteNoSeUsa() throws Exception {
+        Long id = archivoTemporadas.guardar(null, "APC", "FALL31", "APC.xlsx", new byte[] {1}).getId();
+
+        mvc.perform(multipart("/etiquetas-articulo-produccion/generar")
+                        .param("cliente", "AMI").param("temporadaGuardadaId", String.valueOf(id)))
+                .andExpect(redirectedUrl("/etiquetas-articulo-produccion"))
+                .andExpect(flash().attribute("error", containsString("no es de este cliente")));
     }
 
     @Test

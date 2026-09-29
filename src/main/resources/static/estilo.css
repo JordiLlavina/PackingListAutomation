@@ -691,6 +691,8 @@ header.cabecera .enlace-menu:hover {
 .isla-pedido .fila-cliente label,
 .isla-envio > div > label:first-child,
 .isla-campos > .campos-cabecera:first-child label { margin-top: 0; }
+/* Con un texto de introducción delante (etiquetas de artículo), aire hasta los campos. */
+.isla-pedido .ayuda + .fila-cliente { margin-top: 1rem; }
 
 /* Rótulo y campo en la misma línea, con aire entre los dos. */
 .campo-en-linea { display: flex; align-items: center; gap: 0.8rem; }

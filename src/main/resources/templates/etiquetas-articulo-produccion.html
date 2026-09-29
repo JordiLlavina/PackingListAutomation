@@ -6,8 +6,9 @@
 <main>
     <div class="alerta error" th:if="${error}" th:text="${error}"></div>
 
-    <form class="tarjeta" th:action="@{/etiquetas-articulo-produccion/generar}" method="post"
+    <form id="formEtiquetas" th:action="@{/etiquetas-articulo-produccion/generar}" method="post"
           enctype="multipart/form-data">
+      <div class="tarjeta isla-pedido">
         <h3 class="titulo-seccion">🏷️ Etiquetas de artículo de producción</h3>
         <p class="ayuda">
             Del excel de pedido de la temporada salen los códigos de barras EAN13 de cada
@@ -15,51 +16,113 @@
             otro de cinturones, con 40 etiquetas por hoja ajustadas a un A4.
         </p>
 
-        <label for="cliente">Cliente</label>
-        <select id="cliente" name="cliente" required>
-            <option th:each="entrada : ${clientes}"
-                    th:value="${entrada.key}"
-                    th:text="${entrada.value['disponible'] == 'true'
-                              ? entrada.value['nombre']
-                              : entrada.value['nombre'] + ' — en desarrollo'}"
-                    th:disabled="${entrada.value['disponible'] != 'true'}"
-                    th:attr="data-titulo=${entrada.value['tituloCampoPedido']},
-                             data-temporada=${entrada.value['placeholderTemporada']}"></option>
-        </select>
+        <!-- Cliente y temporada juntos, como en el packing list: la temporada es
+             la del cliente que se acaba de elegir. El lápiz lleva a mantenerlas. -->
+        <div class="fila-cliente">
+            <div>
+                <label for="cliente">Cliente</label>
+                <select id="cliente" name="cliente" required>
+                    <option th:each="entrada : ${clientes}"
+                            th:value="${entrada.key}"
+                            th:text="${entrada.value['disponible'] == 'true'
+                                      ? entrada.value['nombre']
+                                      : entrada.value['nombre'] + ' — en desarrollo'}"
+                            th:disabled="${entrada.value['disponible'] != 'true'}"
+                            th:attr="data-titulo=${entrada.value['tituloCampoPedido']},
+                                     data-temporada=${entrada.value['placeholderTemporada']}"></option>
+                </select>
+            </div>
+            <div>
+                <label for="temporadaGuardada" class="etiqueta-con-accion">
+                    <span>Temporada</span>
+                    <a class="lapiz" th:href="@{/temporadas}"
+                       title="Añadir, editar o borrar temporadas guardadas"
+                       aria-label="Editar las temporadas guardadas">&#9998;</a>
+                </label>
+                <select id="temporadaGuardada" name="temporadaGuardadaId"></select>
+                <p class="ayuda" id="ayudaTemporadaGuardada"></p>
+            </div>
+        </div>
 
-        <label for="temporada">Temporada</label>
-        <input type="text" id="temporada" name="temporada">
-        <p class="ayuda">
-            Solo se usa si no se puede deducir del propio excel: si su hoja se llama
-            «EAN H26», manda «H26».
-        </p>
+        <!-- Con una temporada guardada elegida, su nombre y su excel ya están:
+             este bloque se esconde para que no haya dos "Temporada" a la vez. -->
+        <div id="bloquePedido">
+            <label for="temporada">Temporada</label>
+            <input type="text" id="temporada" name="temporada">
+            <p class="ayuda">
+                Solo se usa si no se puede deducir del propio excel: si su hoja se llama
+                «EAN H26», manda «H26».
+            </p>
 
-        <label for="pedido" id="etiquetaPedido">Excel de pedido del cliente</label>
-        <input type="file" id="pedido" name="pedido" accept=".xlsx" required>
+            <label for="pedido" id="etiquetaPedido">Excel de pedido del cliente</label>
+            <input type="file" id="pedido" name="pedido" accept=".xlsx">
+        </div>
+      </div>
 
         <button type="submit">Generar etiquetas</button>
         <a class="boton secundario" th:href="@{/etiquetas-articulo}">Volver</a>
     </form>
 </main>
-<script>
-    // El rótulo del input y la temporada por defecto dependen del cliente,
-    // igual que en la pantalla de entrada del asistente.
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const TEMPORADAS = /*[[${temporadasJs}]]*/ {};
+    /*]]>*/
+    // El rótulo del input y la temporada por defecto dependen del cliente, y
+    // el desplegable de temporadas guardadas se rehace al cambiar de cliente:
+    // una elegida de otro cliente se enviaría igual aunque ya no se vea.
     (function () {
         const cliente = document.getElementById('cliente');
         const etiqueta = document.getElementById('etiquetaPedido');
         const temporada = document.getElementById('temporada');
+        const guardada = document.getElementById('temporadaGuardada');
+        const ayuda = document.getElementById('ayudaTemporadaGuardada');
+        const bloquePedido = document.getElementById('bloquePedido');
+
+        function temporadasDelCliente() {
+            return TEMPORADAS[cliente.value] || [];
+        }
+
+        function rellenar() {
+            guardada.innerHTML = '';
+            const suelta = document.createElement('option');
+            suelta.value = '';
+            suelta.textContent = '-- otra temporada --';
+            guardada.appendChild(suelta);
+            temporadasDelCliente().forEach(function (temporadaGuardada) {
+                const opcion = document.createElement('option');
+                opcion.value = temporadaGuardada.id;
+                opcion.textContent = temporadaGuardada.temporada;
+                guardada.appendChild(opcion);
+            });
+            aplicar();
+        }
+
+        // Con una temporada guardada el excel ya está: el bloque del excel se
+        // esconde y se vacía, porque uno subido a mano mandaría sobre ella.
+        function aplicar() {
+            const elegida = temporadasDelCliente().filter(function (temporadaGuardada) {
+                return String(temporadaGuardada.id) === guardada.value;
+            })[0];
+            bloquePedido.style.display = elegida ? 'none' : '';
+            ayuda.textContent = elegida ? 'Excel de pedido guardado: ' + elegida.fichero : '';
+            if (elegida) {
+                temporada.value = '';
+                document.getElementById('pedido').value = '';
+            }
+        }
 
         function ajustar() {
             const opcion = cliente.options[cliente.selectedIndex];
-            if (!opcion) {
-                return;
+            if (opcion) {
+                const titulo = opcion.dataset.titulo;
+                etiqueta.textContent = titulo ? titulo : 'Excel de pedido del cliente';
+                temporada.placeholder = opcion.dataset.temporada || '';
             }
-            const titulo = opcion.dataset.titulo;
-            etiqueta.textContent = titulo ? titulo : 'Excel de pedido del cliente';
-            temporada.placeholder = opcion.dataset.temporada || '';
+            rellenar();
         }
 
         cliente.addEventListener('change', ajustar);
+        guardada.addEventListener('change', aplicar);
         ajustar();
     })();
 </script>

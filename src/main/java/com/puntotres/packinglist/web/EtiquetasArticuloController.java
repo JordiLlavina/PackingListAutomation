@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -23,6 +24,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.etiquetasarticulo.EtiquetasArticuloGenerationService;
 import com.puntotres.packinglist.service.etiquetasarticulo.ExcelEtiquetasArticulo;
 import com.puntotres.packinglist.service.etiquetasarticulo.GeneradorEtiquetasArticuloCliente;
@@ -30,9 +33,10 @@ import com.puntotres.packinglist.service.etiquetasarticulo.ResultadoEtiquetasArt
 
 /**
  * Flujo de etiquetas de artículo de producción, en dos pantallas: elegir
- * cliente y subir su excel de pedido → descargar los excels generados. Se
- * llega desde el menú de etiquetas de artículo ({@code /etiquetas-articulo},
- * en MenuController), que reparte entre producción, SMS y prototipos.
+ * cliente y su temporada guardada, o subir su excel de pedido → descargar los
+ * excels generados. Se llega desde el menú de etiquetas de artículo
+ * ({@code /etiquetas-articulo}, en MenuController), que reparte entre
+ * producción, SMS y prototipos.
  *
  * No tiene nada que ver con el asistente de packing lists: no necesita JSON,
  * ni envío en curso, ni pesos. Su única entrada es el excel de pedido.
@@ -71,14 +75,17 @@ public class EtiquetasArticuloController {
     private final EtiquetasArticuloGenerationService etiquetasArticuloService;
     private final ClientesProperties clientesProperties;
     private final EtiquetasArticuloEnCurso enCurso;
+    private final ArchivoTemporadas archivoTemporadas;
 
     public EtiquetasArticuloController(
             EtiquetasArticuloGenerationService etiquetasArticuloService,
             ClientesProperties clientesProperties,
-            EtiquetasArticuloEnCurso enCurso) {
+            EtiquetasArticuloEnCurso enCurso,
+            ArchivoTemporadas archivoTemporadas) {
         this.etiquetasArticuloService = etiquetasArticuloService;
         this.clientesProperties = clientesProperties;
         this.enCurso = enCurso;
+        this.archivoTemporadas = archivoTemporadas;
     }
 
     // --- Paso 1: elegir cliente y subir el pedido ---
@@ -86,13 +93,15 @@ public class EtiquetasArticuloController {
     @GetMapping("/etiquetas-articulo-produccion")
     public String entrada(Model model) {
         model.addAttribute("clientes", vistaDeClientes());
+        model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegable());
         return "etiquetas-articulo-produccion";
     }
 
     @PostMapping("/etiquetas-articulo-produccion/generar")
     public String generar(@RequestParam String cliente,
+                          @RequestParam(required = false) Long temporadaGuardadaId,
                           @RequestParam(required = false) String temporada,
-                          @RequestParam MultipartFile pedido,
+                          @RequestParam(required = false) MultipartFile pedido,
                           RedirectAttributes redirect) {
         GeneradorEtiquetasArticuloCliente generador =
                 etiquetasArticuloService.generadorPara(cliente).orElse(null);
@@ -101,14 +110,26 @@ public class EtiquetasArticuloController {
                     "El cliente '" + cliente + "' no tiene etiquetas de artículo implementadas");
             return "redirect:/etiquetas-articulo-produccion";
         }
-        if (pedido == null || pedido.isEmpty()) {
-            redirect.addFlashAttribute("error", "Falta el " + generador.tituloCampoPedido());
+        // Un excel subido a mano manda sobre el guardado; el guardado, solo si
+        // es de este cliente: el desplegable se rellena en el navegador y
+        // cambiar de cliente después de elegir dejaría enviada la de otro.
+        boolean conExcel = pedido != null && !pedido.isEmpty();
+        Optional<TemporadaGuardada> guardada = conExcel ? Optional.empty()
+                : archivoTemporadas.paraElEnvio(temporadaGuardadaId, cliente);
+        if (!conExcel && guardada.isEmpty()) {
+            redirect.addFlashAttribute("error", temporadaGuardadaId != null
+                    ? "La temporada elegida ya no existe o no es de este cliente: vuelve a elegirla "
+                            + "o sube el excel de pedido"
+                    : "Falta el " + generador.tituloCampoPedido());
             return "redirect:/etiquetas-articulo-produccion";
         }
+        String nombreTemporada = temporada != null && !temporada.isBlank() ? temporada
+                : guardada.map(TemporadaGuardada::getTemporada).orElse(temporada);
 
         ResultadoEtiquetasArticulo resultado;
         try {
-            resultado = generador.generar(pedido.getBytes(), temporada);
+            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
+            resultado = generador.generar(excel, nombreTemporada);
         } catch (IllegalArgumentException e) {
             // Un excel que no es el que toca (sin hoja EAN, sin columna
             // EAN13) llega aquí: es lo único que bloquea, porque no hay nada

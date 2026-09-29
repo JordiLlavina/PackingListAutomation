@@ -1,8 +1,6 @@
 package com.puntotres.packinglist.web;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Component;
@@ -11,7 +9,6 @@ import org.springframework.ui.Model;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
-import com.puntotres.packinglist.persistence.ResumenTemporada;
 
 /**
  * Lo que necesita la pantalla de entrada para pintarse, venga de donde venga.
@@ -42,7 +39,7 @@ public class AtributosEntrada {
         // FORMULARIO (evita teclear un tamaño que luego no tendría tara).
         model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
         model.addAttribute("clientesJs", clientesJs());
-        model.addAttribute("temporadasJs", temporadasJs());
+        model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegable());
     }
 
     private Map<String, Map<String, String>> clientesJs() {
@@ -57,27 +54,5 @@ public class AtributosEntrada {
             clientesJs.put(clave, datos);
         });
         return clientesJs;
-    }
-
-    /**
-     * Las temporadas guardadas de cada cliente, para el desplegable que las
-     * ofrece. Van al navegador como un mapa por cliente y no como una lista
-     * plana porque el desplegable se rehace al cambiar de cliente sin volver
-     * al servidor.
-     */
-    private Map<String, List<Map<String, String>>> temporadasJs() {
-        Map<String, List<Map<String, String>>> porCliente = new LinkedHashMap<>();
-        archivoTemporadas.porCliente().forEach((cliente, temporadas) -> {
-            List<Map<String, String>> lista = new ArrayList<>();
-            for (ResumenTemporada temporada : temporadas) {
-                Map<String, String> datos = new LinkedHashMap<>();
-                datos.put("id", String.valueOf(temporada.id()));
-                datos.put("temporada", temporada.temporada());
-                datos.put("fichero", temporada.nombreFichero());
-                lista.add(datos);
-            }
-            porCliente.put(cliente, lista);
-        });
-        return porCliente;
     }
 }

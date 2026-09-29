@@ -45,6 +45,30 @@ public class ArchivoTemporadas {
         return agrupadas;
     }
 
+    /**
+     * Las temporadas de cada cliente tal como las necesita el desplegable de
+     * las pantallas de entrada (packing list, documentos del corte y
+     * etiquetas de artículo): id, nombre y fichero. Van al navegador como un
+     * mapa por cliente porque el desplegable se rehace al cambiar de cliente
+     * sin volver al servidor. Una sola copia para las tres pantallas: con una
+     * en cada controlador, un dato nuevo llega a unas y a otras no.
+     */
+    public Map<String, List<Map<String, String>>> paraElDesplegable() {
+        Map<String, List<Map<String, String>>> porCliente = new LinkedHashMap<>();
+        porCliente().forEach((cliente, temporadas) -> {
+            List<Map<String, String>> lista = new ArrayList<>();
+            for (ResumenTemporada temporada : temporadas) {
+                Map<String, String> datos = new LinkedHashMap<>();
+                datos.put("id", String.valueOf(temporada.id()));
+                datos.put("temporada", temporada.temporada());
+                datos.put("fichero", temporada.nombreFichero());
+                lista.add(datos);
+            }
+            porCliente.put(cliente, lista);
+        });
+        return porCliente;
+    }
+
     /** La temporada con su excel, para descargarla o editarla. */
     public Optional<TemporadaGuardada> conFichero(Long id) {
         return id == null ? Optional.empty() : repositorio.findById(id);

@@ -32,7 +32,6 @@ import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
-import com.puntotres.packinglist.persistence.ResumenTemporada;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.corte.ClienteCorte;
 import com.puntotres.packinglist.service.corte.ConversionFotos;
@@ -100,7 +99,7 @@ public class DocumentosCorteController {
     @GetMapping("/documentos-corte")
     public String entrada(Model model) {
         model.addAttribute("clientes", opcionesDeCliente());
-        model.addAttribute("temporadasJs", temporadasJs());
+        model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegable());
         return "documentos-corte";
     }
 
@@ -446,23 +445,6 @@ public class DocumentosCorteController {
 
     private static String nombreDe(ClienteConfig config, String clave) {
         return config.getNombre() != null && !config.getNombre().isBlank() ? config.getNombre() : clave;
-    }
-
-    /** Las temporadas guardadas por cliente, para rehacer el desplegable al cambiar de cliente. */
-    private Map<String, List<Map<String, String>>> temporadasJs() {
-        Map<String, List<Map<String, String>>> porCliente = new LinkedHashMap<>();
-        archivoTemporadas.porCliente().forEach((cliente, temporadas) -> {
-            List<Map<String, String>> lista = new ArrayList<>();
-            for (ResumenTemporada temporada : temporadas) {
-                Map<String, String> datos = new LinkedHashMap<>();
-                datos.put("id", String.valueOf(temporada.id()));
-                datos.put("temporada", temporada.temporada());
-                datos.put("fichero", temporada.nombreFichero());
-                lista.add(datos);
-            }
-            porCliente.put(cliente, lista);
-        });
-        return porCliente;
     }
 
     private static String error(RedirectAttributes redirect, String mensaje) {
