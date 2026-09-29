@@ -25,7 +25,7 @@ import com.puntotres.packinglist.service.corte.ConversorHeicWindows.Trabajo;
 /**
  * Convierte las fotos del zip en JPEG reducidos, en segundo plano.
  *
- * Tres caminos: los JPG, con ImageIO y enderezados por su EXIF; los HEIC en
+ * Tres caminos: los JPG y PNG, con ImageIO y enderezados por su EXIF; los HEIC en
  * Windows, por lotes con el decodificador del sistema (rápido); y los HEIC
  * que Windows no lee, o todos fuera de Windows, con Openize en Java puro
  * (lento y con mucha memoria, ver DecodificadorHeicJava). Los lotes de
@@ -77,7 +77,7 @@ public class ConversorFotos {
         }
         for (FotoModelo foto : jpg) {
             tareas.add(CompletableFuture.runAsync(() -> conversion.convertir(
-                    foto, salidaDe(foto, destino), ConversorFotos::leerJpeg, true), hilos));
+                    foto, salidaDe(foto, destino), ConversorFotos::leerConImageIO, true), hilos));
         }
         CompletableFuture.allOf(tareas.toArray(CompletableFuture[]::new))
                 .whenComplete((nada, error) -> {
@@ -111,10 +111,10 @@ public class ConversorFotos {
         }
     }
 
-    static BufferedImage leerJpeg(Path fichero) throws IOException {
+    static BufferedImage leerConImageIO(Path fichero) throws IOException {
         BufferedImage imagen = ImageIO.read(fichero.toFile());
         if (imagen == null) {
-            throw new IOException("no es un JPG legible");
+            throw new IOException("no es un JPG ni un PNG legible");
         }
         return imagen;
     }

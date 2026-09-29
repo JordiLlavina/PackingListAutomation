@@ -42,18 +42,21 @@
             <input type="file" id="pedido" name="pedido" accept=".xlsx">
         </div>
 
-        <label for="fotos">Carpeta de fotos de la temporada (zip)</label>
-        <input type="file" id="fotos" name="fotos" accept=".zip" required>
+        <label for="carpeta">Carpeta de fotos de la temporada</label>
+        <input type="file" id="carpeta" name="carpeta" webkitdirectory multiple>
+        <label for="fotos">o la misma carpeta en zip</label>
+        <input type="file" id="fotos" name="fotos" accept=".zip">
         <p class="ayuda">
-            Una subcarpeta por modelo, con el nombre de la referencia del bolso (ULL712, F67008), y
-            dentro sus fotos en HEIC, JPG o JPEG. La foto vale para todas las pieles del modelo.
+            Una subcarpeta por modelo, con el nombre del modelo o de una de sus referencias (ULL712 o
+            ULL712.AL0103, F67008 o PXCBC-F67008), y dentro sus fotos en HEIC, JPG o PNG. La foto
+            vale para todas las pieles del modelo.
         </p>
 
         <button type="submit" id="botonCargar">Cargar</button>
         <a class="boton secundario" th:href="@{/menu}">Volver</a>
     </form>
     <p id="avisoSubiendo" class="aviso-procesando" style="display: none">
-        Subiendo el zip... con muchas fotos tarda un rato; no cierres la página.
+        Subiendo las fotos... con muchas tarda un rato; no cierres la página.
     </p>
 
     <script th:inline="javascript">
@@ -99,9 +102,28 @@
                 }
             }
 
+            // Carpeta o zip, no los dos: elegir uno vacía el otro.
+            const carpeta = document.getElementById('carpeta');
+            const zip = document.getElementById('fotos');
+            carpeta.addEventListener('change', function () {
+                if (carpeta.files.length) {
+                    zip.value = '';
+                }
+            });
+            zip.addEventListener('change', function () {
+                if (zip.files.length) {
+                    carpeta.value = '';
+                }
+            });
+
             cliente.addEventListener('change', rellenar);
             guardada.addEventListener('change', aplicar);
-            document.getElementById('formCorte').addEventListener('submit', function () {
+            document.getElementById('formCorte').addEventListener('submit', function (evento) {
+                if (!carpeta.files.length && !zip.files.length) {
+                    evento.preventDefault();
+                    alert('Elige la carpeta de fotos de la temporada o su zip');
+                    return;
+                }
                 document.getElementById('avisoSubiendo').style.display = '';
             });
             rellenar();

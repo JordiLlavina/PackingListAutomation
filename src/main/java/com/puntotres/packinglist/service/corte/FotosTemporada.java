@@ -1,6 +1,5 @@
 package com.puntotres.packinglist.service.corte;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -30,15 +29,5 @@ public record FotosTemporada(Map<String, List<FotoModelo>> porModelo, List<Strin
 
     public int total() {
         return porModelo.values().stream().mapToInt(List::size).sum();
-    }
-
-    /** Los modelos que no han traído ninguna foto, sin repetir y ordenados. */
-    public List<String> modelosSinFotos(Collection<String> modelos) {
-        return modelos.stream()
-                .map(ReferenciaCorte::normalizar)
-                .filter(modelo -> !porModelo.containsKey(modelo))
-                .distinct()
-                .sorted()
-                .toList();
     }
 }

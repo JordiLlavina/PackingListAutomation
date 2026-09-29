@@ -53,6 +53,26 @@ class ConversorFotosTest {
     }
 
     @Test
+    void unPngConTransparenciaSaleEnJpegSobreFondoBlanco() throws Exception {
+        // Pequeño a propósito: una foto que ya cabe no pasa por el escalado.
+        BufferedImage transparente = new BufferedImage(200, 100, BufferedImage.TYPE_INT_ARGB);
+        java.io.ByteArrayOutputStream png = new java.io.ByteArrayOutputStream();
+        ImageIO.write(transparente, "png", png);
+        FotoModelo foto = foto("ULL027", "logo.png", "00001.png", png.toByteArray());
+
+        ConversionFotos conversion = new ConversorFotos(new DecodificadorHeicJava(), null)
+                .convertir(List.of(foto), dir);
+        conversion.esperar();
+
+        assertTrue(conversion.avisos().isEmpty(), conversion.avisos().toString());
+        BufferedImage jpeg = ImageIO.read(conversion.reducida(foto).orElseThrow().toFile());
+        assertEquals(200, jpeg.getWidth());
+        Color centro = new Color(jpeg.getRGB(100, 50));
+        assertTrue(centro.getRed() > 240 && centro.getGreen() > 240 && centro.getBlue() > 240,
+                "el fondo transparente sale blanco y no negro: " + centro);
+    }
+
+    @Test
     @EnabledOnOs(OS.WINDOWS)
     void enWindowsElHeicSaleIgualPorUnCaminoOPorElOtro() throws Exception {
         FotoModelo heic = foto("ULL027", "b.HEIC", "00001.heic", FotosDePrueba.heicDePrueba());

@@ -87,12 +87,50 @@ class DocumentosCorteControllerTest {
     }
 
     @Test
-    void sinZipNoPasa() throws Exception {
+    void sinFotosNoPasa() throws Exception {
         mvc.perform(multipart("/documentos-corte/cargar")
                         .file(new MockMultipartFile("pedido", "pedido.xlsx", XLSX, pedidoAmi("ULL101")))
+                        // Lo que manda el selector de carpeta cuando no se ha elegido ninguna.
+                        .file(new MockMultipartFile("carpeta", "", "application/octet-stream", new byte[0]))
                         .param("cliente", "AMI").param("temporada", "H26").session(sesion))
                 .andExpect(redirectedUrl("/documentos-corte"))
-                .andExpect(flash().attribute("error", containsString("zip")));
+                .andExpect(flash().attribute("error", containsString("carpeta de fotos")));
+    }
+
+    @Test
+    void unaCarpetaSubidaSinComprimirLlevaALaTablaConSusFotos() throws Exception {
+        // El navegador manda cada fichero con su ruta relativa como nombre.
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("pedido", "pedido.xlsx", XLSX, pedidoAmi("ULL110")))
+                        .file(new MockMultipartFile("carpeta", "H26/ULL110.AL103/b.png", "image/png",
+                                FotosDePrueba.jpeg(300, 200, Color.BLUE)))
+                        .file(new MockMultipartFile("carpeta", "H26/ULL110.AL103/a.jpg", "image/jpeg",
+                                FotosDePrueba.jpeg(200, 300, Color.RED)))
+                        .param("cliente", "AMI").param("temporada", "H26").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("a.jpg")))
+                .andExpect(content().string(containsString("b.png")))
+                .andExpect(content().string(not(containsString("no es ningún modelo"))));
+    }
+
+    @Test
+    void laCarpetaYSuZipALaVezNoPasan() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL111"), zipFotos("ULL111"))
+                        .file(new MockMultipartFile("carpeta", "H26/ULL111/a.jpg", "image/jpeg",
+                                FotosDePrueba.jpeg(20, 20, Color.RED))))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("no los dos")));
+    }
+
+    @Test
+    void losModelosSinCarpetaNoSeAvisanPorqueYaLoDiceLaTabla() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL112"), zipFotos("ULL112")));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("sin fotos")))
+                .andExpect(content().string(not(containsString("sin carpeta de fotos"))));
     }
 
     @Test

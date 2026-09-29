@@ -27,6 +27,11 @@ public class AmiCorte implements ClienteCorte {
         List<LineaCorte> lineas = AmiPedidoExcel.desdeBytes(excel).lineasConCantidad().stream()
                 .map(linea -> new LineaCorte(linea.referencia(), linea.color(), linea.cantidad()))
                 .toList();
-        return PedidoCorte.agrupar(lineas, ReferenciaCorte::deAmi);
+        return PedidoCorte.agrupar(lineas, this::partir);
+    }
+
+    @Override
+    public ReferenciaCorte partir(String referencia) {
+        return ReferenciaCorte.deAmi(referencia);
     }
 }

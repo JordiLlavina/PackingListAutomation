@@ -42,12 +42,12 @@ import com.puntotres.packinglist.service.corte.DocumentosCorteService;
 import com.puntotres.packinglist.service.corte.FilaCorte;
 import com.puntotres.packinglist.service.corte.FotoModelo;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
-import com.puntotres.packinglist.service.corte.LectorZipFotos;
+import com.puntotres.packinglist.service.corte.LectorFotos;
 import com.puntotres.packinglist.service.corte.PedidoCorte;
 import com.puntotres.packinglist.service.corte.ResultadoCorte;
 
 /**
- * Documentos del Corte, en tres pantallas: entrada (cliente, temporada y zip
+ * Documentos del Corte, en tres pantallas: entrada (cliente, temporada y fotos
  * de fotos) → tabla de pieles → descargas.
  *
  * La conversión de las fotos arranca al cargar y trabaja en segundo plano
@@ -110,6 +110,7 @@ public class DocumentosCorteController {
                          @RequestParam(required = false) String temporada,
                          @RequestParam(required = false) MultipartFile pedido,
                          @RequestParam(required = false) MultipartFile fotos,
+                         @RequestParam(required = false) List<MultipartFile> carpeta,
                          RedirectAttributes redirect) {
         ClienteCorte clienteCorte = servicio.clientePara(cliente).orElse(null);
         if (clienteCorte == null) {
@@ -132,8 +133,17 @@ public class DocumentosCorteController {
         if (nombreTemporada.isBlank()) {
             return error(redirect, "Falta el nombre de la temporada");
         }
-        if (fotos == null || fotos.isEmpty()) {
-            return error(redirect, "Falta el zip con las fotos de la temporada");
+        boolean conZip = fotos != null && !fotos.isEmpty();
+        // Un selector de carpeta sin elegir manda igual una parte sin nombre.
+        List<MultipartFile> ficheros = carpeta == null ? List.of() : carpeta.stream()
+                .filter(fichero -> fichero.getOriginalFilename() != null
+                        && !fichero.getOriginalFilename().isBlank())
+                .toList();
+        if (!conZip && ficheros.isEmpty()) {
+            return error(redirect, "Falta la carpeta de fotos de la temporada (tal cual o en zip)");
+        }
+        if (conZip && !ficheros.isEmpty()) {
+            return error(redirect, "Sube la carpeta de fotos o su zip, no los dos");
         }
 
         PedidoCorte pedidoCorte;
@@ -154,23 +164,24 @@ public class DocumentosCorteController {
         Path directorio = null;
         try {
             directorio = Files.createTempDirectory(CorteEnCurso.PREFIJO_DIRECTORIO);
-            Path zip = directorio.resolve("temporada.zip");
-            fotos.transferTo(zip);
-            FotosTemporada leidas;
-            try {
-                leidas = new LectorZipFotos().leer(zip, pedidoCorte.modelos(), directorio);
-            } finally {
-                Files.deleteIfExists(zip);
-            }
+            FotosTemporada leidas = conZip
+                    ? leerZip(fotos, pedidoCorte, clienteCorte, directorio)
+                    : new LectorFotos().leer(ficheros.stream()
+                            .map(fichero -> new LectorFotos.Fichero(fichero.getOriginalFilename(),
+                                    fichero::getInputStream))
+                            .toList(), pedidoCorte.modelos(), clienteCorte::partir, directorio);
             ConversionFotos conversion = conversor.convertir(leidas.todas(), directorio);
+            List<String> avisos = new ArrayList<>(pedidoCorte.avisos());
+            avisos.addAll(leidas.avisos());
             enCurso.cargar(clienteCorte.clave(), nombreDe(clienteCorte.clave()), nombreTemporada,
-                    directorio, pedidoCorte, leidas, conversion, avisosDeCarga(pedidoCorte, leidas));
+                    directorio, pedidoCorte, leidas, conversion, avisos);
         } catch (IllegalArgumentException e) {
             CorteEnCurso.borrar(directorio);
-            return error(redirect, "No se pudo usar el zip de fotos: " + e.getMessage());
+            return error(redirect, "No se pudo usar la carpeta de fotos: " + e.getMessage());
         } catch (IOException e) {
             CorteEnCurso.borrar(directorio);
-            return error(redirect, "No se pudo abrir el zip de fotos: ¿es un fichero .zip?");
+            return error(redirect, conZip ? "No se pudo abrir el zip de fotos: ¿es un fichero .zip?"
+                    : "No se pudieron leer las fotos de la carpeta: vuelve a elegirla");
         }
 
         for (FilaCorte fila : enCurso.getFilas()) {
@@ -402,15 +413,15 @@ public class DocumentosCorteController {
         return vista;
     }
 
-    private static List<String> avisosDeCarga(PedidoCorte pedido, FotosTemporada fotos) {
-        List<String> avisos = new ArrayList<>(pedido.avisos());
-        avisos.addAll(fotos.avisos());
-        List<String> sinFotos = fotos.modelosSinFotos(pedido.modelos());
-        if (!sinFotos.isEmpty()) {
-            avisos.add("Modelos del pedido sin carpeta de fotos (su orden de corte sale sin foto y "
-                    + "no llevan Word de fotos): " + String.join(", ", sinFotos));
+    private static FotosTemporada leerZip(MultipartFile fotos, PedidoCorte pedido, ClienteCorte cliente,
+                                          Path directorio) throws IOException {
+        Path zip = directorio.resolve("temporada.zip");
+        fotos.transferTo(zip);
+        try {
+            return new LectorFotos().leer(zip, pedido.modelos(), cliente::partir, directorio);
+        } finally {
+            Files.deleteIfExists(zip);
         }
-        return avisos;
     }
 
     private Map<String, OpcionCliente> opcionesDeCliente() {

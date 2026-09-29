@@ -18,4 +18,11 @@ public interface ClienteCorte {
      * no es el pedido de este cliente.
      */
     PedidoCorte leerPedido(byte[] excel) throws IOException;
+
+    /**
+     * Parte una referencia en modelo y piel con la regla del cliente. La usa
+     * también la lectura de las fotos: una carpeta "ULL027.AL103" es el modelo
+     * ULL027.
+     */
+    ReferenciaCorte partir(String referencia);
 }

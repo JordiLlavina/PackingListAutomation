@@ -207,3 +207,12 @@ packing-list:
       plantilla: GENERIC
       nombre-legal: SONIA RYKIEL INTERNATIONAL
       direccion-entrega: BLECKMANN - TRB INTERNATIONAL; INDUSTRIEWEG 38C; QUAI B12; 2280 GROBBENDONK, BELGIUM
+
+# La carpeta de fotos del corte también se puede subir sin comprimir, y
+# entonces el navegador manda una parte por foto. Tomcat solo admite 10 por
+# petición: una carpeta real se cortaba sin llegar a la aplicación. El tope
+# va un poco por encima de los 5.000 ficheros de LectorFotos, que es quien
+# lo dice con un mensaje.
+server:
+  tomcat:
+    max-part-count: 5100
