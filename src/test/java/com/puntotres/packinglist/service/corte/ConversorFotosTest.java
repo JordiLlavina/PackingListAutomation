@@ -69,6 +69,24 @@ class ConversorFotosTest {
     }
 
     @Test
+    void losOriginalesSeBorranAlAcabarConEllosYSeQuedanLosReducidos() throws Exception {
+        // Una temporada de fotos de 24 MP son cientos de megas: sin esto el
+        // directorio de la sesión guardaba originales y reducidas a la vez
+        // mientras se rellenaba la tabla, que puede ser media hora.
+        FotoModelo buena = foto("ULL027", "a.jpg", "00001.jpg", FotosDePrueba.jpeg(300, 200, Color.GRAY));
+        FotoModelo rota = foto("ULL027", "b.jpg", "00002.jpg",
+                "no soy un jpeg".getBytes(StandardCharsets.UTF_8));
+
+        ConversionFotos conversion = new ConversorFotos(new DecodificadorHeicJava(), null)
+                .convertir(List.of(buena, rota), dir);
+        conversion.esperar();
+
+        assertTrue(Files.notExists(buena.original()));
+        assertTrue(Files.notExists(rota.original()));
+        assertTrue(Files.exists(conversion.reducida(buena).orElseThrow()));
+    }
+
+    @Test
     void sinFotosTerminaEnseguida() throws Exception {
         ConversionFotos conversion = new ConversorFotos(new DecodificadorHeicJava(), null)
                 .convertir(List.of(), dir);

@@ -1,6 +1,8 @@
 package com.puntotres.packinglist.service.corte;
 
 import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -104,6 +106,7 @@ public final class ConversionFotos {
     /** Una foto que ha convertido otro camino (Windows) y ya está en disco. */
     void anotar(FotoModelo foto, Path salida) {
         reducidas.put(foto.original(), salida);
+        descartarOriginal(foto);
         hechas.incrementAndGet();
     }
 
@@ -128,7 +131,23 @@ public final class ConversionFotos {
                         + " no se ha podido leer (" + explicar(e) + "): no sale en los documentos");
             }
         } finally {
+            descartarOriginal(foto);
             hechas.incrementAndGet();
+        }
+    }
+
+    /**
+     * El original ya no hace falta en cuanto se ha convertido o se ha dado
+     * por ilegible en su último intento: una temporada de fotos de 24 MP son
+     * cientos de megas, y guardarlos junto a las reducidas mientras se
+     * rellena la tabla duplicaba el disco. Un fallo al borrar no importa: el
+     * directorio entero se borra al acabar la sesión.
+     */
+    private static void descartarOriginal(FotoModelo foto) {
+        try {
+            Files.deleteIfExists(foto.original());
+        } catch (IOException e) {
+            // Se queda hasta que se borre el directorio de la sesión.
         }
     }
 
