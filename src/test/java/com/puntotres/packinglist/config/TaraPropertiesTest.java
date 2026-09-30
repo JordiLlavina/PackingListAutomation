@@ -66,4 +66,46 @@ class TaraPropertiesTest {
         assertTrue(props.taraPara("60x40x40").isEmpty());
         assertEquals(1.2, props.taraPara("60x40x30").get());
     }
+
+    @Test
+    void sinSeparadoresConfiguradosLaTaraEsSoloElCarton() {
+        TaraProperties props = new TaraProperties();
+        props.setTaras(Map.of("60x40x40", 1.6));
+
+        assertEquals(0.0, props.pesoSeparadoresKg());
+        assertEquals(1.6, props.taraPara("60x40x40").get());
+    }
+
+    /**
+     * Dentro de cada caja van separadores de cartón y pesan, así que son tara
+     * igual que el cartón. Los dos números van por separado —cuántos y lo que
+     * pesa uno— porque lo que se pone en la báscula es UNO.
+     */
+    @Test
+    void laTaraLlevaLosSeparadoresYElCartonSeSigueLeyendoSolo() {
+        TaraProperties props = new TaraProperties();
+        props.setTaras(Map.of("60x40x40", 1.6));
+        TaraProperties.SeparadoresCarton separadores = new TaraProperties.SeparadoresCarton();
+        separadores.setPorCaja(2);
+        separadores.setPesoKg(0.08);
+        props.setSeparadoresCarton(separadores);
+
+        assertEquals(2 * 0.08, props.pesoSeparadoresKg(), 0.0001);
+        assertEquals(1.6 + 2 * 0.08, props.taraPara(" 60X40X40 ").orElseThrow(), 0.0001);
+        // El cartón sigue siendo consultable solo: es lo que se teclea en /taras.
+        assertEquals(1.6, props.taraCartonPara("60x40x40").orElseThrow());
+    }
+
+    @Test
+    void unTamanoQueNoEstaNoSeInventaNiConSeparadores() {
+        TaraProperties props = new TaraProperties();
+        props.setTaras(Map.of("60x40x40", 1.6));
+        TaraProperties.SeparadoresCarton separadores = new TaraProperties.SeparadoresCarton();
+        separadores.setPorCaja(2);
+        separadores.setPesoKg(0.08);
+        props.setSeparadoresCarton(separadores);
+
+        // Sin cartón no hay caja que pesar: los separadores solos no son tara.
+        assertTrue(props.taraPara("99x99x99").isEmpty());
+    }
 }

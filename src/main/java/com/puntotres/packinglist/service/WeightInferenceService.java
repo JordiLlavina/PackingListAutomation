@@ -17,9 +17,11 @@ import com.puntotres.packinglist.model.CajaFisica;
 
 /**
  * Completa los pesos que faltan a partir de las cajas con algún peso
- * conocido de la misma referencia y de la tabla de taras por tamaño de caja
- * ({@link CatalogoTaras}: el yml siembra la tabla y la pantalla /taras la
- * corrige a medida que se pesa cada cartón).
+ * conocido de la misma referencia y de la tara de su tamaño de caja
+ * ({@link CatalogoTaras}: el yml siembra la tabla de cartones y la pantalla
+ * /taras la corrige a medida que se pesa cada uno). La tara que se suma y se
+ * resta es la del EMBALAJE entero —el cartón más los separadores que van
+ * dentro de cada caja—; de juntar los dos se encarga el propio catálogo.
  *
  * La unidad de peso es la CAJA FÍSICA ({@link CajaFisica}): una caja puede
  * ocupar varias líneas (tallas, colores, referencias) pero se pesa una sola
@@ -110,7 +112,9 @@ public class WeightInferenceService {
      * Completa los pesos de UNA caja física, siempre sobre su línea líder:
      * con el bruto conocido solo falta el neto (bruto − tara); con el neto
      * conocido (tecleado a mano) se deriva el bruto; sin ninguno se estima
-     * el neto con el peso unitario de cada línea y se le suma UNA tara.
+     * el neto con el peso unitario de cada línea y se le suma UNA tara. Una,
+     * porque el cartón y sus separadores son los de la caja y no los de cada
+     * línea que lleve dentro.
      */
     private void completarPesos(CajaFisica caja, Map<String, Double> unitarioPorReferencia,
                                 Set<String> tamanosSinTara) {

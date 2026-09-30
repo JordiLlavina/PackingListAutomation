@@ -275,6 +275,44 @@ class WeightInferenceServiceTest {
      */
     private static int siguienteNumeroCaja = 1;
 
+    /**
+     * Dentro de cada caja van además dos separadores de cartón, y pesan. Su
+     * peso es tara igual que el del cartón: sin contarlo, el neto de una caja
+     * pesada sale 0,16 kg de más —mercancía que no existe— y el bruto de una
+     * caja con el neto tecleado sale 0,16 kg de menos que lo que se va a subir
+     * al camión.
+     *
+     * Los separadores se declaran aquí, como las taras, y los esperados se
+     * calculan con ellos en vez de escribirse a pelo: lo que pesa un separador
+     * es un dato del almacén y se corrige cuando se vuelve a pesar.
+     */
+    @Test
+    void losSeparadoresDeCartonSonTaraEnLosDosSentidos() {
+        TaraProperties conSeparadores = taras();
+        TaraProperties.SeparadoresCarton separadores = new TaraProperties.SeparadoresCarton();
+        separadores.setPorCaja(2);
+        separadores.setPesoKg(0.08);
+        conSeparadores.setSeparadoresCarton(separadores);
+        double tara = conSeparadores.taraPara("60x40x40").orElseThrow();
+        assertEquals(1.6 + 2 * 0.08, tara, 0.0001, "cartón más los dos separadores");
+
+        WeightInferenceService servicio = new WeightInferenceService(conSeparadores);
+        CajaData delBruto = caja("60x40x40", 20, 21.6);
+        CajaData delNeto = caja("60x40x40", 20, null);
+        delNeto.setPesoNetoKg(20.0);
+
+        servicio.inferirPesosDelEnvio(List.of(List.of(delBruto), List.of(delNeto)));
+
+        assertEquals(redondeo(21.6 - tara), delBruto.getPesoNetoKg(),
+                "del bruto se quita el embalaje entero");
+        assertEquals(redondeo(20.0 + tara), delNeto.getPesoBrutoKg(),
+                "y al neto se le pone entero");
+    }
+
+    private static double redondeo(double valor) {
+        return Math.round(valor * 100.0) / 100.0;
+    }
+
     private static CajaData caja(String tamano, int cantidad, Double pesoBruto) {
         CajaData caja = new CajaData();
         caja.setNumeroCaja(siguienteNumeroCaja++);

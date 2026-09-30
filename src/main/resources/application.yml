@@ -36,7 +36,9 @@ spring:
             paths: /**
 
 #
-# Taras conocidas (kg de embalaje vacío) por tamaño de caja "LxWxH" en cm.
+# Taras conocidas: lo que pesa el CARTÓN vacío (kg) de cada tamaño de caja
+# "LxWxH" en cm. No es toda la tara de la caja: a esto se le suman los
+# separadores de más abajo.
 # Para soportar un tamaño nuevo basta con añadirlo aquí; las claves van
 # entre [] y comillas para que Spring las respete tal cual.
 packing-list:
@@ -44,8 +46,28 @@ packing-list:
     "[60x40x51]": 0.01
     "[60x40x45]": 1.08
     "[60x40x40]": 1.06
-    "[60x40x30]": 0.01
+    "[70x60x20]": 1.18
+    "[60x40x30]": 0.88
+    "[60x40x20]": 0.8
     "[40x30x20]": 0.78
+
+  # Los separadores de cartón que van DENTRO de cada caja, sea del tamaño que
+  # sea. Se suman a la tara del cartón para pasar de peso neto a bruto y al
+  # revés, así que cuentan en la inferencia de la revisión, en los pesos que se
+  # recuerdan del taller y en el escalado de las cajas que van a medias.
+  #
+  # Van los dos números por separado porque lo que se pesa es UN separador: con
+  # el total ya multiplicado, pasar de dos a tres obligaría a rehacer la cuenta
+  # a mano y el yml dejaría de decir de dónde sale el número. Cero separadores
+  # (o peso 0) es lo que hacía el programa antes de contarlos.
+  #
+  # A diferencia de las taras, esto NO está en la base de datos ni se edita en
+  # /taras: no es una tabla que crezca con tamaños nuevos, es un número que
+  # vale para todas las cajas. Cambiarlo pide recompilar o editar el yml del
+  # jar.
+  separadores-carton:
+    por-caja: 2
+    peso-kg: 0.08
 
   # Reglas de la entrada por packing list de taller: cómo se reparte lo que
   # llega y cómo se llenan cajas y palets. El packing del taller no se

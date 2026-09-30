@@ -49,10 +49,17 @@ import com.puntotres.packinglist.testutil.PedidoAmiExcel;
  * una constante del programa; que se enlaza bien lo comprueba
  * PackingListApplicationTest. Los demás tamaños del yml siguen ahí: esto
  * solo sobrescribe el peso de estos dos, y "99x99x99" sigue sin tara.
+ *
+ * Por el mismo motivo se ponen a cero los separadores de cartón, que en el
+ * yml suman 0,16 kg a la tara de cada caja: aquí la tara tiene que ser el
+ * número escrito arriba y nada más, para que los pesos esperados se puedan
+ * leer. Que los separadores cuentan lo comprueban WeightInferenceServiceTest
+ * y CatalogoTarasJpaTest.
  */
 @SpringBootTest(properties = {
         "packing-list.taras.[60x40x40]=0.6",
-        "packing-list.taras.[60x40x30]=0.2"})
+        "packing-list.taras.[60x40x30]=0.2",
+        "packing-list.separadores-carton.por-caja=0"})
 @AutoConfigureMockMvc
 class PackingListControllerTest {
 

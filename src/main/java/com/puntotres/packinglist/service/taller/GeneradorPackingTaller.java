@@ -221,8 +221,8 @@ public class GeneradorPackingTaller {
      *
      * Lo que se teclea en la pantalla de ajuste es lo que pesa <em>una caja
      * llena</em>. Una caja llena se lo lleva tal cual; una que va a medias se
-     * calcula escalando <b>solo la mercancía</b>, porque el cartón pesa igual
-     * vaya lleno o a medias:
+     * calcula escalando <b>solo la mercancía</b>, porque el embalaje pesa igual
+     * vaya lleno o a medias —el cartón y sus separadores van los mismos—:
      *
      * <pre>peso = tara + (pesoDeclarado − tara) × unidades / unidadesPorCaja</pre>
      *

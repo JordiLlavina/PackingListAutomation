@@ -36,11 +36,21 @@ public class CatalogoTarasJpa implements CatalogoTaras {
     }
 
     @Override
-    public Optional<Double> taraPara(String tamanoCaja) {
+    public Optional<Double> taraCartonPara(String tamanoCaja) {
         if (tamanoCaja == null) {
             return Optional.empty();
         }
         return repositorio.findById(CatalogoTaras.normalizar(tamanoCaja)).map(TaraCaja::getTaraKg);
+    }
+
+    /**
+     * Los separadores no están en la tabla: no son una tabla, son un número que
+     * vale para todas las cajas, así que se siguen leyendo del yml. Por eso la
+     * semilla se consulta también con la tabla ya llena.
+     */
+    @Override
+    public double pesoSeparadoresKg() {
+        return semilla.pesoSeparadoresKg();
     }
 
     @Override

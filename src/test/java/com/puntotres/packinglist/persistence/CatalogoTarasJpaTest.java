@@ -38,7 +38,7 @@ class CatalogoTarasJpaTest {
     void loGuardadoManda() {
         catalogo.guardar("99x99x99", 3.5);
 
-        assertEquals(3.5, catalogo.taraPara(" 99X99X99 ").orElseThrow());
+        assertEquals(3.5, catalogo.taraCartonPara(" 99X99X99 ").orElseThrow());
         assertTrue(catalogo.tamanosDeMayorAMenor().contains("99x99x99"));
     }
 
@@ -47,15 +47,18 @@ class CatalogoTarasJpaTest {
         catalogo.guardar("98x98x98", 1.0);
         catalogo.guardar("98x98x98", 2.5);
 
-        assertEquals(2.5, catalogo.taraPara("98x98x98").orElseThrow());
+        assertEquals(2.5, catalogo.taraCartonPara("98x98x98").orElseThrow());
         assertEquals(1, catalogo.todas().stream()
                 .filter(t -> t.getMedida().equals("98x98x98")).count());
     }
 
     @Test
     void unTamanoQueNoEstaNoSeInventa() {
+        assertTrue(catalogo.taraCartonPara("11x11x11").isEmpty());
         assertTrue(catalogo.taraPara("11x11x11").isEmpty());
-        assertTrue(catalogo.taraPara(null).isEmpty());
+        assertTrue(catalogo.taraCartonPara(null).isEmpty());
+        assertTrue(catalogo.taraPara(null).isEmpty(),
+                "sin cartón no hay tara, aunque los separadores sí se conozcan");
     }
 
     @Test
@@ -68,5 +71,23 @@ class CatalogoTarasJpaTest {
         assertTrue(tamanos.indexOf("100x40x40") < tamanos.indexOf("40x30x20"),
                 "el orden es por volumen; como texto '100x40x40' iría antes igualmente, "
                         + "pero '40x30x20' iría antes que '60x40x40' y sería falso");
+    }
+
+    /**
+     * Los separadores viven en el yml y no en la tabla, así que este catálogo
+     * podría perfectamente olvidarse de sumarlos: la tabla le da el cartón y la
+     * suma está en la interfaz. Si se olvidara, la misma caja pesaría distinto
+     * en la aplicación arrancada que en Main.java o en los tests unitarios.
+     */
+    @Test
+    void laTaraDeLaAplicacionArrancadaLlevaLosSeparadoresPuestos() {
+        catalogo.guardar("97x97x97", 1.0);
+
+        assertEquals(semilla.pesoSeparadoresKg(), catalogo.pesoSeparadoresKg(),
+                "los separadores salen del yml, que es su único origen");
+        assertEquals(1.0 + semilla.pesoSeparadoresKg(),
+                catalogo.taraPara("97x97x97").orElseThrow(), 0.0001);
+        assertEquals(1.0, catalogo.taraCartonPara("97x97x97").orElseThrow(),
+                "y el cartón se sigue leyendo solo, que es lo que se teclea en /taras");
     }
 }

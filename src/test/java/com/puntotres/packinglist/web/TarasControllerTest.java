@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.puntotres.packinglist.config.TaraProperties;
 import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
 
 /**
@@ -33,6 +34,9 @@ class TarasControllerTest {
     @Autowired
     private CatalogoTarasJpa catalogo;
 
+    @Autowired
+    private TaraProperties configuracion;
+
     @Test
     void laPantallaListaLasTarasConocidas() throws Exception {
         catalogo.guardar("77x77x77", 2.0);
@@ -49,7 +53,7 @@ class TarasControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/taras"));
 
-        assertEquals(0.9, catalogo.taraPara("50x30x20").orElseThrow());
+        assertEquals(0.9, catalogo.taraCartonPara("50x30x20").orElseThrow());
     }
 
     @Test
@@ -58,7 +62,7 @@ class TarasControllerTest {
 
         mvc.perform(post("/taras").param("medida", "55x35x25").param("taraKg", "1.4"));
 
-        assertEquals(1.4, catalogo.taraPara("55x35x25").orElseThrow());
+        assertEquals(1.4, catalogo.taraCartonPara("55x35x25").orElseThrow());
     }
 
     @Test
@@ -66,7 +70,7 @@ class TarasControllerTest {
         mvc.perform(post("/taras").param("medida", "grande").param("taraKg", "1.0"))
                 .andExpect(redirectedUrl("/taras"));
 
-        assertTrue(catalogo.taraPara("grande").isEmpty(),
+        assertTrue(catalogo.taraCartonPara("grande").isEmpty(),
                 "una medida que no es LxAnchoxAlto no sirve para calcular volumen ni altura");
     }
 
@@ -74,6 +78,28 @@ class TarasControllerTest {
     void unPesoNegativoNoEntraEnElCatalogo() throws Exception {
         mvc.perform(post("/taras").param("medida", "44x33x22").param("taraKg", "-1"));
 
-        assertTrue(catalogo.taraPara("44x33x22").isEmpty());
+        assertTrue(catalogo.taraCartonPara("44x33x22").isEmpty());
+    }
+
+    /**
+     * En la pantalla se teclea el cartón, pero la cuenta que se hace después le
+     * suma los separadores. Si no lo dijera, quien vea un cartón de 1,06 y un
+     * bruto 1,22 por encima del neto no tendría de dónde sacar la diferencia y
+     * pensaría que la tara está mal tecleada.
+     *
+     * Los números se leen de la configuración y no se fijan aquí: lo que pesa
+     * un separador es un dato del almacén, igual que la tara, y se corrige
+     * cuando se vuelve a pesar.
+     */
+    @Test
+    void laPantallaDiceQueAdemasSeSumanLosSeparadores() throws Exception {
+        mvc.perform(get("/taras"))
+                .andExpect(status().isOk())
+                .andExpect(model().attribute("separadoresPorCaja",
+                        configuracion.getSeparadoresCarton().getPorCaja()))
+                .andExpect(model().attribute("pesoSeparadorKg",
+                        configuracion.getSeparadoresCarton().getPesoKg()))
+                .andExpect(model().attribute("pesoSeparadoresKg", catalogo.pesoSeparadoresKg()))
+                .andExpect(content().string(containsString("separadores")));
     }
 }

@@ -41,6 +41,12 @@ public class Main {
         // Servicios cableados a mano (fuera de Spring) para la prueba manual.
         TaraProperties taras = new TaraProperties();
         taras.setTaras(Map.of("60x40x40", 1.6, "60x40x30", 1.2));
+        // Los separadores se ponen a mano porque aquí no hay yml que enlazar, y
+        // sin ellos esta prueba daría pesos distintos a los de la aplicación.
+        TaraProperties.SeparadoresCarton separadores = new TaraProperties.SeparadoresCarton();
+        separadores.setPorCaja(2);
+        separadores.setPesoKg(0.08);
+        taras.setSeparadoresCarton(separadores);
         EnvioImportService importador = new EnvioImportService();
         PaletAssignmentService asignadorPalets = new PaletAssignmentService();
         WeightInferenceService inferidorPesos = new WeightInferenceService(taras);

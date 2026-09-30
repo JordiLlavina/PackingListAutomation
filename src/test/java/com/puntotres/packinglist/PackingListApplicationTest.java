@@ -19,7 +19,7 @@ import com.puntotres.packinglist.config.TipoPlantilla;
 /**
  * Levanta el contexto real de Spring y comprueba que application.yml se
  * enlaza en las properties: la tabla de taras (incluida la normalización
- * de claves) y el catálogo de clientes.
+ * de claves), los separadores de cartón y el catálogo de clientes.
  */
 @SpringBootTest
 class PackingListApplicationTest {
@@ -50,6 +50,30 @@ class PackingListApplicationTest {
         assertEquals(tara, taras.taraPara(" " + tamano.toUpperCase() + " "));
 
         assertTrue(taras.taraPara("99x99x99").isEmpty(), "un tamaño que no está no se inventa");
+    }
+
+    /**
+     * Los separadores de cartón que van dentro de cada caja se enlazan del yml
+     * y forman parte de la tara, igual que el cartón. No se comprueba cuántos
+     * son ni cuánto pesan —también es dato del almacén— sino que están y que el
+     * catálogo los suma: si el bloque del yml se renombrara, pesoSeparadoresKg
+     * pasaría a valer 0 y todos los brutos del programa bajarían 0,16 kg sin
+     * que nada fallara.
+     */
+    @Test
+    void cargaLosSeparadoresDeCartonDesdeApplicationYml() {
+        assertTrue(taras.getSeparadoresCarton().getPorCaja() > 0,
+                "application.yml debe decir cuántos separadores lleva una caja");
+        assertTrue(taras.getSeparadoresCarton().getPesoKg() > 0,
+                "y lo que pesa uno");
+        assertEquals(taras.getSeparadoresCarton().getPorCaja()
+                        * taras.getSeparadoresCarton().getPesoKg(),
+                taras.pesoSeparadoresKg(), 0.0001);
+
+        String tamano = taras.tamanosDeMayorAMenor().get(0);
+        assertEquals(taras.taraCartonPara(tamano).orElseThrow() + taras.pesoSeparadoresKg(),
+                taras.taraPara(tamano).orElseThrow(), 0.0001,
+                "la tara de una caja es el cartón más sus separadores");
     }
 
     @Test

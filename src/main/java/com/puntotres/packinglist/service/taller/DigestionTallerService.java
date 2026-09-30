@@ -630,21 +630,23 @@ public class DigestionTallerService {
         }
     }
 
-    /** Lo que pesa la mercancía de una caja llena, quitándole el cartón. */
+    /** Lo que pesa la mercancía de una caja llena, quitándole el embalaje. */
     private Double netoDe(Double pesoBrutoKg, String medidaCaja) {
         return conTara(medidaCaja, pesoBrutoKg, (peso, tara) -> peso - tara);
     }
 
-    /** Lo contrario: el bruto que se enseña en pantalla, con el cartón puesto. */
+    /** Lo contrario: el bruto que se enseña en pantalla, con el embalaje puesto. */
     private Double brutoDe(Double pesoNetoKg, String medidaCaja) {
         return conTara(medidaCaja, pesoNetoKg, (peso, tara) -> peso + tara);
     }
 
     /**
-     * Aplica la tara del cartón a un peso, o devuelve null si falta alguno de
-     * los dos o si la cuenta no da un peso positivo. Un cero o un negativo
-     * significa que el peso tecleado no llega ni a lo que pesa el cartón
-     * vacío, o sea que está mal: no se guarda ni se enseña.
+     * Aplica la tara a un peso, o devuelve null si falta alguno de los dos o si
+     * la cuenta no da un peso positivo. La tara es el embalaje entero —el
+     * cartón y los separadores que van dentro—, y la suma la hace
+     * {@code CatalogoTaras.taraPara}. Un cero o un negativo significa que el
+     * peso tecleado no llega ni a lo que pesa el embalaje vacío, o sea que está
+     * mal: no se guarda ni se enseña.
      */
     private Double conTara(String medidaCaja, Double peso,
                            java.util.function.DoubleBinaryOperator operacion) {

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import com.puntotres.packinglist.config.TaraProperties;
 import com.puntotres.packinglist.model.MedidaCaja;
 import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
 
@@ -18,19 +19,33 @@ import com.puntotres.packinglist.persistence.CatalogoTarasJpa;
  * programa: entran tamaños nuevos y los pesos se corrigen a medida que se
  * pesa cada cartón. Sin esta pantalla, haber movido la tabla del yml a la
  * base de datos habría empeorado las cosas.
+ *
+ * Lo que se teclea aquí es SOLO el cartón, que es lo que se pone en la
+ * báscula; los separadores que van dentro de la caja los suma el catálogo y
+ * esta pantalla se limita a decirlos.
  */
 @Controller
 public class TarasController {
 
     private final CatalogoTarasJpa catalogo;
 
-    public TarasController(CatalogoTarasJpa catalogo) {
+    // Los separadores no están en la tabla (son un número, no una tabla), así
+    // que se leen del yml y solo para poder DECIRLOS en la pantalla: quien vea
+    // que un cartón pesa 1,06 y que el bruto sale 1,22 por encima del neto no
+    // tiene de dónde sacar la diferencia.
+    private final TaraProperties configuracion;
+
+    public TarasController(CatalogoTarasJpa catalogo, TaraProperties configuracion) {
         this.catalogo = catalogo;
+        this.configuracion = configuracion;
     }
 
     @GetMapping("/taras")
     public String taras(Model model) {
         model.addAttribute("taras", catalogo.todas());
+        model.addAttribute("separadoresPorCaja", configuracion.getSeparadoresCarton().getPorCaja());
+        model.addAttribute("pesoSeparadorKg", configuracion.getSeparadoresCarton().getPesoKg());
+        model.addAttribute("pesoSeparadoresKg", catalogo.pesoSeparadoresKg());
         return "taras";
     }
 
