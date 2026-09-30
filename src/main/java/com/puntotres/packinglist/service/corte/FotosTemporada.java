@@ -18,6 +18,14 @@ public record FotosTemporada(Map<String, List<FotoModelo>> porModelo, List<Strin
         avisos = List.copyOf(avisos);
     }
 
+    /**
+     * Ninguna foto: la carpeta de fotos es opcional y, sin ella, salen las
+     * órdenes de corte con el hueco de la foto en blanco y ningún Word de fotos.
+     */
+    public static FotosTemporada vacia() {
+        return new FotosTemporada(Map.of(), List.of());
+    }
+
     /** Las fotos de un modelo, o ninguna. La foto es del modelo: vale para todas sus pieles. */
     public List<FotoModelo> de(String modelo) {
         return porModelo.getOrDefault(ReferenciaCorte.normalizar(modelo), List.of());

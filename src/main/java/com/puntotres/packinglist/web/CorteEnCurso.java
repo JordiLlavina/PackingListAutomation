@@ -42,6 +42,13 @@ public class CorteEnCurso {
     private Path directorio;
     private FotosTemporada fotos;
     private ConversionFotos conversion;
+    /**
+     * No se ha subido carpeta ni zip de fotos. Se guarda en vez de mirar si
+     * {@code fotos} está vacío porque no es lo mismo: unas fotos subidas que
+     * no caen en ningún modelo también dejan el envío sin ninguna, y de eso ya
+     * avisa el lector diciendo qué carpeta no ha reconocido.
+     */
+    private boolean sinFotos;
     private final List<FilaCorte> filas = new ArrayList<>();
     private int columnasCombinacion;
     private final List<String> avisosCarga = new ArrayList<>();
@@ -59,7 +66,8 @@ public class CorteEnCurso {
      */
     public synchronized void cargar(String claveCliente, String nombreCliente, String temporada,
                                     Path directorio, PedidoCorte pedido, FotosTemporada fotos,
-                                    ConversionFotos conversion, List<String> avisos) {
+                                    ConversionFotos conversion, boolean sinFotos,
+                                    List<String> avisos) {
         if (this.conversion != null && this.conversion != conversion) {
             this.conversion.cancelar();
         }
@@ -72,6 +80,7 @@ public class CorteEnCurso {
         this.directorio = directorio;
         this.fotos = fotos;
         this.conversion = conversion;
+        this.sinFotos = sinFotos;
         filas.clear();
         for (ArticuloCorte articulo : pedido.articulos()) {
             filas.add(new FilaCorte(articulo));
@@ -106,6 +115,7 @@ public class CorteEnCurso {
         directorio = null;
         fotos = null;
         conversion = null;
+        sinFotos = false;
         filas.clear();
         columnasCombinacion = 0;
         avisosCarga.clear();
@@ -140,6 +150,7 @@ public class CorteEnCurso {
     public String getTemporada() { return temporada; }
     public Path getDirectorio() { return directorio; }
     public FotosTemporada getFotos() { return fotos; }
+    public boolean isSinFotos() { return sinFotos; }
     public ConversionFotos getConversion() { return conversion; }
     public List<FilaCorte> getFilas() { return filas; }
     public int getColumnasCombinacion() { return columnasCombinacion; }

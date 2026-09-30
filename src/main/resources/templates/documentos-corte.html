@@ -59,7 +59,7 @@
       <div class="tarjeta isla-fotos">
         <div class="fila-fotos">
             <div>
-                <label for="carpeta">Carpeta de fotos de la temporada</label>
+                <label for="carpeta">Carpeta de fotos de la temporada (opcional)</label>
                 <input type="file" id="carpeta" name="carpeta" webkitdirectory multiple>
             </div>
             <div>
@@ -72,6 +72,9 @@
             subcarpetas, una por modelo. Cada subcarpeta debe tener la referencia completa o parcial
             del modelo (ULL712 o ULL712.AL0103, F67008 o PXCBC-F67008). Dentro de cada subcarpeta, pon
             las fotos del modelo.
+        </p>
+        <p class="ayuda">
+            Sin fotos salen solo las órdenes de corte, con el hueco de la foto en blanco.
         </p>
       </div>
 
@@ -141,13 +144,12 @@
 
             cliente.addEventListener('change', rellenar);
             guardada.addEventListener('change', aplicar);
-            document.getElementById('formCorte').addEventListener('submit', function (evento) {
-                if (!carpeta.files.length && !zip.files.length) {
-                    evento.preventDefault();
-                    alert('Elige la carpeta de fotos de la temporada o su zip');
-                    return;
+            // Las fotos son opcionales: sin ellas no hay nada que subir, así que
+            // tampoco se dice que se esté subiendo.
+            document.getElementById('formCorte').addEventListener('submit', function () {
+                if (carpeta.files.length || zip.files.length) {
+                    document.getElementById('avisoSubiendo').style.display = '';
                 }
-                document.getElementById('avisoSubiendo').style.display = '';
             });
             rellenar();
         })();

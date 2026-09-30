@@ -96,6 +96,9 @@ class DocumentosCorteControllerTest {
                 && islaFotos.contains("id=\"fotos\""), "carpeta y zip en la misma fila");
         assertTrue(islaFotos.contains("<strong>Estructura</strong>: Una carpeta con el nombre de la "
                 + "temporada"), islaFotos);
+        // Las fotos son opcionales y la pantalla lo dice antes de subir nada.
+        assertTrue(islaFotos.contains("Carpeta de fotos de la temporada (opcional)")
+                && islaFotos.contains("Sin fotos salen solo las órdenes de corte"), islaFotos);
     }
 
     @Test
@@ -105,15 +108,52 @@ class DocumentosCorteControllerTest {
                 .andExpect(flash().attribute("error", containsString("en desarrollo")));
     }
 
+    /**
+     * Las fotos son opcionales: sin ellas se pasa a la tabla, se genera solo el
+     * documento de órdenes de corte y las dos pantallas lo dicen a la vista, no
+     * dentro de los avisos plegables.
+     */
     @Test
-    void sinFotosNoPasa() throws Exception {
+    void sinFotosSeGeneraSoloElDocumentoDeOrdenes() throws Exception {
         mvc.perform(multipart("/documentos-corte/cargar")
                         .file(new MockMultipartFile("pedido", "pedido.xlsx", XLSX, pedidoAmi("ULL101")))
                         // Lo que manda el selector de carpeta cuando no se ha elegido ninguna.
                         .file(new MockMultipartFile("carpeta", "", "application/octet-stream", new byte[0]))
                         .param("cliente", "AMI").param("temporada", "H26").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
-                .andExpect(flash().attribute("error", containsString("carpeta de fotos")));
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(tabla.contains("id=\"avisoSinFotos\""), "la notificación de que no hay fotos");
+        assertTrue(tabla.contains("No se han adjuntado fotos, así que solo se genera el documento de "
+                + "órdenes de corte"), tabla.substring(tabla.indexOf("fila-progreso")));
+        assertTrue(!tabla.contains("id=\"progresoFotos\""), "sin fotos no hay progreso que enseñar");
+        // El botón de generar no se queda apagado esperando fotos que no hay.
+        assertTrue(!tabla.contains("id=\"botonGenerar\" disabled"), "el botón de generar, encendido");
+
+        mvc.perform(post("/documentos-corte/generar").session(sesion)
+                        .param("filas[0].nombrePiel", "Box calf")
+                        .param("filas[0].bolsos[0]", "10"))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        String resultados = mvc.perform(get("/documentos-corte/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(resultados.contains("id=\"avisoSinFotos\""), resultados);
+        assertTrue(resultados.contains("Ordenes de corte AMI H26.docx"), resultados);
+        assertTrue(resultados.contains("No se han adjuntado fotos de la temporada."),
+                resultados.substring(resultados.indexOf("Fotos de Artículo")));
+
+        byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
+                        .session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        assertEquals('P', word[0]);
+        assertEquals('K', word[1]);
+        // Ningún Word de fotos: el zip de fotos no existe.
+        mvc.perform(get("/documentos-corte/descargar-fotos").session(sesion))
+                .andExpect(status().isNotFound());
     }
 
     @Test

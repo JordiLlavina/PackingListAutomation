@@ -13,7 +13,14 @@
     <!-- El progreso de las fotos y, al otro extremo, marcar o desmarcar todas
          las filas: en gris, porque no es lo que se ha venido a hacer aquí. -->
     <div class="fila-progreso">
-        <p class="aviso-procesando" id="progresoFotos"
+        <!-- Sin carpeta de fotos no hay nada que preparar: en su sitio va la
+             notificación de lo que va a salir, a la vista y no en los avisos
+             plegables, porque cambia el documento que se está a punto de generar. -->
+        <div class="alerta" id="avisoSinFotos" th:if="${sinFotos}">
+            No se han adjuntado fotos, así que solo se genera el documento de órdenes de corte,
+            con el hueco de la foto en blanco y sin ningún Word de fotos.
+        </div>
+        <p class="aviso-procesando" id="progresoFotos" th:unless="${sinFotos}"
            th:attr="data-terminada=${fotosTerminadas}">
             <span id="textoProgreso"
                   th:text="${fotosTerminadas} ? |Fotos preparadas: ${fotosTotal}|
@@ -132,7 +139,8 @@
                     setTimeout(consultar, 5000);
                 });
             }
-            if (progreso.dataset.terminada !== 'true') {
+            // Sin fotos adjuntas no se pinta el progreso: no hay nada que consultar.
+            if (progreso && progreso.dataset.terminada !== 'true') {
                 setTimeout(consultar, 2000);
             }
 

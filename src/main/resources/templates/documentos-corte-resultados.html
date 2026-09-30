@@ -14,6 +14,13 @@
             <strong th:text="${#lists.size(fotos)}"></strong></li>
     </ul>
 
+    <!-- Lo primero y a la vista, no dentro de los avisos plegables: explica por
+         qué solo hay un documento y por qué las órdenes salen sin foto. -->
+    <div class="alerta" id="avisoSinFotos" th:if="${sinFotos}">
+        No se han adjuntado fotos, así que solo se ha generado el documento de órdenes de corte,
+        con el hueco de la foto en blanco.
+    </div>
+
     <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
         <summary th:text="|${#lists.size(avisos)} aviso(s)|"></summary>
         <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
@@ -49,7 +56,9 @@
          enseña: repetía el modelo que ya dice el contenido. -->
     <section class="tarjeta seccion-salida">
         <h3 class="titulo-seccion">📷 Fotos de Artículo</h3>
-        <p th:if="${#lists.isEmpty(fotos)}">Ningún modelo con bolsos ha traído fotos.</p>
+        <p th:if="${#lists.isEmpty(fotos)}"
+           th:text="${sinFotos} ? 'No se han adjuntado fotos de la temporada.'
+                    : 'Ningún modelo con bolsos ha traído fotos.'"></p>
         <table th:unless="${#lists.isEmpty(fotos)}">
             <thead>
             <tr>

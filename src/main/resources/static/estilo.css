@@ -1006,7 +1006,9 @@ main.ancho-completo { max-width: 96rem; }
 .tabla-pieles .c-incluir { text-align: center; width: 1%; }
 /* Progreso de las fotos a la izquierda y "marcar todas" en el extremo derecho. */
 .fila-progreso { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin: 0.5rem 0; }
-.fila-progreso .aviso-procesando, .fila-progreso .boton { margin: 0; }
+/* Sin fotos adjuntas, en el sitio del progreso va la notificación de que solo
+   saldrán las órdenes de corte: sin margen propio, como el progreso al que sustituye. */
+.fila-progreso .aviso-procesando, .fila-progreso .boton, .fila-progreso .alerta { margin: 0; }
 .tabla-pieles input.casilla-incluir { accent-color: var(--gris-fuerte); width: 1.1rem; height: 1.1rem; cursor: pointer; }
 .tabla-pieles tr.fila-excluida td { background: #eceef0; color: #9aa3ab; }
 .tabla-pieles tr.fila-excluida td:not(.c-incluir) > * { opacity: 0.55; }

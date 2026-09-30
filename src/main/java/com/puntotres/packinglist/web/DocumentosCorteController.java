@@ -52,8 +52,9 @@ import com.puntotres.packinglist.service.corte.ResultadoCorte;
  * La conversión de las fotos arranca al cargar y trabaja en segundo plano
  * mientras se rellena la tabla (un HEIC de 24 MP tarda segundos); generar
  * espera a que acabe. Lo único que bloquea es lo que impide empezar: sin
- * pedido legible o sin zip legible no hay nada que hacer. Todo lo demás son
- * avisos.
+ * pedido legible no hay nada que hacer. Todo lo demás son avisos, la carpeta
+ * de fotos incluida: sin ella salen las órdenes de corte sin imágenes, y se
+ * dice en la tabla y en las descargas.
  */
 @Controller
 public class DocumentosCorteController {
@@ -138,9 +139,11 @@ public class DocumentosCorteController {
                 .filter(fichero -> fichero.getOriginalFilename() != null
                         && !fichero.getOriginalFilename().isBlank())
                 .toList();
-        if (!conZip && ficheros.isEmpty()) {
-            return error(redirect, "Falta la carpeta de fotos de la temporada (tal cual o en zip)");
-        }
+        // Las fotos son OPCIONALES: sin ellas salen las órdenes de corte con el
+        // hueco de la foto en blanco, que es un documento que se puede llevar al
+        // puesto de corte. Se dice en la pantalla siguiente y en las descargas,
+        // porque una orden sin foto teniendo fotos del bolso sería un descuido.
+        boolean sinFotos = !conZip && ficheros.isEmpty();
         if (conZip && !ficheros.isEmpty()) {
             return error(redirect, "Sube la carpeta de fotos o su zip, no los dos");
         }
@@ -163,17 +166,22 @@ public class DocumentosCorteController {
         Path directorio = null;
         try {
             directorio = Files.createTempDirectory(CorteEnCurso.PREFIJO_DIRECTORIO);
-            FotosTemporada leidas = conZip
-                    ? leerZip(fotos, pedidoCorte, clienteCorte, directorio)
-                    : new LectorFotos().leer(ficheros.stream()
-                            .map(fichero -> new LectorFotos.Fichero(fichero.getOriginalFilename(),
-                                    fichero::getInputStream))
-                            .toList(), pedidoCorte.modelos(), clienteCorte::partir, directorio);
+            FotosTemporada leidas;
+            if (sinFotos) {
+                leidas = FotosTemporada.vacia();
+            } else if (conZip) {
+                leidas = leerZip(fotos, pedidoCorte, clienteCorte, directorio);
+            } else {
+                leidas = new LectorFotos().leer(ficheros.stream()
+                        .map(fichero -> new LectorFotos.Fichero(fichero.getOriginalFilename(),
+                                fichero::getInputStream))
+                        .toList(), pedidoCorte.modelos(), clienteCorte::partir, directorio);
+            }
             ConversionFotos conversion = conversor.convertir(leidas.todas(), directorio);
             List<String> avisos = new ArrayList<>(pedidoCorte.avisos());
             avisos.addAll(leidas.avisos());
             enCurso.cargar(clienteCorte.clave(), nombreDe(clienteCorte.clave()), nombreTemporada,
-                    directorio, pedidoCorte, leidas, conversion, avisos);
+                    directorio, pedidoCorte, leidas, conversion, sinFotos, avisos);
         } catch (IllegalArgumentException e) {
             CorteEnCurso.borrar(directorio);
             return error(redirect, "No se pudo usar la carpeta de fotos: " + e.getMessage());
@@ -214,6 +222,9 @@ public class DocumentosCorteController {
         model.addAttribute("fotosTotal", conversion.total());
         model.addAttribute("fotosHechas", conversion.hechas());
         model.addAttribute("fotosTerminadas", conversion.terminada());
+        // A la vista y no en los avisos plegables: de las fotos que faltan se
+        // entera quien está a punto de generar, no quien despliega la lista.
+        model.addAttribute("sinFotos", enCurso.isSinFotos());
         model.addAttribute("avisos", enCurso.getAvisosCarga());
         return "documentos-corte-pieles";
     }
@@ -303,6 +314,7 @@ public class DocumentosCorteController {
         model.addAttribute("temporada", enCurso.getTemporada());
         model.addAttribute("ordenes", enCurso.getResultado().ordenes());
         model.addAttribute("fotos", enCurso.getResultado().fotos());
+        model.addAttribute("sinFotos", enCurso.isSinFotos());
         model.addAttribute("avisos", avisos);
         return "documentos-corte-resultados";
     }
