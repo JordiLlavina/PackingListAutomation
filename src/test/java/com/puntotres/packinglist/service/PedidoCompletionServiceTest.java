@@ -90,6 +90,55 @@ class PedidoCompletionServiceTest {
         assertEquals(1, resultado.getAvisos().size());
     }
 
+    // --- nombre del modelo (MODÈLE) ---
+
+    /**
+     * El MODÈLE sale de la Désignation del pedido, y manda sobre lo que
+     * traiga la entrada: es el nombre oficial del cliente.
+     */
+    @Test
+    void elModeloSaleDelPedidoYMandaSobreElDeLaEntrada() throws IOException {
+        CajaData sinModelo = caja(1, "4100128721", "PXBHZ-H65077", "LZZ-NOIR", 3, null, 4.2);
+        CajaData conOtro = caja(2, "4100128710", "PXCBC-F67008", "LZZ-NOIR", 3, null, 4.2);
+        conOtro.setModelo("sac le neige");
+
+        List<String> avisos = servicio.completarModelos(envioCon(sinModelo, conOtro), pedidoReal());
+
+        assertEquals("CEINTURE PARIS", sinModelo.getModelo());
+        assertEquals("LE NEIGE", conOtro.getModelo());
+        assertTrue(avisos.isEmpty(), avisos.toString());
+    }
+
+    /**
+     * Una referencia que el pedido no conoce se queda con lo que trajo la
+     * entrada; si no trajo nada, se avisa: la columna saldría en blanco.
+     */
+    @Test
+    void sinNombreEnElPedidoSeQuedaElDeLaEntradaYSiNoHayNingunoSeAvisa() throws IOException {
+        CajaData conModelo = caja(1, "4100128721", "PXZZZ-F99999", "LZZ-NOIR", 3, null, 4.2);
+        conModelo.setModelo("modelo de la hoja");
+        CajaData sinNada = caja(2, "4100128721", "PXZZZ-F99998", "LZZ-NOIR", 3, null, 4.2);
+
+        List<String> avisos = servicio.completarModelos(envioCon(conModelo, sinNada), pedidoReal());
+
+        assertEquals("modelo de la hoja", conModelo.getModelo());
+        assertNull(sinNada.getModelo());
+        assertEquals(1, avisos.size());
+        assertTrue(avisos.get(0).contains("PXZZZ-F99998") && !avisos.get(0).contains("F99999"),
+                avisos.get(0));
+    }
+
+    @Test
+    void sinExcelDePedidoAvisaDeLasReferenciasQueSeQuedanSinModelo() {
+        CajaData linea = caja(1, "721", "PXBHZ-H65077", "LZZ-NOIR", 3, null, 4.2);
+
+        List<String> avisos = servicio.completarModelos(envioCon(linea), null);
+
+        assertNull(linea.getModelo());
+        assertEquals(1, avisos.size());
+        assertTrue(avisos.get(0).contains("MODÈLE"), avisos.get(0));
+    }
+
     @Test
     void unaCajaSinPedidoSeSaltaSinAvisoDeBusqueda() throws IOException {
         CajaData linea = caja(1, null, "PXBHZ-H65077", "LZZ-NOIR", 3, null, 4.2);

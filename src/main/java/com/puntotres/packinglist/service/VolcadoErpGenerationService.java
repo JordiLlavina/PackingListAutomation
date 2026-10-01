@@ -18,7 +18,20 @@ public class VolcadoErpGenerationService {
     /** Unidad por defecto: los cinturones la sustituyen por su talla. */
     private static final String UNIDAD_UNICA = "U";
 
+    /** Con la factura del envío en el nombre del fichero (la de la pantalla de entrada). */
     public VolcadoErpData generar(List<CajaData> cajas, DatosEnvio envio) {
+        String factura = envio.getNumeroFactura();
+        return generar(cajas, envio,
+                factura == null || factura.isBlank() ? List.of() : List.of(factura));
+    }
+
+    /**
+     * @param facturas las facturas del envío, que van en el nombre del fichero
+     *                 unidas con "_". Son varias porque cada destinación lleva
+     *                 la suya y el volcado es del envío entero; sin ninguna,
+     *                 el fichero se llama "Volcado_ICSUITE.xlsx" a secas.
+     */
+    public VolcadoErpData generar(List<CajaData> cajas, DatosEnvio envio, List<String> facturas) {
         // Agrupar por referencia + talla + color (una línea por combinación única)
         Map<String, Grupo> grupos = new LinkedHashMap<>();
 
@@ -43,9 +56,10 @@ public class VolcadoErpGenerationService {
                     caja.getCodigoColor(), caja.getTalla()));
         }
 
-        // Misma sanitización que el nombre del ZIP en /descargar-todo
-        String facturaSaneada = envio.getNumeroFactura().replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
-        String nombreFichero = "Volcado_ICSUITE_" + facturaSaneada + ".xlsx";
+        List<String> partes = new ArrayList<>();
+        partes.add("Volcado_ICSUITE");
+        partes.addAll(facturas);
+        String nombreFichero = ExcelGenerado.nombreXlsx(partes.toArray(String[]::new));
         return new VolcadoErpData(lineas, nombreFichero);
     }
 

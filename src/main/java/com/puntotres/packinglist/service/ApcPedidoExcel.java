@@ -244,6 +244,55 @@ public final class ApcPedidoExcel {
     }
 
     /**
+     * El nombre del modelo de una referencia, de la columna "Désignation"
+     * ("le neige clou"), en MAYÚSCULAS ("LE NEIGE CLOU"), que es como va en el
+     * packing list y como se comparan las candidatas: dos filas que solo
+     * difieren en mayúsculas dicen el mismo nombre.
+     *
+     * Se busca por la referencia sola porque el nombre es del artículo, no
+     * del pedido: medido en el fichero real, sus 16 Article tienen cada uno
+     * una sola designación en todas sus filas. En dos pasos, y el segundo
+     * solo si el primero no encuentra el artículo:
+     * <ol>
+     * <li>Por la referencia COMPLETA ("PXBHZ-F65101"), que es lo normal: la
+     *     completación al importar ya la ha dejado entera. Si el artículo
+     *     está, manda él, aunque su Désignation venga vacía: buscar entonces
+     *     por sufijo cogería el nombre de OTRO artículo.</li>
+     * <li>Si ningún Article es exactamente esa referencia (una que se quedó
+     *     recortada, "F67043"), por sufijo, y solo cuando todas las candidatas
+     *     dicen lo mismo —PXCDS-F67043, PXCEI-F67043 y PXCBC-F67043 son las
+     *     tres "le neige clou"—, que no es adivinar. Una candidata sin nombre
+     *     cuenta como desacuerdo: no se sabe si es ella.</li>
+     * </ol>
+     * Vacío si no hay nombre o si las candidatas no se ponen de acuerdo.
+     */
+    public Optional<String> designacionDe(String referencia) {
+        if (referencia == null || referencia.isBlank()) {
+            return Optional.empty();
+        }
+        String buscada = referencia.trim().toUpperCase(Locale.ROOT);
+        boolean articuloEncontrado = false;
+        Set<String> deLaReferencia = new LinkedHashSet<>();
+        Set<String> porSufijo = new LinkedHashSet<>();
+        for (LineaCatalogo linea : catalogo) {
+            String articulo = linea.referencia().toUpperCase(Locale.ROOT);
+            String nombre = linea.designacion().trim().toUpperCase(Locale.ROOT);
+            if (articulo.equals(buscada)) {
+                articuloEncontrado = true;
+                if (!nombre.isEmpty()) {
+                    deLaReferencia.add(nombre);
+                }
+            } else if (articulo.endsWith(buscada)) {
+                porSufijo.add(nombre);
+            }
+        }
+        Set<String> candidatas = articuloEncontrado ? deLaReferencia : porSufijo;
+        return candidatas.size() == 1 && !candidatas.iterator().next().isEmpty()
+                ? Optional.of(candidatas.iterator().next())
+                : Optional.empty();
+    }
+
+    /**
      * La destinación y la cantidad total de un número de pedido, o vacío si
      * ese pedido no está en el fichero. La entrada por taller lo usa para
      * saber a dónde va y cuánto se envía de lo que ha llegado.

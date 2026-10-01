@@ -38,14 +38,24 @@ public class ApcEtiquetasExcelBuilder {
     /** POI mide los anchos de columna en píxeles a 96 ppp. */
     private static final double PUNTOS_POR_PIXEL = 72.0 / 96.0;
 
-    /** Datos ya formateados de la etiqueta de una caja. null = en blanco. */
+    /**
+     * Datos ya formateados de la etiqueta de una caja. null = en blanco,
+     * salvo destino: null ahí significa "lo que ya dice la plantilla", que es
+     * lo normal; solo trae valor cuando la caja lleva material de varias
+     * destinaciones hijas ("WHOLESALE / AUSTRALIA").
+     */
     public record EtiquetaCajaApc(String orderNumber, String livraisonCode, String referencia,
                                   String colour, String size, String piecesBySize,
-                                  String colisage, String poidsBrut) {
+                                  String colisage, String poidsBrut, String destino) {
     }
 
-    /** Datos de la etiqueta de un palet. poidsBrut null = en blanco. */
-    public record EtiquetaPaletApc(int numeroCajas, String poidsBrut) {
+    /**
+     * Datos de la etiqueta de un palet. poidsBrut null = en blanco. destino,
+     * como en la caja: null = lo que dice la plantilla; solo trae valor
+     * cuando el palet lleva cajas de varias destinaciones hijas.
+     */
+    public record EtiquetaPaletApc(int numeroPalet, int numeroCajas, String poidsBrut,
+                                   String destino) {
     }
 
     public byte[] generar(ApcEtiquetaLayout layout, List<EtiquetaCajaApc> cajas,
@@ -62,7 +72,7 @@ public class ApcEtiquetasExcelBuilder {
             if (palets.isEmpty()) {
                 quitarHojaPalets(libro, layout);
             } else {
-                escribirHojaPalets(hojaPalet, layout, palets);
+                escribirHojaPalets(hojaPalet, layout, palets, new NumeroPaletEtiqueta(libro), ajuste);
             }
             // Al final y sobre lo que queda vivo en el libro: quitar una hoja
             // remapea los índices, y el área de impresión se pide por índice.
@@ -110,6 +120,12 @@ public class ApcEtiquetasExcelBuilder {
                                              int base, EtiquetaCajaApc etiqueta,
                                              AjusteFuente ajuste) {
         int col = layout.colValor();
+        // DESTINATION solo se reescribe cuando la caja lleva varias
+        // destinaciones hijas y la plantilla rotula ahí la destinación (no
+        // un aeropuerto): si no, se queda lo que dice la plantilla.
+        if (layout.filaDestino() != null && etiqueta.destino() != null) {
+            ajuste.ajustar(escribir(hoja, base + layout.filaDestino(), col, etiqueta.destino()));
+        }
         // El Order N° también lleva un valor por artículo desde que una caja
         // mixta los enseña todos, así que encoge igual que la referencia.
         ajuste.ajustar(escribir(hoja, base + layout.filaOrder(), col, etiqueta.orderNumber()));
@@ -183,7 +199,8 @@ public class ApcEtiquetasExcelBuilder {
     }
 
     private static void escribirHojaPalets(XSSFSheet hoja, ApcEtiquetaLayout layout,
-                                           List<EtiquetaPaletApc> palets) {
+                                           List<EtiquetaPaletApc> palets,
+                                           NumeroPaletEtiqueta numeroPalet, AjusteFuente ajuste) {
         ApcEtiquetaLayout.Palet geo = layout.palet();
         limpiarContadorManual(hoja);
         BloqueEtiquetaModelo modelo = BloqueEtiquetaModelo.capturar(hoja, geo.altura());
@@ -193,6 +210,15 @@ public class ApcEtiquetasExcelBuilder {
         replicarImagenes(hoja, geo.altura(), palets.size());
         for (int i = 0; i < palets.size(); i++) {
             int base = i * geo.altura();
+            // "Nº3" arriba a la derecha, en la fila donde el cliente apuntaba
+            // a mano su contador (que limpiarContadorManual ya ha blanqueado).
+            numeroPalet.escribir(hoja, base, geo.colNumeroPalet(), palets.get(i).numeroPalet());
+            // DESTINATION, igual que en la caja: solo con varias destinaciones
+            // hijas en el palet y donde la plantilla rotula la destinación.
+            if (geo.filaDestino() != null && palets.get(i).destino() != null) {
+                ajuste.ajustar(escribir(hoja, base + geo.filaDestino(), geo.colValor(),
+                        palets.get(i).destino()));
+            }
             celda(hoja, base + geo.filaNumCajas(), geo.colValor())
                     .setCellValue(palets.get(i).numeroCajas());
             escribir(hoja, base + geo.filaPeso(), geo.colValor(), palets.get(i).poidsBrut());
@@ -204,7 +230,8 @@ public class ApcEtiquetasExcelBuilder {
 
     /**
      * La fila 1 de la hoja de palet trae una celda suelta con un contador
-     * apuntado a mano (E1/C1/D1 según plantilla) que no debe replicarse.
+     * apuntado a mano (E1/C1/D1 según plantilla) que no debe replicarse. Su
+     * sitio lo ocupa ahora el número de palet que escribe el builder.
      */
     private static void limpiarContadorManual(XSSFSheet hoja) {
         if (hoja.getRow(0) != null) {

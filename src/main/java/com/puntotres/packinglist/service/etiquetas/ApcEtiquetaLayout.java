@@ -14,6 +14,13 @@ import java.util.Optional;
  * <p>filaLivraison: en WH CROSSLOG y en RETAIL es la fila "ASN N°" (esas
  * plantillas no tienen Livraison); recibe el mismo valor.
  *
+ * <p>filaDestino: la fila del valor de "DESTINATION", SOLO en las plantillas
+ * donde ese valor es el nombre de la destinación (WHOLESALE y RETAIL, que
+ * llevan destinaciones hijas). Ahí se reescribe cuando una caja lleva
+ * material de varias hijas ("WHOLESALE / AUSTRALIA"). En JAPAN, KOREA y USA
+ * es null: su DESTINATION es un aeropuerto o una ciudad ("TOKYO", "JFK") y
+ * no se toca nunca.
+ *
  * <p>Las cinco plantillas están maquetadas cada una por su lado, así que
  * NADA de esto se puede compartir entre destinaciones: ni el alto del
  * bloque, ni dónde cae cada campo, ni la geometría de la hoja de palet. La
@@ -29,7 +36,7 @@ record ApcEtiquetaLayout(
         int alturaBloque, int offsetSegundaEtiqueta,
         int filaOrder, int filaLivraison, int filaReferencia, int filaColor,
         int filaTalla, int filaPiezas, int filaColisage, int filaPeso,
-        Palet palet) {
+        Integer filaDestino, Palet palet) {
 
     /**
      * Geometría de la hoja de etiquetas de palet, que también es distinta en
@@ -37,8 +44,19 @@ record ApcEtiquetaLayout(
      * WHOLESALE el cliente trabaja sin la columna A y los valores caen en la
      * B: escribir en la C dejaría la etiqueta con el número de cajas y el
      * peso fuera del recuadro, en una columna que ni siquiera se imprime.
+     *
+     * colNumeroPalet es la última columna del área de impresión: el "Nº3"
+     * del palet va en la esquina superior derecha de su etiqueta, en la
+     * primera fila del bloque. Por el mismo motivo es la B en WHOLESALE y la
+     * D en las demás.
+     *
+     * filaDestino es la del valor de "DESTINATION", con la misma regla que
+     * la de la hoja de cajas: solo en WHOLESALE y RETAIL, donde nombra la
+     * destinación y se reescribe cuando el palet lleva cajas de varias hijas;
+     * null en las demás, donde es un aeropuerto.
      */
-    record Palet(int altura, int filaNumCajas, int filaPeso, int colValor) {
+    record Palet(int altura, int filaNumCajas, int filaPeso, int colValor, int colNumeroPalet,
+                 Integer filaDestino) {
     }
 
     /** Columna C: los valores de la hoja de cajas en las cinco plantillas. */
@@ -48,17 +66,20 @@ record ApcEtiquetaLayout(
         return COL_VALOR;
     }
 
+    /** La D: última columna del área de impresión de las hojas de palet con columna A. */
+    private static final int COL_D = 3;
+
     public static final ApcEtiquetaLayout JAPAN = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-japan.xlsx",
             "Etiquette colis Bolloré ", "Etiquette Palette Bolloré",
-            36, 18, 8, 9, 10, 11, 12, 13, 16, 17,
-            new Palet(14, 10, 11, COL_VALOR));
+            36, 18, 8, 9, 10, 11, 12, 13, 16, 17, null,
+            new Palet(14, 10, 11, COL_VALOR, COL_D, null));
 
     public static final ApcEtiquetaLayout KOREA = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-korea.xlsx",
             "Etiquette colis FC Logistique", "Etiquette Palette FC logistique",
-            36, 19, 7, 8, 9, 10, 11, 12, 15, 16,
-            new Palet(14, 10, 11, COL_VALOR));
+            36, 19, 7, 8, 9, 10, 11, 12, 15, 16, null,
+            new Palet(14, 10, 11, COL_VALOR, COL_D, null));
 
     /**
      * filaReferencia = 11 y no 12: en esta plantilla la celda de valor de
@@ -71,14 +92,14 @@ record ApcEtiquetaLayout(
     public static final ApcEtiquetaLayout USA = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-usa.xlsx",
             "ETIQUETTE COLIS", "PALET",
-            41, 21, 9, 10, 11, 13, 14, 15, 18, 19,
-            new Palet(19, 12, 13, COL_VALOR));
+            41, 21, 9, 10, 11, 13, 14, 15, 18, 19, null,
+            new Palet(19, 12, 13, COL_VALOR, COL_D, null));
 
     public static final ApcEtiquetaLayout WH_CROSSLOG = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-wh-crosslog.xlsx",
             "Etiquette colis Crosslog", "Etiquette Palette Crosslog",
-            37, 19, 10, 9, 11, 12, 13, 14, 16, 17,
-            new Palet(14, 10, 11, 1));
+            37, 19, 10, 9, 11, 12, 13, 14, 16, 17, 8,
+            new Palet(14, 10, 11, 1, 1, 8));
 
     /**
      * RETAIL y WHOLESALE van al mismo almacén (Crosslog) y el cliente solo
@@ -92,8 +113,8 @@ record ApcEtiquetaLayout(
     public static final ApcEtiquetaLayout RETAIL = new ApcEtiquetaLayout(
             "/client-labels/apc-etiquetas-retail.xlsx",
             "Etiquette colis Retail", "Etiquette Palette Retail",
-            39, 20, 11, 10, 12, 13, 14, 15, 17, 18,
-            new Palet(14, 10, 11, COL_VALOR));
+            39, 20, 11, 10, 12, 13, 14, 15, 17, 18, 9,
+            new Palet(14, 10, 11, COL_VALOR, COL_D, 8));
 
     /**
      * Se aceptan la clave del catálogo de packing (D. USA, WHOLESALE) y el

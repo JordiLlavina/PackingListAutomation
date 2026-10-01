@@ -285,14 +285,20 @@ section.destino h3.titulo-hija {
     opacity: 0.85;
 }
 
-/* Livraison code de la destinación. NO lleva sticky a propósito: el h2 y el
-   thead se anclan a 0 y 3.2rem, y meter aquí una tercera capa fija obligaría
-   a recalcular esos dos offsets cada vez que cambie este campo. */
+/* Cabecera de la destinación: su factura y, en APC, el Livraison code detrás
+   de una barra. NO lleva sticky a propósito: el h2 y el thead se anclan a 0 y
+   3.2rem, y meter aquí una tercera capa fija obligaría a recalcular esos dos
+   offsets cada vez que cambie este campo. */
 section.destino .campo-destino {
     display: flex;
     align-items: center;
     gap: 0.5rem;
     margin: 0 0 0.6rem;
+}
+
+section.destino .campo-destino .separador {
+    margin: 0 0.4rem;
+    opacity: 0.45;
 }
 
 section.destino .campo-destino label {
@@ -315,15 +321,15 @@ td input[type="number"], td input[type="text"] {
 
 /* La tabla de revisión es toda campos editables: cualquier dato puede venir
    mal leído de las fotos, no solo un peso. Los anchos van por columna para que
-   las doce quepan en las 72rem de main. Deliberadamente SIN overflow-x en la
+   las trece quepan en las 72rem de main. Deliberadamente SIN overflow-x en la
    sección: poner scroll horizontal aquí convertiría la sección en el contenedor
    de scroll y rompería las cabeceras sticky de arriba.
 
    La referencia (ULL136.AL00544) y el color comparten el sitio: el color
    no es solo un código de tres cifras, en AMI llega con su nombre
    ("221 DARK COFFEE") y tiene que caber entero. Las numéricas —caja,
-   cantidad, palet y los dos pesos— comparten el ancho de talla, que es el
-   mínimo cómodo. */
+   cantidad, peso del palet y los dos pesos de la caja— comparten el ancho de
+   talla, que es el mínimo cómodo. */
 section.destino td input.c-referencia { width: 8.5rem; }
 section.destino td input.c-color { width: 8.5rem; }
 section.destino td input.c-pedido { width: 6rem; }
@@ -332,6 +338,7 @@ section.destino td select.c-tamano { width: 5.25rem; }
 section.destino td input.c-palet { width: 2.1rem; }
 section.destino td input.c-cantidad,
 section.destino td input.c-peso,
+section.destino td input.c-peso-palet,
 section.destino td.c-caja input[type="number"] { width: 3.5rem; }
 
 section.destino td select.c-tamano {

@@ -99,6 +99,71 @@ class ApcPedidoExcelTest {
         assertTrue(pedidoReal().filasPara("67008", "721").isEmpty());
     }
 
+    /**
+     * El nombre del modelo (MODÈLE del packing list) sale de la Désignation,
+     * que en el fichero real es una sola por Article.
+     */
+    @Test
+    void elNombreDelModeloSaleDeLaDesignacionDeLaReferencia() throws IOException {
+        ApcPedidoExcel pedido = pedidoReal();
+
+        assertEquals("CEINTURE PARIS", pedido.designacionDe("PXBHZ-H65077").orElseThrow());
+        assertEquals("LE NEIGE", pedido.designacionDe(" pxcbc-f67008 ").orElseThrow());
+        // Recortada, pero sus tres candidatas (PXCDS, PXCEI y PXCBC) dicen lo mismo.
+        assertEquals("LE NEIGE CLOU", pedido.designacionDe("F67043").orElseThrow());
+        // Recortada y sus candidatas NO coinciden ("pochette neige clou" y
+        // "la pochette neige clou"): no se elige ninguna.
+        assertTrue(pedido.designacionDe("F63023").isEmpty());
+        // Escrita entera, la exacta manda aunque el sufijo sea ambiguo.
+        assertEquals("POCHETTE NEIGE CLOU", pedido.designacionDe("PXCBC-F63023").orElseThrow());
+        assertTrue(pedido.designacionDe("PXZZZ-F99999").isEmpty());
+        assertTrue(pedido.designacionDe(null).isEmpty());
+    }
+
+    /**
+     * Un pedido en memoria con dos casos que el fichero real no tiene: un
+     * artículo cuya Désignation viene vacía y otro que termina igual pero sí
+     * tiene nombre.
+     */
+    private static ApcPedidoExcel pedidoConUnArticuloSinNombre() throws IOException {
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook libro =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream salida = new java.io.ByteArrayOutputStream()) {
+            var hoja = libro.createSheet("Sheet1");
+            String[][] filas = {
+                    {"Article", "Document d'achat", "Notre référence", "Désignation"},
+                    {"PXCBC-F67008", "4100128710", "Wholesale", ""},
+                    {"PXCDS-F67008", "4100128711", "Wholesale", "le neige"},
+                    {"PXCEI-F67043", "4100128712", "Wholesale", "le neige clou"}};
+            for (int f = 0; f < filas.length; f++) {
+                var fila = hoja.createRow(f);
+                for (int c = 0; c < filas[f].length; c++) {
+                    fila.createCell(c).setCellValue(filas[f][c]);
+                }
+            }
+            libro.write(salida);
+            return ApcPedidoExcel.desdeBytes(salida.toByteArray());
+        }
+    }
+
+    /**
+     * Primero por la referencia COMPLETA y, solo si ningún Article es esa
+     * referencia, por sufijo. Un artículo que está pero no tiene nombre no
+     * coge el de otro que termine igual.
+     */
+    @Test
+    void laReferenciaCompletaMandaYElSufijoSoloSiNoSeEncuentra() throws IOException {
+        ApcPedidoExcel pedido = pedidoConUnArticuloSinNombre();
+
+        assertEquals("LE NEIGE", pedido.designacionDe("PXCDS-F67008").orElseThrow());
+        // Está, pero sin nombre: no coge "le neige" de PXCDS-F67008.
+        assertTrue(pedido.designacionDe("PXCBC-F67008").isEmpty());
+        // No está entera: por sufijo, con una sola candidata y con nombre.
+        assertEquals("LE NEIGE CLOU", pedido.designacionDe("F67043").orElseThrow());
+        // Por sufijo, una de las dos candidatas no tiene nombre: no se sabe cuál es.
+        assertTrue(pedido.designacionDe("F67008").isEmpty());
+    }
+
     @Test
     void elFicheroRealNoTieneNingunaClaveAmbigua() throws IOException {
         assertTrue(pedidoReal().avisos().isEmpty(),

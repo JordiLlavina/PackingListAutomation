@@ -8,8 +8,9 @@
          El recuento de packing lists vive aquí y no como frase debajo del
          título de la sección, donde repetía lo que la tabla ya enseña. -->
     <ul class="ficha-envio">
+        <!-- Una por destinación, sin repetir: cada packing list lleva la suya. -->
         <li><span class="rotulo">Factura</span>
-            <strong th:text="${cabecera.numeroFactura}"></strong></li>
+            <strong th:text="${facturas.isEmpty()} ? '—' : ${facturas}"></strong></li>
         <li><span class="rotulo">Temporada</span>
             <strong th:text="${cabecera.temporada}"></strong></li>
         <li><span class="rotulo">Packing lists</span>

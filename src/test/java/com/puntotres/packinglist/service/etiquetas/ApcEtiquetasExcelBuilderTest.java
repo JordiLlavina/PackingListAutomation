@@ -22,14 +22,14 @@ class ApcEtiquetasExcelBuilderTest {
 
     private static EtiquetaCajaApc etiqueta(String colisage, String poids) {
         return new EtiquetaCajaApc("NOT FOUND", "NOT FOUND", "PXCBC-F67008",
-                "LZZ-NOIR", "U", "11", colisage, poids);
+                "LZZ-NOIR", "U", "11", colisage, poids, null);
     }
 
     @Test
     void escribeElParDeEtiquetasYConservaLasDosHojas() throws IOException {
         byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
                 List.of(etiqueta("1 / 1", "7,60 Kg")),
-                List.of(new EtiquetaPaletApc(1, "17,60 Kg")));
+                List.of(new EtiquetaPaletApc(1, 1, "17,60 Kg", null)));
         try (XSSFWorkbook libro = abrir(excel)) {
             assertEquals(2, libro.getNumberOfSheets());
             XSSFSheet cajas = libro.getSheet("Etiquette colis Bolloré ");
@@ -90,11 +90,39 @@ class ApcEtiquetasExcelBuilderTest {
         }
     }
 
+    /**
+     * La línea DESTINATION solo cambia cuando la etiqueta trae destino (caja
+     * con varias destinaciones hijas) y la plantilla la rotula; en las demás
+     * plantillas es un aeropuerto y se queda como está aunque llegue uno.
+     */
+    @Test
+    void laDestinacionSoloSeReescribeDondeLaPlantillaNombraLaDestinacion() throws IOException {
+        EtiquetaCajaApc mixta = new EtiquetaCajaApc("4100128710 / 4100128799", "PUN1",
+                "PXCBC-F67008 / PXCBC-F67008", "LZZ-NOIR / LZZ-NOIR", "U", "6 / 4",
+                "1 / 1", "7,60 Kg", "WHOLESALE / AUSTRALIA");
+        ApcEtiquetaLayout wh = ApcEtiquetaLayout.WH_CROSSLOG;
+        try (XSSFWorkbook libro = abrir(builder.generar(wh, List.of(mixta),
+                List.of(new EtiquetaPaletApc(1, 1, "17,60 Kg", null))))) {
+            assertEquals("WHOLESALE / AUSTRALIA",
+                    texto(libro.getSheet(wh.hojaCajas()), wh.filaDestino(), wh.colValor()));
+        }
+        try (XSSFWorkbook libro = abrir(builder.generar(wh, List.of(etiqueta("1 / 1", "7,60 Kg")),
+                List.of(new EtiquetaPaletApc(1, 1, "17,60 Kg", null))))) {
+            assertEquals("WHOLESALE",
+                    texto(libro.getSheet(wh.hojaCajas()), wh.filaDestino(), wh.colValor()));
+        }
+        try (XSSFWorkbook libro = abrir(builder.generar(ApcEtiquetaLayout.JAPAN, List.of(mixta),
+                List.of(new EtiquetaPaletApc(1, 1, "17,60 Kg", null))))) {
+            // JAPAN: la fila 8 es DESTINATION, y dice TOKYO pase lo que pase.
+            assertEquals("TOKYO", texto(libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaCajas()), 7, 2));
+        }
+    }
+
     @Test
     void generaUnaEtiquetaDePaletPorPaletConSaltoDePagina() throws IOException {
         byte[] excel = builder.generar(ApcEtiquetaLayout.JAPAN,
                 List.of(etiqueta("1 / 1", "7,60 Kg")),
-                List.of(new EtiquetaPaletApc(9, "64,58 Kg"), new EtiquetaPaletApc(3, null)));
+                List.of(new EtiquetaPaletApc(1, 9, "64,58 Kg", null), new EtiquetaPaletApc(2, 3, null, null)));
         try (XSSFWorkbook libro = abrir(excel)) {
             XSSFSheet palet = libro.getSheet("Etiquette Palette Bolloré");
             ApcEtiquetaLayout.Palet geo = ApcEtiquetaLayout.JAPAN.palet();
@@ -151,8 +179,8 @@ class ApcEtiquetasExcelBuilderTest {
             byte[] excel = builder.generar(layout,
                     List.of(etiqueta("1 / 3", "7,60 Kg"), etiqueta("2 / 3", "7,60 Kg"),
                             etiqueta("3 / 3", "6,20 Kg")),
-                    List.of(new EtiquetaPaletApc(2, "25,20 Kg"),
-                            new EtiquetaPaletApc(1, "16,20 Kg")));
+                    List.of(new EtiquetaPaletApc(1, 2, "25,20 Kg", null),
+                            new EtiquetaPaletApc(2, 1, "16,20 Kg", null)));
             try (XSSFWorkbook libro = abrir(excel)) {
                 String donde = layout.rutaPlantilla() + ": ";
                 assertEquals(3 * layout.alturaBloque() - 1,
@@ -195,7 +223,7 @@ class ApcEtiquetasExcelBuilderTest {
             cajas.add(etiqueta(i + " / " + numCajas, "7,60 Kg"));
         }
         try (XSSFWorkbook libro = abrir(builder.generar(layout, cajas,
-                List.of(new EtiquetaPaletApc(1, "17,60 Kg"))))) {
+                List.of(new EtiquetaPaletApc(1, 1, "17,60 Kg", null))))) {
             XSSFSheet hoja = libro.getSheetAt(0);
             assertTrue(!hoja.getFitToPage(),
                     layout.rutaPlantilla() + ": sigue con 'ajustar a una página', que con varias"

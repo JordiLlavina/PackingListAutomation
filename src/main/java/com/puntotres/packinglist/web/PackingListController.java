@@ -2,14 +2,18 @@ package com.puntotres.packinglist.web;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -32,11 +36,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.EnvioInput;
+import com.puntotres.packinglist.model.PaletData;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
@@ -46,6 +52,7 @@ import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.ExcelGenerado;
 import com.puntotres.packinglist.service.PackingListGenerationService;
 import com.puntotres.packinglist.service.PackingPuntotresDocBuilder;
+import com.puntotres.packinglist.service.PedidoCompletionService;
 import com.puntotres.packinglist.service.ValidadorResumenExtraccion;
 import com.puntotres.packinglist.service.VolcadoErpExcelBuilder;
 import com.puntotres.packinglist.service.VolcadoErpGenerationService;
@@ -89,6 +96,7 @@ public class PackingListController {
     private final VolcadoErpGenerationService generadorVolcado;
     private final VolcadoErpExcelBuilder constructorVolcado;
     private final PackingPuntotresDocBuilder constructorPackingPuntotres;
+    private final PedidoCompletionService completadorPedidos;
     private final EtiquetasGenerationService etiquetasService;
     private final ClientesProperties clientesProperties;
     private final CatalogoTaras catalogoTaras;
@@ -105,6 +113,7 @@ public class PackingListController {
                                  VolcadoErpGenerationService generadorVolcado,
                                  VolcadoErpExcelBuilder constructorVolcado,
                                  PackingPuntotresDocBuilder constructorPackingPuntotres,
+                                 PedidoCompletionService completadorPedidos,
                                  EtiquetasGenerationService etiquetasService,
                                  ClientesProperties clientesProperties,
                                  CatalogoTaras catalogoTaras,
@@ -120,6 +129,7 @@ public class PackingListController {
         this.generadorVolcado = generadorVolcado;
         this.constructorVolcado = constructorVolcado;
         this.constructorPackingPuntotres = constructorPackingPuntotres;
+        this.completadorPedidos = completadorPedidos;
         this.etiquetasService = etiquetasService;
         this.clientesProperties = clientesProperties;
         this.catalogoTaras = catalogoTaras;
@@ -332,6 +342,10 @@ public class PackingListController {
         // Tamaños con tara conocida para el desplegable de la columna TAMAÑO,
         // de la caja más grande a la más pequeña.
         model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
+        // El peso de palet con el que se cuenta si no se teclea ninguno: la
+        // columna "Palet (Kg)" lo enseña en gris, sin ceros de sobra ("10").
+        model.addAttribute("taraPaletDefecto",
+                BigDecimal.valueOf(PaletData.TARA_DEFECTO_KG).stripTrailingZeros().toPlainString());
         // Si el envío viene de una entrega de taller se puede volver a su
         // pantalla de ajuste sin resubir los excels.
         model.addAttribute("vieneDeTaller", !tallerEnCurso.estaVacio());
@@ -441,6 +455,14 @@ public class PackingListController {
             ClienteConfig cliente = clientesProperties.clientePara(cabecera.getClaveCliente())
                     .orElseThrow(() -> new IllegalStateException(
                             "Cliente desconocido: " + cabecera.getClaveCliente()));
+            // El MODÈLE de APC sale de la Désignation del excel de pedido. Se
+            // rellena aquí y no al importar para que siga a la referencia
+            // aunque se haya corregido en la revisión.
+            if (cliente.getPlantilla() == TipoPlantilla.APC) {
+                avisosGeneracion.addAll(completadorPedidos.completarModelos(
+                        envioEnCurso.getImportado().getDestinos(),
+                        envioEnCurso.getExcelPedidoCliente()));
+            }
             List<CajaData> todasLasCajas = new ArrayList<>();
             for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
                 DestinoData datos = destino.getDestino();
@@ -456,12 +478,19 @@ public class PackingListController {
                     todasLasCajas.addAll(datos.getCajas());
                     continue;
                 }
+                // La factura ya no es obligatoria en la entrada: una
+                // destinación que llega aquí sin ninguna sale con la celda en
+                // blanco, y se dice, en vez de parar el envío entero.
+                if (!tieneTexto(cabecera.facturaPara(datos))) {
+                    avisosGeneracion.add("Destinación '" + datos.getNombreDestino()
+                            + "' sin número de factura: su packing list sale con la factura en blanco");
+                }
                 excels.addAll(generador.generar(datos, destino.getPalets(), cabecera, cliente));
                 todasLasCajas.addAll(datos.getCajas());
             }
             // El volcado ERP agrupa TODAS las cajas del envío (todas las
             // destinaciones) por referencia+talla+color, un excel por envío.
-            volcado = generadorVolcado.generar(todasLasCajas, cabecera);
+            volcado = generadorVolcado.generar(todasLasCajas, cabecera, facturasDelEnvio());
         } catch (IOException | RuntimeException e) {
             redirect.addFlashAttribute("error",
                     "No se pudieron generar los excels: " + e.getMessage());
@@ -541,6 +570,8 @@ public class PackingListController {
         model.addAttribute("excels", envioEnCurso.getExcels());
         model.addAttribute("avisosGeneracion", envioEnCurso.getAvisosGeneracion());
         model.addAttribute("cabecera", envioEnCurso.getCabecera());
+        // Cada destinación lleva su factura: la ficha las enseña todas.
+        model.addAttribute("facturas", String.join(" · ", facturasDelEnvio()));
         model.addAttribute("volcadoErp", envioEnCurso.getVolcadoErp());
         model.addAttribute("etiquetas", envioEnCurso.getEtiquetas());
         // Agrupados por destinación: el generador emite un aviso por caja y
@@ -580,7 +611,12 @@ public class PackingListController {
                 zip.closeEntry();
             }
         }
-        String nombreZip = ("PKL_" + envioEnCurso.getCabecera().getNumeroFactura() + ".zip")
+        // Con las facturas del envío (una por destinación, sin repetir) o, si
+        // no hay ninguna, con el cliente: "PKL_null.zip" no se encuentra luego.
+        List<String> facturas = facturasDelEnvio();
+        String nombreZip = ("PKL_" + (facturas.isEmpty()
+                ? envioEnCurso.getCabecera().getClaveCliente()
+                : String.join("_", facturas)) + ".zip")
                 .replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("application/zip"))
@@ -653,6 +689,21 @@ public class PackingListController {
                 .toList();
     }
 
+    /**
+     * Las facturas del envío, una por destinación y sin repetir, en el orden
+     * de las destinaciones. Lo que es del envío entero y no de una destinación
+     * —el ZIP, el volcado ERP, la ficha de resultados— se nombra con todas.
+     */
+    private List<String> facturasDelEnvio() {
+        DatosEnvio cabecera = envioEnCurso.getCabecera();
+        return destinosDelEnvio().stream()
+                .map(cabecera::facturaPara)
+                .filter(PackingListController::tieneTexto)
+                .map(String::trim)
+                .distinct()
+                .toList();
+    }
+
     private String sinEnvio(RedirectAttributes redirect) {
         redirect.addFlashAttribute("mensaje", "No hay ningún envío en curso: empieza pegando el JSON.");
         return "redirect:/packing-list";
@@ -687,17 +738,25 @@ public class PackingListController {
      */
     private void aplicarEdicionesYReinferir(RevisionForm form) {
         List<EnvioImportado.DestinoImportado> destinos = envioEnCurso.getImportado().getDestinos();
-        // Cabecera de la destinación (Livraison code): vacío = "no tocar",
-        // igual que en las cajas, así que no se puede borrar sin querer.
+        // Cabecera de la destinación (factura y Livraison code): vacío = "no
+        // tocar", igual que en las cajas, así que no se puede borrar sin querer.
         for (RevisionForm.DestinoEditado edicion : form.getDestinos()) {
             if (edicion == null || edicion.getIndiceDestino() < 0
-                    || edicion.getIndiceDestino() >= destinos.size()
-                    || !tieneTexto(edicion.getLivraisonCode())) {
+                    || edicion.getIndiceDestino() >= destinos.size()) {
                 continue;
             }
-            destinos.get(edicion.getIndiceDestino()).getDestino().getCajas()
-                    .forEach(caja -> caja.setLivraisonCode(edicion.getLivraisonCode().trim()));
+            DestinoData destino = destinos.get(edicion.getIndiceDestino()).getDestino();
+            if (tieneTexto(edicion.getNumeroFactura())) {
+                destino.setNumeroFactura(edicion.getNumeroFactura().trim());
+            }
+            if (tieneTexto(edicion.getLivraisonCode())) {
+                destino.getCajas()
+                        .forEach(caja -> caja.setLivraisonCode(edicion.getLivraisonCode().trim()));
+            }
         }
+        // Antes que las cajas: el peso va al palet que la fila ENSEÑABA, y
+        // así da igual que en el mismo envío se le cambie el palet a la fila.
+        aplicarPesosDePalet(form.getPalets(), destinos);
         for (RevisionForm.CajaEditada edicion : form.getCajas()) {
             if (edicion == null || edicion.getIndiceDestino() < 0
                     || edicion.getIndiceDestino() >= destinos.size()) {
@@ -753,6 +812,64 @@ public class PackingListController {
     }
 
     /**
+     * Aplica lo tecleado en la columna "Palet (Kg)" a la tara de su palet.
+     *
+     * Varias filas enseñan el mismo palet (todas las de sus cajas), y la
+     * pantalla las mantiene iguales al teclear en una. Pero si eso falla —sin
+     * JavaScript, por ejemplo— llegan el valor nuevo en una fila y el viejo en
+     * las demás, y quedarse con el último pisaría el cambio. Por eso manda el
+     * PRIMER valor que difiere de la tara que el palet ya tenía: el viejo no
+     * difiere de sí mismo, así que el único que puede cambiarla es el nuevo.
+     *
+     * Vacío significa "no tocar", como en el resto de la pantalla. Un palet
+     * que la distribución no traía (un número tecleado a mano en la columna
+     * PALET) se da de alta al ponerle peso: si no, el peso tecleado no iría a
+     * ningún sitio.
+     */
+    private static void aplicarPesosDePalet(List<RevisionForm.PaletEditado> ediciones,
+                                            List<EnvioImportado.DestinoImportado> destinos) {
+        Set<String> yaCambiados = new HashSet<>();
+        for (RevisionForm.PaletEditado edicion : ediciones) {
+            if (edicion == null || edicion.getPesoKg() == null || edicion.getPesoKg() < 0
+                    || CajaData.vaSuelta(edicion.getNumeroPalet())
+                    || edicion.getIndiceDestino() < 0
+                    || edicion.getIndiceDestino() >= destinos.size()) {
+                continue;
+            }
+            EnvioImportado.DestinoImportado destino = destinos.get(edicion.getIndiceDestino());
+            int numero = edicion.getNumeroPalet();
+            Optional<PaletData> existente = destino.getPalets().stream()
+                    .filter(palet -> palet.getNumeroPalet() == numero)
+                    .findFirst();
+            Double actual = existente.map(PaletData::getTara).orElse(null);
+            if (edicion.getPesoKg().equals(actual)
+                    || !yaCambiados.add(edicion.getIndiceDestino() + "|" + numero)) {
+                continue;
+            }
+            existente.orElseGet(() -> altaDePalet(destino, numero)).setTara(edicion.getPesoKg());
+        }
+    }
+
+    /**
+     * Un palet que no venía en la distribución. Su rango se lee de las cajas
+     * que lo llevan, como hacen las etiquetas: el del PaletData solo es el
+     * del envío original.
+     */
+    private static PaletData altaDePalet(EnvioImportado.DestinoImportado destino, int numero) {
+        PaletData palet = new PaletData();
+        palet.setDestino(destino.getDestino().getNombreDestino());
+        palet.setNumeroPalet(numero);
+        List<Integer> suyas = destino.getDestino().getCajas().stream()
+                .filter(caja -> Integer.valueOf(numero).equals(caja.getNumeroPalet()))
+                .map(CajaData::getNumeroCaja)
+                .toList();
+        palet.setCajaInicio(suyas.stream().min(Integer::compare).orElse(0));
+        palet.setCajaFin(suyas.stream().max(Integer::compare).orElse(0));
+        destino.getPalets().add(palet);
+        return palet;
+    }
+
+    /**
      * Rehace la lista de cajas sin palet leyendo el dato real, en vez de volver
      * a ejecutar el PaletAssignmentService: sus rangos son los del JSON de
      * entrada y machacarían el palet que el usuario acaba de teclear a mano.
@@ -801,9 +918,22 @@ public class PackingListController {
             String livraisonCode = cajas.isEmpty() ? null : cajas.get(0).getLivraisonCode();
             String nombre = destinos.get(i).getDestino().getNombreDestino();
             vista.add(new DestinoVista(i, nombre, bloquesPorHija(filas, cajas, nombre),
-                    contarCajasFisicas(cajas), livraisonCode));
+                    contarCajasFisicas(cajas), livraisonCode,
+                    envioEnCurso.getCabecera().facturaPara(destinos.get(i).getDestino()),
+                    taraPorPalet(destinos.get(i).getPalets())));
         }
         return vista;
+    }
+
+    /** Las taras tecleadas de los palets de una destinación, por número de palet. */
+    private static Map<Integer, Double> taraPorPalet(List<PaletData> palets) {
+        Map<Integer, Double> taras = new HashMap<>();
+        for (PaletData palet : palets) {
+            if (palet.getTara() != null) {
+                taras.putIfAbsent(palet.getNumeroPalet(), palet.getTara());
+            }
+        }
+        return taras;
     }
 
     /**

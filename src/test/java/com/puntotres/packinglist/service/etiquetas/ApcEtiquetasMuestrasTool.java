@@ -50,16 +50,16 @@ class ApcEtiquetasMuestrasTool {
     private void generar(String nombre, ApcEtiquetaLayout layout) throws IOException {
         List<EtiquetaCajaApc> cajas = List.of(
                 new EtiquetaCajaApc("4100128863", "PUN20260928WH1", "PXCBC-F67008",
-                        "LZZ-NOIR", "U", "11", "1 / 3", "7,60 Kg"),
+                        "LZZ-NOIR", "U", "11", "1 / 3", "7,60 Kg", null),
                 new EtiquetaCajaApc("4100128863", "PUN20260928WH1", "PXCBC-F67008",
-                        "LZZ-NOIR", "U", "11", "2 / 3", "7,60 Kg"),
+                        "LZZ-NOIR", "U", "11", "2 / 3", "7,60 Kg", null),
                 // Caja mixta: dos artículos concatenados, como en el envío real.
                 new EtiquetaCajaApc("4100128863 / 4100128685", "PUN20260928WH1",
                         "PXCBC-F67008 / PXCEI-F67043", "LZZ-NOIR / GAU-CAMEL",
-                        "U", "6", "3 / 3", "6,20 Kg"));
+                        "U", "6", "3 / 3", "6,20 Kg", null));
         List<EtiquetaPaletApc> palets = List.of(
-                new EtiquetaPaletApc(2, "25,20 Kg"),
-                new EtiquetaPaletApc(1, "16,20 Kg"));
+                new EtiquetaPaletApc(1, 2, "25,20 Kg", null),
+                new EtiquetaPaletApc(2, 1, "16,20 Kg", null));
         byte[] excel = builder.generar(layout, cajas, palets);
         Files.write(DESTINO.resolve("Etiquetas APC " + nombre + ".xlsx"), excel);
     }
@@ -81,8 +81,8 @@ class ApcEtiquetasMuestrasTool {
             String nombre = (String) fila[0];
             ApcEtiquetaLayout layout = (ApcEtiquetaLayout) fila[1];
             byte[] excel = builder.generar(layout,
-                    List.of(new EtiquetaCajaApc("1", "1", "1", "1", "U", "1", "1 / 1", "1 Kg")),
-                    List.of(new EtiquetaPaletApc(1, "1 Kg")));
+                    List.of(new EtiquetaCajaApc("1", "1", "1", "1", "U", "1", "1 / 1", "1 Kg", null)),
+                    List.of(new EtiquetaPaletApc(1, 1, "1 Kg", null)));
             try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
                 System.out.println("=== " + nombre + "  " + layout.rutaPlantilla());
                 for (int i = 0; i < libro.getNumberOfSheets(); i++) {

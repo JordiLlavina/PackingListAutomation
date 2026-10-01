@@ -135,6 +135,19 @@ class ApcExcelBuilderTest {
         }
     }
 
+    /** El MODÈLE va siempre en mayúsculas, venga de donde venga. */
+    @Test
+    void elModeloSeEscribeEnMayusculas() throws Exception {
+        DestinoData destino = destinoIvry();
+        destino.getCajas().get(0).setModelo(" le neige clou ");
+
+        List<ExcelGenerado> excels = builder.generar(destino, palets(), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            assertEquals("LE NEIGE CLOU", wb.getSheetAt(0).getRow(17).getCell(3).getStringCellValue());
+        }
+    }
+
     @Test
     void agrupaPorPaletConSuTaraYSubtotales() throws Exception {
         List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());
@@ -188,8 +201,11 @@ class ApcExcelBuilderTest {
 
     /**
      * Pie de 6 líneas con rótulo en la D y valor en la E, tal como lo pide el
-     * ejemplo del cliente. Los pesos y volúmenes son NÚMEROS, no texto con
-     * las unidades pegadas.
+     * ejemplo del cliente. Los pesos y volúmenes son FÓRMULAS, no el
+     * resultado: apuntan a las celdas de la hoja donde están los números y,
+     * donde no hay celda a la que apuntar (las medidas de caja), llevan los
+     * números a la vista. Así se ve de dónde sale cada uno y se recalculan
+     * solos si alguien corrige una caja o la tara de un palet.
      */
     @Test
     void escribeElResumenDeSeisLineas() throws Exception {
@@ -203,16 +219,80 @@ class ApcExcelBuilderTest {
             assertEquals("2 (1*80x120x130+1*?)", hoja.getRow(26).getCell(4).getStringCellValue());
             assertEquals("CARTONS", hoja.getRow(27).getCell(3).getStringCellValue());
             assertEquals("3 (60x40x40cm)", hoja.getRow(27).getCell(4).getStringCellValue());
-            // Cartones: 31.62 kg; + taras (8.04 + 10) = 49.66 kg de bruto.
+            // Cartones: la fila de total de peso (O24), 31.62 kg.
             assertEquals("CARTON WEIGHT", hoja.getRow(28).getCell(3).getStringCellValue());
-            assertEquals(31.62, hoja.getRow(28).getCell(4).getNumericCellValue());
-            // 3 cajas físicas de 60x40x40: 0.288 m3; + 2 palets * 0.168 = 0.624.
+            assertEquals("O24", hoja.getRow(28).getCell(4).getCellFormula());
+            assertEquals(31.62, valor(wb, hoja, 28, 4), 0.0001);
+            // 3 cajas físicas de 60x40x40: 0.288 m3, con las medidas a la vista.
             assertEquals("CARTONS VOLUME", hoja.getRow(29).getCell(3).getStringCellValue());
-            assertEquals(0.288, hoja.getRow(29).getCell(4).getNumericCellValue());
+            assertEquals("3*0.6*0.4*0.4", hoja.getRow(29).getCell(4).getCellFormula());
+            assertEquals(0.288, valor(wb, hoja, 29, 4), 0.0001);
+            // Bruto: las dos filas PALET, que ya llevan cada una su tara
+            // (8.04 + 10): 49.66 kg.
             assertEquals("GROSS WEIGHT", hoja.getRow(30).getCell(3).getStringCellValue());
-            assertEquals(49.66, hoja.getRow(30).getCell(4).getNumericCellValue());
+            assertEquals("O17+O20", hoja.getRow(30).getCell(4).getCellFormula());
+            assertEquals(49.66, valor(wb, hoja, 30, 4), 0.0001);
+            // Cartones + 2 palets * 0.168 = 0.624.
             assertEquals("GROSS VOLUME", hoja.getRow(31).getCell(3).getStringCellValue());
-            assertEquals(0.624, hoja.getRow(31).getCell(4).getNumericCellValue());
+            assertEquals("E30+2*0.168", hoja.getRow(31).getCell(4).getCellFormula());
+            assertEquals(0.624, valor(wb, hoja, 31, 4), 0.0001);
+        }
+    }
+
+    /**
+     * Si alguien cambia la tara de un palet en el excel (la fila "PALET n"),
+     * el bruto del pie se entera solo: es la razón de que sea una fórmula.
+     */
+    @Test
+    void elBrutoDelPieSeRecalculaAlCorregirUnPaletEnElExcel() throws Exception {
+        List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            hoja.getRow(19).getCell(14).setCellFormula("SUM(O21:O23)+12"); // PALET 2: 10 -> 12
+            assertEquals(51.66, valor(wb, hoja, 30, 4), 0.0001);
+        }
+    }
+
+    /** El valor de una celda con fórmula, calculado como lo haría Excel al abrirla. */
+    private static double valor(XSSFWorkbook wb, Sheet hoja, int fila, int col) {
+        return wb.getCreationHelper().createFormulaEvaluator()
+                .evaluate(hoja.getRow(fila).getCell(col)).getNumberValue();
+    }
+
+    /**
+     * Cada destinación lleva su factura: manda la de la destinación sobre la
+     * del envío, en la cabecera, el nombre de la hoja y el del fichero.
+     */
+    @Test
+    void laFacturaDeLaDestinacionMandaSobreLaDelEnvio() throws Exception {
+        DestinoData destino = destinoIvry();
+        destino.setNumeroFactura("FA-7");
+
+        ExcelGenerado excel = builder.generar(destino, palets(), envio(), apc()).get(0);
+
+        assertEquals("PKL_APC_IVRY_FA-7.xlsx", excel.getNombreFichero());
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel.getContenido()))) {
+            assertEquals("APC INV FA-7 IVRY", wb.getSheetAt(0).getSheetName());
+            assertEquals("FA-7", wb.getSheetAt(0).getRow(13).getCell(15).getStringCellValue());
+        }
+    }
+
+    /**
+     * La factura ya no es obligatoria: sin ninguna, el excel sale igual, con
+     * la celda en blanco y sin un "_" colgando en el nombre del fichero.
+     */
+    @Test
+    void sinFacturaElExcelSaleConLaCeldaEnBlancoYElNombreSinHueco() throws Exception {
+        DatosEnvio sinFactura = envio();
+        sinFactura.setNumeroFactura(null);
+
+        ExcelGenerado excel = builder.generar(destinoIvry(), palets(), sinFactura, apc()).get(0);
+
+        assertEquals("PKL_APC_IVRY.xlsx", excel.getNombreFichero());
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel.getContenido()))) {
+            assertEquals("APC INV IVRY", wb.getSheetAt(0).getSheetName());
+            assertEquals(CellType.BLANK, wb.getSheetAt(0).getRow(13).getCell(15).getCellType());
         }
     }
 
@@ -236,10 +316,13 @@ class ApcExcelBuilderTest {
             // Un bloque menos que con dos palets: el pie sube una fila.
             assertEquals("PALLETS", hoja.getRow(25).getCell(3).getStringCellValue());
             assertEquals("0", hoja.getRow(25).getCell(4).getStringCellValue());
-            assertEquals(31.62, hoja.getRow(27).getCell(4).getNumericCellValue()); // CARTON WEIGHT
-            assertEquals(31.62, hoja.getRow(29).getCell(4).getNumericCellValue()); // GROSS WEIGHT
-            assertEquals(hoja.getRow(28).getCell(4).getNumericCellValue(),         // CARTONS VOLUME
-                    hoja.getRow(30).getCell(4).getNumericCellValue());             // GROSS VOLUME
+            assertEquals(31.62, valor(wb, hoja, 27, 4), 0.0001);   // CARTON WEIGHT
+            // GROSS WEIGHT es la fila NO PALLET, que no suma tara.
+            assertEquals("O17", hoja.getRow(29).getCell(4).getCellFormula());
+            assertEquals(31.62, valor(wb, hoja, 29, 4), 0.0001);
+            // GROSS VOLUME es el de los cartones a secas: ningún palet que sumar.
+            assertEquals("E29", hoja.getRow(30).getCell(4).getCellFormula());
+            assertEquals(valor(wb, hoja, 28, 4), valor(wb, hoja, 30, 4), 0.0001);
         }
     }
 
@@ -263,7 +346,8 @@ class ApcExcelBuilderTest {
             assertEquals("3 (2*60x40x40cm+1*?cm)",
                     hoja.getRow(27).getCell(4).getStringCellValue());
             // Solo las dos cajas medidas suman: 2 * 0.096 = 0.192 m3.
-            assertEquals(0.192, hoja.getRow(29).getCell(4).getNumericCellValue());
+            assertEquals("2*0.6*0.4*0.4", hoja.getRow(29).getCell(4).getCellFormula());
+            assertEquals(0.192, valor(wb, hoja, 29, 4), 0.0001);
         }
     }
 
@@ -294,12 +378,13 @@ class ApcExcelBuilderTest {
     }
 
     /**
-     * Dos ajustes del área de impresión que no se deducen del contenido: la
-     * columna D (el rótulo del pie) sale a 15 caracteres y las seis celdas de
-     * valor del pie, alineadas a la izquierda. Sin lo segundo la columna sale
-     * descuadrada consigo misma: PALLETS y CARTONS son texto y se quedan a la
-     * izquierda, mientras que los cuatro pesos y volúmenes son NÚMEROS y la
-     * alineación General de la plantilla los manda al borde derecho.
+     * Ajustes del área de impresión que no se deducen del contenido: la
+     * columna D (el rótulo del pie) sale a 19 caracteres, la E (su valor) a 6
+     * y las seis celdas de valor del pie, alineadas a la izquierda. Sin lo
+     * último la columna sale descuadrada consigo misma: PALLETS y CARTONS son
+     * texto y se quedan a la izquierda, mientras que los cuatro pesos y
+     * volúmenes son NÚMEROS y la alineación General de la plantilla los manda
+     * al borde derecho.
      */
     @Test
     void laColumnaDelRotuloYElPieSalenConElAreaDeImpresionAjustada() throws Exception {
@@ -307,7 +392,8 @@ class ApcExcelBuilderTest {
 
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
             Sheet hoja = wb.getSheetAt(0);
-            assertEquals(15.0, hoja.getColumnWidth(3) / 256.0, 0.01);
+            assertEquals(19.0, hoja.getColumnWidth(3) / 256.0, 0.01);
+            assertEquals(8.0, hoja.getColumnWidth(4) / 256.0, 0.01);
             // Las seis líneas del pie de este envío (PALLETS..GROSS VOLUME).
             for (int fila = 26; fila <= 31; fila++) {
                 assertEquals(HorizontalAlignment.LEFT,

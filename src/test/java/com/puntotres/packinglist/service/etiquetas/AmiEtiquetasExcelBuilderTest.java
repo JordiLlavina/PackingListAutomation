@@ -420,11 +420,11 @@ class AmiEtiquetasExcelBuilderTest {
     // --- hoja de etiquetas de palet ---
 
     private static final AmiEtiquetasExcelBuilder.EtiquetaPaletAmi PALET_1 =
-            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi("Nº 1 à Nº 12", "64,58 Kg");
+            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi(1, "Nº 1 à Nº 12", "64,58 Kg");
     private static final AmiEtiquetasExcelBuilder.EtiquetaPaletAmi PALET_2 =
-            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi("Nº 13 à Nº 20", "41,20 Kg");
+            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi(2, "Nº 13 à Nº 20", "41,20 Kg");
     private static final AmiEtiquetasExcelBuilder.EtiquetaPaletAmi PALET_3 =
-            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi("Nº 21 à Nº 21", null);
+            new AmiEtiquetasExcelBuilder.EtiquetaPaletAmi(3, "Nº 21 à Nº 21", null);
 
     private byte[] conPalets(AmiEtiquetaLayout layout,
                              List<AmiEtiquetasExcelBuilder.EtiquetaPaletAmi> palets)
@@ -469,6 +469,36 @@ class AmiEtiquetasExcelBuilderTest {
             // de la plantilla.
             assertEquals("Nº 21 à Nº 21", texto(hoja, colis + 2 * altura, 2));
             assertEquals("", texto(hoja, peso + 2 * altura, 2));
+        }
+    }
+
+    /**
+     * Cada etiqueta de palet lleva su número arriba a la derecha, a 11 puntos:
+     * en la primera fila de su bloque y en la última columna que se imprime.
+     * Va en cada etiqueta y no una vez por A4, porque las dos del A4 acaban
+     * pegadas en palets distintos.
+     */
+    @Test
+    void cadaEtiquetaDePaletLlevaSuNumeroArribaALaDerecha() throws IOException {
+        byte[] excel = conPalets(AmiEtiquetaLayout.FRANCE, List.of(PALET_1, PALET_2, PALET_3));
+        try (XSSFWorkbook libro = abrir(excel)) {
+            XSSFSheet hoja = libro.getSheet(AmiEtiquetaLayout.FRANCE.nombreHojaPalets());
+            int altura = AmiEtiquetaLayout.ALTURA_BLOQUE_PALET;
+            int primera = AmiEtiquetaLayout.FILA_PRIMER_PALET;
+            int col = AmiEtiquetaLayout.COL_NUMERO_PALET;
+            assertEquals("Nº1", texto(hoja, primera, col));
+            assertEquals("Nº2", texto(hoja, primera + altura, col));
+            assertEquals("Nº3", texto(hoja, primera + 2 * altura, col));
+            var estilo = hoja.getRow(primera).getCell(col).getCellStyle();
+            assertEquals(11, libro.getFontAt(estilo.getFontIndex()).getFontHeightInPoints());
+            assertEquals(org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT, estilo.getAlignment());
+            assertEquals(org.apache.poi.ss.usermodel.VerticalAlignment.TOP,
+                    estilo.getVerticalAlignment());
+            // Dentro de lo que se imprime.
+            AreaReference area = new AreaReference(
+                    libro.getPrintArea(libro.getSheetIndex(hoja.getSheetName())),
+                    SpreadsheetVersion.EXCEL2007);
+            assertEquals(col, area.getLastCell().getCol());
         }
     }
 

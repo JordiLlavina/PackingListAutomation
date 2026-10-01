@@ -72,7 +72,9 @@ class AmiExcelBuilderTest {
             assertEquals(1, celda(hoja, 24, COL_PESO_BRUTO).getNumericCellValue());
             assertEquals("V21", celda(hoja, 25, COL_PESO_BRUTO).getCellFormula());
             assertEquals("U21", celda(hoja, 26, COL_PESO_BRUTO).getCellFormula());
-            assertEquals(0.072, celda(hoja, 27, COL_PESO_BRUTO).getNumericCellValue(), 0.0001); // 0.6*0.4*0.3
+            // El volumen va como fórmula con la medida a la vista, no como resultado.
+            assertEquals("0.6*0.4*0.3", celda(hoja, 27, COL_PESO_BRUTO).getCellFormula());
+            assertEquals(0.072, valor(wb, celda(hoja, 27, COL_PESO_BRUTO)), 0.0001);
         }
     }
 
@@ -101,7 +103,8 @@ class AmiExcelBuilderTest {
             assertEquals(4, celda(hoja, 27, COL_PESO_BRUTO).getNumericCellValue());
             assertEquals("V24", celda(hoja, 28, COL_PESO_BRUTO).getCellFormula());
             assertEquals("U24", celda(hoja, 29, COL_PESO_BRUTO).getCellFormula());
-            assertEquals(0.384, celda(hoja, 30, COL_PESO_BRUTO).getNumericCellValue(), 0.0001); // 4 * 0.6*0.4*0.4
+            assertEquals("4*0.6*0.4*0.4", celda(hoja, 30, COL_PESO_BRUTO).getCellFormula());
+            assertEquals(0.384, valor(wb, celda(hoja, 30, COL_PESO_BRUTO)), 0.0001);
         }
     }
 
@@ -160,7 +163,8 @@ class AmiExcelBuilderTest {
             Sheet hoja = wb.getSheet(NOMBRE_HOJA);
             assertEquals(CellType.BLANK, hoja.getRow(20).getCell(19).getCellType());
             // Solo la caja medida suma: 0.6*0.4*0.3 = 0.072 m3.
-            assertEquals(0.072, celda(hoja, 28, COL_PESO_BRUTO).getNumericCellValue(), 0.0001);
+            assertEquals("0.6*0.4*0.3", celda(hoja, 28, COL_PESO_BRUTO).getCellFormula());
+            assertEquals(0.072, valor(wb, celda(hoja, 28, COL_PESO_BRUTO)), 0.0001);
         }
     }
 
@@ -294,6 +298,11 @@ class AmiExcelBuilderTest {
         caja.setPesoNetoKg(neto);
         caja.setPesoBrutoKg(bruto);
         return caja;
+    }
+
+    /** El valor de una celda con fórmula, calculado como lo haría Excel al abrirla. */
+    private static double valor(XSSFWorkbook wb, Cell celda) {
+        return wb.getCreationHelper().createFormulaEvaluator().evaluate(celda).getNumberValue();
     }
 
     private static Cell celda(Sheet hoja, int idxFila, int idxCol) {

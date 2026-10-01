@@ -1,12 +1,15 @@
 package com.puntotres.packinglist.web;
 
 import java.util.List;
+import java.util.Map;
+
+import com.puntotres.packinglist.model.CajaData;
 
 /**
  * Una destinación en la pantalla de revisión: su índice en el envío (que
  * localiza sus cajas al aplicar los pesos), su nombre, sus filas ya
- * compactadas y el Livraison code de la destinación entera (null si el
- * cliente no lo usa: solo APC lo tiene).
+ * compactadas, su factura y el Livraison code de la destinación entera
+ * (null si el cliente no lo usa: solo APC lo tiene).
  *
  * <p><b>Una destinación puede llevar dentro varias destinaciones hijas</b>, y
  * por eso las filas van repartidas en {@link Bloque}s en vez de en una sola
@@ -23,9 +26,33 @@ import java.util.List;
  *
  * {@code totalCajas} son los bultos reales y NO coinciden con el número de
  * filas: una fila puede representar un tramo compactado ("4-8").
+ *
+ * {@code factura} es la de la destinación (la tecleada en su cabecera o, si
+ * no hay, la del envío), y {@code taraPorPalet} lo que pesa cada palet de la
+ * destinación según su número, solo los que alguien ha tecleado: un palet
+ * sin entrada cuenta con {@link com.puntotres.packinglist.model.PaletData#TARA_DEFECTO_KG},
+ * que la pantalla enseña en gris.
  */
 public record DestinoVista(int indice, String nombre, List<Bloque> bloques, int totalCajas,
-                           String livraisonCode) {
+                           String livraisonCode, String factura,
+                           Map<Integer, Double> taraPorPalet) {
+
+    /**
+     * El peso del palet de una fila, o null si no se ha tecleado (el campo
+     * sale vacío con el valor por defecto de sugerencia).
+     */
+    public Double pesoPalet(Integer numeroPalet) {
+        return numeroPalet == null ? null : taraPorPalet.get(numeroPalet);
+    }
+
+    /**
+     * Si la fila lleva campo de peso de palet: solo las cajas que van en un
+     * palet de verdad. Sin palet (null) o sueltas (el palet 0) no hay palet
+     * que pesar.
+     */
+    public boolean llevaPesoPalet(Integer numeroPalet) {
+        return !CajaData.vaSuelta(numeroPalet);
+    }
 
     /**
      * Las filas de una destinación hija dentro de su padre. Un cliente sin

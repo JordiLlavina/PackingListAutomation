@@ -76,7 +76,9 @@ public class EnvioForm {
     private String ciudadProveedor;
     private String paisProveedor;
 
-    @NotBlank(message = "El número de factura es obligatorio")
+    // Opcional: cada destinación lleva su propia factura y se teclea en su
+    // cabecera de la revisión. La de aquí es solo el valor de partida de
+    // todas, para el envío que va entero con una sola factura.
     private String numeroFactura;
 
     // Nº de comanda de ICSuite para el volcado ERP. Opcional a propósito:

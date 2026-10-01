@@ -70,6 +70,12 @@ public record AmiEtiquetaLayout(
     public static final int ALTURA_BLOQUE_PALET = 7;
     public static final int FILA_PALET_COLIS = 5;
     public static final int FILA_PALET_PESO = 6;
+    /**
+     * La D: última columna del área de impresión de la hoja de palets
+     * ($A$1:$D$15). Ahí, en la primera fila de cada bloque, va el número del
+     * palet ("Nº3"), arriba a la derecha de su etiqueta.
+     */
+    public static final int COL_NUMERO_PALET = 3;
 
     public static final AmiEtiquetaLayout CHINA = new AmiEtiquetaLayout(
             "AMI CHINA", "Etiquetas Palets CHINA", "CH", 34, 17,

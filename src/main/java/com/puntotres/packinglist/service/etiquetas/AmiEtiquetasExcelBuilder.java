@@ -60,8 +60,11 @@ public class AmiEtiquetasExcelBuilder {
     private record ImagenAnclada(AnclajeBloque anclaje, int indice) {
     }
 
-    /** Los datos ya formateados de la etiqueta de un palet. null = en blanco. */
-    public record EtiquetaPaletAmi(String colis, String poidsBrut) {
+    /**
+     * Los datos ya formateados de la etiqueta de un palet. null = en blanco.
+     * numeroPalet va arriba a la derecha de la etiqueta ("Nº3").
+     */
+    public record EtiquetaPaletAmi(int numeroPalet, String colis, String poidsBrut) {
     }
 
     /** Sin filas extra: la firma que usan los tests y los flujos sin sobrantes. */
@@ -115,7 +118,8 @@ public class AmiEtiquetasExcelBuilder {
                     etiquetas.size() * layout.alturaBloque() - 1);
 
             if (!palets.isEmpty()) {
-                escribirHojaPalets(libro.getSheet(layout.nombreHojaPalets()), palets);
+                escribirHojaPalets(libro.getSheet(layout.nombreHojaPalets()), palets,
+                        new NumeroPaletEtiqueta(libro));
                 actualizarAreaImpresion(libro,
                         libro.getSheetIndex(layout.nombreHojaPalets()),
                         AmiEtiquetaLayout.FILA_PRIMER_PALET
@@ -218,8 +222,14 @@ public class AmiEtiquetasExcelBuilder {
      * La hoja de etiquetas de palet: un bloque por palet, replicado del
      * modelo de la plantilla. Caben dos por A4 (media página cada una), así
      * que el salto de página va tras cada segundo palet, no tras cada uno.
+     *
+     * Cada etiqueta lleva su número de palet ("Nº3") arriba a la derecha: en
+     * la primera fila de su bloque y en la última columna del área de
+     * impresión (la D). Va en cada etiqueta y no una vez por página porque
+     * las dos etiquetas de un A4 se recortan y acaban en palets distintos.
      */
-    private static void escribirHojaPalets(XSSFSheet hoja, List<EtiquetaPaletAmi> palets) {
+    private static void escribirHojaPalets(XSSFSheet hoja, List<EtiquetaPaletAmi> palets,
+                                           NumeroPaletEtiqueta numeroPalet) {
         // La fila 1 de la plantilla trae un contador suelto en E1 apuntado a
         // mano por el cliente: ni es un dato del envío ni debe replicarse.
         if (hoja.getRow(0) != null) {
@@ -243,6 +253,8 @@ public class AmiEtiquetasExcelBuilder {
         }
         for (int i = 0; i < palets.size(); i++) {
             int base = i * altura;
+            numeroPalet.escribir(hoja, primera + base, AmiEtiquetaLayout.COL_NUMERO_PALET,
+                    palets.get(i).numeroPalet());
             escribir(hoja, AmiEtiquetaLayout.FILA_PALET_COLIS + base,
                     AmiEtiquetaLayout.COL_VALOR, palets.get(i).colis());
             escribir(hoja, AmiEtiquetaLayout.FILA_PALET_PESO + base,

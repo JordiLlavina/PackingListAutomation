@@ -47,9 +47,6 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
     /** Los bolsos van como talla única en la etiqueta y en el pedido. */
     private static final String TALLA_UNICA = "U";
 
-    /** Tara de palet cuando el JSON no la trae, la misma que usa APC. */
-    private static final double TARA_PALET_KG_DEFECTO = 10.0;
-
     private static final Map<String, AmiEtiquetaLayout> LAYOUT_POR_DESTINO = Map.of(
             "CHINA", AmiEtiquetaLayout.CHINA,
             "JAPAN", AmiEtiquetaLayout.JAPAN,
@@ -150,8 +147,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
         List<EtiquetaPaletAmi> etiquetasPalet =
                 etiquetasDePalet(cajasFisicas, destino, palets, avisos);
 
-        String nombreFichero = ("Etiquetas_AMI_" + destino.getNombreDestino() + "_"
-                + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
+        String nombreFichero = ExcelGenerado.nombreXlsx("Etiquetas_AMI",
+                destino.getNombreDestino(), envio.facturaPara(destino));
         byte[] contenido = builder.generar(layout, etiquetas, filasExtra, etiquetasPalet);
         return new ExcelGenerado(destino.getNombreDestino(), nombreFichero,
                 contenido, cajasPendientes);
@@ -216,7 +213,7 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
                 avisos.add(AvisoEtiqueta.dePalet(nombreDestino, palet.getNumeroPalet(),
                         "con cajas sin peso", "Etiqueta de palet sin peso"));
             }
-            etiquetas.add(new EtiquetaPaletAmi(
+            etiquetas.add(new EtiquetaPaletAmi(palet.getNumeroPalet(),
                     "Nº " + suyas.stream().mapToInt(CajaFisica::numeroCaja).min().getAsInt()
                             + " à Nº "
                             + suyas.stream().mapToInt(CajaFisica::numeroCaja).max().getAsInt(),
@@ -239,7 +236,7 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             }
             total += caja.pesoBrutoKg();
         }
-        return total + (palet.getTara() != null ? palet.getTara() : TARA_PALET_KG_DEFECTO);
+        return total + palet.taraOPorDefecto();
     }
 
     /** Un artículo de la caja con lo que aporta el excel de pedido. */

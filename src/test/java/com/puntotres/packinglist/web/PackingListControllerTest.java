@@ -1390,6 +1390,36 @@ class PackingListControllerTest {
         assertTrue(revision(sesion).contains("4100128721"));
     }
 
+    /**
+     * La columna MODÈLE del packing de APC sale de la Désignation del excel de
+     * pedido, en mayúsculas: el JSON de esta prueba no trae ningún modelo.
+     */
+    @Test
+    void elModeloDelPackingDeApcSaleDelExcelDePedidoEnMayusculas() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        byte[] pedido;
+        try (var in = getClass().getResourceAsStream("/ejemplos/APC_PEDIDO_FALL26.xlsx")) {
+            pedido = in.readAllBytes();
+        }
+        mvc.perform(multipart("/importar").file(new MockMultipartFile(
+                                "pedidoCliente", "APC_PEDIDO_FALL26.xlsx",
+                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                pedido))
+                        .session(sesion)
+                        .param("cliente", "APC").param("json", JSON_APC_AUSTRALIA)
+                        .param("temporada", "E25").param("numeroFactura", "FA-1")
+                        .param("fechaFactura", "28/04/2026").param("fechaEnvio", "28/04/2026"))
+                .andExpect(redirectedUrl("/revision"));
+        mvc.perform(post("/generar").session(sesion)).andExpect(redirectedUrl("/resultados"));
+
+        byte[] excel = mvc.perform(get("/descargar/PKL_APC_WHOLESALE_FA-1.xlsx").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            assertEquals("CEINTURE PARIS", wb.getSheetAt(0).getRow(17).getCell(3).getStringCellValue());
+        }
+    }
+
     @Test
     void laRevisionMuestraElLivraisonCodeGeneradoDeCadaDestinacion() throws Exception {
         MockHttpSession sesion = new MockHttpSession();
@@ -1432,6 +1462,214 @@ class PackingListControllerTest {
         importar(sesion);
 
         assertFalse(revision(sesion).contains("livraisonCode"));
+    }
+
+    // --- Factura por destinación ---
+
+    private EnvioEnCurso envioDe(MockHttpSession sesion) {
+        return (EnvioEnCurso) sesion.getAttribute("scopedTarget.envioEnCurso");
+    }
+
+    /** La factura ya no es obligatoria en la entrada: cada destinación lleva la suya. */
+    @Test
+    void importarSinFacturaLlevaALaRevision() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", jsonDePrueba())
+                        .param("temporada", "H26")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+    }
+
+    /**
+     * Cada destinación enseña su factura en la cabecera, de partida la de la
+     * entrada, y se edita por separado. Vacío no borra, como el resto.
+     */
+    @Test
+    void cadaDestinacionLlevaSuFacturaYSeEditaPorSeparado() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+        assertTrue(revision(sesion).contains("name=\"destinos[1].numeroFactura\""));
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("destinos[0].indiceDestino", "0")
+                        .param("destinos[0].numeroFactura", "FA-26-2000")
+                        .param("destinos[1].indiceDestino", "1")
+                        .param("destinos[1].numeroFactura", ""))
+                .andExpect(redirectedUrl("/revision"));
+
+        var destinos = envioDe(sesion).getImportado().getDestinos();
+        var cabecera = envioDe(sesion).getCabecera();
+        assertEquals("FA-26-2000", cabecera.facturaPara(destinos.get(0).getDestino()));
+        assertEquals("FA-26-1189", cabecera.facturaPara(destinos.get(1).getDestino()));
+    }
+
+    /**
+     * En APC la factura va primero y el Livraison code detrás de una barra,
+     * en la misma cabecera de la destinación.
+     */
+    @Test
+    void enApcLaFacturaVaDelanteDelLivraisonCode() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        String html = revision(sesion);
+        int factura = html.indexOf("destinos[0].numeroFactura");
+        int barra = html.indexOf("class=\"separador\"");
+        int livraison = html.indexOf("destinos[0].livraisonCode");
+        assertTrue(factura > 0 && factura < barra && barra < livraison, "factura | livraison");
+    }
+
+    /** La factura de cada destinación llega a SU packing list y a sus etiquetas. */
+    @Test
+    void laFacturaDeCadaDestinacionLlegaASusFicheros() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importarApcAustralia(sesion);
+
+        mvc.perform(post("/generar").session(sesion)
+                        .param("destinos[0].indiceDestino", "0")
+                        .param("destinos[0].numeroFactura", "FA-77"))
+                .andExpect(redirectedUrl("/resultados"));
+
+        String html = mvc.perform(get("/resultados").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(html.contains("PKL_APC_WHOLESALE_FA-77.xlsx"), html);
+        assertTrue(html.contains("Etiquetas_APC_WHOLESALE_FA-77.xlsx"), html);
+    }
+
+    /**
+     * Una destinación que llega a generar sin ninguna factura sale igual, con
+     * la celda en blanco, y se dice; el ZIP y el volcado se nombran entonces
+     * con el cliente en vez de con un "null".
+     */
+    @Test
+    void generarSinFacturaAvisaYGeneraIgual() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(post("/importar").session(sesion)
+                        .param("cliente", "AMI").param("json", jsonDePrueba())
+                        .param("temporada", "H26")
+                        .param("fechaFactura", "10/07/2026").param("fechaEnvio", "24/07/2026"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(post("/generar").session(sesion))
+                .andExpect(redirectedUrl("/resultados"));
+
+        mvc.perform(get("/resultados").session(sesion))
+                .andExpect(content().string(containsString("sin número de factura")));
+        mvc.perform(get("/descargar-todo").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", containsString("PKL_AMI.zip")));
+        assertEquals("Volcado_ICSUITE.xlsx", envioDe(sesion).getVolcadoErp().getNombreFichero());
+    }
+
+    // --- Peso de palet ---
+
+    @Test
+    void laColumnaDePesoDePaletSugiereLaTaraPorDefecto() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        String html = revision(sesion);
+        assertTrue(html.contains("Palet (Kg)"));
+        assertTrue(html.contains("class=\"c-peso-palet\""));
+        assertTrue(html.contains("placeholder=\"10\""));
+    }
+
+    /**
+     * El peso de palet es del PALET: lo tecleado en una fila va a la tara de
+     * ese palet de esa destinación, y lo enseñan todas sus filas.
+     */
+    @Test
+    void elPesoDePaletTecleadoVaASuPaletYLoEnsenanTodasSusFilas() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("palets[3].indiceDestino", "0")
+                        .param("palets[3].numeroPalet", "2")
+                        .param("palets[3].pesoKg", "12.5"))
+                .andExpect(redirectedUrl("/revision"));
+
+        var paris = envioDe(sesion).getImportado().getDestinos().get(0);
+        var palet2 = paris.getPalets().stream().filter(p -> p.getNumeroPalet() == 2).findFirst().orElseThrow();
+        assertEquals(12.5, palet2.getTara());
+        // Los demás palets de la destinación no se tocan.
+        assertNull(paris.getPalets().stream().filter(p -> p.getNumeroPalet() == 1)
+                .findFirst().orElseThrow().getTara());
+
+        String html = revision(sesion);
+        int filasDelPalet2 = html.split("data-palet=\"2\"", -1).length - 1;
+        int conElPeso = html.split("value=\"12.5\"\\s+placeholder=\"10\"\\s+data-destino=\"0\"\\s+data-palet=\"2\"", -1).length - 1;
+        assertTrue(filasDelPalet2 > 0);
+        assertEquals(filasDelPalet2, conElPeso, "todas las filas del palet 2 enseñan su peso");
+    }
+
+    /**
+     * Sin JavaScript, las demás filas del palet llegan con el valor viejo: el
+     * que cambia es el que manda, venga antes o después que ellas.
+     */
+    @Test
+    void siLasFilasDeUnPaletLleganDistintasMandaLaQueCambia() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("palets[0].indiceDestino", "0").param("palets[0].numeroPalet", "1")
+                        .param("palets[0].pesoKg", "12"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("palets[0].indiceDestino", "0").param("palets[0].numeroPalet", "1")
+                        .param("palets[0].pesoKg", "12")
+                        .param("palets[1].indiceDestino", "0").param("palets[1].numeroPalet", "1")
+                        .param("palets[1].pesoKg", "14")
+                        .param("palets[2].indiceDestino", "0").param("palets[2].numeroPalet", "1")
+                        .param("palets[2].pesoKg", "12"))
+                .andExpect(redirectedUrl("/revision"));
+
+        var paris = envioDe(sesion).getImportado().getDestinos().get(0);
+        assertEquals(14.0, paris.getPalets().stream().filter(p -> p.getNumeroPalet() == 1)
+                .findFirst().orElseThrow().getTara());
+    }
+
+    @Test
+    void unPesoDePaletVacioNoBorraElTecleado() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("palets[0].indiceDestino", "0").param("palets[0].numeroPalet", "1")
+                        .param("palets[0].pesoKg", "12"))
+                .andExpect(redirectedUrl("/revision"));
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("palets[0].indiceDestino", "0").param("palets[0].numeroPalet", "1")
+                        .param("palets[0].pesoKg", ""))
+                .andExpect(redirectedUrl("/revision"));
+
+        assertEquals(12.0, envioDe(sesion).getImportado().getDestinos().get(0).getPalets().stream()
+                .filter(p -> p.getNumeroPalet() == 1).findFirst().orElseThrow().getTara());
+    }
+
+    /**
+     * Un palet que la distribución no traía (tecleado a mano en la columna
+     * PALET) se da de alta al ponerle peso: si no, el peso no iría a ningún
+     * sitio y el packing list contaría la tara por defecto.
+     */
+    @Test
+    void ponerlePesoAUnPaletNuevoLoDaDeAlta() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        importar(sesion);
+
+        mvc.perform(post("/recalcular").session(sesion)
+                        .param("cajas[0].indiceDestino", "0").param("cajas[0].indicesCaja", "0")
+                        .param("cajas[0].numeroPalet", "9")
+                        .param("palets[1].indiceDestino", "0").param("palets[1].numeroPalet", "9")
+                        .param("palets[1].pesoKg", "11"))
+                .andExpect(redirectedUrl("/revision"));
+
+        var paris = envioDe(sesion).getImportado().getDestinos().get(0);
+        var nuevo = paris.getPalets().stream().filter(p -> p.getNumeroPalet() == 9).findFirst().orElseThrow();
+        assertEquals(11.0, nuevo.getTara());
+        assertEquals("PARIS", nuevo.getDestino());
     }
 
     /**

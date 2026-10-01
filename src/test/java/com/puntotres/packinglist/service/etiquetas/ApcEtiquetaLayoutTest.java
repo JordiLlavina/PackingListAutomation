@@ -177,6 +177,57 @@ class ApcEtiquetaLayoutTest {
         throw new AssertionError("La plantilla no tiene el rótulo '" + rotulo + "'");
     }
 
+    /**
+     * La línea DESTINATION solo se reescribe (caja con varias destinaciones
+     * hijas) donde la plantilla rotula ahí la destinación: WHOLESALE y
+     * RETAIL. En JAPAN, KOREA y USA ese valor es un aeropuerto o una ciudad y
+     * no se toca, así que no tienen fila.
+     */
+    @Test
+    void laFilaDeDestinoEsLaDeSuRotuloYSoloExisteDondeNombraLaDestinacion() throws IOException {
+        for (ApcEtiquetaLayout layout : List.of(ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.RETAIL)) {
+            try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
+                 XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
+                XSSFSheet hoja = libro.getSheet(layout.hojaCajas());
+                assertEquals(filaDeValor(hoja, "DESTINATION"), layout.filaDestino(),
+                        layout.rutaPlantilla() + ": DESTINATION");
+            }
+        }
+        for (ApcEtiquetaLayout layout : List.of(ApcEtiquetaLayout.JAPAN, ApcEtiquetaLayout.KOREA,
+                ApcEtiquetaLayout.USA)) {
+            assertEquals(null, layout.filaDestino(), layout.rutaPlantilla());
+            assertEquals(null, layout.palet().filaDestino(), layout.rutaPlantilla() + " (palet)");
+        }
+    }
+
+    /** Lo mismo en la hoja de palet: la fila de DESTINATION, al lado de su rótulo. */
+    @Test
+    void laFilaDeDestinoDelPaletEsLaDeSuRotulo() throws IOException {
+        for (ApcEtiquetaLayout layout : List.of(ApcEtiquetaLayout.WH_CROSSLOG, ApcEtiquetaLayout.RETAIL)) {
+            ApcEtiquetaLayout.Palet geo = layout.palet();
+            try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
+                 XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
+                XSSFSheet hoja = libro.getSheet(layout.hojaPalet());
+                assertEquals(filaDeRotulo(hoja, geo.colValor() - 1, "DESTINATION"), geo.filaDestino(),
+                        layout.rutaPlantilla() + ": DESTINATION del palet");
+            }
+        }
+    }
+
+    /** El número del palet va en la última columna que se imprime: arriba a la derecha. */
+    @Test
+    void elNumeroDePaletVaEnLaUltimaColumnaDelAreaDeImpresion() throws IOException {
+        for (ApcEtiquetaLayout layout : TODOS) {
+            try (InputStream plantilla = getClass().getResourceAsStream(layout.rutaPlantilla());
+                 XSSFWorkbook libro = new XSSFWorkbook(plantilla)) {
+                int indice = libro.getSheetIndex(layout.hojaPalet());
+                int ultima = new org.apache.poi.ss.util.AreaReference(libro.getPrintArea(indice),
+                        org.apache.poi.ss.SpreadsheetVersion.EXCEL2007).getLastCell().getCol();
+                assertEquals(ultima, layout.palet().colNumeroPalet(), layout.rutaPlantilla());
+            }
+        }
+    }
+
     @Test
     void cadaPlantillaExisteEnElClasspathYTieneSusDosHojas() throws IOException {
         for (ApcEtiquetaLayout layout : TODOS) {

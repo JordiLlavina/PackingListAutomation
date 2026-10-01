@@ -442,6 +442,117 @@ class ApcEtiquetasGeneradorTest {
         assertEquals(1, resultado.getExcels().get(0).getCajasPendientes().size());
     }
 
+    /**
+     * Una caja de WHOLESALE con material de WHOLESALE y de AUSTRALIA (dos
+     * destinaciones hijas que comparten fichero): la línea DESTINATION las
+     * dice las dos y Order N° lleva el pedido de cada una en el mismo orden.
+     * El mismo artículo a dos destinaciones son DOS artículos, porque en APC
+     * el pedido es de la destinación: juntarlos dejaría uno de los dos.
+     */
+    @Test
+    void unaCajaConDosDestinacionesHijasLasNombraYLlevaElPedidoDeCadaUna() throws IOException {
+        CajaData wholesale = caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 6, 7.6, 1);
+        wholesale.setCanal("WHOLESALE");
+        wholesale.setNumeroPedido("4100128710");
+        CajaData australia = caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 4, null, 1);
+        australia.setCanal("AUSTRALIA");
+        australia.setNumeroPedido("4100128799");
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("WHOLESALE", List.of(palet(1, 1, 1, null)), wholesale, australia)),
+                envio(), Map.of());
+
+        ApcEtiquetaLayout wh = ApcEtiquetaLayout.WH_CROSSLOG;
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet hoja = libro.getSheet(wh.hojaCajas());
+            assertEquals("WHOLESALE / AUSTRALIA", texto(hoja, wh.filaDestino(), 2));
+            assertEquals("4100128710 / 4100128799", texto(hoja, wh.filaOrder(), 2));
+            assertEquals("PXCBC-F67008 / PXCBC-F67008", texto(hoja, wh.filaReferencia(), 2));
+            assertEquals("6 / 4", texto(hoja, wh.filaPiezas(), 2));
+            // Y en la segunda etiqueta del par, igual.
+            assertEquals("WHOLESALE / AUSTRALIA",
+                    texto(hoja, wh.filaDestino() + wh.offsetSegundaEtiqueta(), 2));
+        }
+    }
+
+    /** Una caja que va entera a un sitio deja la DESTINATION de la plantilla. */
+    @Test
+    void unaCajaDeUnaSolaDestinacionHijaDejaLaDestinacionDeLaPlantilla() throws IOException {
+        CajaData australia = caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 4, 7.6, 1);
+        australia.setCanal("AUSTRALIA");
+
+        ResultadoEtiquetas resultado = generador.generar(
+                List.of(destino("WHOLESALE", List.of(palet(1, 1, 1, null)), australia)),
+                envio(), Map.of());
+
+        ApcEtiquetaLayout wh = ApcEtiquetaLayout.WH_CROSSLOG;
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            assertEquals("WHOLESALE", texto(libro.getSheet(wh.hojaCajas()), wh.filaDestino(), 2));
+        }
+    }
+
+    /**
+     * La misma regla en la etiqueta de PALET: un palet con cajas de WHOLESALE
+     * y de AUSTRALIA dice las dos en DESTINATION; uno con cajas de una sola
+     * se queda con lo que dice la plantilla.
+     */
+    @Test
+    void unPaletConCajasDeDosDestinacionesHijasLasNombraAmbas() throws IOException {
+        CajaData wholesale = caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 6, 7.6, 1);
+        wholesale.setCanal("WHOLESALE");
+        CajaData australia = caja(2, "PXCBC-F67008", "LZZ-NOIR", null, 4, 5.0, 1);
+        australia.setCanal("AUSTRALIA");
+        CajaData soloAustralia = caja(3, "PXCBC-F67008", "LZZ-NOIR", null, 4, 5.0, 2);
+        soloAustralia.setCanal("AUSTRALIA");
+
+        ResultadoEtiquetas resultado = generador.generar(List.of(destino("WHOLESALE",
+                        List.of(palet(1, 1, 2, null), palet(2, 3, 3, null)),
+                        wholesale, australia, soloAustralia)),
+                envio(), Map.of());
+
+        ApcEtiquetaLayout.Palet geo = ApcEtiquetaLayout.WH_CROSSLOG.palet();
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.WH_CROSSLOG.hojaPalet());
+            assertEquals("WHOLESALE / AUSTRALIA", texto(palet, geo.filaDestino(), geo.colValor()));
+            assertEquals("WHOLESALE", texto(palet, geo.filaDestino() + geo.altura(), geo.colValor()));
+        }
+    }
+
+    /** Cada etiqueta de palet lleva su número arriba a la derecha, a 11 puntos. */
+    @Test
+    void cadaEtiquetaDePaletLlevaSuNumeroArribaALaDerecha() throws IOException {
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        destino("JAPAN", List.of(palet(1, 1, 1, null), palet(2, 2, 2, null)),
+                                caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 1),
+                                caja(2, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 2))),
+                envio(), Map.of());
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(
+                resultado.getExcels().get(0).getContenido()))) {
+            XSSFSheet palet = libro.getSheet(ApcEtiquetaLayout.JAPAN.hojaPalet());
+            assertEquals("Nº1", texto(palet, 0, PALET.colNumeroPalet()));
+            assertEquals("Nº2", texto(palet, PALET.altura(), PALET.colNumeroPalet()));
+            var estilo = palet.getRow(0).getCell(PALET.colNumeroPalet()).getCellStyle();
+            assertEquals(11, libro.getFontAt(estilo.getFontIndex()).getFontHeightInPoints());
+            assertEquals(org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT, estilo.getAlignment());
+        }
+    }
+
+    /** El nombre del fichero lleva la factura de SU destinación. */
+    @Test
+    void elNombreDelFicheroLlevaLaFacturaDeLaDestinacion() throws IOException {
+        EnvioImportado.DestinoImportado japan = destino("JAPAN", List.of(palet(1, 1, 1, null)),
+                caja(1, "PXCBC-F67008", "LZZ-NOIR", null, 11, 7.6, 1));
+        japan.getDestino().setNumeroFactura("26099");
+
+        ResultadoEtiquetas resultado = generador.generar(List.of(japan), envio(), Map.of());
+
+        assertEquals("Etiquetas_APC_JAPAN_26099.xlsx",
+                resultado.getExcels().get(0).getNombreFichero());
+    }
+
     @Test
     void laEtiquetaDePaletSumaLasCajasYSuTara() throws IOException {
         ResultadoEtiquetas resultado = generador.generar(List.of(

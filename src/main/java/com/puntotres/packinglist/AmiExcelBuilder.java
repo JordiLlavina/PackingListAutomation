@@ -231,8 +231,13 @@ public class AmiExcelBuilder {
 
     /**
      * Bloque SUM UP. Las fórmulas apuntan a la fila de totales ya
-     * desplazada; el número de cajas y el volumen van como valor, igual que
-     * en el original.
+     * desplazada; el número de cajas va como valor, igual que en el original.
+     *
+     * El volumen va como FÓRMULA con las medidas a la vista
+     * ("16*0.6*0.4*0.4") en vez del resultado, igual que los pesos, que ya
+     * eran fórmula: así se ve de dónde sale y se corrige a mano sin
+     * recalcular nada. No puede apuntar a celdas porque la columna SIZE OF
+     * BOX es texto ("60x40x40").
      */
     private void escribirResumen(Sheet hoja, int idxFilaTotales, List<PackingListData.Caja> cajas, AmiLayout layout) {
         int desplazamiento = cajas.size() - 1;
@@ -250,17 +255,23 @@ public class AmiExcelBuilder {
                 .setCellFormula(colPesoBrutoLetra + filaTotalesExcel);
         celda(hoja, layout.idxResumenPesoNeto() + desplazamiento, col)
                 .setCellFormula(colPesoNetoLetra + filaTotalesExcel);
-        celda(hoja, layout.idxResumenVolumen() + desplazamiento, col)
-                .setCellValue(calcularVolumenTotalM3(cajas));
+        Cell volumen = celda(hoja, layout.idxResumenVolumen() + desplazamiento, col);
+        String formulaVolumen = formulaVolumenM3(cajas);
+        if (formulaVolumen == null) {
+            volumen.setCellValue(0);
+        } else {
+            volumen.setCellFormula(formulaVolumen);
+        }
     }
 
     /**
-     * Suma del volumen de cada caja en m3, con el mismo criterio que APC y
-     * la genérica (ver {@link VolumenUtil#volumenTotalM3}): las cajas cuya
-     * medida falta no suman, y una medida mal formada sí lanza.
+     * Volumen de las cajas en m3 como fórmula, con el mismo criterio que APC
+     * y la genérica (ver {@link VolumenUtil#formulaVolumenM3}): las cajas cuya
+     * medida falta no suman, y una medida mal formada sí lanza. null si
+     * ninguna caja trae medida.
      */
-    private double calcularVolumenTotalM3(List<PackingListData.Caja> cajas) {
-        return VolumenUtil.volumenTotalM3(
+    private String formulaVolumenM3(List<PackingListData.Caja> cajas) {
+        return VolumenUtil.formulaVolumenM3(
                 cajas.stream().map(PackingListData.Caja::getTamanoCaja).toList());
     }
 

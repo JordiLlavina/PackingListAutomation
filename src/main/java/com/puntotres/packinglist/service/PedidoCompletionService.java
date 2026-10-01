@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -23,6 +24,9 @@ import com.puntotres.packinglist.model.CajaData;
  *
  * Sin excel, sin fila que case o con varias filas candidatas: aviso y se deja
  * el dato como llegó. Un PO inventado sería peor que uno incompleto, que se ve.
+ *
+ * Del mismo excel sale también el nombre del modelo ({@link #completarModelos}),
+ * pero ese con otro ciclo de vida: se rellena al generar, no al importar.
  */
 @Service
 public class PedidoCompletionService {
@@ -55,6 +59,54 @@ public class PedidoCompletionService {
             }
         }
         return resultado;
+    }
+
+    /**
+     * Pone en cada línea el nombre de su modelo —la columna MODÈLE del
+     * packing list de APC— sacado de la "Désignation" del excel de pedido
+     * ({@link ApcPedidoExcel#designacionDe}). Ni la entrada por taller ni la
+     * mayoría de hojas traen ese nombre, y la columna salía en blanco.
+     *
+     * <p>Al revés que {@link #completar}, este SÍ se repite y se llama al
+     * GENERAR, no al importar: el modelo no se teclea en ninguna pantalla, así
+     * que no hay nada que pisar, y así sigue a la referencia aunque se haya
+     * corregido en la revisión. Manda el pedido sobre lo que traiga la entrada
+     * —es el nombre oficial del cliente, el mismo en todos los envíos— y,
+     * si la referencia no está en el pedido, se queda lo que trajera.
+     *
+     * @return un aviso por destinación con las referencias que se quedan sin
+     *         nombre: la columna saldría en blanco en un documento del cliente
+     */
+    public List<String> completarModelos(List<EnvioImportado.DestinoImportado> destinos,
+                                         byte[] excelPedido) {
+        ApcPedidoExcel pedido = null;
+        if (excelPedido != null && excelPedido.length > 0) {
+            try {
+                pedido = ApcPedidoExcel.desdeBytes(excelPedido);
+            } catch (Exception ilegible) {
+                // Ya se avisó al importar; aquí solo cuenta que no hay nombres.
+            }
+        }
+        List<String> avisos = new ArrayList<>();
+        for (EnvioImportado.DestinoImportado destino : destinos) {
+            Set<String> sinNombre = new LinkedHashSet<>();
+            for (CajaData caja : destino.getDestino().getCajas()) {
+                if (pedido != null) {
+                    pedido.designacionDe(caja.getReferencia()).ifPresent(caja::setModelo);
+                }
+                if (caja.getModelo() == null || caja.getModelo().isBlank()) {
+                    sinNombre.add(caja.getReferencia());
+                }
+            }
+            if (!sinNombre.isEmpty()) {
+                avisos.add(destino.getDestino().getNombreDestino() + ": "
+                        + (pedido == null
+                                ? "sin excel de pedido no hay nombre de modelo para "
+                                : "el excel de pedido no trae el nombre del modelo de ")
+                        + String.join(", ", sinNombre) + ": la columna MODÈLE sale en blanco");
+            }
+        }
+        return avisos;
     }
 
     private void completarCaja(CajaData caja, ApcPedidoExcel pedido,

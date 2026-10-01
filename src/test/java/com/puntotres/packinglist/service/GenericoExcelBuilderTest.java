@@ -119,6 +119,13 @@ class GenericoExcelBuilderTest {
         }
     }
 
+    /**
+     * Pesos y volumen van como FÓRMULA, no como el texto ya calculado: el
+     * peso de los cartones suma las filas de caja (sin las de palet), el
+     * bruto apunta a la fila TOTAL y el volumen lleva las medidas. La unidad
+     * ("Kg", "m3") la pone el formato de la celda, así que se sigue leyendo
+     * igual que antes.
+     */
     @Test
     void rellenaElBloqueShipmentDetails() throws Exception {
         List<ExcelGenerado> excels = builder.generar(destino(), palets(), envio(), ackermann());
@@ -127,10 +134,38 @@ class GenericoExcelBuilderTest {
             Sheet hoja = wb.getSheetAt(0);
 
             // Cartones 29.16 kg; + taras (12.5 + 10) = 51.66 kg.
-            assertEquals("29.16 Kg", hoja.getRow(11).getCell(8).getStringCellValue());  // TOTAL WEIGHT
-            assertEquals("51.66 Kg", hoja.getRow(12).getCell(8).getStringCellValue());  // TOTAL GROSS WEIGHT
+            assertEquals("SUM(H22:H23)+SUM(H25:H25)",                              // TOTAL WEIGHT
+                    hoja.getRow(11).getCell(8).getCellFormula());
+            assertEquals(29.16, valor(wb, hoja, 11, 8), 0.0001);
+            assertEquals("0.00\" Kg\"", hoja.getRow(11).getCell(8).getCellStyle().getDataFormatString());
+            assertEquals("H26", hoja.getRow(12).getCell(8).getCellFormula());      // TOTAL GROSS WEIGHT
+            assertEquals(51.66, valor(wb, hoja, 12, 8), 0.0001);
+            assertEquals("3*0.6*0.4*0.4", hoja.getRow(13).getCell(8).getCellFormula()); // TOTAL VOLUME
+            assertEquals(0.288, valor(wb, hoja, 13, 8), 0.0001);
+            assertEquals("0.00\" m3\"", hoja.getRow(13).getCell(8).getCellStyle().getDataFormatString());
             assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());    // TOTAL CARTONS
             assertEquals("3 (60x40x40cm)", hoja.getRow(16).getCell(8).getStringCellValue()); // DIMENTIONS
+        }
+    }
+
+    /** El valor de una celda con fórmula, calculado como lo haría Excel al abrirla. */
+    private static double valor(XSSFWorkbook wb, Sheet hoja, int fila, int col) {
+        return wb.getCreationHelper().createFormulaEvaluator()
+                .evaluate(hoja.getRow(fila).getCell(col)).getNumberValue();
+    }
+
+    /** La factura que manda es la de la destinación; sin ella, la del envío. */
+    @Test
+    void laFacturaDeLaDestinacionMandaSobreLaDelEnvio() throws Exception {
+        DestinoData destino = destino();
+        destino.setNumeroFactura("FA-9");
+
+        ExcelGenerado excel = builder.generar(destino, palets(), envio(), ackermann()).get(0);
+
+        assertTrue(excel.getNombreFichero().endsWith("_FA-9.xlsx"), excel.getNombreFichero());
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel.getContenido()))) {
+            assertEquals("INV FA-9", wb.getSheetAt(0).getSheetName());
+            assertEquals("FA-9", wb.getSheetAt(0).getRow(15).getCell(2).getStringCellValue()); // C16
         }
     }
 
@@ -150,7 +185,8 @@ class GenericoExcelBuilderTest {
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
             Sheet hoja = wb.getSheetAt(0);
             // Solo las dos cajas medidas suman: 2 * 0.096 = 0.192 m3.
-            assertEquals("0.19 m3", hoja.getRow(13).getCell(8).getStringCellValue());
+            assertEquals("2*0.6*0.4*0.4", hoja.getRow(13).getCell(8).getCellFormula());
+            assertEquals(0.192, valor(wb, hoja, 13, 8), 0.0001);
             assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());
             assertEquals("3 (2*60x40x40cm+1*?cm)",
                     hoja.getRow(16).getCell(8).getStringCellValue());

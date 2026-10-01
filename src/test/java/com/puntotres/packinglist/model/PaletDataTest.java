@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.model;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,5 +27,14 @@ class PaletDataTest {
 
         assertFalse(palet.contiene(9));
         assertFalse(palet.contiene(21));
+    }
+
+    @Test
+    void sinTaraTecleadaCuentaLaDePorDefectoYConTaraCuentaEsa() {
+        PaletData palet = new PaletData();
+        assertEquals(PaletData.TARA_DEFECTO_KG, palet.taraOPorDefecto());
+
+        palet.setTara(12.5);
+        assertEquals(12.5, palet.taraOPorDefecto());
     }
 }

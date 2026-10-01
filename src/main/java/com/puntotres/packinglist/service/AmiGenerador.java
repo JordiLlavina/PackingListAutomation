@@ -119,7 +119,9 @@ public class AmiGenerador implements GeneradorPackingListCliente {
         // mapeo ciudad -> destino AMI queda pendiente de ver imágenes reales.
         data.setDestino(destino.getNombreDestino());
         data.setTemporada(envio.getTemporada());
-        data.setNumeroFactura(envio.getNumeroFactura());
+        // Todos los excels de una destinación comparten su factura: la
+        // tecleada en su cabecera de la revisión o, si no hay, la del envío.
+        data.setNumeroFactura(envio.facturaPara(destino));
         data.setFechaFactura(envio.getFechaFactura());
         data.setFechaEnvio(envio.getFechaEnvio());
         if (envio.getCiudadProveedor() != null && !envio.getCiudadProveedor().isBlank()) {

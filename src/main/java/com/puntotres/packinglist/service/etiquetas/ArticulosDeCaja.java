@@ -38,16 +38,31 @@ public final class ArticulosDeCaja {
 
     /** Los artículos de la caja, en orden de primera aparición en el packing list. */
     public static List<ArticuloEtiqueta> de(CajaFisica caja, boolean agruparPorTalla) {
+        return de(caja, agruparPorTalla, false);
+    }
+
+    /**
+     * Igual, pero con {@code separarPorCanal} el mismo artículo que va a dos
+     * destinaciones hijas (APC: WHOLESALE y AUSTRALIA en la misma caja) sale
+     * como DOS artículos, uno por destinación. Hace falta porque en APC el
+     * número de pedido es de una destinación, un artículo y un color:
+     * juntarlos se quedaría con el pedido de una de las dos. En una caja que
+     * va entera a una sola destinación no cambia nada.
+     */
+    public static List<ArticuloEtiqueta> de(CajaFisica caja, boolean agruparPorTalla,
+                                            boolean separarPorCanal) {
         Map<String, ArticuloEtiqueta> porClave = new LinkedHashMap<>();
         for (CajaData linea : caja.lineas()) {
             String talla = agruparPorTalla ? linea.getTalla() : null;
-            String clave = linea.getReferencia() + "|" + linea.getCodigoColor() + "|" + talla;
+            String canal = separarPorCanal ? linea.getCanal() : null;
+            String clave = linea.getReferencia() + "|" + linea.getCodigoColor() + "|" + talla
+                    + "|" + canal;
             porClave.merge(clave,
                     new ArticuloEtiqueta(linea.getReferencia(), linea.getCodigoColor(),
-                            talla, linea.getCantidad()),
+                            talla, linea.getCantidad(), canal),
                     (previo, nuevo) -> new ArticuloEtiqueta(previo.referencia(),
                             previo.codigoColor(), previo.talla(),
-                            previo.cantidad() + nuevo.cantidad()));
+                            previo.cantidad() + nuevo.cantidad(), previo.canal()));
         }
         return List.copyOf(porClave.values());
     }

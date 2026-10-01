@@ -35,13 +35,13 @@ import com.puntotres.packinglist.service.etiquetas.ApcEtiquetasExcelBuilder.Etiq
  * Una caja física = un numeroCaja; los cinturones (línea con talla, APC no
  * usa el prefijo UBL) agrupan unidades por talla en SIZE/PIECES. El peso es
  * el de la línea líder de cada caja ({@link CajaFisica}) y el del palet, la
- * suma de los de sus cajas más la tara (10 kg si el JSON no la trae).
+ * suma de los de sus cajas más la tara (la de la columna "Palet (Kg)" de la
+ * revisión, o {@link PaletData#TARA_DEFECTO_KG} si nadie la ha tecleado).
  */
 @Service
 public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
 
     private static final String NO_DISPONIBLE = "NOT FOUND";
-    private static final double TARA_PALET_KG_DEFECTO = 10.0;
     private static final Locale ESPANOL = Locale.forLanguageTag("es-ES");
 
     private final ApcEtiquetasExcelBuilder builder;
@@ -111,8 +111,8 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     "hay cajas sin palet asignado", "No salen en ninguna etiqueta de palet"));
         }
 
-        String nombreFichero = ("Etiquetas_APC_" + destino.getNombreDestino() + "_"
-                + envio.getNumeroFactura() + ".xlsx").replaceAll("[\\\\/:*?\"<>|\\s]+", "_");
+        String nombreFichero = ExcelGenerado.nombreXlsx("Etiquetas_APC",
+                destino.getNombreDestino(), envio.facturaPara(destino));
         byte[] contenido = builder.generar(layout, etiquetas, etiquetasPalet);
         return new ExcelGenerado(destino.getNombreDestino(), nombreFichero,
                 contenido, cajasPendientes);
@@ -153,15 +153,17 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                     + " " + lider.getCodigoColor()));
         }
 
-        // Un artículo = referencia + color, en el orden del packing list. Los
-        // tres campos que lo identifican (Order N°, Reference y Colour) se
-        // concatenan con " / " y en el MISMO orden, para poder leer la
-        // etiqueta en paralelo: el pedido de la posición n es el de la
-        // referencia de la posición n. El Document d'achat de APC es una
-        // destinación, un artículo y un color, así que cada artículo de la
-        // caja lleva el suyo y quedarse con el de la línea líder ponía en la
-        // etiqueta un pedido que no era el de los demás.
-        List<ArticuloEtiqueta> articulos = ArticulosDeCaja.de(caja, false);
+        // Un artículo = referencia + color (y destinación hija, si la caja
+        // lleva varias), en el orden del packing list. Los tres campos que lo
+        // identifican (Order N°, Reference y Colour) se concatenan con " / "
+        // y en el MISMO orden, para poder leer la etiqueta en paralelo: el
+        // pedido de la posición n es el de la referencia de la posición n. El
+        // Document d'achat de APC es una destinación, un artículo y un color,
+        // así que cada artículo de la caja lleva el suyo y quedarse con el de
+        // la línea líder ponía en la etiqueta un pedido que no era el de los
+        // demás. Por lo mismo, el mismo artículo que va a WHOLESALE y a
+        // AUSTRALIA son dos artículos: cada destinación tiene su pedido.
+        List<ArticuloEtiqueta> articulos = ArticulosDeCaja.de(caja, false, true);
         String referencia = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::referencia);
         String colour = ArticulosDeCaja.unir(articulos, ArticuloEtiqueta::codigoColor);
         String orderNumber = ArticulosDeCaja.unirValores(pedidosDe(caja, articulos));
@@ -199,7 +201,37 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         // El Livraison code sí es uno solo: es de la destinación entera.
         return new EtiquetaCajaApc(orderNumber,
                 oNoDisponible(lider.getLivraisonCode()), referencia,
-                colour, size, piezas, posicion + " / " + total, kg(peso));
+                colour, size, piezas, posicion + " / " + total, kg(peso),
+                destinosSiVarios(List.of(caja), nombreDestino));
+    }
+
+    /**
+     * Las destinaciones hijas de unas cajas ("WHOLESALE / AUSTRALIA"), en el
+     * orden del packing list, SOLO si hay más de una; null si todo va a un
+     * sitio, y entonces la etiqueta se queda con lo que dice su plantilla.
+     * Pasa en WHOLESALE y RETAIL, donde varias hijas comparten fichero y
+     * palet, y un bulto puede llevar material de dos. La misma regla vale
+     * para la etiqueta de una caja (sus líneas) y para la de un palet (las
+     * líneas de todas sus cajas).
+     *
+     * La hija de una línea es su canal, que es donde la deja
+     * ResolutorDestinosPadre al fusionar; una línea sin canal va a la
+     * destinación misma.
+     */
+    private static String destinosSiVarios(List<CajaFisica> cajas, String nombreDestino) {
+        Set<String> destinos = new LinkedHashSet<>();
+        for (CajaFisica caja : cajas) {
+            for (CajaData linea : caja.lineas()) {
+                destinos.add(destinoDe(linea, nombreDestino));
+            }
+        }
+        return destinos.size() > 1 ? String.join(" / ", destinos) : null;
+    }
+
+    private static String destinoDe(CajaData linea, String nombreDestino) {
+        String canal = linea.getCanal();
+        String destino = canal == null || canal.isBlank() ? nombreDestino : canal;
+        return destino.trim().toUpperCase(Locale.ROOT);
     }
 
     /**
@@ -212,13 +244,19 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
         Map<String, String> porArticulo = new LinkedHashMap<>();
         for (CajaData linea : caja.lineas()) {
             if (linea.getNumeroPedido() != null && !linea.getNumeroPedido().isBlank()) {
-                porArticulo.putIfAbsent(claveRefColor(linea), linea.getNumeroPedido());
+                porArticulo.putIfAbsent(claveArticulo(linea.getReferencia(),
+                        linea.getCodigoColor(), linea.getCanal()), linea.getNumeroPedido());
             }
         }
         return articulos.stream()
-                .map(articulo -> oNoDisponible(
-                        porArticulo.get(articulo.referencia() + "|" + articulo.codigoColor())))
+                .map(articulo -> oNoDisponible(porArticulo.get(claveArticulo(
+                        articulo.referencia(), articulo.codigoColor(), articulo.canal()))))
                 .toList();
+    }
+
+    /** Referencia + color + destinación hija: lo que identifica un pedido de APC. */
+    private static String claveArticulo(String referencia, String color, String canal) {
+        return referencia + "|" + color + "|" + canal;
     }
 
     private static String oNoDisponible(String valor) {
@@ -288,9 +326,10 @@ public class ApcEtiquetasGenerador implements GeneradorEtiquetasCliente {
                         "con cajas sin peso", "Etiqueta de palet sin peso"));
                 peso = null;
             } else {
-                peso += palet.getTara() != null ? palet.getTara() : TARA_PALET_KG_DEFECTO;
+                peso += palet.taraOPorDefecto();
             }
-            etiquetas.add(new EtiquetaPaletApc(numeroCajas, kg(peso)));
+            etiquetas.add(new EtiquetaPaletApc(palet.getNumeroPalet(), numeroCajas, kg(peso),
+                    destinosSiVarios(suyas, nombreDestino)));
         }
         return etiquetas;
     }

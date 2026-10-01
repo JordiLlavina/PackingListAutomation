@@ -141,10 +141,14 @@
                 <input type="text" id="temporada" th:field="*{temporada}" placeholder="H26">
                 <p class="error-campo" th:errors="*{temporada}"></p>
             </div>
+            <!-- Opcional: cada destinación lleva su factura y se teclea en la
+                 revisión, en la cabecera de la destinación. Lo que se ponga
+                 aquí es solo el valor de partida de todas. -->
             <div>
                 <label for="numeroFactura">Nº de factura</label>
-                <input type="text" id="numeroFactura" th:field="*{numeroFactura}" placeholder="FA-26-1189">
-                <p class="error-campo" th:errors="*{numeroFactura}"></p>
+                <input type="text" id="numeroFactura" th:field="*{numeroFactura}"
+                       placeholder="Opcional"
+                       title="Cada destinación lleva su factura y se pone en la revisión: la de aquí es la de partida de todas">
             </div>
             <div>
                 <label for="fechaFactura">Fecha factura (dd/MM/yyyy)</label>

@@ -1,6 +1,11 @@
 package com.puntotres.packinglist;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Cálculo de volumen en m3 a partir de medidas "LxWxH" en centímetros
@@ -13,13 +18,8 @@ public final class VolumenUtil {
     }
 
     public static double volumenM3(String medidasCm) {
-        String[] partes = medidasCm == null ? new String[0] : medidasCm.split("[xX]");
-        if (partes.length != 3) {
-            throw new IllegalArgumentException(
-                    "Las medidas deben tener formato LxWxH en cm, recibido: " + medidasCm);
-        }
         double volumen = 1;
-        for (String parte : partes) {
+        for (String parte : lados(medidasCm)) {
             volumen *= Double.parseDouble(parte.trim()) / 100.0;
         }
         return volumen;
@@ -46,6 +46,38 @@ public final class VolumenUtil {
         return total;
     }
 
+    /**
+     * El mismo volumen que {@link #volumenTotalM3}, pero como FÓRMULA de Excel
+     * (sin el "=") y no como resultado: el packing list enseña de dónde sale
+     * el número y quien lo abre puede corregir una caja sin recalcular nada a
+     * mano. Un término por medida distinta, con cuántas cajas la llevan y sus
+     * tres lados en metros, en el orden en que aparecen:
+     * {@code "2*0.6*0.4*0.3+51*0.6*0.4*0.4"}. Una sola caja de una medida va
+     * sin el "1*".
+     *
+     * Van los lados y no el volumen de cada caja ya multiplicado porque el
+     * desglose de cartones del mismo excel se escribe en centímetros
+     * ("60x40x30cm"), y así los dos se leen uno al lado del otro.
+     *
+     * Mismo criterio que la suma: una medida que falta no suma y una ilegible
+     * lanza. null si no hay ninguna medida que sumar, para que quien llama
+     * escriba un cero en vez de una fórmula vacía.
+     */
+    public static String formulaVolumenM3(List<String> medidasCm) {
+        Map<String, Integer> cajasPorMedida = new LinkedHashMap<>();
+        for (String medidas : medidasCm) {
+            if (tieneMedida(medidas)) {
+                cajasPorMedida.merge(ladosEnMetros(medidas), 1, Integer::sum);
+            }
+        }
+        if (cajasPorMedida.isEmpty()) {
+            return null;
+        }
+        return cajasPorMedida.entrySet().stream()
+                .map(e -> e.getValue() == 1 ? e.getKey() : e.getValue() + "*" + e.getKey())
+                .collect(Collectors.joining("+"));
+    }
+
     public static boolean tieneMedida(String medidasCm) {
         return medidasCm != null && !medidasCm.isBlank();
     }
@@ -57,5 +89,22 @@ public final class VolumenUtil {
      */
     public static String etiqueta(String medidasCm) {
         return tieneMedida(medidasCm) ? medidasCm : "?";
+    }
+
+    /** "60x40x30" -> "0.6*0.4*0.3": los tres lados en metros, sin ceros de sobra. */
+    private static String ladosEnMetros(String medidasCm) {
+        return Arrays.stream(lados(medidasCm))
+                .map(lado -> new BigDecimal(lado.trim()).movePointLeft(2)
+                        .stripTrailingZeros().toPlainString())
+                .collect(Collectors.joining("*"));
+    }
+
+    private static String[] lados(String medidasCm) {
+        String[] partes = medidasCm == null ? new String[0] : medidasCm.split("[xX]");
+        if (partes.length != 3) {
+            throw new IllegalArgumentException(
+                    "Las medidas deben tener formato LxWxH en cm, recibido: " + medidasCm);
+        }
+        return partes;
     }
 }
