@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -223,12 +224,18 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
             medidasPorPalet.put(palet.getNumeroPalet(), palet.getMedidas());
         }
 
-        Map<Integer, Map<Integer, List<CajaData>>> porPaletYCaja = new LinkedHashMap<>();
-        Map<Integer, List<CajaData>> sinPaletPorCaja = new LinkedHashMap<>();
+        // Palets y cajas POR NÚMERO, no por orden de llegada: las cajas vienen
+        // agrupadas por destinación hija (todo WHOLESALE y luego todo
+        // AUSTRALIA), que comparten fichero, palet y numeración, así que
+        // respetando ese orden el packing enseñaba la caja 14 entre la 11 y la
+        // 12. Quien lo lee busca un número de bulto, y una lista que salta no
+        // se puede recorrer.
+        Map<Integer, Map<Integer, List<CajaData>>> porPaletYCaja = new TreeMap<>();
+        Map<Integer, List<CajaData>> sinPaletPorCaja = new TreeMap<>();
         for (CajaData caja : destino.getCajas()) {
             Map<Integer, List<CajaData>> porCaja = CajaData.vaSuelta(caja.getNumeroPalet())
                     ? sinPaletPorCaja
-                    : porPaletYCaja.computeIfAbsent(caja.getNumeroPalet(), n -> new LinkedHashMap<>());
+                    : porPaletYCaja.computeIfAbsent(caja.getNumeroPalet(), n -> new TreeMap<>());
             porCaja.computeIfAbsent(caja.getNumeroCaja(), n -> new ArrayList<>()).add(caja);
         }
 

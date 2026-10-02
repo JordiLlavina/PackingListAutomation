@@ -9,10 +9,9 @@
 
     <section class="tarjeta">
         <p class="ayuda">
-            La tara es el peso del cartón vacío. Se usa para calcular el peso bruto de cada
-            caja a partir del neto, y al revés. Un cartón que todavía no se haya pesado se
-            puede dejar en 0,01: el programa funciona igual, pero los pesos que salgan de
-            ahí no valdrán.
+            La tara es el peso de la caja vacía. Se usa para calcular el peso bruto a partir
+            del neto, y al viceversa. Un cartón que todavía no se haya pesado se puede dejar
+            en 0,01.
         </p>
         <p class="ayuda" th:if="${pesoSeparadoresKg > 0}">
             A la tara del cartón el programa le suma además
@@ -20,12 +19,7 @@
             <strong th:text="${#numbers.formatDecimal(pesoSeparadorKg, 1, 'COMMA', 2, 'POINT')} + ' kg'">0,08 kg</strong>
             por caja, o sea
             <strong th:text="${#numbers.formatDecimal(pesoSeparadoresKg, 1, 'COMMA', 2, 'POINT')} + ' kg'">0,16 kg</strong>
-            más. Aquí se teclea solo lo que pesa el cartón, que es lo que se pone en la
-            báscula; los separadores no se editan en esta pantalla.
-        </p>
-        <p class="ayuda">
-            La medida se escribe <strong>largo x ancho x alto</strong>, en centímetros y con
-            la altura al final. De ese último número salen las pilas del palet.
+            más.
         </p>
 
         <table class="tabla-taras">

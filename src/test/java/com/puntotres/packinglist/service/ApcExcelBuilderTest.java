@@ -169,6 +169,40 @@ class ApcExcelBuilderTest {
         }
     }
 
+    /**
+     * Las cajas llegan agrupadas por destinación hija (todo WHOLESALE y
+     * luego todo AUSTRALIA), que comparten fichero, palet y numeración. El
+     * packing las saca ORDENADAS POR NÚMERO, no en ese orden: quien lee la
+     * hoja busca un número de bulto, y una lista que salta de la 11 a la 14
+     * y vuelve a la 12 no se puede recorrer. Lo mismo con los palets.
+     */
+    @Test
+    void lasCajasSalenPorNumeroAunqueLleguenAgrupadasPorDestinacionHija() throws Exception {
+        DestinoData destino = new DestinoData();
+        destino.setNombreDestino("IVRY");
+        destino.setCajas(List.of(
+                linea(3, 2, "LE NEIGE", "PXCBC-F67008", "WHOLESALE", null, 11, 8.18),
+                linea(4, 2, "LE NEIGE", "PXCBC-F67008", "WHOLESALE", null, 11, 8.18),
+                linea(1, 1, "LE NEIGE", "PXCBC-F67008", "AUSTRALIA", null, 11, 8.18),
+                linea(2, 1, "LE NEIGE", "PXCBC-F67008", "AUSTRALIA", null, 11, 8.18)));
+
+        List<ExcelGenerado> excels = builder.generar(destino,
+                List.of(palet("IVRY", 1, 1, 2), palet("IVRY", 2, 3, 4)), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            assertEquals("PALET 1", hoja.getRow(16).getCell(1).getStringCellValue());
+            assertEquals(1, (int) hoja.getRow(17).getCell(1).getNumericCellValue());
+            assertEquals(2, (int) hoja.getRow(18).getCell(1).getNumericCellValue());
+            assertEquals("PALET 2", hoja.getRow(19).getCell(1).getStringCellValue());
+            assertEquals(3, (int) hoja.getRow(20).getCell(1).getNumericCellValue());
+            assertEquals(4, (int) hoja.getRow(21).getCell(1).getNumericCellValue());
+            // Cada caja conserva su destinación: lo que se reordena son las filas.
+            assertEquals("AUSTRALIA", hoja.getRow(17).getCell(10).getStringCellValue());
+            assertEquals("WHOLESALE", hoja.getRow(20).getCell(10).getStringCellValue());
+        }
+    }
+
     @Test
     void unaCajaConVariasLineasSoloLlevaNumeroYPesoEnLaPrimera() throws Exception {
         List<ExcelGenerado> excels = builder.generar(destinoIvry(), palets(), envio(), apc());

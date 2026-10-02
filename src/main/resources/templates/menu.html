@@ -75,17 +75,31 @@
             </ul>
             <a class="boton" th:href="@{/clickup}">Empezar</a>
         </section>
+
+        <!-- Los dos ajustes no son un flujo con pantallas, sino un dato que se
+             guarda una vez y vale para todos los envíos, así que van en paneles
+             pequeños y no en una tarjeta. En la columna caben tres; el tercero
+             se deja libre para el siguiente, que entra añadiendo su enlace. -->
+        <div class="menu-paneles">
+            <a class="menu-panel" th:href="@{/taras}">
+                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 4v16M8 20h8M4 7h16"/>
+                    <path d="M4 7 1.5 13h5zM20 7l-2.5 6h5z"/>
+                </svg>
+                <span class="menu-panel-titulo">Taras de los cartones</span>
+            </a>
+
+            <a class="menu-panel" th:href="@{/temporadas}">
+                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 4.5h18v4H3zM5 8.5v11h14v-11"/>
+                    <path d="M10 12h4"/>
+                </svg>
+                <span class="menu-panel-titulo">Guarda Temporadas y Ficheros</span>
+            </a>
+        </div>
     </div>
-
-    <p class="menu-ajustes">
-        ⚖️ <a th:href="@{/taras}">Taras de los cartones</a> — el peso de cada caja vacía,
-        de donde salen los pesos brutos.
-    </p>
-
-    <p class="menu-ajustes">
-        🗂️ <a th:href="@{/temporadas}">Guarda Temporadas y Ficheros</a> — el excel de pedido de
-        cada temporada, guardado una vez para no subirlo en cada envío.
-    </p>
 </main>
 </body>
 </html>
