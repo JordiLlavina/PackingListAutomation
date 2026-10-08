@@ -10,7 +10,6 @@ import java.util.Arrays;
 import org.apache.poi.common.usermodel.PictureType;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.xwpf.usermodel.BreakType;
-import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
 import org.apache.poi.xwpf.usermodel.TableRowHeightRule;
 import org.apache.poi.xwpf.usermodel.TableWidthType;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -20,7 +19,6 @@ import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBody;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTBorder;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageMar;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTPageSz;
@@ -29,22 +27,19 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTSpacing;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblGrid;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblLayoutType;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTblPr;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcBorders;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr;
-import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STLineSpacingRule;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STPageOrientation;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblLayoutType;
 
 /**
- * Lo que comparten los dos Word del corte: página, tablas de medidas
- * exactas, textos y fotos. Todo en twips (veinteavos de punto), que es como
- * mide Word la página y las tablas, salvo las imágenes, que van en EMU.
+ * Las piezas del Word de fotos del corte: página, tablas de medidas exactas,
+ * textos y fotos. Todo en twips (veinteavos de punto), que es como mide Word
+ * la página y las tablas, salvo las imágenes, que van en EMU. (Las órdenes de
+ * corte también eran un Word; ahora son un Excel, OrdenCorteExcelBuilder.)
  *
  * Las tablas van con medidas y alturas EXACTAS a propósito: es lo único que
- * garantiza que una orden de corte o una hoja de fotos ocupe exactamente una
- * página, en vez de dejar que Word reparta y empuje media tabla a la
- * siguiente.
+ * garantiza que una hoja de fotos ocupe exactamente una página, en vez de
+ * dejar que Word reparta y empuje media tabla a la siguiente.
  */
 final class WordCorte {
 
@@ -118,13 +113,6 @@ final class WordCorte {
         return parrafo;
     }
 
-    static XWPFParagraph parrafo(XWPFTableCell celda, ParagraphAlignment alineacion) {
-        XWPFParagraph parrafo = celda.addParagraph();
-        sinEspacio(parrafo);
-        parrafo.setAlignment(alineacion);
-        return parrafo;
-    }
-
     static void sinEspacio(XWPFParagraph parrafo) {
         parrafo.setSpacingBefore(0);
         parrafo.setSpacingAfter(0);
@@ -154,20 +142,6 @@ final class WordCorte {
             parrafo.createRun().addPicture(datos, PictureType.JPEG, "foto.jpg", ancho, alto);
         } catch (InvalidFormatException e) {
             throw new IOException("no se ha podido meter la foto en el Word", e);
-        }
-    }
-
-    static void bordeCaja(XWPFTableCell celda, int grosor, String color) {
-        CTTcPr propiedades = celda.getCTTc().isSetTcPr()
-                ? celda.getCTTc().getTcPr() : celda.getCTTc().addNewTcPr();
-        CTTcBorders bordes = propiedades.isSetTcBorders()
-                ? propiedades.getTcBorders() : propiedades.addNewTcBorders();
-        for (CTBorder borde : new CTBorder[] {bordes.addNewTop(), bordes.addNewLeft(),
-                bordes.addNewBottom(), bordes.addNewRight()}) {
-            borde.setVal(STBorder.SINGLE);
-            borde.setSz(BigInteger.valueOf(grosor));
-            borde.setSpace(BigInteger.ZERO);
-            borde.setColor(color);
         }
     }
 

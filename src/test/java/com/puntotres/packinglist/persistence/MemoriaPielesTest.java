@@ -86,4 +86,52 @@ class MemoriaPielesTest {
         assertEquals("", recordadas.nombrePiel(), "sin ref de piel no hay dónde guardar su nombre");
         assertEquals(List.of("Ante"), recordadas.combinaciones());
     }
+
+    @Test
+    void losColoresDePielSonDeCadaColorDelBolso() {
+        memoria.recordarColores("AMI", "ULL027.AL0906", "001", "Box calf", "BLACK", "NOIR",
+                List.of("NEGRO", "", "MARRON"));
+        memoria.recordarColores("AMI", "ULL027.AL0906", "718", "Box calf", "CRUDO", "", List.of());
+
+        MemoriaPieles.ColoresRecordados negro = memoria.buscarColores("ami", "ull027.al0906", "001");
+        assertEquals("BLACK", negro.colorPiel());
+        assertEquals("NOIR", negro.colorForro());
+        assertEquals(List.of("NEGRO", "", "MARRON"), negro.coloresCombinacion(),
+                "los huecos se quedan: van emparejados por posición con las combinaciones");
+        assertEquals("CRUDO", memoria.buscarColores("AMI", "ULL027.AL0906", "718").colorPiel());
+        assertEquals(MemoriaPieles.ColoresRecordados.NINGUNO,
+                memoria.buscarColores("AMI", "ULL027.AL0906", "A237"));
+    }
+
+    @Test
+    void laTablaDePielesAnadeLasNuevasVaciasYNoTocaLasQueYaEstaban() {
+        memoria.guardarPiel("PRUEBAP", "pz1", "Box calf");
+
+        Incorporacion incorporacion = memoria.incorporarPieles("PRUEBAP", List.of("PZ1", "PZ2", "pz2", " "));
+
+        assertEquals(List.of("PZ2"), incorporacion.anadidos());
+        assertEquals(List.of("PZ1"), incorporacion.yaEstaban());
+        assertEquals(List.of("PZ1", "PZ2"), memoria.pielesDe("PRUEBAP").stream().map(MemoriaPiel::getRefPiel).toList());
+        assertEquals("Box calf", memoria.buscar("PRUEBAP", "PZ1", "X.PZ1").nombrePiel());
+        assertEquals("", memoria.buscar("PRUEBAP", "PZ2", "X.PZ2").nombrePiel());
+    }
+
+    @Test
+    void desdeSuTablaUnNombreSePuedeVaciarYUnaPielBorrar() {
+        memoria.guardarPiel("PRUEBAP", "PZ3", "Nappa");
+        memoria.guardarPiel("PRUEBAP", "PZ3", "");
+
+        assertEquals("", memoria.buscar("PRUEBAP", "PZ3", "X.PZ3").nombrePiel(),
+                "en su tabla vaciar es corregir, al revés que al generar el corte");
+        assertTrue(memoria.borrarPiel("PRUEBAP", "pz3"));
+        assertTrue(!memoria.borrarPiel("PRUEBAP", "PZ3"));
+    }
+
+    @Test
+    void sinNombreDePielNoSeGuardanLosColores() {
+        memoria.recordarColores("AMI", "ULL027.AL0907", "001", "Box calf", "BLACK", "", List.of());
+        memoria.recordarColores("AMI", "ULL027.AL0907", "001", " ", "OTRO", "", List.of());
+
+        assertEquals("BLACK", memoria.buscarColores("AMI", "ULL027.AL0907", "001").colorPiel());
+    }
 }

@@ -7,6 +7,10 @@ import java.util.List;
  * Lo que llega de la tabla de pieles: una fila por referencia, en el mismo
  * orden que CorteEnCurso.getFilas(). Los bolsos llegan como texto para poder
  * decir qué se tecleó mal en vez de perderlo en un error de conversión.
+ *
+ * Los colores de piel llegan uno por color del bolso ({@code colores}, en el
+ * orden de los colores de la fila), con el de la piel principal, el del
+ * forro y uno por columna de combinación.
  */
 public class PielesForm {
 
@@ -21,6 +25,7 @@ public class PielesForm {
         private String forro;
         private List<String> combinaciones = new ArrayList<>();
         private List<String> bolsos = new ArrayList<>();
+        private List<ColoresDeUnColor> colores = new ArrayList<>();
         private Integer fotoPrincipal;
         /** null = no ha llegado ni la casilla ni su marcador "_": se deja como estaba. */
         private Boolean incluir;
@@ -33,9 +38,26 @@ public class PielesForm {
         public void setCombinaciones(List<String> combinaciones) { this.combinaciones = combinaciones; }
         public List<String> getBolsos() { return bolsos; }
         public void setBolsos(List<String> bolsos) { this.bolsos = bolsos; }
+        public List<ColoresDeUnColor> getColores() { return colores; }
+        public void setColores(List<ColoresDeUnColor> colores) { this.colores = colores; }
         public Integer getFotoPrincipal() { return fotoPrincipal; }
         public void setFotoPrincipal(Integer fotoPrincipal) { this.fotoPrincipal = fotoPrincipal; }
         public Boolean getIncluir() { return incluir; }
         public void setIncluir(Boolean incluir) { this.incluir = incluir; }
+    }
+
+    /** Los colores de piel de un color del bolso. Un campo null no ha llegado y no se toca. */
+    public static class ColoresDeUnColor {
+
+        private String piel;
+        private String forro;
+        private List<String> combinaciones = new ArrayList<>();
+
+        public String getPiel() { return piel; }
+        public void setPiel(String piel) { this.piel = piel; }
+        public String getForro() { return forro; }
+        public void setForro(String forro) { this.forro = forro; }
+        public List<String> getCombinaciones() { return combinaciones; }
+        public void setCombinaciones(List<String> combinaciones) { this.combinaciones = combinaciones; }
     }
 }

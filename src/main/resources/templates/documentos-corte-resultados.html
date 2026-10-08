@@ -26,7 +26,8 @@
         <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
     </details>
 
-    <!-- Sección 1: las órdenes de corte, un solo Word con una página por orden. -->
+    <!-- Sección 1: las órdenes de corte, un solo Excel con una hoja (una página
+         impresa) por modelo, piel y color. -->
     <section class="tarjeta seccion-salida">
         <h3 class="titulo-seccion">
             <svg th:replace="~{fragmentos :: iconoPiel('icono-titulo')}"></svg>

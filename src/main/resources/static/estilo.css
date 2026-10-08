@@ -755,6 +755,34 @@ header.cabecera .enlace-menu:hover {
 
 .fecha-tara { color: #5a6673; font-size: 0.8rem; white-space: nowrap; }
 
+/* Colores y Pieles de Cliente: el código en negrita y, en una fila que aún no tiene
+   descripción, la casilla resaltada, que es la que hay que rellenar. */
+.selector-cliente {
+    min-width: 18rem;
+    padding: 0.5rem 0.7rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    background: #fff;
+    font: inherit;
+    font-size: 1.05rem;
+}
+/* El título "Cliente" y su desplegable en la misma línea. */
+.cabecera-cliente { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem 1.2rem; }
+.cabecera-cliente .titulo-seccion { margin: 0; }
+.form-pedido-colores input[type="file"] { width: 24rem; max-width: 100%; }
+.form-pedido-colores .fila-cliente label { margin-top: 0; }
+.tabla-colores .codigo-color { font-weight: 600; white-space: nowrap; }
+.tabla-colores input[type="text"] { width: 16rem; }
+.tabla-colores tr.sin-descripcion input[type="text"] { background: #fff8e1; }
+/* Guardar una fila no recarga: el resultado se dice al lado, en verde o en rojo. */
+.tabla-colores .celda-valor { display: flex; align-items: center; gap: 0.6rem; }
+.tabla-colores .celda-valor button { margin: 0; }
+.estado-fila { font-size: 0.85rem; color: #2e7d32; white-space: nowrap; }
+.estado-fila.error { color: var(--error-borde); }
+.acciones-pedido button { margin-right: 0.6rem; }
+.anadir-a-mano { display: flex; flex-wrap: wrap; gap: 1rem 3rem; }
+.anadir-a-mano label { margin-top: 0; }
+
 .menu-ajustes {
     margin-top: 1.5rem;
     font-size: 0.9rem;
@@ -1030,17 +1058,15 @@ main.ancho-completo { max-width: 96rem; }
 .tabla-desplazable { overflow-x: auto; }
 .tabla-pieles td { vertical-align: top; }
 .tabla-pieles td.c-modelo, .tabla-pieles td.c-piel { white-space: nowrap; font-weight: 600; }
-.tabla-pieles .color-bolsos {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-    white-space: nowrap;
-}
-.tabla-pieles .color-bolsos + .color-bolsos { margin-top: 0.3rem; }
-.tabla-pieles .color-bolsos label { display: inline; margin: 0; font-weight: normal; }
+/* Una referencia ocupa una fila por color: una raya más gruesa separa una
+   referencia de la siguiente, para que sus filas se lean como un bloque. */
+.tabla-pieles tbody.referencia > tr:first-child > td { border-top: 2px solid var(--borde); }
+.tabla-pieles td.c-color { white-space: nowrap; vertical-align: middle; }
+.tabla-pieles td.c-color label { display: inline; margin: 0; font-weight: normal; }
 .tabla-pieles td input[type="number"] { width: 5rem; }
 .tabla-pieles td input[type="text"] { width: 100%; min-width: 9rem; }
+/* El color de cada piel es una palabra ("NOIR"): casilla más estrecha que la del nombre. */
+.tabla-pieles .c-color-piel input[type="text"] { min-width: 6rem; }
 .tabla-pieles select { max-width: 12rem; }
 .tabla-pieles .sin-fotos { color: var(--gris-fuerte); font-style: italic; }
 /* Incluir o no una referencia en los documentos: casilla en gris y, desmarcada, la fila apagada. */
@@ -1051,6 +1077,6 @@ main.ancho-completo { max-width: 96rem; }
    saldrán las órdenes de corte: sin margen propio, como el progreso al que sustituye. */
 .fila-progreso .aviso-procesando, .fila-progreso .boton, .fila-progreso .alerta { margin: 0; }
 .tabla-pieles input.casilla-incluir { accent-color: var(--gris-fuerte); width: 1.1rem; height: 1.1rem; cursor: pointer; }
-.tabla-pieles tr.fila-excluida td { background: #eceef0; color: #9aa3ab; }
-.tabla-pieles tr.fila-excluida td:not(.c-incluir) > * { opacity: 0.55; }
+.tabla-pieles tbody.fila-excluida td { background: #eceef0; color: #9aa3ab; }
+.tabla-pieles tbody.fila-excluida td:not(.c-incluir) > * { opacity: 0.55; }
 .acciones-corte { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }

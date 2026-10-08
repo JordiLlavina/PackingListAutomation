@@ -37,6 +37,7 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.testutil.FotosDePrueba;
+import com.puntotres.packinglist.testutil.ExcelDePrueba;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel.Fila;
 
@@ -141,16 +142,16 @@ class DocumentosCorteControllerTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertTrue(resultados.contains("id=\"avisoSinFotos\""), resultados);
-        assertTrue(resultados.contains("Ordenes de corte AMI H26.docx"), resultados);
+        assertTrue(resultados.contains("Ordenes de corte AMI H26.xlsx"), resultados);
         assertTrue(resultados.contains("No se han adjuntado fotos de la temporada."),
                 resultados.substring(resultados.indexOf("Fotos de Artículo")));
 
-        byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
+        byte[] excel = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.xlsx")
                         .session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
-        assertEquals('P', word[0]);
-        assertEquals('K', word[1]);
+        assertEquals('P', excel[0]);
+        assertEquals('K', excel[1]);
         // Ningún Word de fotos: el zip de fotos no existe.
         mvc.perform(get("/documentos-corte/descargar-fotos").session(sesion))
                 .andExpect(status().isNotFound());
@@ -255,7 +256,7 @@ class DocumentosCorteControllerTest {
         assertTrue(ordenes > 0 && fotos > ordenes, resultados);
         String apartadoOrdenes = resultados.substring(ordenes, fotos);
         String apartadoFotos = resultados.substring(fotos);
-        assertTrue(apartadoOrdenes.contains("Ordenes de corte AMI H26.docx"), apartadoOrdenes);
+        assertTrue(apartadoOrdenes.contains("Ordenes de corte AMI H26.xlsx"), apartadoOrdenes);
         assertTrue(apartadoFotos.contains("Fotos de ULL105 (2 fotos)"), apartadoFotos);
         assertTrue(!apartadoFotos.contains("<th>Fichero</th>"), "el fichero es redundante con el contenido");
         assertTrue(apartadoFotos.contains("href=\"/documentos-corte/descargar-fotos\""), apartadoFotos);
@@ -267,14 +268,16 @@ class DocumentosCorteControllerTest {
         }
         assertEquals(3, pie.split("boton neutro", -1).length - 1);
 
-        byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
+        byte[] excel = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.xlsx")
                         .session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(content().contentType(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .andExpect(content().contentType(XLSX))
                 .andReturn().getResponse().getContentAsByteArray();
-        assertEquals('P', word[0]);
-        assertEquals('K', word[1]);
+        assertEquals('P', excel[0]);
+        assertEquals('K', excel[1]);
+        mvc.perform(get("/documentos-corte/descargar/Fotos ULL105.docx").session(sesion))
+                .andExpect(content().contentType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
 
         byte[] zip = mvc.perform(get("/documentos-corte/descargar-fotos").session(sesion))
                 .andExpect(status().isOk())
@@ -347,15 +350,14 @@ class DocumentosCorteControllerTest {
 
         mvc.perform(get("/documentos-corte/resultados").session(sesion))
                 .andExpect(content().string(not(containsString("Fotos ULL113"))));
-        byte[] word = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.docx")
+        byte[] excel = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.xlsx")
                 .session(sesion)).andReturn().getResponse().getContentAsByteArray();
-        String texto = com.puntotres.packinglist.testutil.WordDePrueba.texto(
-                new org.apache.poi.xwpf.usermodel.XWPFDocument(new ByteArrayInputStream(word)));
+        String texto = ExcelDePrueba.texto(ExcelDePrueba.abrir(excel));
         assertTrue(texto.contains("ULL745") && !texto.contains("ULL113"), texto);
 
         mvc.perform(get("/documentos-corte/pieles").session(sesion))
                 .andExpect(content().string(matchesPattern(
-                        "(?s).*<tr class=\"fila-excluida\">.*")));
+                        "(?s).*<tbody class=\"referencia fila-excluida\">.*")));
     }
 
     @Test
@@ -410,6 +412,88 @@ class DocumentosCorteControllerTest {
         mvc.perform(get("/documentos-corte/pieles").session(sesion))
                 .andExpect(content().string(containsString("value=\"Vachette recordada\"")))
                 .andExpect(content().string(containsString("value=\"Cabretilla recordada\"")));
+    }
+
+    @Test
+    void laTablaEnsenaElColorConSuCodigoYUnColorDePielPorColorQueEmpiezaConElDelBolso()
+            throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL114", "AL0914"), zipFotos("ULL114")));
+
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(tabla.contains(">001 BLACK<") && tabla.contains(">718 VANILLA CREAM<"), tabla);
+        assertTrue(tabla.matches("(?s).*name=\"filas\\[0\\]\\.colores\\[0\\]\\.piel\"[^>]*value=\"BLACK\".*"),
+                "la piel principal empieza con la descripción del color del bolso");
+        assertTrue(tabla.matches(
+                "(?s).*name=\"filas\\[0\\]\\.colores\\[1\\]\\.piel\"[^>]*value=\"VANILLA CREAM\".*"));
+        assertTrue(tabla.contains("name=\"filas[0].colores[1].forro\""));
+        // El forro y las combinaciones se copian a los modelos del mismo color: por su código.
+        assertTrue(tabla.contains("data-color-modelo=\"001\""), tabla);
+        assertTrue(tabla.contains("copiarAlMismoColor('input.color-forro'"));
+        // El nombre de la piel es uno por referencia: ocupa todas sus filas de color.
+        assertTrue(tabla.matches("(?s).*<td rowspan=\"2\">\\s*<input type=\"text\" class=\"c-nombre-piel\".*"),
+                tabla);
+    }
+
+    @Test
+    void losColoresDePielSalenEnSuFichaYSeRecuerdanParaLaSiguienteVez() throws Exception {
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL115", "AL0915"), zipFotos("ULL115")));
+        esperarFotos();
+        mvc.perform(post("/documentos-corte/generar").session(sesion)
+                        .param("filas[0].nombrePiel", "Box calf")
+                        .param("filas[0].forro", "Cabretilla")
+                        .param("filas[0].colores[0].piel", "NEGRO")
+                        .param("filas[0].colores[0].forro", "NOIR")
+                        .param("filas[0].colores[1].forro", "CRUDO"))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        byte[] excel = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.xlsx")
+                .session(sesion)).andReturn().getResponse().getContentAsByteArray();
+        var libro = ExcelDePrueba.abrir(excel);
+        assertEquals(List.of("ULL115.AL0915 - 001 BLACK", "ULL115.AL0915 - 718 VANILLA CRE", "ULL745.AL0915 - 001 BLACK"),
+                ExcelDePrueba.nombresDeHoja(libro));
+        String negro = ExcelDePrueba.texto(libro.getSheetAt(0));
+        assertTrue(negro.contains("COLOR\nNEGRO") && negro.contains("COLOR\nNOIR"), negro);
+        String crudo = ExcelDePrueba.texto(libro.getSheetAt(1));
+        assertTrue(crudo.contains("COLOR\nVANILLA CREAM") && crudo.contains("COLOR\nCRUDO"), crudo);
+
+        mvc.perform(get("/documentos-corte/nuevo").session(sesion));
+        mvc.perform(cargar("AMI", "H27", pedidoAmi("ULL115", "AL0915"), zipFotos("ULL115")));
+
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(tabla.matches("(?s).*name=\"filas\\[0\\]\\.colores\\[0\\]\\.piel\"[^>]*value=\"NEGRO\".*"));
+        assertTrue(tabla.matches("(?s).*name=\"filas\\[0\\]\\.colores\\[0\\]\\.forro\"[^>]*value=\"NOIR\".*"));
+        assertTrue(tabla.matches("(?s).*name=\"filas\\[0\\]\\.colores\\[1\\]\\.forro\"[^>]*value=\"CRUDO\".*"));
+    }
+
+    @Test
+    void laPielGuardadaEnColoresYPielesSaleEnLaTablaDePieles() throws Exception {
+        mvc.perform(post("/colores/pieles/fila").param("cliente", "AMI").param("codigo", "AL0920")
+                        .param("valor", "Vachette de la tabla"))
+                .andExpect(status().isOk());
+
+        mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL116", "AL0920"), zipFotos("ULL116")));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("value=\"Vachette de la tabla\"")));
+    }
+
+    @Test
+    void enApcElColorSeDescribeConLaTablaYDeLosQueNoTienenDescripcionSeAvisa() throws Exception {
+        byte[] pedido;
+        try (var entrada = getClass().getResourceAsStream("/ejemplos/APC_PEDIDO_FALL26.xlsx")) {
+            pedido = entrada.readAllBytes();
+        }
+        mvc.perform(cargar("APC", "FALL26", pedido, zipFotos("F67008")))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(tabla.contains(">LZZ NOIR<"), "la descripción sale de la tabla de colores");
+        assertTrue(tabla.contains(">CAB<"), "sin descripción, el código a secas");
+        assertTrue(tabla.contains("Colores sin descripción en la Tabla colores Clientes"), tabla);
     }
 
     @Test

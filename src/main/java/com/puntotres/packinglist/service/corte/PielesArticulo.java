@@ -4,27 +4,29 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Los nombres de las pieles de un artículo tal como se teclean en la pantalla
- * de pieles: la principal, el forro (solo si es de piel; vacío = no lleva) y
- * de cero a cuatro de combinación. Una combinación vacía no existe.
+ * Las pieles de una orden de corte tal como se teclean en la pantalla de
+ * pieles, cada una con su color: la principal, el forro (solo si es de piel;
+ * sin nombre = no lleva) y de cero a cuatro de combinación. Una combinación
+ * sin nombre no existe, aunque se le haya puesto color.
  */
-public record PielesArticulo(String nombrePiel, String forro, List<String> combinaciones) {
+public record PielesArticulo(PielCorte principal, PielCorte forro, List<PielCorte> combinaciones) {
 
     public PielesArticulo {
-        nombrePiel = limpio(nombrePiel);
-        forro = limpio(forro);
+        principal = principal == null ? PielCorte.NINGUNA : principal;
+        forro = forro == null ? PielCorte.NINGUNA : forro;
         combinaciones = combinaciones == null ? List.of() : combinaciones.stream()
                 .filter(Objects::nonNull)
-                .map(String::trim)
-                .filter(combinacion -> !combinacion.isEmpty())
+                .filter(PielCorte::existe)
                 .toList();
     }
 
-    public boolean tieneForro() {
-        return !forro.isEmpty();
+    /** Solo los nombres, sin colores. */
+    public PielesArticulo(String nombrePiel, String forro, List<String> combinaciones) {
+        this(new PielCorte(nombrePiel, ""), new PielCorte(forro, ""), combinaciones == null ? List.of()
+                : combinaciones.stream().map(nombre -> new PielCorte(nombre, "")).toList());
     }
 
-    private static String limpio(String texto) {
-        return texto == null ? "" : texto.trim();
+    public boolean tieneForro() {
+        return forro.existe();
     }
 }

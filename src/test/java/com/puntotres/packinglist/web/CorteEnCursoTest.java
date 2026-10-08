@@ -46,6 +46,6 @@ class CorteEnCursoTest {
 
     private static PedidoCorte pedido() {
         return new PedidoCorte(List.of(new ArticuloCorte(ReferenciaCorte.deAmi("ULL027.AL0103"),
-                List.of(new ColorCorte("001 BLACK", 1)))), List.of());
+                List.of(new ColorCorte("001", "BLACK", 1)))), List.of());
     }
 }

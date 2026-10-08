@@ -17,6 +17,9 @@ import java.util.function.Function;
  * ese color, sin mirar destinación, talla ni número de pedido: al cortador le
  * da igual a dónde vaya el bolso, lo que corta es la piel. Salen TODAS las
  * referencias, cinturones incluidos: el alcance de las órdenes es el pedido.
+ *
+ * El color se suma por su CÓDIGO, que es lo que lo identifica; la descripción
+ * es la primera que traiga el pedido para ese código, si trae alguna.
  */
 public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
 
@@ -27,7 +30,7 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
 
     public static PedidoCorte agrupar(List<LineaCorte> lineas,
                                       Function<String, ReferenciaCorte> partir) {
-        Map<String, Map<String, Integer>> porReferencia = new LinkedHashMap<>();
+        Map<String, Map<String, ColorCorte>> porReferencia = new LinkedHashMap<>();
         Map<String, String> nombres = new LinkedHashMap<>();
         for (LineaCorte linea : lineas) {
             String referencia = ReferenciaCorte.normalizar(linea.referencia());
@@ -37,9 +40,15 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
             if (!linea.nombreModelo().isEmpty()) {
                 nombres.putIfAbsent(referencia, linea.nombreModelo());
             }
-            String color = linea.color() == null ? "" : linea.color().trim();
-            porReferencia.computeIfAbsent(referencia, clave -> new LinkedHashMap<>())
-                    .merge(color, Math.max(0, linea.cantidad()), Integer::sum);
+            // Sin código (un pedido raro), el color es su descripción.
+            String clave = linea.codigoColor().isEmpty() ? linea.descripcionColor() : linea.codigoColor();
+            porReferencia.computeIfAbsent(referencia, r -> new LinkedHashMap<>())
+                    .merge(clave, new ColorCorte(linea.codigoColor(), linea.descripcionColor(),
+                                    Math.max(0, linea.cantidad())),
+                            (anterior, nuevo) -> new ColorCorte(anterior.codigo(),
+                                    anterior.descripcion().isEmpty() ? nuevo.descripcion()
+                                            : anterior.descripcion(),
+                                    anterior.bolsos() + nuevo.bolsos()));
         }
 
         List<ArticuloCorte> articulos = new ArrayList<>();
@@ -49,9 +58,8 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
             if (!partida.tienePiel()) {
                 sinPiel.add(referencia);
             }
-            articulos.add(new ArticuloCorte(partida, colores.entrySet().stream()
-                    .map(color -> new ColorCorte(color.getKey(), color.getValue()))
-                    .toList(), nombres.getOrDefault(referencia, "")));
+            articulos.add(new ArticuloCorte(partida, List.copyOf(colores.values()),
+                    nombres.getOrDefault(referencia, "")));
         });
         articulos.sort(Comparator
                 .comparing((ArticuloCorte articulo) -> articulo.referencia().modelo())
@@ -77,5 +85,34 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
         Set<String> modelos = new LinkedHashSet<>();
         articulos.forEach(articulo -> modelos.add(articulo.referencia().modelo()));
         return modelos;
+    }
+
+    /**
+     * Los códigos de color a los que el pedido no les da descripción, sin
+     * repetir y en orden: los que hay que buscar en la Tabla colores Clientes.
+     * En AMI, que trae el Libellé coloris, no sale ninguno.
+     */
+    public Set<String> codigosSinDescripcion() {
+        Set<String> codigos = new LinkedHashSet<>();
+        articulos.forEach(articulo -> articulo.colores().stream()
+                .filter(color -> color.descripcion().isEmpty() && !color.codigo().isEmpty())
+                .forEach(color -> codigos.add(color.codigo())));
+        return codigos;
+    }
+
+    /**
+     * El mismo pedido con la descripción de cada color que no la traía,
+     * sacada de {@code descripciones} (código → descripción). Lo que el
+     * pedido sí trae manda: la tabla solo rellena huecos.
+     */
+    public PedidoCorte conDescripciones(Map<String, String> descripciones) {
+        List<ArticuloCorte> completados = articulos.stream()
+                .map(articulo -> new ArticuloCorte(articulo.referencia(), articulo.colores().stream()
+                        .map(color -> color.descripcion().isEmpty()
+                                ? color.conDescripcion(descripciones.getOrDefault(color.codigo(), ""))
+                                : color)
+                        .toList(), articulo.nombreModelo()))
+                .toList();
+        return new PedidoCorte(completados, avisos);
     }
 }

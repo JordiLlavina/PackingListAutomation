@@ -1,5 +1,7 @@
 package com.puntotres.packinglist.persistence;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -17,10 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
  * por piel, las combinaciones de ULL027.AL0103 aparecerían en ULL712.AL0103,
  * que no las lleva.
  *
+ * Y una tercera para los COLORES de las pieles, por cliente + referencia +
+ * código de color del bolso: son de ese bolso en ese color.
+ *
  * Solo se guarda lo que alguien ha dado por bueno: una fila sin nombre de
  * piel no ha rellenado nada y no toca la memoria (ni el nombre ni el forro ni
- * las combinaciones). Con nombre, el forro y las combinaciones se guardan tal
- * cual, vacío incluido: quitar una combinación es decir que ya no la lleva.
+ * las combinaciones ni los colores). Con nombre, el resto se guarda tal cual,
+ * vacío incluido: quitar una combinación es decir que ya no la lleva.
  */
 @Service
 public class MemoriaPieles {
@@ -35,12 +40,29 @@ public class MemoriaPieles {
         }
     }
 
+    /**
+     * Los colores de piel recordados de un color del bolso; vacíos cuando no
+     * se sabe nada. Los de las combinaciones van en el orden de
+     * {@link Recordadas#combinaciones()}.
+     */
+    public record ColoresRecordados(String colorPiel, String colorForro, List<String> coloresCombinacion) {
+
+        public static final ColoresRecordados NINGUNO = new ColoresRecordados("", "", List.of());
+
+        public ColoresRecordados {
+            coloresCombinacion = List.copyOf(coloresCombinacion);
+        }
+    }
+
     private final MemoriaPielRepository pieles;
     private final MemoriaPielesArticuloRepository articulos;
+    private final MemoriaColoresPielRepository colores;
 
-    public MemoriaPieles(MemoriaPielRepository pieles, MemoriaPielesArticuloRepository articulos) {
+    public MemoriaPieles(MemoriaPielRepository pieles, MemoriaPielesArticuloRepository articulos,
+                         MemoriaColoresPielRepository colores) {
         this.pieles = pieles;
         this.articulos = articulos;
+        this.colores = colores;
     }
 
     public Recordadas buscar(String cliente, String refPiel, String referencia) {
@@ -85,6 +107,113 @@ public class MemoriaPieles {
                 fila -> fila.actualizar(elForro, rellenas),
                 () -> articulos.save(new MemoriaPielesArticulo(
                         id.cliente(), id.referencia(), elForro, rellenas)));
+    }
+
+    public ColoresRecordados buscarColores(String cliente, String referencia, String codigoColor) {
+        if (vacio(cliente) || vacio(referencia) || vacio(codigoColor)) {
+            return ColoresRecordados.NINGUNO;
+        }
+        return colores.findById(new MemoriaColoresPielId(clave(cliente), clave(referencia), clave(codigoColor)))
+                .map(fila -> new ColoresRecordados(fila.getColorPiel(), fila.getColorForro(),
+                        fila.getColoresCombinacion()))
+                .orElse(ColoresRecordados.NINGUNO);
+    }
+
+    /**
+     * Guarda los colores de piel de un color del bolso, con la misma regla
+     * que los nombres: sin nombre de piel la fila no se ha rellenado y no
+     * toca nada. Los de las combinaciones llegan uno por combinación CON
+     * nombre y en su orden, que es como se guardan los nombres.
+     */
+    @Transactional
+    public void recordarColores(String cliente, String referencia, String codigoColor, String nombrePiel,
+                                String colorPiel, String colorForro, List<String> coloresCombinacion) {
+        if (vacio(cliente) || vacio(referencia) || vacio(codigoColor) || vacio(nombrePiel)) {
+            return;
+        }
+        List<String> deCombinaciones = coloresCombinacion == null ? List.of() : coloresCombinacion.stream()
+                .map(color -> color == null ? "" : color.trim())
+                .limit(MAXIMO_COMBINACIONES)
+                .toList();
+        String elDeLaPiel = colorPiel == null ? "" : colorPiel.trim();
+        String elDelForro = colorForro == null ? "" : colorForro.trim();
+        MemoriaColoresPielId id = new MemoriaColoresPielId(clave(cliente), clave(referencia), clave(codigoColor));
+        colores.findById(id).ifPresentOrElse(
+                fila -> fila.actualizar(elDeLaPiel, elDelForro, deCombinaciones),
+                () -> colores.save(new MemoriaColoresPiel(id.cliente(), id.referencia(), id.codigoColor(),
+                        elDeLaPiel, elDelForro, deCombinaciones)));
+    }
+
+    // --- La tabla de pieles de la pantalla "Colores y Pieles de Cliente" ---
+    // Es la misma memoria de nombres de piel que lee la tabla de los Documentos
+    // del Corte: lo que se guarda aquí sale allí solo, sin otra copia.
+
+    /** Las pieles de un cliente, por referencia de piel. */
+    public List<MemoriaPiel> pielesDe(String cliente) {
+        return vacio(cliente) ? List.of() : pieles.findByClienteOrderByRefPiel(clave(cliente));
+    }
+
+    /**
+     * Alta o corrección del nombre de una piel desde su pantalla. Al revés que
+     * {@link #recordar}, aquí un nombre vacío SÍ se guarda: es la tabla donde
+     * se mantienen, y vaciar una casilla a mano es una corrección.
+     */
+    @Transactional
+    public void guardarPiel(String cliente, String refPiel, String nombre) {
+        if (vacio(cliente) || vacio(refPiel)) {
+            throw new IllegalArgumentException("La piel necesita cliente y referencia");
+        }
+        MemoriaPielId id = new MemoriaPielId(clave(cliente), clave(refPiel));
+        String elNombre = nombre == null ? "" : nombre.trim();
+        pieles.findById(id).ifPresentOrElse(
+                fila -> fila.actualizar(elNombre),
+                () -> pieles.save(new MemoriaPiel(id.cliente(), id.refPiel(), elNombre)));
+    }
+
+    /** Devuelve si había algo que borrar. */
+    @Transactional
+    public boolean borrarPiel(String cliente, String refPiel) {
+        if (vacio(cliente) || vacio(refPiel)) {
+            return false;
+        }
+        MemoriaPielId id = new MemoriaPielId(clave(cliente), clave(refPiel));
+        if (pieles.existsById(id)) {
+            pieles.deleteById(id);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Mete las referencias de piel de un excel de pedido. El pedido no trae el
+     * nombre de la piel, así que las nuevas entran vacías, listas para
+     * rellenar; las que ya estaban no se tocan.
+     */
+    @Transactional
+    public Incorporacion incorporarPieles(String cliente, Collection<String> refsPiel) {
+        List<String> anadidas = new ArrayList<>();
+        List<String> yaEstaban = new ArrayList<>();
+        if (vacio(cliente)) {
+            return new Incorporacion(anadidas, List.of(), yaEstaban);
+        }
+        String elCliente = clave(cliente);
+        for (String refPiel : refsPiel) {
+            if (vacio(refPiel)) {
+                continue;
+            }
+            String laRef = clave(refPiel);
+            if (anadidas.contains(laRef) || yaEstaban.contains(laRef)) {
+                continue;
+            }
+            MemoriaPielId id = new MemoriaPielId(elCliente, laRef);
+            if (pieles.existsById(id)) {
+                yaEstaban.add(laRef);
+            } else {
+                pieles.save(new MemoriaPiel(elCliente, laRef, ""));
+                anadidas.add(laRef);
+            }
+        }
+        return new Incorporacion(anadidas, List.of(), yaEstaban);
     }
 
     private static boolean vacio(String texto) {

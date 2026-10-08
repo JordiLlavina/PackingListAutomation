@@ -38,7 +38,10 @@
     </details>
 
     <form class="tarjeta" id="formPieles" method="post" th:action="@{/documentos-corte/generar}">
-        <p class="ayuda">Los campos se pueden dejar vacíos. Se puede generar sin fotografías.</p>
+        <p class="ayuda">Los campos se pueden dejar vacíos. Se puede generar sin fotografías.
+            El color de la piel principal empieza con el del bolso; los del forro y las
+            combinaciones, al escribirlos por primera vez, se copian a los demás modelos del
+            mismo color que los tengan vacíos.</p>
         <div class="tabla-desplazable">
             <table class="tabla-pieles">
                 <thead>
@@ -46,49 +49,84 @@
                     <th class="c-incluir" title="Desmarcada, la referencia no saca órdenes de corte ni Word de fotos">Incluir</th>
                     <th>Modelo</th>
                     <th>Piel</th>
-                    <th>Bolsos por color</th>
+                    <th>Color</th>
+                    <th>Bolsos</th>
                     <th>Nombre de la piel</th>
+                    <th class="c-color-piel">Color de la piel</th>
                     <th>Forro de piel</th>
-                    <th th:each="numero : ${columnas}" th:text="|Combinación ${numero}|"></th>
+                    <th class="c-color-piel">Color del forro</th>
+                    <th:block th:each="numero : ${columnas}">
+                        <th th:text="|Combinación ${numero}|"></th>
+                        <th class="c-color-piel" th:text="|Color comb. ${numero}|"></th>
+                    </th:block>
                     <th>Foto para Orden de Corte</th>
                 </tr>
                 </thead>
-                <tbody>
-                <tr th:each="fila : ${filas}" th:classappend="${!fila.incluida} ? 'fila-excluida'">
-                    <td class="c-incluir">
-                        <!-- Una casilla desmarcada no se envía: el marcador "_" dice que estaba. -->
-                        <input type="hidden" th:name="|_filas[${fila.indice}].incluir|" value="on">
-                        <input type="checkbox" class="casilla-incluir" value="true"
-                               th:name="|filas[${fila.indice}].incluir|" th:checked="${fila.incluida}"
-                               th:attr="aria-label=|Incluir ${fila.referencia}|">
+                <!-- Un tbody por referencia y una fila por color: lo que es de la
+                     referencia (los nombres de las pieles, la foto) va una sola vez,
+                     ocupando todas sus filas; lo que es de cada color (bolsos y colores
+                     de piel), en la suya. -->
+                <tbody th:each="fila : ${filas}" class="referencia"
+                       th:classappend="${!fila.incluida} ? 'fila-excluida'"
+                       th:with="alto=${#lists.size(fila.colores)}">
+                <tr th:each="color : ${fila.colores}">
+                    <th:block th:if="${color.indice == 0}">
+                        <td class="c-incluir" th:rowspan="${alto}">
+                            <!-- Una casilla desmarcada no se envía: el marcador "_" dice que estaba. -->
+                            <input type="hidden" th:name="|_filas[${fila.indice}].incluir|" value="on">
+                            <input type="checkbox" class="casilla-incluir" value="true"
+                                   th:name="|filas[${fila.indice}].incluir|" th:checked="${fila.incluida}"
+                                   th:attr="aria-label=|Incluir ${fila.referencia}|">
+                        </td>
+                        <td class="c-modelo" th:rowspan="${alto}" th:text="${fila.modelo}"></td>
+                        <td class="c-piel" th:rowspan="${alto}" th:text="${fila.piel}"></td>
+                    </th:block>
+                    <td class="c-color">
+                        <label th:for="|bolsos-${fila.indice}-${color.indice}|" th:text="${color.nombre}"></label>
                     </td>
-                    <td class="c-modelo" th:text="${fila.modelo}"></td>
-                    <td class="c-piel" th:text="${fila.piel}"></td>
                     <td class="c-bolsos">
-                        <div class="color-bolsos" th:each="color, estado : ${fila.colores}">
-                            <label th:for="|bolsos-${fila.indice}-${estado.index}|"
-                                   th:text="${color.color}"></label>
-                            <input type="number" min="0"
-                                   th:id="|bolsos-${fila.indice}-${estado.index}|"
-                                   th:name="|filas[${fila.indice}].bolsos[${estado.index}]|"
-                                   th:value="${color.bolsos}">
-                        </div>
+                        <input type="number" min="0"
+                               th:id="|bolsos-${fila.indice}-${color.indice}|"
+                               th:name="|filas[${fila.indice}].bolsos[${color.indice}]|"
+                               th:value="${color.bolsos}">
                     </td>
-                    <td>
+                    <td th:if="${color.indice == 0}" th:rowspan="${alto}">
                         <input type="text" class="c-nombre-piel"
                                th:name="|filas[${fila.indice}].nombrePiel|"
                                th:value="${fila.nombrePiel}" th:attr="data-piel=${fila.piel}">
                     </td>
-                    <td>
+                    <td class="c-color-piel">
+                        <input type="text" class="color-piel"
+                               th:name="|filas[${fila.indice}].colores[${color.indice}].piel|"
+                               th:value="${color.colorPiel}"
+                               th:attr="aria-label=|Color de la piel de ${fila.referencia} en ${color.nombre}|">
+                    </td>
+                    <td th:if="${color.indice == 0}" th:rowspan="${alto}">
                         <input type="text" th:name="|filas[${fila.indice}].forro|"
                                th:value="${fila.forro}">
                     </td>
-                    <td th:each="combinacion, estado : ${fila.combinaciones}">
-                        <input type="text"
-                               th:name="|filas[${fila.indice}].combinaciones[${estado.index}]|"
-                               th:value="${combinacion}">
+                    <td class="c-color-piel">
+                        <input type="text" class="color-forro"
+                               th:name="|filas[${fila.indice}].colores[${color.indice}].forro|"
+                               th:value="${color.colorForro}"
+                               th:attr="data-color-modelo=${color.codigo},
+                                        aria-label=|Color del forro de ${fila.referencia} en ${color.nombre}|">
                     </td>
-                    <td>
+                    <th:block th:each="combinacion, columna : ${fila.combinaciones}">
+                        <td th:if="${color.indice == 0}" th:rowspan="${alto}">
+                            <input type="text"
+                                   th:name="|filas[${fila.indice}].combinaciones[${columna.index}]|"
+                                   th:value="${combinacion}">
+                        </td>
+                        <td class="c-color-piel">
+                            <input type="text" class="color-combinacion"
+                                   th:name="|filas[${fila.indice}].colores[${color.indice}].combinaciones[${columna.index}]|"
+                                   th:value="${color.coloresCombinacion[columna.index]}"
+                                   th:attr="data-color-modelo=${color.codigo}, data-columna=${columna.index},
+                                            aria-label=|Color de la combinación ${columna.count} de ${fila.referencia} en ${color.nombre}|">
+                        </td>
+                    </th:block>
+                    <td th:if="${color.indice == 0}" th:rowspan="${alto}">
                         <select th:if="${!#lists.isEmpty(fila.fotos)}"
                                 th:name="|filas[${fila.indice}].fotoPrincipal|">
                             <option th:each="foto, estado : ${fila.fotos}"
@@ -177,12 +215,43 @@
                 });
             });
 
-            // La casilla de incluir apaga la fila en gris al momento, y el botón
-            // de todas dice lo que hará: desmarcar si ya están todas marcadas.
+            // El color del forro y el de cada combinación, la PRIMERA vez que se
+            // rellenan, se copian a los demás modelos del mismo color de bolso
+            // (mismo código) que tengan esa casilla vacía: el forro de un bolso
+            // negro suele ser negro en todos. Las casillas a rellenar se fijan al
+            // entrar en el campo, así que siguen lo que se va tecleando, pero una
+            // que ya tenía algo (puesto a mano o copiado antes) no se pisa nunca.
+            function copiarAlMismoColor(selector, mismaColumna) {
+                const campos = document.querySelectorAll(selector);
+                campos.forEach(function (campo) {
+                    let destinos = [];
+                    campo.addEventListener('focus', function () {
+                        destinos = Array.prototype.filter.call(campos, function (otro) {
+                            return otro !== campo && !otro.value.trim()
+                                && otro.dataset.colorModelo === campo.dataset.colorModelo
+                                && (!mismaColumna || otro.dataset.columna === campo.dataset.columna);
+                        });
+                    });
+                    campo.addEventListener('input', function () {
+                        destinos.forEach(function (otro) {
+                            otro.value = campo.value;
+                        });
+                    });
+                    campo.addEventListener('blur', function () {
+                        destinos = [];
+                    });
+                });
+            }
+            copiarAlMismoColor('input.color-forro', false);
+            copiarAlMismoColor('input.color-combinacion', true);
+
+            // La casilla de incluir apaga la referencia en gris al momento —todas
+            // sus filas de color—, y el botón de todas dice lo que hará:
+            // desmarcar si ya están todas marcadas.
             const casillas = document.querySelectorAll('input.casilla-incluir');
             const botonTodas = document.getElementById('botonTodas');
             function pintarCasilla(casilla) {
-                casilla.closest('tr').classList.toggle('fila-excluida', !casilla.checked);
+                casilla.closest('tbody').classList.toggle('fila-excluida', !casilla.checked);
             }
             function todasMarcadas() {
                 return Array.prototype.every.call(casillas, function (casilla) {

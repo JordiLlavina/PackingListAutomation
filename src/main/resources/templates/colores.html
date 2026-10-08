@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Colores y Pieles')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Colores y Pieles de Cliente')}"></header>
+<main>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <!-- El título y el desplegable en la misma línea: la tarjeta solo elige cliente. -->
+    <section class="tarjeta cabecera-cliente">
+        <h3 class="titulo-seccion" id="tituloCliente">Cliente</h3>
+        <!-- Cambiar de cliente recarga la página con sus tablas; el botón es para
+             quien navega sin JavaScript. -->
+        <form th:action="@{/colores}" method="get" class="form-tara">
+            <select id="clienteColores" name="cliente" class="selector-cliente"
+                    aria-labelledby="tituloCliente" onchange="this.form.submit()">
+                <option th:each="entrada : ${clientes}" th:value="${entrada.key}"
+                        th:text="${entrada.value}" th:selected="${entrada.key == cliente}"></option>
+            </select>
+            <noscript><button type="submit" class="mini">Ver</button></noscript>
+        </form>
+    </section>
+
+    <!-- Las dos tablas son el mismo fragmento. Cada una va dentro del formulario de
+         "Guardar todo"; el "Guardar" y el "Borrar" de cada fila no lo envían: van
+         por fetch, sin recargar, para no perder lo tecleado en las demás filas. -->
+    <section class="tarjeta"
+             th:replace="~{colores-fragmentos :: tablaEditable('colores', |Colores de ${nombreCliente}|, ${colores},
+                          'Código', 'Descripción', 'el color', 'sin descripción')}"></section>
+
+    <section class="tarjeta"
+             th:replace="~{colores-fragmentos :: tablaEditable('pieles', |Pieles de ${nombreCliente}|, ${pieles},
+                          'Ref. piel', 'Nombre de la piel', 'la piel', 'sin nombre')}"></section>
+
+    <!-- Solo para los clientes cuyo excel de pedido se sabe leer (AMI y APC). El
+         excel es el de una temporada guardada o uno que se sube, como en la
+         entrada del packing list: el lápiz lleva a mantener las temporadas. -->
+    <section class="tarjeta" th:if="${admitePedido}">
+        <h3 class="titulo-seccion">Añadir colores y pieles nuevos de un excel de pedido</h3>
+        <form th:action="@{/colores/pedido}" method="post" enctype="multipart/form-data"
+              class="form-pedido-colores">
+            <input type="hidden" name="cliente" th:value="${cliente}">
+            <div class="fila-cliente">
+                <div>
+                    <label for="temporadaGuardada" class="etiqueta-con-accion">
+                        <span>Temporada</span>
+                        <a class="lapiz" th:href="@{/temporadas}"
+                           title="Añadir, editar o borrar temporadas guardadas"
+                           aria-label="Editar las temporadas guardadas">&#9998;</a>
+                    </label>
+                    <select id="temporadaGuardada" name="temporadaGuardadaId">
+                        <option value="">-- otra temporada --</option>
+                        <option th:each="temporada : ${temporadas}" th:value="${temporada.id}"
+                                th:text="${temporada.temporada}"
+                                th:attr="data-fichero=${temporada.nombreFichero}"></option>
+                    </select>
+                    <p class="ayuda" id="ayudaTemporadaGuardada"></p>
+                </div>
+                <!-- Con una temporada guardada elegida su excel ya está: este bloque
+                     se esconde y se vacía, porque uno subido mandaría sobre ella. -->
+                <div id="bloquePedido">
+                    <label for="pedidoColores" th:text="|Excel de pedido de ${nombreCliente}|">Excel de pedido</label>
+                    <input type="file" id="pedidoColores" name="pedido" accept=".xlsx">
+                </div>
+            </div>
+            <div class="acciones-pedido">
+                <button type="submit" name="que" value="todo">Extraer Colores y Pieles</button>
+                <button type="submit" name="que" value="colores" class="secundario">Extraer Colores</button>
+                <button type="submit" name="que" value="pieles" class="secundario">Extraer Pieles</button>
+            </div>
+        </form>
+        <script>
+            (function () {
+                const guardada = document.getElementById('temporadaGuardada');
+                const bloque = document.getElementById('bloquePedido');
+                const ayuda = document.getElementById('ayudaTemporadaGuardada');
+                function aplicar() {
+                    const opcion = guardada.options[guardada.selectedIndex];
+                    const elegida = guardada.value !== '';
+                    bloque.style.display = elegida ? 'none' : '';
+                    ayuda.textContent = elegida ? 'Excel de pedido guardado: ' + opcion.dataset.fichero : '';
+                    if (elegida) {
+                        document.getElementById('pedidoColores').value = '';
+                    }
+                }
+                guardada.addEventListener('change', aplicar);
+                aplicar();
+            })();
+        </script>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Añadir a mano</h3>
+        <div class="anadir-a-mano">
+            <form th:action="@{/colores/colores/nuevo}" method="post" class="form-tara">
+                <input type="hidden" name="cliente" th:value="${cliente}">
+                <label for="codigoNuevo">Código de color
+                    <input type="text" id="codigoNuevo" name="codigo" placeholder="LZZ" required>
+                </label>
+                <label for="descripcionNueva">Descripción
+                    <input type="text" id="descripcionNueva" name="valor" placeholder="NOIR">
+                </label>
+                <button type="submit">Añadir color</button>
+            </form>
+            <form th:action="@{/colores/pieles/nuevo}" method="post" class="form-tara">
+                <input type="hidden" name="cliente" th:value="${cliente}">
+                <label for="refPielNueva">Ref. piel
+                    <input type="text" id="refPielNueva" name="codigo" placeholder="AL0201" required>
+                </label>
+                <label for="nombrePielNuevo">Nombre de la piel
+                    <input type="text" id="nombrePielNuevo" name="valor" placeholder="Vachette grainée">
+                </label>
+                <button type="submit">Añadir piel</button>
+            </form>
+        </div>
+    </section>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const CLIENTE = /*[[${cliente}]]*/ '';
+        const BASE = /*[[@{/colores}]]*/ '/colores';
+        /*]]>*/
+        // Guardar o borrar una fila sin recargar la página: recargando se perdía lo
+        // tecleado en las demás filas. El estado se dice al lado de la fila.
+        (function () {
+            function enviar(url, datos) {
+                const cuerpo = new URLSearchParams(datos);
+                cuerpo.set('cliente', CLIENTE);
+                return fetch(url, {method: 'POST', body: cuerpo}).then(function (respuesta) {
+                    return respuesta.json().then(function (json) {
+                        if (!respuesta.ok || !json.ok) {
+                            throw new Error(json.mensaje || 'No se ha podido guardar');
+                        }
+                        return json;
+                    });
+                });
+            }
+            function avisar(fila, texto, esError) {
+                const estado = fila.querySelector('.estado-fila');
+                estado.textContent = texto;
+                estado.classList.toggle('error', !!esError);
+            }
+            document.querySelectorAll('button.guardar-fila').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    const fila = boton.closest('tr');
+                    const campo = fila.querySelector('input.valor-fila');
+                    avisar(fila, 'Guardando…');
+                    enviar(BASE + '/' + boton.dataset.tabla + '/fila',
+                            {codigo: boton.dataset.codigo, valor: campo.value})
+                        .then(function () {
+                            avisar(fila, 'Guardado');
+                            campo.defaultValue = campo.value;
+                            fila.classList.toggle('sin-descripcion', !campo.value.trim());
+                        })
+                        .catch(function (error) { avisar(fila, error.message, true); });
+                });
+            });
+            document.querySelectorAll('button.borrar-fila').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    const fila = boton.closest('tr');
+                    if (!confirm('¿Borrar ' + boton.dataset.nombre + ' ' + boton.dataset.codigo + '?')) {
+                        return;
+                    }
+                    enviar(BASE + '/' + boton.dataset.tabla + '/fila/borrar', {codigo: boton.dataset.codigo})
+                        .then(function () { fila.remove(); })
+                        .catch(function (error) { avisar(fila, error.message, true); });
+                });
+            });
+            // Enter dentro de una casilla guarda solo esa fila, no la tabla entera.
+            document.querySelectorAll('input.valor-fila').forEach(function (campo) {
+                campo.addEventListener('keydown', function (evento) {
+                    if (evento.key === 'Enter') {
+                        evento.preventDefault();
+                        campo.closest('tr').querySelector('button.guardar-fila').click();
+                    }
+                });
+            });
+        })();
+    </script>
+</main>
+
+</body>
+</html>

@@ -32,8 +32,10 @@ import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
+import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.corte.ClienteCorte;
+import com.puntotres.packinglist.service.corte.ColorCorte;
 import com.puntotres.packinglist.service.corte.ConversionFotos;
 import com.puntotres.packinglist.service.corte.ConversorFotos;
 import com.puntotres.packinglist.service.corte.DocumentoCorte;
@@ -43,6 +45,8 @@ import com.puntotres.packinglist.service.corte.FotoModelo;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
 import com.puntotres.packinglist.service.corte.LectorFotos;
 import com.puntotres.packinglist.service.corte.PedidoCorte;
+import com.puntotres.packinglist.service.corte.PielCorte;
+import com.puntotres.packinglist.service.corte.PielesArticulo;
 import com.puntotres.packinglist.service.corte.ResultadoCorte;
 
 /**
@@ -61,6 +65,8 @@ public class DocumentosCorteController {
 
     private static final MediaType TIPO_DOCX = MediaType.parseMediaType(
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    private static final MediaType TIPO_XLSX = MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private static final String PEDIDO_ILEGIBLE =
             "no tiene el formato esperado: revisa que sea el excel de pedido de ese cliente";
     /**
@@ -81,17 +87,19 @@ public class DocumentosCorteController {
     private final ClientesProperties clientesProperties;
     private final ArchivoTemporadas archivoTemporadas;
     private final MemoriaPieles memoria;
+    private final TablaColores tablaColores;
     private final CorteEnCurso enCurso;
 
     public DocumentosCorteController(DocumentosCorteService servicio, ConversorFotos conversor,
                                      ClientesProperties clientesProperties,
                                      ArchivoTemporadas archivoTemporadas, MemoriaPieles memoria,
-                                     CorteEnCurso enCurso) {
+                                     TablaColores tablaColores, CorteEnCurso enCurso) {
         this.servicio = servicio;
         this.conversor = conversor;
         this.clientesProperties = clientesProperties;
         this.archivoTemporadas = archivoTemporadas;
         this.memoria = memoria;
+        this.tablaColores = tablaColores;
         this.enCurso = enCurso;
     }
 
@@ -161,6 +169,8 @@ public class DocumentosCorteController {
         if (pedidoCorte.articulos().isEmpty()) {
             return error(redirect, "El excel de pedido no trae ninguna referencia: no hay nada que cortar");
         }
+        List<String> avisosColores = new ArrayList<>();
+        pedidoCorte = describirColores(clienteCorte.clave(), pedidoCorte, avisosColores);
 
         enCurso.reiniciar();
         Path directorio = null;
@@ -179,6 +189,7 @@ public class DocumentosCorteController {
             }
             ConversionFotos conversion = conversor.convertir(leidas.todas(), directorio);
             List<String> avisos = new ArrayList<>(pedidoCorte.avisos());
+            avisos.addAll(avisosColores);
             avisos.addAll(leidas.avisos());
             enCurso.cargar(clienteCorte.clave(), nombreDe(clienteCorte.clave()), nombreTemporada,
                     directorio, pedidoCorte, leidas, conversion, sinFotos, avisos);
@@ -197,6 +208,17 @@ public class DocumentosCorteController {
             fila.setNombrePiel(recordadas.nombrePiel());
             fila.setForro(recordadas.forro());
             fila.setCombinaciones(recordadas.combinaciones());
+            List<ColorCorte> colores = fila.colores();
+            for (int indice = 0; indice < colores.size(); indice++) {
+                MemoriaPieles.ColoresRecordados recordados = memoria.buscarColores(clienteCorte.clave(),
+                        fila.referencia().referencia(), colores.get(indice).codigo());
+                // Sin color recordado, la piel principal se queda con el del bolso.
+                if (!recordados.colorPiel().isEmpty()) {
+                    fila.setColorPiel(indice, recordados.colorPiel());
+                }
+                fila.setColorForro(indice, recordados.colorForro());
+                fila.setColoresCombinacion(indice, recordados.coloresCombinacion());
+            }
         }
         enCurso.ajustarColumnasALasFilas();
         return "redirect:/documentos-corte/pieles";
@@ -279,6 +301,16 @@ public class DocumentosCorteController {
             memoria.recordar(enCurso.getClaveCliente(), fila.referencia().piel(),
                     fila.referencia().referencia(), fila.getNombrePiel(), fila.getForro(),
                     fila.getCombinaciones());
+            List<ColorCorte> colores = fila.colores();
+            for (int indice = 0; indice < colores.size(); indice++) {
+                // Las de las combinaciones, emparejadas con las que tienen nombre:
+                // es como se guardan los nombres y como se vuelven a leer.
+                PielesArticulo pieles = fila.pieles(indice);
+                memoria.recordarColores(enCurso.getClaveCliente(), fila.referencia().referencia(),
+                        colores.get(indice).codigo(), fila.getNombrePiel(), pieles.principal().color(),
+                        pieles.forro().color(),
+                        pieles.combinaciones().stream().map(PielCorte::color).toList());
+            }
         }
         try {
             enCurso.getConversion().esperar();
@@ -331,7 +363,7 @@ public class DocumentosCorteController {
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok()
-                .contentType(TIPO_DOCX)
+                .contentType(nombreFichero.endsWith(".xlsx") ? TIPO_XLSX : TIPO_DOCX)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
                         .filename(documento.get().nombreFichero()).build().toString())
                 .body(Files.readAllBytes(documento.get().fichero()));
@@ -369,9 +401,34 @@ public class DocumentosCorteController {
     // --- Internos ---
 
     /**
+     * La descripción de los colores que el pedido no describe (APC), sacada
+     * de la Tabla colores Clientes. Los códigos que no estaban se añaden a la
+     * tabla vacíos, para que salgan en su pantalla listos para rellenar, y de
+     * todos los que siguen sin descripción se avisa: salen solo con el código.
+     */
+    private PedidoCorte describirColores(String cliente, PedidoCorte pedido, List<String> avisos) {
+        if (pedido.codigosSinDescripcion().isEmpty()) {
+            return pedido;
+        }
+        TablaColores.Consulta consulta = tablaColores.consultar(cliente, pedido.codigosSinDescripcion());
+        List<String> sinDescripcion = consulta.sinDescripcion();
+        if (!sinDescripcion.isEmpty()) {
+            String aviso = "Colores sin descripción en la Tabla colores Clientes, que salen solo con "
+                    + "el código: " + String.join(", ", sinDescripcion);
+            if (!consulta.anadidos().isEmpty()) {
+                aviso += ". Se han añadido a la tabla los que no estaban ("
+                        + String.join(", ", consulta.anadidos()) + ")";
+            }
+            avisos.add(aviso + ". Se rellenan desde el menú, en «Tabla colores Clientes»");
+        }
+        return pedido.conDescripciones(consulta.descripciones());
+    }
+
+    /**
      * Pasa lo tecleado a las filas de la sesión y devuelve los bolsos que no
      * se entienden. Un bolso vacío es 0 (esa orden no sale); uno ilegible deja
-     * el número que había y se dice.
+     * el número que había y se dice. Un color de piel que no ha llegado (null)
+     * se deja como estaba.
      */
     private List<String> aplicar(PielesForm form) {
         List<String> errores = new ArrayList<>();
@@ -402,8 +459,24 @@ public class DocumentosCorteController {
                     fila.setBolsos(color, numero);
                 } catch (NumberFormatException e) {
                     errores.add("Los bolsos '" + valor + "' de " + fila.referencia().referencia()
-                            + " en " + fila.colores().get(color).color()
+                            + " en " + fila.colores().get(color).nombre()
                             + " no son un número: se deja " + fila.colores().get(color).bolsos());
+                }
+            }
+            List<PielesForm.ColoresDeUnColor> colores = datos.getColores();
+            for (int color = 0; color < Math.min(colores.size(), fila.colores().size()); color++) {
+                PielesForm.ColoresDeUnColor deEseColor = colores.get(color);
+                if (deEseColor == null) {
+                    continue;
+                }
+                if (deEseColor.getPiel() != null) {
+                    fila.setColorPiel(color, deEseColor.getPiel());
+                }
+                if (deEseColor.getForro() != null) {
+                    fila.setColorForro(color, deEseColor.getForro());
+                }
+                if (!deEseColor.getCombinaciones().isEmpty()) {
+                    fila.setColoresCombinacion(color, deEseColor.getCombinaciones());
                 }
             }
         }
@@ -416,19 +489,30 @@ public class DocumentosCorteController {
         int columnas = enCurso.getColumnasCombinacion();
         for (int i = 0; i < filas.size(); i++) {
             FilaCorte fila = filas.get(i);
-            List<String> combinaciones = new ArrayList<>(fila.getCombinaciones());
-            while (combinaciones.size() < columnas) {
-                combinaciones.add("");
+            List<ColorCorte> colores = fila.colores();
+            List<FilaPielesVista.ColorVista> coloresVista = new ArrayList<>();
+            for (int color = 0; color < colores.size(); color++) {
+                coloresVista.add(new FilaPielesVista.ColorVista(color, colores.get(color).codigo(),
+                        colores.get(color).nombre(), colores.get(color).bolsos(), fila.getColorPiel(color),
+                        fila.getColorForro(color), unaPorColumna(fila.getColoresCombinacion(color), columnas)));
             }
             List<String> fotos = enCurso.getFotos().de(fila.referencia().modelo()).stream()
                     .map(FotoModelo::nombreOriginal).toList();
             vista.add(new FilaPielesVista(i, fila.isIncluida(), fila.referencia().referencia(),
-                    fila.referencia().modelo(), fila.referencia().piel(), fila.colores(),
-                    fila.getNombrePiel(), fila.getForro(),
-                    combinaciones.subList(0, Math.min(combinaciones.size(), columnas)), fotos,
-                    Math.min(fila.getFotoPrincipal(), Math.max(0, fotos.size() - 1))));
+                    fila.referencia().modelo(), fila.referencia().piel(), coloresVista,
+                    fila.getNombrePiel(), fila.getForro(), unaPorColumna(fila.getCombinaciones(), columnas),
+                    fotos, Math.min(fila.getFotoPrincipal(), Math.max(0, fotos.size() - 1))));
         }
         return vista;
+    }
+
+    /** Una casilla por columna de combinación: las que falten, vacías; las que sobren, fuera. */
+    private static List<String> unaPorColumna(List<String> valores, int columnas) {
+        List<String> casillas = new ArrayList<>(valores);
+        while (casillas.size() < columnas) {
+            casillas.add("");
+        }
+        return casillas.subList(0, columnas);
     }
 
     private static FotosTemporada leerZip(MultipartFile fotos, PedidoCorte pedido, ClienteCorte cliente,

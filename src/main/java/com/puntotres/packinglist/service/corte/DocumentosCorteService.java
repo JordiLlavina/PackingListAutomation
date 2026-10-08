@@ -16,12 +16,13 @@ import org.springframework.stereotype.Service;
 
 /**
  * Los documentos del corte: a qué cliente le toca cada pedido y, a partir de
- * lo tecleado en la pantalla de pieles, los Word que salen.
+ * lo tecleado en la pantalla de pieles, los documentos que salen.
  *
- * Salen un Word de órdenes con una página por referencia y color con bolsos,
- * y un Word de fotos por MODELO con bolsos y fotos: la carpeta ULL027 vale
- * para ULL027.AL0103 y para ULL027.AL0216, y sin pieles en su cabecera los
- * dos Word serían el mismo. Una fila desmarcada en la tabla no saca nada.
+ * Salen un Excel de órdenes con una hoja por referencia (modelo + piel) y
+ * color con bolsos, y un Word de fotos por MODELO con bolsos y
+ * fotos: la carpeta ULL027 vale para ULL027.AL0103 y para ULL027.AL0216, y
+ * sin pieles en su cabecera los dos Word serían el mismo. Una fila
+ * desmarcada en la tabla no saca nada.
  */
 @Service
 public class DocumentosCorteService {
@@ -30,7 +31,7 @@ public class DocumentosCorteService {
     private static final Pattern CARACTERES_INSEGUROS = Pattern.compile("[\\\\/:*?\"<>|]+");
 
     private final List<ClienteCorte> clientes;
-    private final OrdenCorteDocBuilder ordenes = new OrdenCorteDocBuilder();
+    private final OrdenCorteExcelBuilder ordenes = new OrdenCorteExcelBuilder();
     private final FotosCorteDocBuilder albumes = new FotosCorteDocBuilder();
 
     public DocumentosCorteService(List<ClienteCorte> clientes) {
@@ -46,7 +47,7 @@ public class DocumentosCorteService {
     }
 
     /**
-     * Escribe los Word en {@code destino}. {@code reducida} da el JPEG
+     * Escribe los documentos en {@code destino}. {@code reducida} da el JPEG
      * reducido de cada foto, o vacío si no se pudo convertir (de eso ya avisó
      * la conversión).
      */
@@ -57,7 +58,7 @@ public class DocumentosCorteService {
         Files.createDirectories(destino);
         Map<Path, Optional<Imagen>> leidas = new HashMap<>();
         List<String> avisos = new ArrayList<>();
-        List<OrdenCorte> paginas = new ArrayList<>();
+        List<OrdenCorte> fichas = new ArrayList<>();
         List<DocumentoCorte> documentosFotos = new ArrayList<>();
 
         // Modelo → nombre del bolso, en el orden de las filas: un Word de fotos por modelo.
@@ -69,10 +70,12 @@ public class DocumentosCorteService {
             String modelo = fila.referencia().modelo();
             List<FotoModelo> delModelo = fotos.de(modelo);
             Imagen principal = principal(delModelo, fila.getFotoPrincipal(), reducida, leidas, avisos);
-            for (ColorCorte color : fila.colores()) {
+            List<ColorCorte> colores = fila.colores();
+            for (int indice = 0; indice < colores.size(); indice++) {
+                ColorCorte color = colores.get(indice);
                 if (color.bolsos() > 0) {
-                    paginas.add(new OrdenCorte(cliente, temporada, modelo, color.color(),
-                            color.bolsos(), fila.pieles(), principal));
+                    fichas.add(new OrdenCorte(cliente, temporada, fila.referencia().referencia(), modelo,
+                            color.nombre(), color.bolsos(), fila.pieles(indice), principal));
                 }
             }
             modelos.merge(modelo, fila.nombreModelo(),
@@ -96,15 +99,15 @@ public class DocumentosCorteService {
         }
 
         List<DocumentoCorte> documentos = new ArrayList<>();
-        if (paginas.isEmpty()) {
+        if (fichas.isEmpty()) {
             avisos.add("Ninguna referencia tiene bolsos que cortar: no sale el documento de "
                     + "órdenes de corte");
         } else {
-            String nombre = sanear("Ordenes de corte " + cliente + " " + temporada + ".docx");
+            String nombre = sanear("Ordenes de corte " + cliente + " " + temporada + ".xlsx");
             Path fichero = destino.resolve(nombre);
-            Files.write(fichero, ordenes.generar(paginas));
-            documentos.add(new DocumentoCorte(DocumentoCorte.Tipo.ORDENES, "Órdenes de corte (" + paginas.size()
-                    + (paginas.size() == 1 ? " página)" : " páginas)"), nombre, fichero));
+            Files.write(fichero, ordenes.generar(fichas));
+            documentos.add(new DocumentoCorte(DocumentoCorte.Tipo.ORDENES, "Órdenes de corte ("
+                    + fichas.size() + (fichas.size() == 1 ? " hoja)" : " hojas)"), nombre, fichero));
         }
         documentos.addAll(documentosFotos);
         return new ResultadoCorte(documentos, avisos);

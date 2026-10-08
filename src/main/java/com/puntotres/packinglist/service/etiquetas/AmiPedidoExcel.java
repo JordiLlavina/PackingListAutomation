@@ -93,13 +93,14 @@ public class AmiPedidoExcel {
     /**
      * Una fila del pedido con su cantidad, para los documentos del corte:
      * cuántos bolsos de cada referencia y color hay que cortar. El color va
-     * solo con su nombre ("BLACK", del Libellé coloris), que es como lo pide
-     * el cortador en la orden; sin nombre, con el código.
+     * partido en su código ("001", de COLORIS) y su nombre ("BLACK", del
+     * Libellé coloris): la orden de corte los enseña juntos, "001 BLACK".
      *
      * Va aparte de {@link LineaCatalogo} a propósito: el catálogo que se le
      * enseña a Claude no debe llevar cantidades (ver su javadoc).
      */
-    public record LineaConCantidad(String referencia, String color, int cantidad) {
+    public record LineaConCantidad(String referencia, String codigoColor, String nombreColor,
+                                   int cantidad) {
     }
 
     private final List<FilaCruda> filas;
@@ -275,9 +276,8 @@ public class AmiPedidoExcel {
     /** Una por fila del fichero (o sea, por talla y PO), en su orden. */
     public List<LineaConCantidad> lineasConCantidad() {
         return filas.stream()
-                .map(fila -> new LineaConCantidad(fila.article(),
-                        fila.libelle().isBlank() ? fila.coloris() : fila.libelle().trim(),
-                        fila.commande()))
+                .map(fila -> new LineaConCantidad(fila.article(), fila.coloris().trim(),
+                        fila.libelle().trim(), fila.commande()))
                 .toList();
     }
 

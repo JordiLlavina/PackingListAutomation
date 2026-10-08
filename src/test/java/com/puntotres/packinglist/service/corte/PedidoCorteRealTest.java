@@ -22,9 +22,9 @@ class PedidoCorteRealTest {
     void amiSumaCadaColorSinMirarDestinacionNiTalla() throws IOException {
         PedidoCorte pedido = new AmiCorte().leerPedido(leer("EAN PUNTOTRES H26.xlsx"));
 
-        assertEquals(Map.of("BLACK", 169, "VANILLA CREAM", 102, "MOCHA", 31),
+        assertEquals(Map.of("001 BLACK", 169, "718 VANILLA CREAM", 102, "A237 MOCHA", 31),
                 bolsosDe(pedido, "ULL729.AL0103"));
-        assertEquals(Map.of("BLACK", 1995, "MASTIC BEIGE", 381, "TRUFFLE", 809),
+        assertEquals(Map.of("001 BLACK", 1995, "A184 MASTIC BEIGE", 381, "A236 TRUFFLE", 809),
                 bolsosDe(pedido, "USL728.AL0217"));
     }
 
@@ -76,6 +76,47 @@ class PedidoCorteRealTest {
     }
 
     @Test
+    void amiTraeCodigoYDescripcionDelColorYApcSoloElCodigo() throws IOException {
+        // AMI: COLORIS + Libellé coloris, así que no necesita la Tabla colores
+        // Clientes. APC: solo Couleurs, y sus nueve códigos son los que se
+        // siembran en la tabla (TablaColoresTest lo comprueba por su lado).
+        PedidoCorte ami = new AmiCorte().leerPedido(leer("EAN PUNTOTRES H26.xlsx"));
+        PedidoCorte apc = new ApcCorte().leerPedido(leer("APC_PEDIDO_FALL26.xlsx"));
+
+        assertTrue(ami.codigosSinDescripcion().isEmpty());
+        assertTrue(ami.articulos().stream().flatMap(articulo -> articulo.colores().stream())
+                .allMatch(color -> !color.codigo().isEmpty() && !color.descripcion().isEmpty()));
+        assertEquals(java.util.Set.of("CAB", "CAE", "CAW", "GAE", "GAU", "KAN", "KBE", "LAW", "LZZ"),
+                apc.codigosSinDescripcion());
+    }
+
+    @Test
+    void losColoresDelPedidoSonTodosTambienLosDeLosCinturones() throws IOException {
+        // Para la Tabla colores Clientes: 13 colores en el pedido de AMI, 4 de
+        // ellos solo en cinturones (que el corte deja fuera), y los 9 de APC.
+        Map<String, String> ami = new AmiCorte().coloresDelPedido(leer("EAN PUNTOTRES H26.xlsx"));
+        Map<String, String> apc = new ApcCorte().coloresDelPedido(leer("APC_PEDIDO_FALL26.xlsx"));
+
+        assertEquals(13, ami.size(), ami.toString());
+        assertEquals("BLACK", ami.get("001"));
+        assertEquals("NOIR/ARGENT VIBRE", ami.get("0014"), "un color que solo llevan los cinturones");
+        assertTrue(ami.values().stream().noneMatch(String::isEmpty));
+        assertEquals(java.util.Set.of("CAB", "CAE", "CAW", "GAE", "GAU", "KAN", "KBE", "LAW", "LZZ"), apc.keySet());
+        assertTrue(apc.values().stream().allMatch(String::isEmpty), "APC no trae la descripción");
+    }
+
+    @Test
+    void lasPielesDelPedidoSonLaParteDeLaReferenciaQueEsLaPiel() throws IOException {
+        java.util.Set<String> ami = new AmiCorte().pielesDelPedido(leer("EAN PUNTOTRES H26.xlsx"));
+        java.util.Set<String> apc = new ApcCorte().pielesDelPedido(leer("APC_PEDIDO_FALL26.xlsx"));
+
+        assertTrue(ami.contains("AL0103") && ami.contains("AL0216"), ami.toString());
+        assertTrue(ami.stream().allMatch(piel -> piel.startsWith("AL")), "detrás del punto: " + ami);
+        assertTrue(apc.contains("PXCBC") && apc.contains("PXCDS"), apc.toString());
+        assertTrue(apc.stream().allMatch(piel -> piel.startsWith("PX")), "delante del guion: " + apc);
+    }
+
+    @Test
     void elServicioSoloConoceAmiYApc() {
         DocumentosCorteService servicio = new DocumentosCorteService(
                 List.of(new AmiCorte(), new ApcCorte()));
@@ -91,7 +132,7 @@ class PedidoCorteRealTest {
         pedido.articulos().stream()
                 .filter(articulo -> articulo.referencia().referencia().equals(referencia))
                 .findFirst().orElseThrow()
-                .colores().forEach(color -> bolsos.put(color.color(), color.bolsos()));
+                .colores().forEach(color -> bolsos.put(color.nombre(), color.bolsos()));
         return bolsos;
     }
 

@@ -42,8 +42,20 @@ public class MemoriaPiel {
         actualizar(nombre);
     }
 
+    public String getCliente() {
+        return cliente;
+    }
+
+    public String getRefPiel() {
+        return refPiel;
+    }
+
     public String getNombre() {
-        return nombre;
+        return nombre == null ? "" : nombre;
+    }
+
+    public LocalDateTime getFechaActualizacion() {
+        return fechaActualizacion;
     }
 
     public void actualizar(String nombre) {

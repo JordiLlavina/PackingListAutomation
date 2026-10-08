@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Una tabla editable: código fijo, valor tecleable, guardar y borrar por fila
+     (sin recargar) y "Guardar todo" al pie (envío normal, lleva la tabla entera). -->
+<section class="tarjeta" th:fragment="tablaEditable(tabla, titulo, filas, rotuloCodigo, rotuloValor, nombre, vacio)">
+    <h3 class="titulo-seccion" th:text="${titulo}">Tabla</h3>
+
+    <p class="ayuda" th:if="${#lists.isEmpty(filas)}">
+        Todavía no hay ninguna fila. Se añaden desde el excel de pedido o a mano, aquí abajo.
+    </p>
+
+    <form th:unless="${#lists.isEmpty(filas)}" th:action="@{/colores/{t}/todo(t=${tabla})}" method="post"
+          th:id="|tabla-${tabla}|">
+        <input type="hidden" name="cliente" th:value="${cliente}">
+        <table class="tabla-colores">
+            <thead>
+            <tr>
+                <th th:text="${rotuloCodigo}">Código</th>
+                <th th:text="${rotuloValor}">Descripción</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="fila, estado : ${filas}" th:classappend="${fila.valor.isEmpty()} ? 'sin-descripcion'">
+                <td class="codigo-color" th:text="${fila.codigo}">LZZ</td>
+                <td>
+                    <div class="celda-valor">
+                        <input type="hidden" th:name="|filas[${estado.index}].codigo|" th:value="${fila.codigo}">
+                        <input type="text" class="valor-fila" th:name="|filas[${estado.index}].valor|"
+                               th:value="${fila.valor}" th:placeholder="${vacio}"
+                               th:attr="aria-label=|${rotuloValor} de ${fila.codigo}|">
+                        <button type="button" class="mini guardar-fila"
+                                th:attr="data-tabla=${tabla}, data-codigo=${fila.codigo}">Guardar</button>
+                        <span class="estado-fila" aria-live="polite"></span>
+                    </div>
+                </td>
+                <td>
+                    <button type="button" class="mini borrar-fila"
+                            th:attr="data-tabla=${tabla}, data-codigo=${fila.codigo}, data-nombre=${nombre}">Borrar</button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <button type="submit" class="guardar-todo">Guardar todo</button>
+    </form>
+</section>
+</body>
+</html>

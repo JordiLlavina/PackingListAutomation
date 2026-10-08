@@ -1,7 +1,6 @@
 package com.puntotres.packinglist.service.corte;
 
 import static com.puntotres.packinglist.testutil.WordDePrueba.fotosDe;
-import static com.puntotres.packinglist.testutil.WordDePrueba.texto;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,11 +15,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import com.puntotres.packinglist.testutil.ExcelDePrueba;
 import com.puntotres.packinglist.testutil.FotosDePrueba;
 
 class DocumentosCorteGeneracionTest {
@@ -50,11 +51,13 @@ class DocumentosCorteGeneracionTest {
                 fila("ULL712.AL0103", 5),
                 fila("ULL999.AL0001", 0)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL027.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.xlsx", "Fotos ULL027.docx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
-        XWPFDocument ordenes = abrir(resultado.documentos().get(0));
-        assertEquals(4, ordenes.getTables().size(), "ULL027 en negro y ULL712: dos órdenes");
-        String texto = texto(ordenes);
+        XSSFWorkbook ordenes = abrirExcel(resultado.documentos().get(0));
+        assertEquals(List.of("ULL027.AL0103 - 001 BLACK", "ULL712.AL0103 - 001 BLACK"),
+                ExcelDePrueba.nombresDeHoja(ordenes), "ULL027 en negro y ULL712: dos órdenes, una hoja cada una");
+        assertEquals("Órdenes de corte (2 hojas)", resultado.documentos().get(0).descripcion());
+        String texto = ExcelDePrueba.texto(ordenes);
         assertTrue(texto.contains("ULL027") && texto.contains("ULL712"));
         assertTrue(!texto.contains("ULL999"), "sin bolsos no hay orden");
         XWPFDocument album = abrir(resultado.documentos().get(1));
@@ -90,8 +93,11 @@ class DocumentosCorteGeneracionTest {
         ResultadoCorte resultado = generar("H26", List.of(
                 fila("ULL027.AL0103", 1), fila("ULL027.AL0216", 1)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.docx", "Fotos ULL027.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.xlsx", "Fotos ULL027.docx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
+        XSSFWorkbook ordenes = abrirExcel(resultado.documentos().get(0));
+        assertEquals(List.of("ULL027.AL0103 - 001 BLACK", "ULL027.AL0216 - 001 BLACK"),
+                ExcelDePrueba.nombresDeHoja(ordenes), "el mismo modelo y color en dos pieles: la piel las distingue");
     }
 
     @Test
@@ -101,16 +107,16 @@ class DocumentosCorteGeneracionTest {
 
         ResultadoCorte resultado = generar("H26", List.of(fuera, fila("ULL712.AL0103", 5)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.xlsx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
-        String texto = texto(abrir(resultado.documentos().get(0)));
+        String texto = ExcelDePrueba.texto(abrirExcel(resultado.documentos().get(0)));
         assertTrue(texto.contains("ULL712") && !texto.contains("ULL027"), texto);
     }
 
     @Test
     void elWordDeFotosSeTitulaConElModeloYElNombreDelBolsoSiElPedidoLoTrae() throws IOException {
         FilaCorte conNombre = new FilaCorte(new ArticuloCorte(ReferenciaCorte.deAmi("ULL027.AL0103"),
-                List.of(new ColorCorte("BLACK", 1)), "Sac Le Neige"));
+                List.of(new ColorCorte("001", "BLACK", 1)), "Sac Le Neige"));
 
         ResultadoCorte resultado = generar("H26", List.of(conNombre));
 
@@ -130,7 +136,7 @@ class DocumentosCorteGeneracionTest {
     void elNombreDelFicheroSeSanea() throws IOException {
         ResultadoCorte resultado = generar("H26/27", List.of(fila("ULL712.AL0103", 1)));
 
-        assertEquals("Ordenes de corte AMI H26_27.docx", resultado.documentos().get(0).nombreFichero());
+        assertEquals("Ordenes de corte AMI H26_27.xlsx", resultado.documentos().get(0).nombreFichero());
         assertTrue(Files.exists(resultado.documentos().get(0).fichero()));
     }
 
@@ -140,10 +146,10 @@ class DocumentosCorteGeneracionTest {
     }
 
     private static FilaCorte fila(String referencia, int... bolsos) {
-        String[] colores = {"001 BLACK", "718 VANILLA CREAM", "A237 MOCHA"};
+        String[][] colores = {{"001", "BLACK"}, {"718", "VANILLA CREAM"}, {"A237", "MOCHA"}};
         List<ColorCorte> lista = new java.util.ArrayList<>();
         for (int i = 0; i < bolsos.length; i++) {
-            lista.add(new ColorCorte(colores[i], bolsos[i]));
+            lista.add(new ColorCorte(colores[i][0], colores[i][1], bolsos[i]));
         }
         FilaCorte fila = new FilaCorte(new ArticuloCorte(ReferenciaCorte.deAmi(referencia), lista));
         fila.setNombrePiel("Box calf");
@@ -162,8 +168,12 @@ class DocumentosCorteGeneracionTest {
         }
     }
 
+    private static XSSFWorkbook abrirExcel(DocumentoCorte documento) throws IOException {
+        return ExcelDePrueba.abrir(Files.readAllBytes(documento.fichero()));
+    }
+
     private static byte[] fotoPrincipal(ResultadoCorte resultado) throws IOException {
-        return fotosDe(abrir(resultado.documentos().get(0)).getTables().get(0))
+        return ExcelDePrueba.fotosDe(abrirExcel(resultado.documentos().get(0)).getSheetAt(0))
                 .get(0).getPictureData().getData();
     }
 }
