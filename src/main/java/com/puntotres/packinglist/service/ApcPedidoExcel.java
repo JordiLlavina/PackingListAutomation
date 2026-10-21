@@ -64,6 +64,15 @@ public final class ApcPedidoExcel {
     private static final String CABECERA_COLOR = "COULEUR";
     private static final String CABECERA_TALLA = "TAILLE";
 
+    /**
+     * El sku es el Article con el código de color pegado detrás
+     * ("PXCBC-F67043" + "LZZ" = "PXCBC-F67043LZZ"). Es de donde sale el color
+     * cuando el fichero no trae la columna Couleurs, que es lo que pasó en
+     * Spring 27: medido, en las 162 filas de ese pedido y en las 130 del de
+     * Fall 26 el sku es exactamente Article + color.
+     */
+    private static final String CABECERA_SKU = "SKU";
+
     /** Una fila del excel: referencia (Article) y pedido completos. */
     public record FilaPedido(String referencia, String pedido) {
     }
@@ -102,8 +111,8 @@ public final class ApcPedidoExcel {
     /**
      * Una fila del pedido con su cantidad, para los documentos del corte:
      * cuántos bolsos de cada referencia y color hay que cortar. El color es
-     * el código de la columna Couleurs ("LZZ"): el pedido de APC no trae su
-     * nombre. La designación ("sac Le Neige") es el nombre del bolso.
+     * el código de la columna Couleurs ("LZZ") o, sin ella, el que lleva el
+     * sku detrás del Article: el pedido de APC no trae su nombre. La designación ("sac Le Neige") es el nombre del bolso.
      *
      * Va aparte de {@link LineaCatalogo} a propósito: el catálogo que se le
      * enseña a Claude no debe llevar cantidades (ver su javadoc).
@@ -143,6 +152,9 @@ public final class ApcPedidoExcel {
             int colDesignacion = columnaQueContenga(cabecera, CABECERA_DESIGNACION);
             int colColor = columnaOpcional(cabecera, CABECERA_COLOR);
             int colTalla = columnaOpcional(cabecera, CABECERA_TALLA);
+            // Si no hay columna de color (Spring 27), el color sale del sku.
+            int colSku = colColor >= 0 ? -1 : columnaOpcional(cabecera, CABECERA_SKU);
+            Set<String> skusQueNoCuadran = new LinkedHashSet<>();
 
             List<FilaPedido> filas = new ArrayList<>();
             List<LineaCatalogo> catalogo = new ArrayList<>();
@@ -162,13 +174,17 @@ public final class ApcPedidoExcel {
                 if (vistas.add(entrada)) {
                     filas.add(entrada);
                 }
+                String color = colColor >= 0
+                        ? textoOpcional(hoja, fila, colColor)
+                        : colorDelSku(textoOpcional(hoja, fila, colSku), entrada.referencia(),
+                                skusQueNoCuadran);
                 catalogo.add(new LineaCatalogo(entrada.referencia(), entrada.pedido(),
                         textoOpcional(hoja, fila, colDestino),
                         textoOpcional(hoja, fila, colDesignacion),
-                        textoOpcional(hoja, fila, colColor),
+                        color,
                         textoOpcional(hoja, fila, colTalla)));
                 lineasConCantidad.add(new LineaConCantidad(entrada.referencia(),
-                        textoOpcional(hoja, fila, colColor),
+                        color,
                         colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)),
                         textoOpcional(hoja, fila, colDesignacion)));
                 acumularComanda(comandas, destinosMezclados, entrada.pedido(),
@@ -196,8 +212,38 @@ public final class ApcPedidoExcel {
                 avisos.add("El excel de pedido no tiene la columna 'Quantité échéancée': "
                         + "las cantidades a enviar hay que teclearlas a mano");
             }
+            // Sin color no se puede comprobar que el taller y el pedido hablan
+            // del mismo artículo, y el corte junta todos los colores de una
+            // referencia en una ficha: eso no puede pasar sin decirlo.
+            if (colColor < 0 && colSku < 0) {
+                avisos.add("El excel de pedido no tiene ni la columna 'Couleurs' ni la 'sku':"
+                        + " no se sabe el color de ningún artículo");
+            }
+            for (String sku : skusQueNoCuadran) {
+                avisos.add("En el excel de pedido, el sku " + sku + " no empieza por su artículo:"
+                        + " esas líneas se quedan sin color");
+            }
             return new ApcPedidoExcel(filas, comandas, catalogo, lineasConCantidad, avisos);
         }
+    }
+
+    /**
+     * El color de una fila sin columna Couleurs: lo que el sku lleva detrás
+     * del Article. Si el sku no empieza por su Article no se recorta a ojo
+     * —partirlo por otro sitio daría el color de otro artículo—: la fila se
+     * queda sin color y se anota para avisar.
+     */
+    private static String colorDelSku(String sku, String articulo, Set<String> queNoCuadran) {
+        String limpio = sku.trim().toUpperCase(Locale.ROOT);
+        String delArticulo = articulo.trim().toUpperCase(Locale.ROOT);
+        if (limpio.isEmpty()) {
+            return "";
+        }
+        if (!limpio.startsWith(delArticulo) || limpio.length() == delArticulo.length()) {
+            queNoCuadran.add(sku.trim() + " (" + articulo.trim() + ")");
+            return "";
+        }
+        return limpio.substring(delArticulo.length()).trim();
     }
 
     /**
@@ -317,8 +363,9 @@ public final class ApcPedidoExcel {
      * Devuelve <b>varios</b> a propósito: aunque un Document d'achat suele ser
      * un artículo y un color, en el fichero real hay pedidos con dos
      * (4100128685 lleva LZZ y GAU), así que basta con que el color case con
-     * uno. Vacío = el fichero no trae columna "Couleur" y no hay nada que
-     * comprobar.
+     * uno. Vacío = el fichero no trae ni columna "Couleurs" ni "sku" (y eso
+     * ya se avisa al cargarlo), o el sku de esas filas no se pudo partir, y
+     * no hay nada que comprobar.
      */
     public Set<String> coloresDe(String pedido) {
         if (pedido == null || pedido.isBlank()) {

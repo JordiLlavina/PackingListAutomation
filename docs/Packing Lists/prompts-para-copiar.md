@@ -468,6 +468,7 @@ comprobar que no falta ninguna hoja.
     Japan -> JAPAN
     Korea -> KOREA
     Douanes USA / D. USA -> D. USA
+    Retail USA -> RETAIL USA
     Ivry -> IVRY
     Retail -> RETAIL
     Wholesale concess -> WHOLESALE CONCESS

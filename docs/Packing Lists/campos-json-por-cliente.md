@@ -103,7 +103,7 @@ sin el sufijo (`"09839"`).
 Bolsos y cinturones comparten plantilla. Destinos configurados en
 `application.yml`: **WHOLESALE**, **RETAIL**, D. USA, IVRY, JAPAN y KOREA.
 
-WHOLESALE y RETAIL son **destinos padre**: agrupan destinaciones hijas que se
+WHOLESALE, RETAIL y D. USA son **destinos padre**: agrupan destinaciones hijas que se
 tratan como si fueran ellos (mismo fichero, misma hoja, misma dirección), y la
 hija solo sobrevive en la columna DESTINATION de sus líneas.
 
@@ -111,6 +111,7 @@ hija solo sobrevive en la columna DESTINATION de sus líneas.
 |---|---|
 | WHOLESALE | AUSTRALIA, WHOLESALE, CHINE FRANCH |
 | RETAIL | RETAIL, WHOLESALE CONCESS |
+| D. USA | DOUANES USA (otro nombre del mismo sitio), D. USA, RETAIL USA |
 
 Dos hijas del mismo padre en un envío salen en UN solo excel, con sus cajas
 concatenadas. Si sus números de caja o de palet se repiten se avisa y **no se

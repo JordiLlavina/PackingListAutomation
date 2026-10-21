@@ -127,6 +127,8 @@ packing-list:
           "[KOREA]":         { altura-max-cm: 155, prioridad: 1, mezcla: LIBRE }
           "[D. USA]":        { altura-max-cm: 155, prioridad: 2, mezcla: LIBRE }
           "[DOUANES USA]":   { prioridad: 2, mezcla: LIBRE }
+          # Hija de D. USA (Spring 27): la misma prioridad que USA.
+          "[RETAIL USA]":    { prioridad: 2, mezcla: LIBRE }
           "[RETAIL]":        { altura-max-cm: 168, prioridad: 3, mezcla: LIBRE }
           "[WHOLESALE]":     { altura-max-cm: 168, prioridad: 4, mezcla: LIBRE }
 
@@ -183,7 +185,10 @@ packing-list:
           # "Notre référence" de su excel de pedido; "D. USA" es como se
           # teclea a mano. Es el mismo sitio, así que entra como hija para
           # que el envío que viene del pedido acabe en este mismo fichero.
-          destinos-hijo: [DOUANES USA, D. USA]
+          # "Retail USA" (desde Spring 27) es una destinación de verdad, no
+          # otro nombre del mismo sitio: cuelga de USA como Australia de
+          # Wholesale, y solo sobrevive en la columna DESTINATION.
+          destinos-hijo: [DOUANES USA, D. USA, RETAIL USA]
         "[IVRY]":
           nombre-cliente: A.P.C.
           direccion: 74 BIS AV MAURICE THOREZ 94200 IVRY SUR SEINE FRANCE

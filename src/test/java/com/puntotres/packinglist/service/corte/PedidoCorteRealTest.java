@@ -75,6 +75,24 @@ class PedidoCorteRealTest {
         assertTrue(pedido.avisos().isEmpty(), pedido.avisos().toString());
     }
 
+    /**
+     * Spring 27 ya no trae la columna Couleurs: el color sale del sku. Sin
+     * eso los colores de cada referencia se sumaban en una sola ficha sin
+     * color (PXCEV-F63034 salía como 254 bolsos de nada).
+     */
+    @Test
+    void apcSpring27SacaElColorDelSkuYNoJuntaLosColores() throws IOException {
+        PedidoCorte pedido = new ApcCorte().leerPedido(leer("APC_PEDIDO_SPRING27.xlsx"));
+
+        assertEquals(Map.of("LZZ", 105, "GAA", 149), bolsosDe(pedido, "PXCEV-F63034"));
+        assertEquals(22, pedido.articulos().size());
+        assertTrue(pedido.articulos().stream().flatMap(articulo -> articulo.colores().stream())
+                .noneMatch(color -> color.codigo().isEmpty()));
+        assertEquals(java.util.Set.of("CAD", "CAE", "CAV", "DAB", "FAB", "GAA", "IAI", "IBC",
+                        "KBG", "LAO", "LZZ", "TLD"),
+                new ApcCorte().coloresDelPedido(leer("APC_PEDIDO_SPRING27.xlsx")).keySet());
+    }
+
     @Test
     void amiTraeCodigoYDescripcionDelColorYApcSoloElCodigo() throws IOException {
         // AMI: COLORIS + Libellé coloris, así que no necesita la Tabla colores

@@ -23,7 +23,7 @@ nada, simplemente el ejemplo deja de ser realista.
 
 ## Lo que sí es un fichero real
 
-**Los datos reales de cliente son los excels de pedido, y solo esos.** Hay tres:
+**Los datos reales de cliente son los excels de pedido, y solo esos.** Hay cuatro:
 
 - `docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx` (AMI, temporada H26), copiado
   aquí como `EAN PUNTOTRES H26.xlsx`.
@@ -40,6 +40,11 @@ nada, simplemente el ejemplo deja de ser realista.
   référence`, porque otras dos hojas del libro tienen las dos primeras) y
   `Article` + los tres últimos dígitos del pedido identifican una única fila de
   las 130.
+- `docs/Etiquetas cajas/APC documentos test/LCT_Spring 27_Puntotres.XLSX` (APC, Spring 27),
+  copiado aquí como `APC_PEDIDO_SPRING27.xlsx`. Mismo libro que el de Fall 26
+  pero **sin la columna `Couleurs`**: el color sale del `sku` (`Article` +
+  color, cierto en sus 162 filas). Trae una destinación nueva, `Retail USA`,
+  hija de `D. USA`. Lo anclan `ApcPedidoExcelTest` y `PedidoCorteRealTest`.
 
 De los demás `.xlsx` de `docs/` lo real es la **maquetación** (son las
 plantillas y las salidas que usa el cliente); su contenido es de relleno.
@@ -58,6 +63,8 @@ Lo mismo con el de APC:
 
     cp "docs/Etiquetas cajas/APC documentos test/APC_PEDIDO_FALL26.xlsx" \
        "src/test/resources/ejemplos/APC_PEDIDO_FALL26.xlsx"
+    cp "docs/Etiquetas cajas/APC documentos test/LCT_Spring 27_Puntotres.XLSX" \
+       "src/test/resources/ejemplos/APC_PEDIDO_SPRING27.xlsx"
 
 `escandallos/` son también copias de escandallos reales del ERP.
 

@@ -125,6 +125,23 @@ class ReglasTallerPropertiesTest {
         assertEquals(TipoMezcla.MISMO_PEDIDO, reglas.mezclaDe("AMI", "PRESS"));
     }
 
+    /**
+     * "Retail USA" llegó en el pedido de Spring 27. Cuelga de USA como
+     * Australia de Wholesale (mismo fichero, dirección y Livraison code) y se
+     * sirve con la prioridad de USA. Sin regla, el envío de taller entero se
+     * bloqueaba.
+     */
+    @Test
+    void retailUsaEsHijaDeUsaYSeSirveComoElla() {
+        ClienteConfig.DestinoResuelto padre = clientes.clientePara("APC").orElseThrow()
+                .destinoPadrePara("Retail USA").orElseThrow();
+
+        assertEquals("D. USA", padre.nombrePadre());
+        assertEquals("UST", padre.config().getAbreviatura());
+        assertEquals(reglas.prioridadDe("APC", "D. USA"), reglas.prioridadDe("APC", "RETAIL USA"));
+        assertTrue(reglas.prioridadDe("APC", "RETAIL USA").isPresent());
+    }
+
     @Test
     void amiNumeraSeguidoEntreDestinacionesYApcReinicia() {
         assertEquals(NumeracionCajas.CONTINUA,

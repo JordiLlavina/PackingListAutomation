@@ -164,6 +164,94 @@ class ApcPedidoExcelTest {
         assertTrue(pedido.designacionDe("F67008").isEmpty());
     }
 
+    // --- el color: columna Couleurs (Fall 26) o, si no está, el sku (Spring 27) ---
+
+    private static ApcPedidoExcel pedido(String[]... filas) throws IOException {
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook libro =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+             java.io.ByteArrayOutputStream salida = new java.io.ByteArrayOutputStream()) {
+            var hoja = libro.createSheet("Sheet1");
+            for (int f = 0; f < filas.length; f++) {
+                var fila = hoja.createRow(f);
+                for (int c = 0; c < filas[f].length; c++) {
+                    fila.createCell(c).setCellValue(filas[f][c]);
+                }
+            }
+            libro.write(salida);
+            return ApcPedidoExcel.desdeBytes(salida.toByteArray());
+        }
+    }
+
+    @Test
+    void sinColumnaCouleursElColorEsElSkuMenosElArticulo() throws IOException {
+        ApcPedidoExcel pedido = pedido(
+                new String[] {"Notre référence", "sku", "Document d'achat", "Article", "Valeur de grille"},
+                new String[] {"Retail", "PXCBC-F67043LZZ", "4100132821", "PXCBC-F67043", "LZZTU"},
+                new String[] {"Retail", "PXCBC-F67043GAA", "4100132821", "PXCBC-F67043", "GAATU"});
+
+        assertEquals(java.util.Set.of("LZZ", "GAA"), pedido.coloresDe("4100132821"));
+        assertEquals("LZZ", pedido.catalogo().get(0).color());
+        assertEquals("GAA", pedido.lineasConCantidad().get(1).color());
+        // El único aviso es el de la cantidad, que este fixture no trae.
+        assertTrue(pedido.avisos().stream().noneMatch(aviso -> aviso.contains("color")),
+                pedido.avisos().toString());
+    }
+
+    /** Con las dos columnas manda Couleurs, que es el color dicho tal cual. */
+    @Test
+    void conColumnaCouleursMandaElla() throws IOException {
+        ApcPedidoExcel pedido = pedido(
+                new String[] {"Notre référence", "SKU", "Document d'achat", "Article", "Couleurs"},
+                new String[] {"Retail", "PXCBC-F67043LZZ", "4100132821", "PXCBC-F67043", "GAA"});
+
+        assertEquals(java.util.Set.of("GAA"), pedido.coloresDe("4100132821"));
+    }
+
+    /**
+     * Un sku que no empieza por su Article no se recorta a ojo: esa fila se
+     * queda sin color y se dice, porque sin color la entrada por taller no
+     * puede comprobar que el taller y el pedido hablan del mismo artículo.
+     */
+    @Test
+    void unSkuQueNoEmpiezaPorSuArticuloNoDaColorYAvisa() throws IOException {
+        ApcPedidoExcel pedido = pedido(
+                new String[] {"Notre référence", "sku", "Document d'achat", "Article"},
+                new String[] {"Retail", "PXCEV-F63037GAA", "4100132845", "PXCBS-F63037"});
+
+        assertTrue(pedido.coloresDe("4100132845").isEmpty());
+        assertTrue(pedido.avisos().stream().anyMatch(aviso -> aviso.contains("PXCBS-F63037")),
+                pedido.avisos().toString());
+    }
+
+    @Test
+    void sinCouleursNiSkuAvisaDeQueElPedidoNoTraeColor() throws IOException {
+        ApcPedidoExcel pedido = pedido(
+                new String[] {"Notre référence", "Document d'achat", "Article"},
+                new String[] {"Retail", "4100132821", "PXCBC-F67043"});
+
+        assertTrue(pedido.avisos().stream().anyMatch(aviso -> aviso.contains("color")),
+                pedido.avisos().toString());
+    }
+
+    /** Contra el pedido real de Spring 27 (162 líneas, sin columna Couleurs). */
+    @Test
+    void elPedidoRealDeSpring27TraeElColorDeCadaLinea() throws IOException {
+        ApcPedidoExcel pedido;
+        try (InputStream in = ApcPedidoExcelTest.class
+                .getResourceAsStream("/ejemplos/APC_PEDIDO_SPRING27.xlsx")) {
+            pedido = ApcPedidoExcel.desdeBytes(in.readAllBytes());
+        }
+
+        assertTrue(pedido.avisos().isEmpty(), pedido.avisos().toString());
+        assertEquals(162, pedido.catalogo().size());
+        assertTrue(pedido.catalogo().stream().noneMatch(linea -> linea.color().isBlank()));
+        // Un pedido con cuatro artículos de cuatro colores, en el orden del fichero.
+        assertEquals(List.of("FAB", "LZZ", "GAA", "CAV"),
+                List.copyOf(pedido.coloresDe("4100132845")));
+        assertEquals("4100132821", pedido.pedidoCompleto("F67043", "821").orElseThrow());
+        assertEquals("Retail USA", pedido.comandaDe("4100132816").orElseThrow().destino());
+    }
+
     @Test
     void elFicheroRealNoTieneNingunaClaveAmbigua() throws IOException {
         assertTrue(pedidoReal().avisos().isEmpty(),
