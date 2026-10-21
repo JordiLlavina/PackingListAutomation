@@ -417,6 +417,39 @@ class AmiEtiquetasGeneradorTest {
         assertFalse(generador.soportaDestino("HONG KONG"));
     }
 
+    /**
+     * PRESS (el material de marketing, desde SS27) va a París y usa la hoja
+     * de France, pero sus PO llevan el sufijo PRESS: los códigos de barras
+     * tienen que salir de su fila y no de la de France, que es el mismo
+     * artículo con otro PO y otro EAN128.
+     */
+    @Test
+    void pressUsaLaHojaDeFranceConLosCodigosDeSuPropioPo() throws IOException {
+        byte[] pedido = PedidoAmiExcel.crearFormatoSs27("Feuil1 Original",
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09009",
+                        "3667549163510", ean128("3667549163510", 9009, "MA")),
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09839 PRESS",
+                        "3667549163510", ean128("3667549163510", 9839, "MA")));
+
+        ResultadoEtiquetas resultado = generador.generar(List.of(
+                        importado(destino("PRESS", caja(1, "ULL770.AL0245", "001", null, 1, 1.5, "09839")))),
+                cabecera(), Map.of("pedido", pedido));
+
+        assertTrue(generador.soportaDestino("PRESS"));
+        assertEquals(1, resultado.getExcels().size());
+        ExcelGenerado press = resultado.getExcels().get(0);
+        assertEquals("Etiquetas_AMI_PRESS_F-123.xlsx", press.getNombreFichero());
+        try (XSSFWorkbook libro = abrir(press)) {
+            assertEquals("AMI FRANCE", libro.getSheetName(0));
+            assertEquals("09839", texto(libro.getSheetAt(0),
+                    AmiEtiquetaLayout.PRESS.filaOrderNumber(), 2));
+            // Imagen compuesta + EAN128 en las dos etiquetas del par: los
+            // códigos se han encontrado en la fila de PRESS.
+            assertEquals(4, libro.getSheetAt(0).getDrawingPatriarch().getShapes().size());
+        }
+        assertTrue(avisosDeCaja(resultado).isEmpty(), avisosDeCaja(resultado).toString());
+    }
+
     // --- EAN13 y EAN128 ---
 
     @Test

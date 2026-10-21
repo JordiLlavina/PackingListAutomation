@@ -282,6 +282,122 @@ class AmiGeneradorTest {
                 () -> generador.generar(destino, List.of(), envio(), ami));
     }
 
+    // --- PRESS: un solo packing list para todos los modelos ---
+
+    private static DestinoData press(CajaData... cajas) {
+        DestinoData destino = new DestinoData();
+        destino.setNombreDestino("PRESS");
+        destino.setCajas(List.of(cajas));
+        return destino;
+    }
+
+    /**
+     * PRESS es el material de marketing: va a París con los documentos de
+     * France, pero en UN packing list para todo el envío en vez de uno por
+     * modelo y color. En DESTINATION va "France", que es el valor del
+     * desplegable de la plantilla; PRESS solo se ve en el nombre del fichero.
+     */
+    @Test
+    void pressSaleEnUnSoloPackingListConTodosSusModelos() throws Exception {
+        List<ExcelGenerado> excels = generador.generar(press(
+                caja(1, "09839", "ULL770.AL0245", "001", 1, 1.0, 2.0),
+                caja(2, "09839", "ULL771.AL0245", "255", 1, 1.1, 2.1),
+                caja(3, "09839", "ULL771.AL0245", "709", 1, 1.2, 2.2)), List.of(), envio(), ami);
+
+        assertEquals(1, excels.size());
+        ExcelGenerado excel = excels.get(0);
+        assertEquals("2026.07.24_PUN_09839_H26_PRESS.xlsx", excel.getNombreFichero());
+        assertEquals("PRESS", excel.getDescripcion());
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excel.getContenido()))) {
+            Sheet hoja = wb.getSheet("STANDARD PKL H26");
+            assertEquals("France", hoja.getRow(9).getCell(1).getStringCellValue());   // B10
+            assertEquals("ULL770.AL0245", hoja.getRow(19).getCell(2).getStringCellValue());
+            assertEquals("001", hoja.getRow(19).getCell(3).getStringCellValue());
+            assertEquals("ULL771.AL0245", hoja.getRow(20).getCell(2).getStringCellValue());
+            assertEquals("255", hoja.getRow(20).getCell(3).getStringCellValue());
+            assertEquals("709", hoja.getRow(21).getCell(3).getStringCellValue());
+            assertEquals(3, (int) hoja.getRow(21).getCell(4).getNumericCellValue());
+            assertEquals("SUM(V20:V22)", hoja.getRow(22).getCell(21).getCellFormula());
+        }
+    }
+
+    /**
+     * Con algún cinturón todo va en la plantilla de cinturones: sus filas
+     * llevan la matriz de tallas y las de bolso la rejilla "U", que esa
+     * plantilla también trae en su leyenda (fila 16, F=U y G=U).
+     */
+    @Test
+    void pressConBolsosYCinturonesVaEnLaPlantillaDeCinturones() throws Exception {
+        List<ExcelGenerado> excels = generador.generar(press(
+                caja(2, "09839", "ULL772.AL0245", "001", 6, 3.0, 4.0),
+                cajaConTalla(1, "09839", "UBL218.AL0238", "A519", "75", 9, 2.0, 3.0),
+                cajaConTalla(1, "09839", "UBL218.AL0238", "A519", "85", 13, null, null)),
+                List.of(), envio(), ami);
+
+        assertEquals(1, excels.size());
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheet("STANDARD PKL E25");
+            assertTrue(hoja != null, "tiene que ser la plantilla de cinturones");
+            assertEquals("France", hoja.getRow(9).getCell(1).getStringCellValue());   // B10
+
+            Row cinturon = hoja.getRow(18);                                    // por nº de caja
+            assertEquals(1, (int) cinturon.getCell(4).getNumericCellValue());
+            assertEquals("UBL218.AL0238", cinturon.getCell(2).getStringCellValue());
+            assertEquals("75-85", cinturon.getCell(5).getStringCellValue());   // F: SIZE GRID
+            assertEquals(9, (int) cinturon.getCell(7).getNumericCellValue());  // H: talla 75
+            assertEquals(13, (int) cinturon.getCell(9).getNumericCellValue()); // J: talla 85
+            assertEquals(3.0, cinturon.getCell(20).getNumericCellValue());     // U: GROSS
+
+            Row bolso = hoja.getRow(19);
+            assertEquals(2, (int) bolso.getCell(4).getNumericCellValue());
+            assertEquals("ULL772.AL0245", bolso.getCell(2).getStringCellValue());
+            assertEquals("U", bolso.getCell(5).getStringCellValue());          // F: SIZE GRID
+            assertEquals(6, (int) bolso.getCell(6).getNumericCellValue());     // G: U
+            assertEquals("SUM(G20:Q20)", bolso.getCell(17).getCellFormula());  // R: QNTY TOTAL
+            assertEquals(4.0, bolso.getCell(20).getNumericCellValue());
+        }
+    }
+
+    /**
+     * En PRESS una caja suele llevar varios artículos (son pocas unidades de
+     * cada uno): el peso del bulto va una sola vez, en su primera fila, o el
+     * SUM de la fila de totales lo contaría dos veces. Dos cinturones
+     * distintos en la misma caja son dos filas, no una con las tallas de
+     * los dos sumadas.
+     */
+    @Test
+    void enPressCadaArticuloDeUnaCajaVaEnSuFilaYElPesoUnaSolaVez() throws Exception {
+        List<ExcelGenerado> excels = generador.generar(press(
+                cajaConTalla(1, "09839", "UBL218.AL0238", "A519", "75", 9, 2.0, 3.0),
+                cajaConTalla(1, "09839", "UBL218.AL0238", "A521", "75", 6, null, null),
+                cajaConTalla(1, "09839", "UBL218.AL0238", "A521", "85", 6, null, null)),
+                List.of(), envio(), ami);
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheet("STANDARD PKL E25");
+            Row a519 = hoja.getRow(18);
+            Row a521 = hoja.getRow(19);
+            assertEquals("A519", a519.getCell(3).getStringCellValue());
+            assertEquals("75", a519.getCell(5).getStringCellValue());
+            assertEquals(3.0, a519.getCell(20).getNumericCellValue());
+            assertEquals("A521", a521.getCell(3).getStringCellValue());
+            assertEquals("75-85", a521.getCell(5).getStringCellValue());
+            assertEquals(CellType.BLANK, a521.getCell(20).getCellType());
+            assertEquals("SUM(U19:U20)", hoja.getRow(20).getCell(20).getCellFormula());
+        }
+    }
+
+    @Test
+    void enPressLosBultosSinPesoSeReportanUnaVez() throws Exception {
+        CajaData sinPeso = caja(2, "09839", "ULL770.AL0245", "001", 1, null, null);
+        List<ExcelGenerado> excels = generador.generar(press(
+                caja(1, "09839", "ULL771.AL0245", "001", 1, 1.0, 2.0),
+                sinPeso,
+                caja(2, "09839", "ULL772.AL0245", "001", 1, null, null)), List.of(), envio(), ami);
+
+        assertEquals(List.of(sinPeso), excels.get(0).getCajasPendientes());
+    }
+
     private static DatosEnvio envio() {
         DatosEnvio envio = new DatosEnvio();
         envio.setTemporada("H26");

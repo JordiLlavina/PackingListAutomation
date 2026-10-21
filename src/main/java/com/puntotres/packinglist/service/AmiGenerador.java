@@ -6,8 +6,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -26,6 +28,14 @@ import com.puntotres.packinglist.model.PaletData;
  * Genera los excels AMI de una destinación: uno por cada combinación de
  * referencia (modelo) + color, reutilizando el {@link AmiExcelBuilder}.
  *
+ * <b>PRESS es la excepción</b>: es el material de marketing (desde SS27), va
+ * a París con los documentos de France y se manda en UN solo packing list
+ * con todos sus modelos. En DESTINATION lleva "France", que es el valor del
+ * desplegable de la plantilla (decisión del usuario); que es PRESS se ve en
+ * el nombre del fichero. Si lleva algún cinturón sale en la plantilla de
+ * cinturones, con las filas de bolso en la rejilla "U" que esa plantilla
+ * también trae en su leyenda; si solo lleva bolsos, en la de bolsos.
+ *
  * Las cajas con pesos sin resolver no bloquean la generación: el excel
  * sale con esas celdas vacías y las cajas se devuelven en
  * {@link ExcelGenerado#getCajasPendientes()} para la pantalla de revisión.
@@ -34,7 +44,7 @@ import com.puntotres.packinglist.model.PaletData;
  * o dos referencias en la misma caja). El peso es del bulto, así que sale
  * repetido en todos ellos: cada packing list describe ese cartón entero y
  * uno sin peso no sirve para expedir. Dentro de cada excel, en cambio, se
- * escribe una sola vez (ver {@link #mapearCajasBolso}).
+ * escribe una sola vez (ver {@link #filasDe}).
  *
  * No usa los palets de la destinación (AMI no los imprime en el excel).
  *
@@ -44,6 +54,12 @@ import com.puntotres.packinglist.model.PaletData;
  */
 @Service
 public class AmiGenerador implements GeneradorPackingListCliente {
+
+    /** La destinación de marketing, que va en un solo packing list. */
+    static final String PRESS = "PRESS";
+
+    /** Lo que se escribe en DESTINATION del packing de PRESS. */
+    private static final String DESTINO_EN_PACKING_PRESS = "France";
 
     private final AmiExcelBuilder excelBuilder;
 
@@ -68,6 +84,10 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             bultos.put(bulto.numeroCaja(), bulto);
         }
 
+        if (esPress(destino)) {
+            return List.of(generarPress(destino, envio, bultos));
+        }
+
         Map<String, List<CajaData>> grupos = new LinkedHashMap<>();
         for (CajaData caja : destino.getCajas()) {
             String clave = caja.getReferencia() + "|" + caja.getCodigoColor();
@@ -76,29 +96,15 @@ public class AmiGenerador implements GeneradorPackingListCliente {
 
         List<ExcelGenerado> resultado = new ArrayList<>();
         for (List<CajaData> grupo : grupos.values()) {
-            List<CajaData> cajas = new ArrayList<>(grupo);
-            cajas.sort(Comparator.comparingInt(CajaData::getNumeroCaja));
+            List<CajaData> cajas = ordenadas(grupo);
 
             String referencia = cajas.get(0).getReferencia();
             String color = cajas.get(0).getCodigoColor();
 
-            // Pendiente = bulto que sale con las celdas de peso vacías en ESTE
-            // excel. Se mira el bulto de la destinación, no el del grupo: la
-            // caja compartida ya no está pendiente aquí solo porque su peso lo
-            // trajera la línea de otro artículo.
-            List<CajaData> pendientes = cajas.stream()
-                    .map(CajaData::getNumeroCaja)
-                    .distinct()
-                    .map(bultos::get)
-                    .filter(bulto -> !bulto.tienePesosCompletos())
-                    .map(CajaFisica::lider)
-                    .toList();
-
             boolean esCinturon = referencia.startsWith(CajaData.PREFIJO_CINTURON);
             AmiLayout layout = esCinturon ? AmiLayout.BELTS : AmiLayout.BAGS;
             PackingListData data = mapearCabecera(destino, envio);
-            data.setCajas(esCinturon
-                    ? mapearCajasCinturon(cajas, bultos) : mapearCajasBolso(cajas, bultos));
+            data.setCajas(filasDe(cajas, bultos));
 
             // El product order es el mismo para todo el grupo (viene por
             // bloque de referencia en el JSON): basta con el de la primera caja.
@@ -108,9 +114,68 @@ public class AmiGenerador implements GeneradorPackingListCliente {
             resultado.add(new ExcelGenerado(destino.getNombreDestino(), referencia, color,
                     AmiNombreFichero.componer(envio.getFechaEnvio(), pedido, referencia, color,
                             envio.getTemporada(), destino.getNombreDestino()),
-                    excel, pendientes));
+                    excel, pendientesDe(cajas, bultos)));
         }
         return resultado;
+    }
+
+    static boolean esPress(DestinoData destino) {
+        return destino.getNombreDestino() != null
+                && PRESS.equals(destino.getNombreDestino().trim().toUpperCase(Locale.ROOT));
+    }
+
+    /**
+     * El packing único de PRESS: todas las cajas en orden de número. El
+     * nombre del fichero lleva el PO (en el pedido real PRESS tiene uno solo
+     * para todos sus artículos; si llegaran varios, van todos unidos por
+     * guiones) y no lleva artículo, porque son todos.
+     */
+    private ExcelGenerado generarPress(DestinoData destino, DatosEnvio envio,
+                                       Map<Integer, CajaFisica> bultos) throws IOException {
+        List<CajaData> cajas = ordenadas(destino.getCajas());
+        boolean algunCinturon = cajas.stream().anyMatch(CajaData::esCinturon);
+        AmiLayout layout = algunCinturon ? AmiLayout.BELTS : AmiLayout.BAGS;
+
+        PackingListData data = mapearCabecera(destino, envio);
+        data.setDestino(DESTINO_EN_PACKING_PRESS);
+        data.setCajas(filasDe(cajas, bultos));
+
+        String pedidos = cajas.stream()
+                .map(CajaData::getNumeroPedido)
+                .filter(pedido -> pedido != null && !pedido.isBlank())
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.joining("-"));
+
+        byte[] excel = excelBuilder.generar(data, layout);
+        return new ExcelGenerado(destino.getNombreDestino(),
+                AmiNombreFichero.componer(envio.getFechaEnvio(), pedidos, null, null,
+                        envio.getTemporada(), destino.getNombreDestino()),
+                excel, pendientesDe(cajas, bultos));
+    }
+
+    /** Por número de caja, conservando el orden de las líneas dentro de cada caja. */
+    private static List<CajaData> ordenadas(List<CajaData> cajas) {
+        List<CajaData> copia = new ArrayList<>(cajas);
+        copia.sort(Comparator.comparingInt(CajaData::getNumeroCaja));
+        return copia;
+    }
+
+    /**
+     * Pendiente = bulto que sale con las celdas de peso vacías en ESTE
+     * excel. Se mira el bulto de la destinación, no el del grupo: la caja
+     * compartida ya no está pendiente aquí solo porque su peso lo trajera la
+     * línea de otro artículo.
+     */
+    private static List<CajaData> pendientesDe(List<CajaData> cajas,
+                                               Map<Integer, CajaFisica> bultos) {
+        return cajas.stream()
+                .map(CajaData::getNumeroCaja)
+                .distinct()
+                .map(bultos::get)
+                .filter(bulto -> !bulto.tienePesosCompletos())
+                .map(CajaFisica::lider)
+                .toList();
     }
 
     private PackingListData mapearCabecera(DestinoData destino, DatosEnvio envio) {
@@ -134,7 +199,14 @@ public class AmiGenerador implements GeneradorPackingListCliente {
     }
 
     /**
-     * Bolsos/carteras (talla única): una fila de plantilla por línea.
+     * Las filas de plantilla de unas cajas ya ordenadas por número.
+     *
+     * Bolsos y carteras (talla única): una fila por línea. Cinturones
+     * (matriz de tallas): una caja puede mezclar tallas, así que las líneas
+     * con la misma caja, referencia y color (una por talla) se agregan en UNA
+     * fila. La referencia y el color van en la clave porque en PRESS una
+     * caja puede llevar dos cinturones distintos, y sumar sus tallas en una
+     * fila con la referencia del primero diría algo que no es cierto.
      *
      * El peso que se escribe es el del BULTO, no el de la línea: así la caja
      * que comparten dos artículos sale con su peso en los dos packing lists
@@ -142,66 +214,54 @@ public class AmiGenerador implements GeneradorPackingListCliente {
      * en la PRIMERA fila que nombra ese bulto en este excel: repetirlo lo
      * contaría dos veces en el SUM de la fila de totales.
      */
-    private List<PackingListData.Caja> mapearCajasBolso(List<CajaData> cajas,
-                                                        Map<Integer, CajaFisica> bultos) {
+    private List<PackingListData.Caja> filasDe(List<CajaData> cajas,
+                                               Map<Integer, CajaFisica> bultos) {
         List<PackingListData.Caja> filas = new ArrayList<>();
+        Map<String, PackingListData.Caja> filaDeCinturon = new LinkedHashMap<>();
         Set<Integer> bultosYaPesados = new HashSet<>();
         for (CajaData caja : cajas) {
-            PackingListData.Caja fila = new PackingListData.Caja();
-            fila.setNumeroCaja(caja.getNumeroCaja());
-            fila.setNumeroPedido(caja.getNumeroPedido());
-            fila.setReferencia(caja.getReferencia());
-            fila.setCodigoColor(caja.getCodigoColor());
-            fila.setCantidad(caja.getCantidad());
-            fila.setTamanoCaja(caja.getTamanoCaja());
-            if (bultosYaPesados.add(caja.getNumeroCaja())) {
-                CajaFisica bulto = bultos.get(caja.getNumeroCaja());
-                fila.setPesoNetoKg(bulto.pesoNetoKg());
-                fila.setPesoBrutoKg(bulto.pesoBrutoKg());
+            if (caja.esCinturon()) {
+                if (caja.getTalla() == null || caja.getTalla().isBlank()) {
+                    throw new IllegalArgumentException("La caja " + caja.getNumeroCaja()
+                            + " de la referencia " + caja.getReferencia()
+                            + " es un cinturón (UBL) pero no trae talla");
+                }
+                String clave = caja.getNumeroCaja() + "|" + caja.getReferencia()
+                        + "|" + caja.getCodigoColor();
+                PackingListData.Caja existente = filaDeCinturon.get(clave);
+                if (existente != null) {
+                    existente.getCantidadesPorTalla()
+                            .merge(caja.getTalla(), caja.getCantidad(), Integer::sum);
+                    continue;
+                }
+                PackingListData.Caja fila = filaBase(caja, bultos, bultosYaPesados);
+                Map<String, Integer> cantidadesPorTalla = new LinkedHashMap<>();
+                cantidadesPorTalla.put(caja.getTalla(), caja.getCantidad());
+                fila.setCantidadesPorTalla(cantidadesPorTalla);
+                filaDeCinturon.put(clave, fila);
+                filas.add(fila);
+            } else {
+                PackingListData.Caja fila = filaBase(caja, bultos, bultosYaPesados);
+                fila.setCantidad(caja.getCantidad());
+                filas.add(fila);
             }
-            filas.add(fila);
         }
         return filas;
     }
 
-    /**
-     * Cinturones (matriz de tallas): una caja física puede mezclar tallas,
-     * así que las entradas del JSON con el mismo número de caja (una por
-     * talla, igual que ya ocurre con los colores) se agregan en UNA fila de
-     * plantilla — por eso aquí no hace falta callar ningún peso repetido.
-     *
-     * El peso es el del BULTO de la destinación, no el de las líneas que
-     * caen en este excel: si la caja la comparte con un bolso, su líder está
-     * en el packing list del bolso y aquí solo se ve el resto de líneas.
-     */
-    private List<PackingListData.Caja> mapearCajasCinturon(List<CajaData> cajas,
-                                                           Map<Integer, CajaFisica> bultos) {
-        List<PackingListData.Caja> filas = new ArrayList<>();
-        for (CajaFisica cajaFisica : CajaFisica.agrupar(cajas)) {
-            List<CajaData> entradas = cajaFisica.lineas();
-            CajaData primera = cajaFisica.lider();
-            CajaFisica bulto = bultos.get(primera.getNumeroCaja());
-            PackingListData.Caja fila = new PackingListData.Caja();
-            fila.setNumeroCaja(primera.getNumeroCaja());
-            fila.setNumeroPedido(primera.getNumeroPedido());
-            fila.setReferencia(primera.getReferencia());
-            fila.setCodigoColor(primera.getCodigoColor());
-            fila.setTamanoCaja(primera.getTamanoCaja());
+    private static PackingListData.Caja filaBase(CajaData caja, Map<Integer, CajaFisica> bultos,
+                                                 Set<Integer> bultosYaPesados) {
+        PackingListData.Caja fila = new PackingListData.Caja();
+        fila.setNumeroCaja(caja.getNumeroCaja());
+        fila.setNumeroPedido(caja.getNumeroPedido());
+        fila.setReferencia(caja.getReferencia());
+        fila.setCodigoColor(caja.getCodigoColor());
+        fila.setTamanoCaja(caja.getTamanoCaja());
+        if (bultosYaPesados.add(caja.getNumeroCaja())) {
+            CajaFisica bulto = bultos.get(caja.getNumeroCaja());
             fila.setPesoNetoKg(bulto.pesoNetoKg());
             fila.setPesoBrutoKg(bulto.pesoBrutoKg());
-
-            Map<String, Integer> cantidadesPorTalla = new LinkedHashMap<>();
-            for (CajaData entrada : entradas) {
-                if (entrada.getTalla() == null || entrada.getTalla().isBlank()) {
-                    throw new IllegalArgumentException("La caja " + entrada.getNumeroCaja()
-                            + " de la referencia " + entrada.getReferencia()
-                            + " es un cinturón (UBL) pero no trae talla");
-                }
-                cantidadesPorTalla.merge(entrada.getTalla(), entrada.getCantidad(), Integer::sum);
-            }
-            fila.setCantidadesPorTalla(cantidadesPorTalla);
-            filas.add(fila);
         }
-        return filas;
+        return fila;
     }
 }

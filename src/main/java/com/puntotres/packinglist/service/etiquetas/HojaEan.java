@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.etiquetas;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.text.Normalizer;
 import java.util.Locale;
 
 import org.apache.poi.ss.usermodel.Cell;
@@ -57,23 +58,26 @@ public final class HojaEan implements AutoCloseable {
     }
 
     /**
-     * Índice de la primera columna cuya cabecera empieza por el título dado
-     * (indiferente a mayúsculas). Lanza si no está: sin ella no se puede
+     * Índice de la primera columna cuya cabecera empieza por el título dado.
+     * Se compara sin mayúsculas, espacios, puntos ni acentos: "PO" casa con
+     * "P.O." y "EAN13" con "EAN 13 ". Lanza si no está: sin ella no se puede
      * hacer nada útil con el fichero, así que aquí sí se bloquea.
      */
     public int columna(String titulo) {
-        return columna(titulo, titulo);
+        return columnaEntre(titulo, titulo);
     }
 
     /**
-     * Igual que {@link #columna(String)}, pero con un rótulo distinto para
-     * el mensaje de error: la clave de búsqueda no siempre es cómoda de leer
-     * ("LIBELL" para encontrar cualquier variante de "Libellé coloris"), y el
-     * usuario que lee el aviso conoce su fichero por el nombre de columna
-     * real, no por la clave interna.
+     * Igual que {@link #columna(String)}, pero buscando la columna por
+     * VARIOS nombres (el cliente renombra columnas entre temporadas:
+     * "Libellé coloris" en H26 es "DESCRIPTION COLORIS" en SS27) y con un
+     * rótulo distinto para el mensaje de error: la clave de búsqueda no
+     * siempre es cómoda de leer ("LIBELL" para encontrar cualquier variante
+     * de "Libellé coloris"), y el usuario que lee el aviso conoce su fichero
+     * por el nombre de columna real, no por la clave interna.
      */
-    public int columna(String titulo, String rotuloEnElError) {
-        int indice = columnaOpcional(titulo);
+    public int columnaEntre(String rotuloEnElError, String... titulos) {
+        int indice = columnaOpcional(titulos);
         if (indice < 0) {
             throw new IllegalArgumentException("La hoja '" + nombre()
                     + "' del excel de pedido no tiene la columna '" + rotuloEnElError + "'");
@@ -85,12 +89,16 @@ public final class HojaEan implements AutoCloseable {
      * Igual que {@link #columna(String)} pero devuelve -1 en vez de lanzar
      * cuando la columna no está. Para las columnas de las que se puede
      * prescindir: sin ellas la salida sale incompleta y con aviso, pero sale.
+     *
+     * Con varios títulos manda el PRIMERO que casa con alguna cabecera, no
+     * la columna más a la izquierda: el orden de los nombres es el de
+     * preferencia.
      */
-    public int columnaOpcional(String titulo) {
-        String buscado = titulo.toUpperCase(Locale.ROOT);
-        for (Cell celda : cabecera) {
-            if (texto(celda).trim().toUpperCase(Locale.ROOT).startsWith(buscado)) {
-                return celda.getColumnIndex();
+    public int columnaOpcional(String... titulos) {
+        for (String titulo : titulos) {
+            int indice = indice(cabecera, titulo);
+            if (indice >= 0) {
+                return indice;
             }
         }
         return -1;
@@ -119,14 +127,72 @@ public final class HojaEan implements AutoCloseable {
         libro.close();
     }
 
+    /**
+     * La primera hoja "EAN ..." y, si no hay ninguna, la primera cuya primera
+     * fila lleva las cabeceras ARTICLE, COLORIS y TAILLE. Lo segundo es por
+     * SS27, que llegó con la hoja llamada "Feuil1 Original"; se exigen las
+     * tres cabeceras para no quedarse con una hoja auxiliar del libro que
+     * casualmente nombre los artículos.
+     */
     private static Sheet primeraHojaEan(Workbook libro) {
         for (int i = 0; i < libro.getNumberOfSheets(); i++) {
             if (libro.getSheetName(i).trim().toUpperCase(Locale.ROOT).startsWith("EAN")) {
                 return libro.getSheetAt(i);
             }
         }
-        throw new IllegalArgumentException(
-                "El excel de pedido no tiene ninguna hoja 'EAN ...': ¿es el archivo correcto?");
+        for (int i = 0; i < libro.getNumberOfSheets(); i++) {
+            Sheet hoja = libro.getSheetAt(i);
+            Row cabecera = hoja.getRow(hoja.getFirstRowNum());
+            if (cabecera != null && indice(cabecera, "ARTICLE") >= 0
+                    && indice(cabecera, "COLORIS") >= 0 && indice(cabecera, "TAILLE") >= 0) {
+                return hoja;
+            }
+        }
+        throw new IllegalArgumentException("El excel de pedido no tiene ninguna hoja 'EAN ...'"
+                + " ni ninguna con las columnas ARTICLE, COLORIS y TAILLE:"
+                + " ¿es el archivo correcto?");
+    }
+
+    /**
+     * El país de fabricación que va al final del EAN128 ("ES" SPAIN,
+     * "MA" MOROCCO), con el mismo nombre que la columna Made in; "" si el
+     * código no acaba en ninguno de los dos.
+     *
+     * Existe porque el excel de SS27 ya no trae la columna Made in, y el país
+     * sigue estando dentro del código: el cliente lo compone así en todas
+     * las filas medidas (las 100 del SS27 y las del H26, salvo las 8 que no
+     * cuadran y que avisan).
+     */
+    public static String madeInDeEan128(String ean128) {
+        String codigo = ean128 == null ? "" : ean128.trim().toUpperCase(Locale.ROOT);
+        if (codigo.endsWith("ES")) {
+            return "SPAIN";
+        }
+        if (codigo.endsWith("MA")) {
+            return "MOROCCO";
+        }
+        return "";
+    }
+
+    private static int indice(Row cabecera, String titulo) {
+        String buscado = normalizar(titulo);
+        for (Cell celda : cabecera) {
+            if (normalizar(texto(celda)).startsWith(buscado)) {
+                return celda.getColumnIndex();
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Cabecera sin nada más que letras sin acento y dígitos: el cliente
+     * escribe la misma columna como "PO" o "P.O.", "EAN13" o "EAN 13 ",
+     * "Libellé" con o sin acento. Comparando así casan todas.
+     */
+    private static String normalizar(String texto) {
+        return Normalizer.normalize(texto, Normalizer.Form.NFD)
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]", "");
     }
 
     private static String texto(Cell celda) {

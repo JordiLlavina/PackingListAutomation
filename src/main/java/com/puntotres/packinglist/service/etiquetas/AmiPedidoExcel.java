@@ -17,9 +17,16 @@ import java.util.Optional;
  * por artículo) que se ignoran. Las columnas se localizan por el texto de
  * la cabecera de la fila 1, no por posición.
  *
+ * Se leen DOS formatos, porque AMI cambió el suyo en SS27: la hoja se llama
+ * "Feuil1 Original" (HojaEan la localiza entonces por sus cabeceras), las
+ * columnas son "P.O.", " DESCRIPTION COLORIS", "EAN 13 " y "CODE 128" en vez
+ * de "PO", "Libellé coloris", "EAN13" y "EAN128", y no hay columna Made in:
+ * el país se saca del final del Code 128 ({@link HojaEan#madeInDeEan128}).
+ *
  * La columna PO codifica la destinación: "NNNNN CH" (China), "NNNNN JP"
- * (Japan) o un número sin sufijo (France). El order number de la etiqueta
- * es siempre la parte numérica con padding a 5 dígitos.
+ * (Japan), "NNNNN PRESS" (Press, desde SS27) o un número sin sufijo
+ * (France). El order number de la etiqueta es siempre la parte numérica con
+ * padding a 5 dígitos.
  *
  * De aquí salen dos cosas con reglas distintas a propósito:
  * <ul>
@@ -115,12 +122,12 @@ public class AmiPedidoExcel {
         try (HojaEan hoja = HojaEan.abrir(contenido)) {
             int colArticle = hoja.columna("ARTICLE");
             int colColoris = hoja.columna("COLORIS");
-            int colLibelle = hoja.columna("LIBELL", "Libellé coloris");
+            int colLibelle = hoja.columnaEntre("Libellé coloris", "LIBELL", "DESCRIPTION COLORIS");
             int colTaille = hoja.columna("TAILLE");
             int colPo = hoja.columna("PO");
             int colMadeIn = hoja.columnaOpcional("MADE IN");
             int colEan13 = hoja.columnaOpcional("EAN13");
-            int colEan128 = hoja.columnaOpcional("EAN128");
+            int colEan128 = hoja.columnaOpcional("EAN128", "CODE 128");
             // Solo la usa la entrada por taller, para saber cuánto pide el
             // cliente de cada cosa. Las etiquetas nunca la han necesitado.
             int colCommande = hoja.columnaOpcional("COMMAND");
@@ -134,7 +141,10 @@ public class AmiPedidoExcel {
                 avisos.add("El excel de pedido no tiene la columna 'EAN128': "
                         + "las etiquetas van sin ese código de barras");
             }
-            if (colMadeIn < 0) {
+            // Sin Made in pero con EAN128 (SS27) el país sale del propio
+            // código, así que no falta nada que avisar: el EAN13 y el PO se
+            // siguen comprobando contra él.
+            if (colMadeIn < 0 && colEan128 < 0) {
                 avisos.add("El excel de pedido no tiene la columna 'Made in': "
                         + "no se comprueba el país del EAN128");
             }
@@ -151,8 +161,11 @@ public class AmiPedidoExcel {
                     continue;
                 }
                 String sufijo = po.replaceAll("[0-9\\s]", "").toUpperCase(Locale.ROOT);
+                String madeIn = colMadeIn >= 0
+                        ? textoDe(hoja, i, colMadeIn).toUpperCase(Locale.ROOT)
+                        : HojaEan.madeInDeEan128(textoDe(hoja, i, colEan128));
                 filas.add(new FilaCruda(
-                        textoDe(hoja, i, colMadeIn).toUpperCase(Locale.ROOT),
+                        madeIn,
                         article.trim().toUpperCase(Locale.ROOT),
                         hoja.texto(i, colColoris).trim(),
                         hoja.texto(i, colLibelle).trim(),

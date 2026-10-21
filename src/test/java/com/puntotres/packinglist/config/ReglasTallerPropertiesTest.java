@@ -111,6 +111,20 @@ class ReglasTallerPropertiesTest {
         assertTrue(ami.destinoDeSufijo("XX").isEmpty(), "un sufijo desconocido no se adivina");
     }
 
+    /**
+     * PRESS llegó en el pedido de SS27 ("09839 PRESS"): sin su sufijo aquí,
+     * todo envío de taller con material de marketing se bloquea. Se sirve de
+     * los primeros, como CHINA y JAPAN (decisión del usuario).
+     */
+    @Test
+    void pressEsUnaDestinacionDeAmiQueSeSirveDeLasPrimeras() {
+        ReglaClienteTaller ami = reglas.clienteTaller("AMI").orElseThrow();
+
+        assertEquals("PRESS", ami.destinoDeSufijo("PRESS").orElseThrow());
+        assertEquals(reglas.prioridadDe("AMI", "CHINA"), reglas.prioridadDe("AMI", "PRESS"));
+        assertEquals(TipoMezcla.MISMO_PEDIDO, reglas.mezclaDe("AMI", "PRESS"));
+    }
+
     @Test
     void amiNumeraSeguidoEntreDestinacionesYApcReinicia() {
         assertEquals(NumeracionCajas.CONTINUA,

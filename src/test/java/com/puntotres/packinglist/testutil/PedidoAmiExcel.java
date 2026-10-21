@@ -69,6 +69,55 @@ public final class PedidoAmiExcel {
         return crear(nombreHojaEan, 8, filas);
     }
 
+    /**
+     * El formato que estrenó AMI en SS27 ("EAN PUNTOTRES SS27.xlsx"): la hoja
+     * no se llama "EAN ...", no hay columna Made in (el país solo va al final
+     * del Code 128) y las cabeceras cambian de forma — "P.O.", "EAN 13 ",
+     * "CODE 128" y el nombre del color en " DESCRIPTION COLORIS", con su
+     * espacio delante como en el fichero real. Delante va la misma hoja
+     * señuelo vacía que en {@link #crear}.
+     */
+    public static byte[] crearFormatoSs27(String nombreHoja, Fila... filas) {
+        String[] titulos = {"ARTICLE", "COLORIS", " DESCRIPTION COLORIS", "COLOUR",
+                "TAILLE", "P.O.", "Commandé", "EAN 13 ", "CODE 128"};
+        try (XSSFWorkbook libro = new XSSFWorkbook()) {
+            libro.createSheet("BOLSITAS ANTIHUMEDAD");
+            Sheet hoja = libro.createSheet(nombreHoja);
+            Row cabecera = hoja.createRow(0);
+            for (int i = 0; i < titulos.length; i++) {
+                cabecera.createCell(i).setCellValue(titulos[i]);
+            }
+            int numFila = 1;
+            for (Fila fila : filas) {
+                Row f = hoja.createRow(numFila++);
+                f.createCell(0).setCellValue(fila.article());
+                f.createCell(1).setCellValue(fila.coloris());
+                f.createCell(2).setCellValue(fila.libelle());
+                f.createCell(3).setCellValue(fila.coloris() + " " + fila.libelle());
+                f.createCell(4).setCellValue(fila.taille());
+                if (fila.po() instanceof Number n) {
+                    f.createCell(5).setCellValue(n.doubleValue());
+                } else {
+                    f.createCell(5).setCellValue((String) fila.po());
+                }
+                if (fila.commande() != null) {
+                    f.createCell(6).setCellValue(fila.commande());
+                }
+                if (fila.ean13() != null) {
+                    f.createCell(7).setCellValue(fila.ean13());
+                }
+                if (fila.ean128() != null) {
+                    f.createCell(8).setCellValue(fila.ean128());
+                }
+            }
+            ByteArrayOutputStream salida = new ByteArrayOutputStream();
+            libro.write(salida);
+            return salida.toByteArray();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static byte[] crear(String nombreHojaEan, int numColumnas, Fila... filas) {
         try (XSSFWorkbook libro = new XSSFWorkbook()) {
             libro.createSheet("BOLSITAS ANTIHUMEDAD"); // señuelo: no es la primera hoja EAN

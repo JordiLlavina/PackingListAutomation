@@ -69,11 +69,62 @@ class AmiPedidoExcelTest {
     }
 
     @Test
-    void sinHojaEanFallaConMensajeClaro() {
-        byte[] sinEan = PedidoAmiExcel.crear("OTRA COSA");
+    void sinHojaDePedidoFallaConMensajeClaro() throws IOException {
+        byte[] sinPedido;
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook libro =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
+            libro.createSheet("OTRA COSA");
+            java.io.ByteArrayOutputStream salida = new java.io.ByteArrayOutputStream();
+            libro.write(salida);
+            sinPedido = salida.toByteArray();
+        }
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> AmiPedidoExcel.desdeBytes(sinEan));
+                () -> AmiPedidoExcel.desdeBytes(sinPedido));
         assertTrue(error.getMessage().contains("EAN"));
+    }
+
+    // --- formato SS27: otra hoja, otras cabeceras y sin Made in ---
+
+    private static byte[] pedidoSs27() {
+        return PedidoAmiExcel.crearFormatoSs27("Feuil1 Original",
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09839 PRESS",
+                        "3667549163510", ean128("3667549163510", 9839, "MA")),
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09009",
+                        "3667549163510", ean128("3667549163510", 9009, "MA")),
+                new Fila(null, "UBL029.AL0246", "0014", "NOIR/ARGENT VIBRE", "75", "08993 JP",
+                        "3667549161264", ean128("3667549161264", 8993, "ES")));
+    }
+
+    @Test
+    void elFormatoSs27SeLeeEntero() throws IOException {
+        AmiPedidoExcel pedido = AmiPedidoExcel.desdeBytes(pedidoSs27());
+
+        assertTrue(pedido.avisos().isEmpty(), pedido.avisos().toString());
+        AmiPedidoExcel.FilaPedido press =
+                pedido.buscar("ULL770.AL0245", "001", null, "PRESS").orElseThrow();
+        assertEquals("09839", press.orderNumber());
+        assertEquals("001 NOIR", press.colorCompleto());
+        assertEquals("3667549163510", press.ean13());
+        assertEquals(ean128("3667549163510", 9839, "MA"), press.ean128());
+        assertTrue(press.avisosEan().isEmpty(), press.avisosEan().toString());
+        assertEquals("09009",
+                pedido.buscar("ULL770.AL0245", "001", null, null).orElseThrow().orderNumber());
+    }
+
+    /**
+     * Sin columna Made in el país se deduce del propio Code 128, así que esa
+     * parte siempre cuadra; pero el EAN13 y el PO se siguen comprobando.
+     */
+    @Test
+    void enElSs27UnCodigo128ConElPoDeOtraDestinacionSigueAvisando() throws IOException {
+        byte[] pedido = PedidoAmiExcel.crearFormatoSs27("Feuil1 Original",
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09839 PRESS",
+                        "3667549163510", ean128("3667549163510", 9009, "MA")));
+        AmiPedidoExcel.FilaPedido fila = AmiPedidoExcel.desdeBytes(pedido)
+                .buscar("ULL770.AL0245", "001", null, "PRESS").orElseThrow();
+
+        assertTrue(fila.avisosEan().stream().anyMatch(a -> a.texto().contains("EAN128")),
+                fila.avisosEan().toString());
     }
 
     @Test

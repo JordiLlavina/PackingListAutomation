@@ -62,13 +62,75 @@ class HojaEanTest {
         }
     }
 
+    /**
+     * SS27 llegó con la hoja llamada "Feuil1 Original": sin ninguna "EAN ...",
+     * vale la primera que lleva la cabecera de un pedido. La hoja señuelo de
+     * delante está vacía y se salta.
+     */
     @Test
-    void sinHojaEanAvisaConClaridad() {
-        byte[] libroSinEan = PedidoAmiExcel.crear("OTRA COSA",
-                new Fila("SPAIN", "ULL163.AL0052", "221", "BLACK", "U", 7672));
+    void sinHojaEanUsaLaQueTraeLaCabeceraDelPedido() throws Exception {
+        byte[] ss27 = PedidoAmiExcel.crearFormatoSs27("Feuil1 Original",
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09839 PRESS"));
+        try (HojaEan hoja = HojaEan.abrir(ss27)) {
+            assertEquals("Feuil1 Original", hoja.nombre());
+        }
+    }
+
+    @Test
+    void sinNingunaHojaDePedidoAvisaConClaridad() throws Exception {
+        byte[] libro;
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook wb =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook()) {
+            wb.createSheet("OTRA COSA").createRow(0).createCell(0).setCellValue("PRECIO");
+            java.io.ByteArrayOutputStream salida = new java.io.ByteArrayOutputStream();
+            wb.write(salida);
+            libro = salida.toByteArray();
+        }
         IllegalArgumentException e =
-                assertThrows(IllegalArgumentException.class, () -> HojaEan.abrir(libroSinEan));
-        assertTrue(e.getMessage().contains("EAN"));
+                assertThrows(IllegalArgumentException.class, () -> HojaEan.abrir(libro));
+        assertTrue(e.getMessage().contains("EAN"), e.getMessage());
+        assertTrue(e.getMessage().contains("ARTICLE"), e.getMessage());
+    }
+
+    /**
+     * Las cabeceras del SS27 se escriben de otra forma ("P.O.", "EAN 13 ")
+     * y se comparan sin puntos, espacios ni acentos. Las que cambiaron de
+     * nombre ("DESCRIPTION COLORIS", "CODE 128") se piden por sus dos nombres.
+     */
+    @Test
+    void lasCabecerasDelSs27SeEncuentranConLosMismosNombres() throws Exception {
+        byte[] ss27 = PedidoAmiExcel.crearFormatoSs27("Feuil1 Original",
+                new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09839 PRESS"));
+        try (HojaEan hoja = HojaEan.abrir(ss27)) {
+            assertEquals(0, hoja.columna("ARTICLE"));
+            assertEquals(1, hoja.columna("COLORIS"));
+            assertEquals(2, hoja.columnaOpcional("LIBELL", "DESCRIPTION COLORIS"));
+            assertEquals(4, hoja.columna("TAILLE"));
+            assertEquals(5, hoja.columna("PO"));
+            assertEquals(6, hoja.columna("COMMAND"));
+            assertEquals(7, hoja.columna("EAN13"));
+            assertEquals(8, hoja.columnaOpcional("EAN128", "CODE 128"));
+            assertEquals(-1, hoja.columnaOpcional("MADE IN"));
+        }
+    }
+
+    /** El primer nombre que casa manda, aunque el segundo esté más a la izquierda. */
+    @Test
+    void conVariosNombresGanaElPrimeroQueCasa() throws Exception {
+        try (HojaEan hoja = HojaEan.abrir(pedido())) {
+            assertEquals(9, hoja.columnaOpcional("EAN128", "EAN13"));
+        }
+    }
+
+    @Test
+    void elPaisSaleDelFinalDelEan128() {
+        assertEquals("SPAIN",
+                HojaEan.madeInDeEan128("366754916126400001000090060000000000000000ES"));
+        assertEquals("MOROCCO",
+                HojaEan.madeInDeEan128("366754916500000001000098390000000000000000MA"));
+        assertEquals("", HojaEan.madeInDeEan128("366754916126400001000090060000000000000000XX"));
+        assertEquals("", HojaEan.madeInDeEan128(""));
+        assertEquals("", HojaEan.madeInDeEan128(null));
     }
 
     @Test

@@ -101,11 +101,17 @@ packing-list:
         sufijos-po:
           "[CH]": CHINA
           "[JP]": JAPAN
+          # Material de marketing, desde SS27 ("09839 PRESS"). Va a París con
+          # los documentos de France, pero en un solo packing list (AmiGenerador).
+          "[PRESS]": PRESS
         destino-sin-sufijo: PARIS
         destinos:
           "[CHINA]": { altura-max-cm: 158, prioridad: 1, mezcla: NINGUNA }
           "[JAPAN]": { altura-max-cm: 158, prioridad: 1, mezcla: NINGUNA }
           "[PARIS]": { altura-max-cm: 168, prioridad: 2, mezcla: MISMO_PEDIDO }
+          # Se sirve de las primeras, como CHINA y JAPAN; la altura es la de
+          # París, que es adonde va.
+          "[PRESS]": { altura-max-cm: 168, prioridad: 1, mezcla: MISMO_PEDIDO }
       "[APC]":
         numeracion-cajas: POR_DESTINACION
         # Van las destinaciones HIJAS, no solo los padres: la prioridad se
@@ -140,6 +146,9 @@ packing-list:
       etiqueta-pedido: "PO - Orden de Producto"
       # Destinos habituales (informativo, la plantilla los escribe tal cual
       # llegan del JSON): PARIS, CHINA, JAPAN, HONG KONG. Pueden llegar más.
+      # PRESS (marketing) va en un solo packing list con "France" en
+      # DESTINATION y etiquetas de France: es código, en AmiGenerador y
+      # AmiEtiquetaLayout.PRESS.
 
     "[APC]":
       nombre: A.P.C.

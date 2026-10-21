@@ -24,7 +24,9 @@ import com.puntotres.packinglist.service.etiquetas.AmiEtiquetasExcelBuilder.Etiq
 
 /**
  * Etiquetas de caja de AMI: tres destinaciones (China, Japan, France; el
- * JSON suele llamar PARIS a la de France). Necesita del usuario el excel
+ * JSON suele llamar PARIS a la de France), más PRESS, el material de
+ * marketing, que va a París con la hoja de France pero con sus propios PO
+ * ({@link AmiEtiquetaLayout#PRESS}). Necesita del usuario el excel
  * del pedido completo de la temporada (ej. "AMI EAN H26.xlsx") para el
  * color code y para los dos códigos de barras que no salen del JSON: el
  * EAN-13 del artículo y el Code 128 de la columna EAN128, que codifica el
@@ -51,7 +53,8 @@ public class AmiEtiquetasGenerador implements GeneradorEtiquetasCliente {
             "CHINA", AmiEtiquetaLayout.CHINA,
             "JAPAN", AmiEtiquetaLayout.JAPAN,
             "FRANCE", AmiEtiquetaLayout.FRANCE,
-            "PARIS", AmiEtiquetaLayout.FRANCE);
+            "PARIS", AmiEtiquetaLayout.FRANCE,
+            "PRESS", AmiEtiquetaLayout.PRESS);
 
     private final AmiEtiquetasExcelBuilder builder;
 

@@ -1,0 +1,553 @@
+{
+  "cliente": "AMI",
+  "destinos": [
+    {
+      "destino": "FRANCE",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 12, "medidas": "80x120x131" },
+        { "palet": 2, "cajaInicio": 13, "cajaFin": 24, "medidas": "80x120x131" },
+        { "palet": 3, "cajaInicio": 25, "cajaFin": 32, "medidas": "80x120x71", "tara": 8.5 }
+      ],
+      "referencias": [
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09010",
+          "cantidadTotal": 240,
+          "cajas": [
+            { "cajaInicio": 1, "cajaFin": 8, "unidadesPorCaja": 30, "pesoBruto": 14.6 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "09010",
+          "cantidadTotal": 120,
+          "cajas": [
+            { "cajaInicio": 9, "cajaFin": 12, "unidadesPorCaja": 30, "pesoBruto": 14.6 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "709",
+          "medidaCaja": "60x40x40",
+          "pedido": "09010",
+          "cantidadTotal": 90,
+          "cajas": [
+            { "cajaInicio": 13, "cajaFin": 15, "unidadesPorCaja": 30 }
+          ]
+        },
+        {
+          "referencia": "USL745.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09012",
+          "cantidadTotal": 300,
+          "cajas": [
+            { "cajaInicio": 16, "cajaFin": 21, "unidadesPorCaja": 50, "pesoBruto": 9.8 }
+          ]
+        },
+        {
+          "referencia": "USL745.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "09012",
+          "cantidadTotal": 100,
+          "cajas": [
+            { "cajaInicio": 22, "cajaFin": 23, "unidadesPorCaja": 50 }
+          ]
+        },
+        {
+          "referencia": "ULL770.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09009",
+          "cantidadTotal": 19,
+          "cajas": [
+            { "caja": 24, "unidades": 19, "pesoBruto": 10.9 }
+          ]
+        },
+        {
+          "referencia": "ULL770.AL0245",
+          "color": "709",
+          "medidaCaja": "60x40x40",
+          "pedido": "09009",
+          "cantidadTotal": 11,
+          "cajas": [
+            { "caja": 24, "unidades": 11 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0014",
+          "medidaCaja": "60x40x30",
+          "pedido": "09006",
+          "talla": "75",
+          "cantidadTotal": 100,
+          "cajas": [
+            { "cajaInicio": 25, "cajaFin": 26, "unidadesPorCaja": 50, "pesoBruto": 8.4 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0014",
+          "medidaCaja": "60x40x30",
+          "pedido": "09006",
+          "talla": "85",
+          "cantidadTotal": 150,
+          "cajas": [
+            { "cajaInicio": 27, "cajaFin": 29, "unidadesPorCaja": 50, "pesoBruto": 8.4 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0014",
+          "medidaCaja": "60x40x30",
+          "pedido": "09006",
+          "talla": "95",
+          "cantidadTotal": 50,
+          "cajas": [
+            { "caja": 30, "unidades": 50, "pesoBruto": 8.4 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0014",
+          "medidaCaja": "60x40x30",
+          "pedido": "09006",
+          "talla": "105",
+          "cantidadTotal": 30,
+          "cajas": [
+            { "caja": 31, "unidades": 30 }
+          ]
+        },
+        {
+          "referencia": "UBL205.AL0140",
+          "color": "2042",
+          "medidaCaja": "60x40x30",
+          "pedido": "09013",
+          "talla": "75",
+          "cantidadTotal": 7,
+          "cajas": [
+            { "caja": 32, "unidades": 7, "pesoBruto": 7.1 }
+          ]
+        },
+        {
+          "referencia": "UBL205.AL0140",
+          "color": "2042",
+          "medidaCaja": "60x40x30",
+          "pedido": "09013",
+          "talla": "85",
+          "cantidadTotal": 20,
+          "cajas": [
+            { "caja": 32, "unidades": 20 }
+          ]
+        },
+        {
+          "referencia": "UBL205.AL0140",
+          "color": "2042",
+          "medidaCaja": "60x40x30",
+          "pedido": "09013",
+          "talla": "95",
+          "cantidadTotal": 20,
+          "cajas": [
+            { "caja": 32, "unidades": 20 }
+          ]
+        }
+      ]
+    },
+    {
+      "destino": "JAPAN",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 12, "medidas": "80x120x131" },
+        { "palet": 2, "cajaInicio": 13, "cajaFin": 22, "medidas": "80x120x131" },
+        { "palet": 3, "cajaInicio": 23, "cajaFin": 28, "medidas": "80x120x71" }
+      ],
+      "referencias": [
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "08995",
+          "cantidadTotal": 210,
+          "cajas": [
+            { "cajaInicio": 1, "cajaFin": 7, "unidadesPorCaja": 30, "pesoBruto": 14.6 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "08995",
+          "cantidadTotal": 115,
+          "cajas": [
+            { "cajaInicio": 8, "cajaFin": 10, "unidadesPorCaja": 30, "pesoBruto": 14.6 },
+            { "caja": 11, "unidades": 25, "pesoBruto": 12.3 }
+          ]
+        },
+        {
+          "referencia": "ULL772.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "08996",
+          "cantidadTotal": 90,
+          "cajas": [
+            { "cajaInicio": 12, "cajaFin": 14, "unidadesPorCaja": 30 }
+          ]
+        },
+        {
+          "referencia": "USL745.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "08997",
+          "cantidadTotal": 361,
+          "cajas": [
+            { "cajaInicio": 15, "cajaFin": 21, "unidadesPorCaja": 50, "pesoBruto": 9.8 },
+            { "caja": 22, "unidades": 11, "pesoBruto": 2.9 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "08993",
+          "talla": "75",
+          "cantidadTotal": 141,
+          "cajas": [
+            { "cajaInicio": 23, "cajaFin": 24, "unidadesPorCaja": 50, "pesoBruto": 8.4 },
+            { "caja": 25, "unidades": 41 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "08993",
+          "talla": "85",
+          "cantidadTotal": 69,
+          "cajas": [
+            { "caja": 26, "unidades": 50, "pesoBruto": 8.4 },
+            { "caja": 27, "unidades": 19 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0014",
+          "medidaCaja": "60x40x30",
+          "pedido": "08993",
+          "talla": "95",
+          "cantidadTotal": 35,
+          "cajas": [
+            { "caja": 28, "unidades": 35, "pesoBruto": 6.2 }
+          ]
+        }
+      ]
+    },
+    {
+      "destino": "CHINA",
+      "palets": [
+        { "palet": 1, "cajaInicio": 1, "cajaFin": 10, "medidas": "80x120x131" },
+        { "palet": 2, "cajaInicio": 11, "cajaFin": 16, "medidas": "80x120x71" }
+      ],
+      "referencias": [
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09003",
+          "cantidadTotal": 51,
+          "cajas": [
+            { "caja": 1, "unidades": 30, "pesoBruto": 14.6 },
+            { "caja": 2, "unidades": 21 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "09003",
+          "cantidadTotal": 46,
+          "cajas": [
+            { "caja": 3, "unidades": 30 },
+            { "caja": 4, "unidades": 16 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "709",
+          "medidaCaja": "60x40x40",
+          "pedido": "09003",
+          "cantidadTotal": 45,
+          "cajas": [
+            { "caja": 5, "unidades": 30 },
+            { "caja": 6, "unidades": 15 }
+          ]
+        },
+        {
+          "referencia": "ULL772.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09004",
+          "cantidadTotal": 51,
+          "cajas": [
+            { "caja": 7, "unidades": 30, "pesoBruto": 13.9 },
+            { "caja": 8, "unidades": 21 }
+          ]
+        },
+        {
+          "referencia": "USL745.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09005",
+          "cantidadTotal": 42,
+          "cajas": [
+            { "caja": 9, "unidades": 42, "pesoBruto": 8.4 }
+          ]
+        },
+        {
+          "referencia": "USL745.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "09005",
+          "cantidadTotal": 41,
+          "cajas": [
+            { "caja": 10, "unidades": 41 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "08999",
+          "talla": "75",
+          "cantidadTotal": 11,
+          "cajas": [
+            { "caja": 11, "unidades": 11, "pesoBruto": 8.1 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "08999",
+          "talla": "85",
+          "cantidadTotal": 17,
+          "cajas": [
+            { "caja": 11, "unidades": 17 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "08999",
+          "talla": "95",
+          "cantidadTotal": 20,
+          "cajas": [
+            { "caja": 11, "unidades": 20 }
+          ]
+        },
+        {
+          "referencia": "UBL029.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "08999",
+          "talla": "105",
+          "cantidadTotal": 16,
+          "cajas": [
+            { "caja": 12, "unidades": 16, "pesoBruto": 3.2 }
+          ]
+        },
+        {
+          "referencia": "UBL209.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "09000",
+          "talla": "75",
+          "cantidadTotal": 17,
+          "cajas": [
+            { "caja": 13, "unidades": 17 }
+          ]
+        },
+        {
+          "referencia": "UBL209.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "09000",
+          "talla": "85",
+          "cantidadTotal": 31,
+          "cajas": [
+            { "caja": 13, "unidades": 31 }
+          ]
+        },
+        {
+          "referencia": "UBL209.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "09000",
+          "talla": "95",
+          "cantidadTotal": 19,
+          "cajas": [
+            { "caja": 14, "unidades": 19 }
+          ]
+        },
+        {
+          "referencia": "UBL209.AL0246",
+          "color": "0015",
+          "medidaCaja": "60x40x30",
+          "pedido": "09000",
+          "talla": "105",
+          "cantidadTotal": 1,
+          "cajas": [
+            { "caja": 14, "unidades": 1 }
+          ]
+        },
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A521",
+          "medidaCaja": "60x40x30",
+          "pedido": "09001",
+          "talla": "75",
+          "cantidadTotal": 20,
+          "cajas": [
+            { "caja": 15, "unidades": 20, "pesoBruto": 7.3 }
+          ]
+        },
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A521",
+          "medidaCaja": "60x40x30",
+          "pedido": "09001",
+          "talla": "85",
+          "cantidadTotal": 23,
+          "cajas": [
+            { "caja": 15, "unidades": 23 }
+          ]
+        },
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A521",
+          "medidaCaja": "60x40x30",
+          "pedido": "09001",
+          "talla": "95",
+          "cantidadTotal": 10,
+          "cajas": [
+            { "caja": 16, "unidades": 10 }
+          ]
+        }
+      ]
+    },
+    {
+      "destino": "PRESS",
+      "palets": [],
+      "referencias": [
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A519",
+          "medidaCaja": "60x40x30",
+          "pedido": "09839",
+          "talla": "75",
+          "cantidadTotal": 9,
+          "cajas": [
+            { "caja": 1, "unidades": 9, "pesoBruto": 6.4 }
+          ]
+        },
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A519",
+          "medidaCaja": "60x40x30",
+          "pedido": "09839",
+          "talla": "85",
+          "cantidadTotal": 13,
+          "cajas": [
+            { "caja": 1, "unidades": 13 }
+          ]
+        },
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A521",
+          "medidaCaja": "60x40x30",
+          "pedido": "09839",
+          "talla": "75",
+          "cantidadTotal": 6,
+          "cajas": [
+            { "caja": 1, "unidades": 6 }
+          ]
+        },
+        {
+          "referencia": "UBL218.AL0238",
+          "color": "A521",
+          "medidaCaja": "60x40x30",
+          "pedido": "09839",
+          "talla": "85",
+          "cantidadTotal": 6,
+          "cajas": [
+            { "caja": 1, "unidades": 6 }
+          ]
+        },
+        {
+          "referencia": "ULL772.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09839",
+          "cantidadTotal": 6,
+          "cajas": [
+            { "caja": 2, "unidades": 6, "pesoBruto": 4.3 }
+          ]
+        },
+        {
+          "referencia": "ULL772.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "09839",
+          "cantidadTotal": 3,
+          "cajas": [
+            { "caja": 3, "unidades": 3 }
+          ]
+        },
+        {
+          "referencia": "ULL770.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09839",
+          "cantidadTotal": 1,
+          "cajas": [
+            { "caja": 3, "unidades": 1 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "001",
+          "medidaCaja": "60x40x40",
+          "pedido": "09839",
+          "cantidadTotal": 1,
+          "cajas": [
+            { "caja": 3, "unidades": 1 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "255",
+          "medidaCaja": "60x40x40",
+          "pedido": "09839",
+          "cantidadTotal": 1,
+          "cajas": [
+            { "caja": 3, "unidades": 1 }
+          ]
+        },
+        {
+          "referencia": "ULL771.AL0245",
+          "color": "709",
+          "medidaCaja": "60x40x40",
+          "pedido": "09839",
+          "cantidadTotal": 1,
+          "cajas": [
+            { "caja": 3, "unidades": 1 }
+          ]
+        }
+      ]
+    }
+  ]
+}

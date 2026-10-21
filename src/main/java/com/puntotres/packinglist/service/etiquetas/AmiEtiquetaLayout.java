@@ -98,6 +98,20 @@ public record AmiEtiquetaLayout(
             new AnclajeBloque(7, 2057400, 156331, 2575560, 430408),
             Map.of(16, 31f));    // fila 17: hueco entre las dos etiquetas
 
+    /**
+     * PRESS, el material de marketing (desde SS27): va a París, así que es la
+     * hoja de FRANCE con todo lo suyo, pero sus filas del excel de pedido
+     * llevan el PO con sufijo PRESS ("09839 PRESS"). Con el sufijo de France
+     * los códigos de barras saldrían de la fila de France del mismo artículo,
+     * que tiene otro PO dentro del EAN128.
+     */
+    public static final AmiEtiquetaLayout PRESS = new AmiEtiquetaLayout(
+            FRANCE.nombreHoja(), FRANCE.nombreHojaPalets(), "PRESS",
+            FRANCE.alturaBloque(), FRANCE.offsetSegundaEtiqueta(),
+            FRANCE.filaOrderNumber(), FRANCE.filaTemporada(), FRANCE.filaReferencia(),
+            FRANCE.filaColor(), FRANCE.filaTalla(), FRANCE.filaCantidad(), FRANCE.filaPeso(),
+            FRANCE.filaParcel(), FRANCE.imagenArticulo(), FRANCE.ean128(), FRANCE.alturasFila());
+
     /** Anclaje de la imagen-dirección de JAPAN. */
     public static final AnclajeBloque JAPAN_DIRECCION =
             new AnclajeBloque(2, 66675, 95250, 2562225, 1143000);

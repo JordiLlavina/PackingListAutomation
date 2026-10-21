@@ -91,6 +91,13 @@ El tipo de artículo se reconoce por el prefijo de la referencia:
 Además, en la pantalla de entrada AMI permite editar CIUDAD y PAÍS del
 proveedor (por defecto Badalona / Spain).
 
+Destinaciones: PARIS (o FRANCE), CHINA, JAPAN y, desde SS27, **PRESS** (el
+material de marketing, PO con sufijo `PRESS` en el excel de pedido). PRESS va
+a París con los documentos de France, pero en **un solo packing list** para
+todos sus modelos (con "France" en DESTINATION), no uno por referencia+color.
+En el JSON se escribe como cualquier otra: `"destino": "PRESS"` y el `pedido`
+sin el sufijo (`"09839"`).
+
 ## APC (plantilla APC, un excel por destino)
 
 Bolsos y cinturones comparten plantilla. Destinos configurados en

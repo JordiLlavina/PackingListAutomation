@@ -23,10 +23,16 @@ nada, simplemente el ejemplo deja de ser realista.
 
 ## Lo que sí es un fichero real
 
-**Los datos reales de cliente son los excels de pedido, y solo esos.** Hay dos:
+**Los datos reales de cliente son los excels de pedido, y solo esos.** Hay tres:
 
 - `docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx` (AMI, temporada H26), copiado
   aquí como `EAN PUNTOTRES H26.xlsx`.
+- `docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES SS27.xlsx` (AMI, temporada SS27), copiado
+  aquí como `EAN PUNTOTRES SS27.xlsx`. Es el **formato nuevo** del cliente: hoja
+  `Feuil1 Original`, cabeceras `P.O.` / ` DESCRIPTION COLORIS` / `EAN 13 ` /
+  `CODE 128`, sin columna Made in, y el sufijo de PO `PRESS` (marketing).
+  `AmiPedidoSs27RealTest` lo ancla; sus 100 filas tienen un Code 128 coherente
+  con su EAN13 y su PO.
 - `docs/Etiquetas cajas/APC documentos test/APC_PEDIDO_FALL26.xlsx` (APC, Fall 26), copiado aquí
   como `APC_PEDIDO_FALL26.xlsx`. Lo lee `ApcPedidoExcel` para completar el
   número de pedido, y `ApcPedidoExcelTest` ancla su comportamiento: la hoja se
@@ -45,6 +51,8 @@ comportamiento. Si se actualiza el de `docs/`, actualizar también la copia:
 
     cp "docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx" \
        "src/test/resources/ejemplos/EAN PUNTOTRES H26.xlsx"
+    cp "docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES SS27.xlsx" \
+       "src/test/resources/ejemplos/EAN PUNTOTRES SS27.xlsx"
 
 Lo mismo con el de APC:
 

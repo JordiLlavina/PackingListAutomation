@@ -163,6 +163,51 @@ class AmiCatalogoEanTest {
         assertFalse(excepcion.getMessage().contains("LIBELL'"), excepcion.getMessage());
     }
 
+    /**
+     * El SS27 no trae columna Made in, que es la que reparte los ficheros
+     * (bolsos MOROCCO, bolsos SPAIN): el país sale del final del Code 128.
+     * Su hoja tampoco se llama "EAN ...", así que no da temporada.
+     */
+    @Test
+    void enElFormatoSs27ElMadeInSaleDelCodigo128() throws Exception {
+        AmiCatalogoEan catalogo = AmiCatalogoEan.desdeBytes(
+                PedidoAmiExcel.crearFormatoSs27("Feuil1 Original",
+                        new Fila(null, "ULL770.AL0245", "001", "NOIR", "U", "09839 PRESS",
+                                "3667549163510",
+                                "366754916351000001000098390000000000000000MA"),
+                        new Fila(null, "UBL029.AL0246", "0014", "NOIR/ARGENT VIBRE", "75",
+                                "09006", "3667549161264",
+                                "366754916126400001000090060000000000000000ES")));
+
+        assertTrue(catalogo.avisos().isEmpty(), catalogo.avisos().toString());
+        FilaEan bolso = catalogo.filas().get(0);
+        assertEquals("MOROCCO", bolso.madeIn());
+        assertEquals("NOIR", bolso.libelle());
+        assertEquals("09839", bolso.poNumerico());
+        assertEquals("PRESS", bolso.poSufijo());
+        assertEquals("3667549163510", bolso.ean13());
+        assertEquals("SPAIN", catalogo.filas().get(1).madeIn());
+        assertTrue(catalogo.temporada().isEmpty());
+    }
+
+    /** Contra el fichero real: 100 filas, bolsos de Marruecos y cinturones de España. */
+    @Test
+    void elPedidoRealSs27SeLeeEntero() throws Exception {
+        byte[] contenido;
+        try (java.io.InputStream entrada = AmiCatalogoEanTest.class
+                .getResourceAsStream("/ejemplos/EAN PUNTOTRES SS27.xlsx")) {
+            contenido = entrada.readAllBytes();
+        }
+        AmiCatalogoEan catalogo = AmiCatalogoEan.desdeBytes(contenido);
+
+        assertTrue(catalogo.avisos().isEmpty(), catalogo.avisos().toString());
+        assertEquals(100, catalogo.filas().size());
+        for (FilaEan fila : catalogo.filas()) {
+            assertEquals(fila.article().startsWith("UBL") ? "SPAIN" : "MOROCCO", fila.madeIn(),
+                    fila.article() + " " + fila.coloris() + " " + fila.taille());
+        }
+    }
+
     @Test
     void conservaElOrdenDeAparicionDelExcel() throws Exception {
         AmiCatalogoEan catalogo = AmiCatalogoEan.desdeBytes(PedidoAmiExcel.crear("EAN H26",

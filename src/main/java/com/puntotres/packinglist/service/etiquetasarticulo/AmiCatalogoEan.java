@@ -34,10 +34,14 @@ public final class AmiCatalogoEan {
 
     public static AmiCatalogoEan desdeBytes(byte[] contenido) throws IOException {
         try (HojaEan hoja = HojaEan.abrir(contenido)) {
-            int colMadeIn = hoja.columna("MADE IN");
+            // El Made in reparte los ficheros (bolsos MOROCCO y SPAIN). SS27
+            // ya no trae la columna, pero el país sigue al final del Code 128:
+            // sin ninguna de las dos no hay de dónde sacarlo y se bloquea.
+            int colMadeIn = hoja.columnaOpcional("MADE IN");
+            int colEan128 = colMadeIn >= 0 ? -1 : hoja.columnaEntre("Made in", "EAN128", "CODE 128");
             int colArticle = hoja.columna("ARTICLE");
             int colColoris = hoja.columna("COLORIS");
-            int colLibelle = hoja.columna("LIBELL", "Libellé coloris");
+            int colLibelle = hoja.columnaEntre("Libellé coloris", "LIBELL", "DESCRIPTION COLORIS");
             int colTaille = hoja.columna("TAILLE");
             int colPo = hoja.columna("PO");
             int colEan13 = hoja.columna("EAN13");
@@ -52,8 +56,11 @@ public final class AmiCatalogoEan {
                 // sin ruido. Si trae CUALQUIER dato pero le falta ARTICLE o
                 // PO, se avisa: es un error del fichero que alguien puede
                 // arreglar.
+                String madeIn = colMadeIn >= 0
+                        ? hoja.texto(i, colMadeIn).trim().toUpperCase(Locale.ROOT)
+                        : HojaEan.madeInDeEan128(hoja.texto(i, colEan128));
                 boolean vacia = article.isBlank() && po.isBlank()
-                        && hoja.texto(i, colMadeIn).isBlank()
+                        && madeIn.isBlank()
                         && hoja.texto(i, colColoris).isBlank()
                         && hoja.texto(i, colLibelle).isBlank()
                         && hoja.texto(i, colTaille).isBlank()
@@ -70,7 +77,7 @@ public final class AmiCatalogoEan {
                 }
                 String sufijo = po.replaceAll("[0-9\\s]", "").toUpperCase(Locale.ROOT);
                 filas.add(new FilaEan(
-                        hoja.texto(i, colMadeIn).trim().toUpperCase(Locale.ROOT),
+                        madeIn,
                         article,
                         hoja.texto(i, colColoris).trim(),
                         hoja.texto(i, colLibelle).trim(),
@@ -97,6 +104,11 @@ public final class AmiCatalogoEan {
      * desde la pantalla.
      */
     public Optional<String> temporada() {
+        // SS27 llegó con la hoja llamada "Feuil1 Original": ahí el nombre no
+        // dice la temporada y la pone el usuario.
+        if (!nombreHoja.toUpperCase(Locale.ROOT).startsWith("EAN")) {
+            return Optional.empty();
+        }
         String resto = nombreHoja.substring("EAN".length()).trim();
         return resto.isBlank() ? Optional.empty() : Optional.of(resto.toUpperCase(Locale.ROOT));
     }
