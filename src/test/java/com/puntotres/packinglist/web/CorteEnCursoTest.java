@@ -1,11 +1,13 @@
 package com.puntotres.packinglist.web;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,6 +16,7 @@ import com.puntotres.packinglist.service.corte.ArticuloCorte;
 import com.puntotres.packinglist.service.corte.ColorCorte;
 import com.puntotres.packinglist.service.corte.ConversionFotos;
 import com.puntotres.packinglist.service.corte.ConversionesDePrueba;
+import com.puntotres.packinglist.service.corte.FotoModelo;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
 import com.puntotres.packinglist.service.corte.PedidoCorte;
 import com.puntotres.packinglist.service.corte.ReferenciaCorte;
@@ -42,6 +45,23 @@ class CorteEnCursoTest {
         assertTrue(primera.terminada(), "la primera conversión se cancela");
         assertTrue(Files.notExists(primero));
         assertTrue(Files.exists(segundo));
+    }
+
+    @Test
+    void cadaFilaArrancaConLaFotoPrincipalDeSuModelo() {
+        // Las fotos llegan ordenadas por nombre: sin la regla, la orden de
+        // corte llevaría «0001.jpg» y no la que el usuario ha llamado main.
+        CorteEnCurso enCurso = new CorteEnCurso();
+        FotosTemporada fotos = new FotosTemporada(Map.of("ULL027", List.of(
+                foto("0001.jpg"), foto("detalle.jpg"), foto("main.heic"))), List.of());
+        enCurso.cargar("AMI", "AMI", "H26", dir, pedido(), fotos, ConversionesDePrueba.sinTerminar(0),
+                false, List.of());
+
+        assertEquals(2, enCurso.getFilas().get(0).getFotoPrincipal());
+    }
+
+    private static FotoModelo foto(String nombre) {
+        return new FotoModelo("ULL027", nombre, Path.of(nombre));
     }
 
     private static PedidoCorte pedido() {

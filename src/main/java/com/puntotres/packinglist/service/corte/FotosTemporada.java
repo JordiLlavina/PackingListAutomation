@@ -31,6 +31,32 @@ public record FotosTemporada(Map<String, List<FotoModelo>> porModelo, List<Strin
         return porModelo.getOrDefault(ReferenciaCorte.normalizar(modelo), List.of());
     }
 
+    /**
+     * La foto que la orden de corte lleva si nadie elige otra: la que se llame
+     * {@code principal}, si no {@code main}, si no {@code 0} —con cualquier
+     * extensión y sin mirar mayúsculas—, y si no la primera por nombre, que es
+     * la de siempre. Índice en {@link #de(String)}.
+     */
+    public int indicePorDefecto(String modelo) {
+        List<FotoModelo> fotos = de(modelo);
+        for (String preferido : NOMBRES_PRINCIPAL) {
+            for (int i = 0; i < fotos.size(); i++) {
+                if (sinExtension(fotos.get(i).nombreOriginal()).equalsIgnoreCase(preferido)) {
+                    return i;
+                }
+            }
+        }
+        return 0;
+    }
+
+    /** De más a menos prioridad. */
+    private static final List<String> NOMBRES_PRINCIPAL = List.of("principal", "main", "0");
+
+    private static String sinExtension(String nombre) {
+        int punto = nombre.lastIndexOf('.');
+        return (punto < 0 ? nombre : nombre.substring(0, punto)).trim();
+    }
+
     public List<FotoModelo> todas() {
         return porModelo.values().stream().flatMap(List::stream).toList();
     }

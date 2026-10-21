@@ -83,7 +83,9 @@ public class CorteEnCurso {
         this.sinFotos = sinFotos;
         filas.clear();
         for (ArticuloCorte articulo : pedido.articulos()) {
-            filas.add(new FilaCorte(articulo));
+            FilaCorte fila = new FilaCorte(articulo);
+            fila.setFotoPrincipal(fotos.indicePorDefecto(articulo.referencia().modelo()));
+            filas.add(fila);
         }
         avisosCarga.clear();
         avisosCarga.addAll(avisos);
