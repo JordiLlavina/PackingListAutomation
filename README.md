@@ -245,7 +245,7 @@ Si la aplicación corre desde un `.jar` en otro ordenador, estos ajustes se pued
 
 Los `envio-*.json` de [src/test/resources/ejemplos/](src/test/resources/ejemplos/README.md), el `packing_list_ami_test.json` del `Main` y los JSON recortados en los documentos de `docs/` son **fixtures generados por IA**: envíos escritos a ojo, sin conocer la realidad del almacén, para ejercitar el flujo y hacer pruebas visuales. **No son datos de ningún cliente** y no hay que deducir de ellos cómo son los datos reales.
 
-Los únicos **datos reales** de cliente son los dos excels de pedido: `docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI) y `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC), ambos copiados a `src/test/resources/ejemplos/`. De los demás `.xlsx` de [docs/](docs/) lo real es la **maquetación**, no el contenido.
+Los únicos **datos reales** de cliente son los dos excels de pedido: `docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx` (AMI) y `docs/Etiquetas cajas/APC documentos test/APC_PEDIDO_FALL26.xlsx` (APC), ambos copiados a `src/test/resources/ejemplos/`. De los demás `.xlsx` de [docs/](docs/) lo real es la **maquetación**, no el contenido.
 
 ## Plantillas de cliente
 

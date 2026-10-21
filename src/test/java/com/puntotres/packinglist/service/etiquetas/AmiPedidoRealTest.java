@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Ancla la resolución de EAN13/EAN128 contra el excel de pedido REAL de AMI
- * ("EAN PUNTOTRES H26.xlsx", copia del de docs/Etiquetas cajas/). Los demás
+ * ("EAN PUNTOTRES H26.xlsx", copia del de docs/Etiquetas cajas/AMI documentos test/). Los demás
  * tests usan fixtures sintéticos; este es el que garantiza que la regla de
  * clave exacta funciona con los datos que manda el cliente, rarezas incluidas.
  */

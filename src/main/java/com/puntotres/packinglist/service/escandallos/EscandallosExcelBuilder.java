@@ -74,7 +74,7 @@ public class EscandallosExcelBuilder {
 
         etiqueta(hoja, FILA_MODELO, "MODEL", escandallo.modelo(), estilos);
         etiqueta(hoja, FILA_DESCRIPCION, "DESCRIPCIÓ", escandallo.descripcion(), estilos);
-        etiqueta(hoja, FILA_COLOR, "COLOR", escandallo.color(), estilos);
+        etiqueta(hoja, FILA_COLOR, "COLOR", escandallo.descripcionColor(), estilos);
 
         Row encabezados = hoja.createRow(FILA_ENCABEZADOS);
         texto(encabezados, COLUMNA_ETIQUETA, "Article", estilos.encabezado);

@@ -48,16 +48,17 @@ class EscandallosFlujoRealTest {
             assertEquals("ULL770.AL245", noir.getRow(1).getCell(1).getStringCellValue());
             assertEquals("SAC CANDY RABAT LARGE UNISEX",
                     noir.getRow(2).getCell(1).getStringCellValue());
-            assertEquals("000    0014 NOIR", noir.getRow(3).getCell(1).getStringCellValue());
-            // 25 materiales a partir de la fila 7 (índice 6).
-            assertEquals(30, noir.getLastRowNum());
+            assertEquals("NOIR", noir.getRow(3).getCell(1).getStringCellValue());
+            // De los 25 materiales del ERP salen 22 a partir de la fila 7
+            // (índice 6): R-FOAM, R-PP00 y R-TT00 se quitan.
+            assertEquals(27, noir.getLastRowNum());
             assertEquals("P-FOUB01", noir.getRow(6).getCell(0).getStringCellValue());
             assertEquals(1.2, noir.getRow(6).getCell(2).getNumericCellValue(), 0.0001);
-            assertEquals("R-TT00", noir.getRow(30).getCell(0).getStringCellValue());
-            assertEquals(0.008, noir.getRow(30).getCell(2).getNumericCellValue(), 0.0001);
+            assertEquals("R-TN5799", noir.getRow(27).getCell(0).getStringCellValue());
+            assertEquals(0.008, noir.getRow(27).getCell(2).getNumericCellValue(), 0.0001);
 
             Sheet sand = libro.getSheet("ULL770.AL245 SABLE SAND");
-            assertEquals("001    255 SABLE SAND", sand.getRow(3).getCell(1).getStringCellValue());
+            assertEquals("SABLE SAND", sand.getRow(3).getCell(1).getStringCellValue());
             assertEquals("P-FOUB255", sand.getRow(6).getCell(0).getStringCellValue());
             assertEquals("PIEL/FOULARD SAND", sand.getRow(6).getCell(1).getStringCellValue());
         }

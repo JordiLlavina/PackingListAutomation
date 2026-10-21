@@ -60,29 +60,8 @@ public class NombresHoja {
         if (modelo.isEmpty()) {
             return sinExtension(escandallo.origen());
         }
-        String color = colorAbreviado(escandallo.color());
+        String color = escandallo.descripcionColor();
         return color.isEmpty() ? modelo : modelo + " " + color;
-    }
-
-    /**
-     * El campo COLOR del ERP viene como «000    0014 NOIR»: códigos internos y
-     * al final el color de verdad. Se descartan los grupos puramente
-     * numéricos, salvo que no quede nada (entonces el código <em>es</em> el
-     * color).
-     */
-    private static String colorAbreviado(String color) {
-        if (color == null || color.isBlank()) {
-            return "";
-        }
-        String[] partes = color.trim().split("\\s+");
-        StringBuilder legible = new StringBuilder();
-        for (String parte : partes) {
-            if (parte.matches("\\d+")) {
-                continue;
-            }
-            legible.append(legible.isEmpty() ? "" : " ").append(parte);
-        }
-        return legible.isEmpty() ? String.join(" ", partes) : legible.toString();
     }
 
     private static String sinExtension(String origen) {

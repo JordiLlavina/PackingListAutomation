@@ -46,7 +46,7 @@ import com.puntotres.packinglist.model.EnvioInput;
  * porque lo que hay que leer en una hoja de AMI (referencia con puntos,
  * numeración continua) no tiene nada que ver con una de APC (referencia
  * parcial, pedido de tres dígitos, hoja por destinación). Las hojas de
- * ejemplo reales están en docs/Packing Lists/*IMAGENES.pdf y el análisis en
+ * ejemplo reales están en docs/Packing Lists/Packing List PDF tests/*IMAGENES.pdf y el análisis en
  * docs/Packing Lists/analisis-hojas-manuscritas.md.
  *
  * El cliente HTTP se crea perezosamente en el primer uso: así la aplicación

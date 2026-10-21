@@ -2,6 +2,8 @@ package com.puntotres.packinglist.service.escandallos;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
@@ -18,6 +20,14 @@ import org.springframework.stereotype.Service;
 @Service
 public class EscandallosGenerationService {
 
+    /**
+     * Materiales del escandallo que no se quieren en el excel descargable, por
+     * decisión del usuario: la espuma, el papel y la tinta. Se quitan aquí y no
+     * en {@link EscandalloReader}, que sigue leyendo lo que trae el ERP tal
+     * cual; y sin aviso, porque salen en casi todos los escandallos.
+     */
+    static final Set<String> ARTICULOS_EXCLUIDOS = Set.of("R-FOAM", "R-PP00", "R-TT00");
+
     private final EscandalloReader reader;
     private final EscandallosExcelBuilder builder;
 
@@ -33,7 +43,7 @@ public class EscandallosGenerationService {
         for (FicheroEscandallo fichero : ficheros) {
             try {
                 LecturaEscandallo lectura = reader.leer(fichero.contenido(), fichero.nombre());
-                escandallos.add(lectura.escandallo());
+                escandallos.add(sinExcluidos(lectura.escandallo()));
                 avisos.addAll(lectura.avisos());
             } catch (IllegalArgumentException e) {
                 // El reader ya redacta sus mensajes en español y con el nombre
@@ -47,5 +57,14 @@ public class EscandallosGenerationService {
         ExcelEscandallos excel = builder.construir(escandallos);
         avisos.addAll(excel.avisos());
         return new ExcelEscandallos(excel.contenido(), excel.hojas(), List.copyOf(avisos));
+    }
+
+    private static Escandallo sinExcluidos(Escandallo escandallo) {
+        List<LineaEscandallo> lineas = escandallo.lineas().stream()
+                .filter(linea -> !ARTICULOS_EXCLUIDOS.contains(
+                        linea.article().trim().toUpperCase(Locale.ROOT)))
+                .toList();
+        return new Escandallo(escandallo.modelo(), escandallo.descripcion(),
+                escandallo.color(), lineas, escandallo.origen());
     }
 }

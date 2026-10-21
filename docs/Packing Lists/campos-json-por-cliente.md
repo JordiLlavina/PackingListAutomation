@@ -159,8 +159,8 @@ La temporada del formulario va a la columna SEASON.
 > recortados que aparecen como ejemplo más arriba en este documento.
 >
 > Los únicos ficheros de `docs/` con **datos reales** de cliente son los dos
-> excels de pedido: `docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI) y
-> `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC). De los demás `.xlsx`
+> excels de pedido: `docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx` (AMI) y
+> `docs/Etiquetas cajas/APC documentos test/APC_PEDIDO_FALL26.xlsx` (APC). De los demás `.xlsx`
 > de `docs/` lo real es la **maquetación** (son las plantillas y salidas que
 > usa el cliente); su contenido es también de relleno.
 

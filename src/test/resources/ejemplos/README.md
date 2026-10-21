@@ -25,9 +25,9 @@ nada, simplemente el ejemplo deja de ser realista.
 
 **Los datos reales de cliente son los excels de pedido, y solo esos.** Hay dos:
 
-- `docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx` (AMI, temporada H26), copiado
+- `docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx` (AMI, temporada H26), copiado
   aquí como `EAN PUNTOTRES H26.xlsx`.
-- `docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx` (APC, Fall 26), copiado aquí
+- `docs/Etiquetas cajas/APC documentos test/APC_PEDIDO_FALL26.xlsx` (APC, Fall 26), copiado aquí
   como `APC_PEDIDO_FALL26.xlsx`. Lo lee `ApcPedidoExcel` para completar el
   número de pedido, y `ApcPedidoExcelTest` ancla su comportamiento: la hoja se
   localiza por sus tres cabeceras (`Article`, `Document d'achat` y `Notre
@@ -43,12 +43,12 @@ La copia del pedido de AMI describe los datos del cliente con sus rarezas (hay
 están ocultas por un filtro guardado); `AmiPedidoRealTest` ancla su
 comportamiento. Si se actualiza el de `docs/`, actualizar también la copia:
 
-    cp "docs/Etiquetas cajas/EAN PUNTOTRES H26.xlsx" \
+    cp "docs/Etiquetas cajas/AMI documentos test/EAN PUNTOTRES H26.xlsx" \
        "src/test/resources/ejemplos/EAN PUNTOTRES H26.xlsx"
 
 Lo mismo con el de APC:
 
-    cp "docs/Etiquetas cajas/APC_PEDIDO_FALL26.xlsx" \
+    cp "docs/Etiquetas cajas/APC documentos test/APC_PEDIDO_FALL26.xlsx" \
        "src/test/resources/ejemplos/APC_PEDIDO_FALL26.xlsx"
 
 `escandallos/` son también copias de escandallos reales del ERP.
@@ -61,7 +61,7 @@ y peso debajo de la última fila, y una fila de otro cliente entre las de AMI.
 Todo eso es lo que `TallerColisExcelTest` ancla, y nada de ello lo habría
 traído un fixture inventado. Las referencias y las cantidades son de relleno.
 
-    cp "docs/Packing Lists/Packing List Taller/Packing List Taller Exemple.xlsx" \
+    cp "docs/Packing Lists/Packing List Excel Taller tests/Packing List Taller Exemple.xlsx" \
        "src/test/resources/ejemplos/taller/Packing List Taller Exemple.xlsx"
 
 `corte/gimp_rgb_420_with_alpha.heic` es el HEIC de prueba de los documentos del

@@ -6,10 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -42,6 +47,29 @@ class EscandallosGenerationServiceTest {
         assertEquals(List.of("ULL770.AL245 NOIR", "ULL770.AL245 SABLE SAND"), excel.hojas());
         assertEquals(List.of(), excel.avisos());
         assertFalse(excel.estaVacio());
+    }
+
+    /**
+     * La espuma, el papel y la tinta de los escandallos del ERP no se quieren
+     * en el excel descargable. Los dos escandallos reales traen los tres.
+     */
+    @Test
+    void laEspumaElPapelYLaTintaNoSalenEnElExcel() throws Exception {
+        ExcelEscandallos excel = service.procesar(
+                List.of(recurso("ULL770 NOIR.xlsx"), recurso("ULL770 SAND.xlsx")));
+
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(excel.contenido()))) {
+            for (Sheet hoja : libro) {
+                for (Row fila : hoja) {
+                    Cell article = fila.getCell(0);
+                    String codigo = article == null ? "" : article.toString().trim();
+                    assertFalse(List.of("R-FOAM", "R-PP00", "R-TT00").contains(codigo),
+                            hoja.getSheetName() + " fila " + (fila.getRowNum() + 1)
+                                    + " trae " + codigo);
+                }
+            }
+        }
+        assertEquals(List.of(), excel.avisos());
     }
 
     @Test

@@ -62,9 +62,9 @@ class EscandallosExcelBuilderTest {
             assertEquals("DESCRIPCIÓ", texto(hoja, 2, 0));
             assertEquals("SAC CANDY RABAT LARGE UNISEX", texto(hoja, 2, 1));
             assertEquals("COLOR", texto(hoja, 3, 0));
-            // El color va entero, con sus códigos: abreviarlo es cosa del
-            // nombre de la hoja, no del dato.
-            assertEquals("000    0014 NOIR", texto(hoja, 3, 1));
+            // Solo la descripción del color: los códigos del ERP («000    0014»)
+            // no se quieren en el excel.
+            assertEquals("NOIR", texto(hoja, 3, 1));
         }
     }
 
