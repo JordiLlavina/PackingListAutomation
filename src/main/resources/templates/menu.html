@@ -8,7 +8,7 @@
          encima de la lista repetía lo que la lista ya dice, así que se quitó:
          aquí solo se elige por dónde empezar. -->
     <div class="menu-tarjetas">
-        <section class="tarjeta menu-tarjeta">
+        <a class="tarjeta menu-tarjeta" th:href="@{/packing-list}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -23,10 +23,9 @@
                 <li>Etiquetas de caja y de palet</li>
                 <li>Volcado del albarán para el ERP</li>
             </ul>
-            <a class="boton" th:href="@{/packing-list}">Empezar</a>
-        </section>
+        </a>
 
-        <section class="tarjeta menu-tarjeta">
+        <a class="tarjeta menu-tarjeta" th:href="@{/etiquetas-articulo}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -41,10 +40,9 @@
                 <li>SMS — en desarrollo</li>
                 <li>Prototipos — en desarrollo</li>
             </ul>
-            <a class="boton" th:href="@{/etiquetas-articulo}">Empezar</a>
-        </section>
+        </a>
 
-        <section class="tarjeta menu-tarjeta">
+        <a class="tarjeta menu-tarjeta" th:href="@{/documentos-corte}">
             <h2 class="menu-titulo">
                 <svg th:replace="~{fragmentos :: iconoPiel('menu-icono')}"></svg>
                 Documentos del Corte
@@ -55,10 +53,9 @@
                 <li>Un Word de fotos por modelo</li>
                 <li>AMI y APC — genéricos en desarrollo</li>
             </ul>
-            <a class="boton" th:href="@{/documentos-corte}">Empezar</a>
-        </section>
+        </a>
 
-        <section class="tarjeta menu-tarjeta">
+        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -73,8 +70,7 @@
                 <li>Cada hoja, con el nombre de su modelo y su color</li>
                 <li>Sin precios, sin importes y sin fases</li>
             </ul>
-            <a class="boton" th:href="@{/clickup}">Empezar</a>
-        </section>
+        </a>
 
         <!-- Los ajustes no son un flujo con pantallas, sino un dato que se
              guarda una vez y vale para todos los envíos, así que van en paneles

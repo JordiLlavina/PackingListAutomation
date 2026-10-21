@@ -39,6 +39,19 @@ class RutasTest {
     }
 
     @Test
+    void cadaTarjetaDelMenuEsElEnlaceEnteroSinBotonDentro() throws Exception {
+        // La tarjeta entera es el botón, como los paneles de ajustes: un
+        // "Empezar" dentro sería un segundo sitio que pulsar para lo mismo.
+        String html = mvc.perform(get("/menu")).andReturn().getResponse().getContentAsString();
+        for (String ruta : java.util.List.of("/packing-list", "/etiquetas-articulo",
+                "/documentos-corte", "/clickup")) {
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    html.contains("<a class=\"tarjeta menu-tarjeta\" href=\"" + ruta + "\">"), ruta);
+        }
+        org.junit.jupiter.api.Assertions.assertFalse(html.contains(">Empezar<"));
+    }
+
+    @Test
     void elCssSeSirveConElHashDeSuContenidoEnElNombre() throws Exception {
         // Sin esto el navegador se queda con la copia vieja de estilo.css tras
         // cada cambio de estilos y hay que vaciar la caché a mano: un fallo

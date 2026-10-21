@@ -5,7 +5,7 @@
 <header th:replace="~{fragmentos :: cabecera('Etiquetas de artículo')}"></header>
 <main>
     <div class="menu-tarjetas">
-        <section class="tarjeta menu-tarjeta">
+        <a class="tarjeta menu-tarjeta" th:href="@{/etiquetas-articulo-produccion}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
@@ -20,8 +20,7 @@
                 <li>Un excel de cinturones</li>
                 <li>40 etiquetas por hoja, ajustadas a un A4</li>
             </ul>
-            <a class="boton" th:href="@{/etiquetas-articulo-produccion}">Empezar</a>
-        </section>
+        </a>
 
         <section class="tarjeta menu-tarjeta deshabilitada">
             <h2 class="menu-titulo">
