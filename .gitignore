@@ -27,3 +27,7 @@ datos/
 .~lock.*#
 ~$*.xlsx
 docs/Envios DHL/address-book-*.csv
+
+# Fotos reales de temporada para probar los Documentos del Corte: no entran en el repo
+docs/Documentos de Corte/APC SPRING 27/
+docs/Documentos de Corte/AMI SS27/

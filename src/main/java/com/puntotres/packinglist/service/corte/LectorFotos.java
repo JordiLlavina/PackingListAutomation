@@ -34,7 +34,8 @@ import java.util.zip.ZipFile;
  * como él o como una referencia suya: "ULL027.AL103" es el modelo ULL027
  * aunque el pedido escriba la piel AL0103, porque la foto es del modelo y no
  * de la piel. La referencia se parte con la regla del cliente (ver
- * ReferenciaCorte). Lo que no cae en ningún modelo se avisa y no se usa: una
+ * ReferenciaCorte). Detrás del modelo, separado por un espacio, puede ir el
+ * nombre del bolso ("F67008 le neige"): no cuenta. Lo que no cae en ningún modelo se avisa y no se usa: una
  * foto en la carpeta equivocada acabaría en el documento de otro bolso.
  *
  * Los nombres de las entradas NUNCA se usan como ruta al copiar (zip slip):
@@ -166,7 +167,7 @@ public class LectorFotos {
 
         private Optional<String> modeloDe(List<String> carpetas) {
             for (int i = carpetas.size() - 1; i >= 0; i--) {
-                String carpeta = ReferenciaCorte.normalizar(carpetas.get(i));
+                String carpeta = primeraPalabra(ReferenciaCorte.normalizar(carpetas.get(i)));
                 if (buscados.contains(carpeta)) {
                     return Optional.of(carpeta);
                 }
@@ -241,6 +242,19 @@ public class LectorFotos {
             }
         }
         return copiados;
+    }
+
+    /**
+     * Lo que nombra el modelo es la primera palabra de la carpeta: detrás
+     * puede ir el nombre del bolso ("F63033 porte-monnaie neige rond"), que
+     * ayuda a quien pone las fotos y no cuenta. Hay que cortarlo ANTES de
+     * partir la referencia: el guion de "porte-monnaie" haría buscar a la
+     * regla de APC el modelo "MONNAIE NEIGE ROND". Ningún modelo ni
+     * referencia lleva espacios.
+     */
+    private static String primeraPalabra(String carpeta) {
+        int espacio = carpeta.indexOf(' ');
+        return espacio < 0 ? carpeta : carpeta.substring(0, espacio);
     }
 
     private static boolean esBasura(String nombre, List<String> carpetas) {

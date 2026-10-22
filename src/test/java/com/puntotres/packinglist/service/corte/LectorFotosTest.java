@@ -132,6 +132,48 @@ class LectorFotosTest {
     }
 
     @Test
+    void elNombreDelBolsoDetrasDelModeloNoCambiaDeQueModeloEsLaCarpeta() throws IOException {
+        // "porte-monnaie" lleva guion: sin cortar antes por el espacio, la regla
+        // de APC buscaría el modelo "MONNAIE NEIGE ROND".
+        Map<String, byte[]> entradas = new LinkedHashMap<>();
+        entradas.put("SS27/F63033 porte-monnaie neige rond/a.jpg", FOTO);
+        entradas.put("SS27/F67008 - le neige/b.jpg", FOTO);
+        entradas.put("SS27/PXCBC-F67081  le neige mini/c.jpg", FOTO);
+
+        FotosTemporada fotos = new LectorFotos().leer(zip(StandardCharsets.UTF_8, entradas),
+                Set.of("F63033", "F67008", "F67081"), ReferenciaCorte::deApc, dir.resolve("trabajo"));
+
+        assertEquals(List.of("a.jpg"), nombres(fotos.de("F63033")));
+        assertEquals(List.of("b.jpg"), nombres(fotos.de("F67008")));
+        assertEquals(List.of("c.jpg"), nombres(fotos.de("F67081")));
+        assertTrue(fotos.avisos().isEmpty(), fotos.avisos().toString());
+    }
+
+    @Test
+    void enAmiTambienSePuedeNombrarLaCarpetaConElBolsoDetras() throws IOException {
+        Map<String, byte[]> entradas = new LinkedHashMap<>();
+        entradas.put("H26/ULL027 sac mini/a.jpg", FOTO);
+        entradas.put("H26/ULL027.AL103 sac mini/b.jpg", FOTO);
+
+        FotosTemporada fotos = leer(zip(StandardCharsets.UTF_8, entradas));
+
+        assertEquals(List.of("a.jpg", "b.jpg"), nombres(fotos.de("ULL027")));
+    }
+
+    @Test
+    void unNombreDeBolsoNoHaceModeloAUnaCarpetaQueNoEmpiezaPorEl() throws IOException {
+        Map<String, byte[]> entradas = new LinkedHashMap<>();
+        entradas.put("H26/ULL999 sac mini/a.jpg", FOTO);
+        entradas.put("H26/sac ULL027/b.jpg", FOTO);
+
+        FotosTemporada fotos = leer(zip(StandardCharsets.UTF_8, entradas));
+
+        assertEquals(0, fotos.total());
+        String avisos = String.join("\n", fotos.avisos());
+        assertTrue(avisos.contains("ULL999 sac mini") && avisos.contains("sac ULL027"), avisos);
+    }
+
+    @Test
     void unaCarpetaConReferenciaDeOtroModeloSigueSinUsarse() throws IOException {
         FotosTemporada fotos = leer(zip(StandardCharsets.UTF_8, Map.of("ULL999.AL0103/a.jpg", FOTO)));
 
