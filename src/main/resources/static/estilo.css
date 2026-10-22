@@ -661,14 +661,14 @@ header.cabecera .enlace-menu:hover {
     cursor: not-allowed;
 }
 
-/* Lo que hace falta para empezar, en un bloque suave y redondeado, en
+/* Lo que hace falta para empezar, en un bloque suave de esquinas apenas redondeadas, en
    un gris claro, en vez de una barra lateral: queda dentro de la tarjeta sin
    recortarla con una línea más. */
 .menu-entrada {
     margin: 0 0 0.9rem;
     padding: 0.6rem 0.85rem;
-    border-radius: 8px;
-    background: #eef1f4;
+    border-radius: 4px;
+    background: #f3f5f7;
     font-size: 0.9rem;
     font-weight: 500;
     line-height: 1.45;
