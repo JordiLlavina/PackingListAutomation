@@ -52,6 +52,24 @@ class RutasTest {
     }
 
     @Test
+    void elMenuTraeElInterruptorDeEstiloYTodasLasPantallasAplicanElElegido() throws Exception {
+        // El estilo elegido se aplica desde <head> en todas las pantallas, pero
+        // el interruptor solo está en la cabecera del menú.
+        String menu = mvc.perform(get("/menu")).andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertTrue(menu.contains("id=\"interruptor-tema\""));
+        // El Puntotres es el de partida: solo el clásico elegido a propósito lo quita.
+        org.junit.jupiter.api.Assertions.assertTrue(menu.contains("=== \"clasico\""));
+        org.junit.jupiter.api.Assertions.assertTrue(menu.contains("role=\"switch\""));
+        for (String ruta : java.util.List.of("/menu", "/taras", "/temporadas", "/colores")) {
+            String html = mvc.perform(get(ruta)).andReturn().getResponse().getContentAsString();
+            org.junit.jupiter.api.Assertions.assertTrue(
+                    html.contains("localStorage.getItem(\"tema\")"), ruta);
+        }
+        String taras = mvc.perform(get("/taras")).andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertFalse(taras.contains("interruptor-tema"));
+    }
+
+    @Test
     void elCssSeSirveConElHashDeSuContenidoEnElNombre() throws Exception {
         // Sin esto el navegador se queda con la copia vieja de estilo.css tras
         // cada cambio de estilos y hay que vaciar la caché a mano: un fallo

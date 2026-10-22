@@ -18,6 +18,28 @@
     --error-borde: #d9534f;
     --ok-fondo: #e8f5ec;
     --ok-borde: #3d9960;
+
+    /* Todo lo que cambia de un estilo a otro vive aquí y en el bloque
+       html[data-tema="puntotres"] del final: el resto del CSS solo usa estas
+       variables, así que cambiar de paleta no toca ninguna regla. */
+    --superficie: #fff;
+    --superficie-fin: #f5f7f9;
+    --pulsada-ini: #eef1f4;
+    --pulsada-fin: #f7f9fa;
+    --entrada: #f3f5f7;
+    --campo: #fff;
+    --brillo: #fff;
+    --borde-tarjeta: #d3d9e0;
+    --borde-tarjeta-fuerte: #b8c1cb;
+    --texto-suave: #5a6673;
+    --texto-tenue: #7a8591;
+    --cabecera: #1c2733;
+    --cabecera-filete: #1c2733;
+    --texto-cabecera: #fff;
+    --sombra-rgb: 28, 39, 51;
+    --acento-rgb: 26, 111, 235;
+    --acento-suave-ini: #eaf2fe;
+    --acento-suave-fin: #f4f8ff;
 }
 
 * { box-sizing: border-box; }
@@ -36,9 +58,10 @@ main {
 }
 
 header.cabecera {
-    background: var(--tinta);
-    color: #fff;
+    background: var(--cabecera);
+    color: var(--texto-cabecera);
     padding: 0.9rem 1rem;
+    border-bottom: 1px solid var(--cabecera-filete);
 }
 
 header.cabecera .titulo {
@@ -85,7 +108,7 @@ h2 { margin-top: 2rem; }
 }
 
 form.tarjeta, .tarjeta {
-    background: #fff;
+    background: var(--superficie);
     border: 1px solid var(--borde);
     border-radius: 6px;
     padding: 1.25rem;
@@ -129,9 +152,9 @@ textarea.json {
 
 .error-campo { color: var(--error-borde); font-size: 0.85rem; }
 
-.ayuda { color: #5a6673; font-size: 0.85rem; margin: 0.1rem 0 0.5rem; }
+.ayuda { color: var(--texto-suave); font-size: 0.85rem; margin: 0.1rem 0 0.5rem; }
 
-.aviso-procesando { color: #5a6673; font-size: 1.45rem; font-weight: bold; margin: 0.5rem 0; }
+.aviso-procesando { color: var(--texto-suave); font-size: 1.45rem; font-weight: bold; margin: 0.5rem 0; }
 
 /* --- Selector del modo de entrada (JSON / CLAUDE / FORMULARIO) --- */
 
@@ -143,7 +166,7 @@ textarea.json {
 
 .selector-modo button {
     margin: 0;
-    background: #fff;
+    background: var(--superficie);
     color: var(--acento);
 }
 
@@ -151,6 +174,81 @@ textarea.json {
     background: var(--acento);
     color: #fff;
 }
+
+/* --- Formato del excel del taller (Puntotres / Taller) ---
+   Dos botones grandes con el relieve de los paneles del menú, porque son
+   eso: elegir por dónde se entra. El elegido se queda hundido y con el borde
+   y el título en el azul de acción, para que se vea de un vistazo cuál manda
+   en la tarjeta de debajo. */
+.selector-formato {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+button.boton-formato {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 0;
+    padding: 0.9rem 1.1rem;
+    text-align: left;
+    font-weight: 400;
+    color: inherit;
+    border: 1px solid var(--borde-tarjeta);
+    border-radius: 6px;
+    background: linear-gradient(180deg, var(--superficie) 0%, var(--superficie-fin) 100%);
+    box-shadow:
+        inset 0 1px 0 var(--brillo),
+        0 1px 2px rgba(var(--sombra-rgb), 0.07),
+        0 4px 12px -4px rgba(var(--sombra-rgb), 0.18);
+    transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
+}
+
+button.boton-formato:hover {
+    transform: translateY(-1px);
+    border-color: var(--borde-tarjeta-fuerte);
+    box-shadow:
+        inset 0 1px 0 var(--brillo),
+        0 2px 4px rgba(var(--sombra-rgb), 0.08),
+        0 12px 26px -10px rgba(var(--sombra-rgb), 0.30);
+}
+
+button.boton-formato:active, button.boton-formato.activo {
+    transform: translateY(1px);
+    border-color: var(--acento);
+    background: linear-gradient(180deg, var(--acento-suave-ini) 0%, var(--acento-suave-fin) 100%);
+    box-shadow:
+        inset 0 2px 6px rgba(var(--acento-rgb), 0.18),
+        0 0 0 rgba(var(--sombra-rgb), 0);
+}
+
+button.boton-formato:focus-visible {
+    outline: 2px solid var(--acento);
+    outline-offset: 2px;
+}
+
+.boton-formato-icono {
+    width: 1.5rem;
+    height: 1.5rem;
+    flex: none;
+    color: var(--marca);
+}
+
+.boton-formato-titulo { display: block; font-weight: 600; }
+.boton-formato.activo .boton-formato-titulo { color: var(--acento); }
+.boton-formato-detalle { display: block; font-size: 0.85rem; color: var(--texto-suave); }
+
+@media (prefers-reduced-motion: reduce) {
+    button.boton-formato { transition: none; }
+}
+
+.acciones-conversion { display: flex; flex-wrap: wrap; align-items: center; }
+
+/* Por qué "Digerir Datos Taller" está apagado: el gris del botón dice que no
+   se puede, esto dice qué falta para poder. */
+.motivo-boton-apagado { color: var(--texto-suave); font-size: 0.9rem; font-style: italic; }
 
 input[type="file"] {
     display: block;
@@ -178,7 +276,7 @@ button, a.boton {
 }
 
 button.secundario, a.boton.secundario {
-    background: #fff;
+    background: var(--superficie);
     color: var(--acento);
 }
 
@@ -196,7 +294,7 @@ button.gris, a.boton.gris {
    venido a hacer aquí, así que van sin relleno y con el texto y el borde en
    gris fuerte, en vez de en el azul de acción. */
 button.neutro, a.boton.neutro {
-    background: #fff;
+    background: var(--superficie);
     border-color: var(--gris-fuerte);
     color: var(--gris-fuerte);
 }
@@ -216,7 +314,7 @@ button.mini {
     padding: 0.2rem 0.5rem;
     font-size: 0.8rem;
     font-weight: 400;
-    background: #fff;
+    background: var(--superficie);
     color: var(--acento);
     white-space: nowrap;
 }
@@ -227,7 +325,7 @@ table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    background: #fff;
+    background: var(--superficie);
     font-size: 0.9rem;
 }
 
@@ -346,7 +444,7 @@ section.destino td select.c-tamano {
     border: 1px solid var(--borde);
     border-radius: 4px;
     font: inherit;
-    background: #fff;
+    background: var(--campo);
 }
 
 /* Las celdas de la revisión aprietan en horizontal: son doce y casi todas
@@ -502,7 +600,7 @@ tr.pendiente td.celda-peso { background: var(--aviso-fondo); }
 .ficha-envio .rotulo {
     display: block;
     font-size: 0.8rem;
-    color: #5a6673;
+    color: var(--texto-suave);
 }
 
 .ficha-envio strong { font-size: 1.05rem; }
@@ -525,7 +623,7 @@ tr.pendiente td.celda-peso { background: var(--aviso-fondo); }
 button:disabled {
     background: var(--borde);
     border-color: var(--borde);
-    color: #7a8591;
+    color: var(--texto-tenue);
     cursor: not-allowed;
 }
 
@@ -553,7 +651,7 @@ button:disabled {
     position: fixed;
     inset: 0;
     z-index: 10;
-    background: rgba(28, 39, 51, 0.55);
+    background: rgba(var(--sombra-rgb), 0.55);
 }
 
 .modal-fondo.visible {
@@ -564,7 +662,7 @@ button:disabled {
 
 .modal-caja {
     position: relative;
-    background: #fff;
+    background: var(--superficie);
     border-radius: 6px;
     padding: 1.25rem;
     max-width: 90vw;
@@ -584,7 +682,7 @@ button:disabled {
     right: 0.4rem;
     margin: 0;
     padding: 0.1rem 0.55rem;
-    background: #fff;
+    background: var(--superficie);
     border: none;
     color: var(--tinta);
     font-size: 1.4rem;
@@ -656,7 +754,7 @@ header.cabecera .enlace-menu:hover {
     border: 1px solid var(--borde);
     border-radius: 4px;
     background: var(--borde);
-    color: #7a8591;
+    color: var(--texto-tenue);
     font-weight: 600;
     cursor: not-allowed;
 }
@@ -668,7 +766,7 @@ header.cabecera .enlace-menu:hover {
     margin: 0 0 0.9rem;
     padding: 0.6rem 0.85rem;
     border-radius: 4px;
-    background: #f3f5f7;
+    background: var(--entrada);
     font-size: 0.9rem;
     font-weight: 500;
     line-height: 1.45;
@@ -701,7 +799,7 @@ header.cabecera .enlace-menu:hover {
     align-items: center;
     gap: 0.8rem;
     padding: 0.9rem 1.1rem;
-    background: #fff;
+    background: var(--superficie);
     border: 1px solid var(--borde);
     border-radius: 6px;
     color: inherit;
@@ -726,31 +824,31 @@ header.cabecera .enlace-menu:hover {
 a.menu-tarjeta, .menu-panel {
     color: inherit;
     text-decoration: none;
-    background: linear-gradient(180deg, #fff 0%, #f5f7f9 100%);
-    border-color: #d3d9e0;
+    background: linear-gradient(180deg, var(--superficie) 0%, var(--superficie-fin) 100%);
+    border-color: var(--borde-tarjeta);
     box-shadow:
-        inset 0 1px 0 #fff,
-        0 1px 2px rgba(28, 39, 51, 0.07),
-        0 4px 12px -4px rgba(28, 39, 51, 0.18);
+        inset 0 1px 0 var(--brillo),
+        0 1px 2px rgba(var(--sombra-rgb), 0.07),
+        0 4px 12px -4px rgba(var(--sombra-rgb), 0.18);
     transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.12s ease;
 }
 
 a.menu-tarjeta:hover, .menu-panel:hover {
     transform: translateY(-1px);
-    border-color: #b8c1cb;
+    border-color: var(--borde-tarjeta-fuerte);
     box-shadow:
-        inset 0 1px 0 #fff,
-        0 2px 4px rgba(28, 39, 51, 0.08),
-        0 12px 26px -10px rgba(28, 39, 51, 0.30);
+        inset 0 1px 0 var(--brillo),
+        0 2px 4px rgba(var(--sombra-rgb), 0.08),
+        0 12px 26px -10px rgba(var(--sombra-rgb), 0.30);
 }
 
 a.menu-tarjeta:active, .menu-panel:active {
     transform: translateY(1px);
-    border-color: #b8c1cb;
-    background: linear-gradient(180deg, #eef1f4 0%, #f7f9fa 100%);
+    border-color: var(--borde-tarjeta-fuerte);
+    background: linear-gradient(180deg, var(--pulsada-ini) 0%, var(--pulsada-fin) 100%);
     box-shadow:
-        inset 0 2px 6px rgba(28, 39, 51, 0.18),
-        0 0 0 rgba(28, 39, 51, 0);
+        inset 0 2px 6px rgba(var(--sombra-rgb), 0.18),
+        0 0 0 rgba(var(--sombra-rgb), 0);
 }
 
 a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
@@ -805,7 +903,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
 
 .form-tara input[type="number"] { width: 7rem; }
 
-.fecha-tara { color: #5a6673; font-size: 0.8rem; white-space: nowrap; }
+.fecha-tara { color: var(--texto-suave); font-size: 0.8rem; white-space: nowrap; }
 
 /* Colores y Pieles de Cliente: el código en negrita y, en una fila que aún no tiene
    descripción, la casilla resaltada, que es la que hay que rellenar. */
@@ -814,7 +912,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
     padding: 0.5rem 0.7rem;
     border: 1px solid var(--borde);
     border-radius: 4px;
-    background: #fff;
+    background: var(--campo);
     font: inherit;
     font-size: 1.05rem;
 }
@@ -838,7 +936,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
 .menu-ajustes {
     margin-top: 1.5rem;
     font-size: 0.9rem;
-    color: #5a6673;
+    color: var(--texto-suave);
 }
 
 /* --- Pantalla de temporadas guardadas -----------------------------------
@@ -947,7 +1045,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
 .titulo-entrega .fichero-entrega {
     font-size: 0.85rem;
     font-weight: 400;
-    color: #5a6673;
+    color: var(--texto-suave);
     margin-left: 0.5rem;
 }
 
@@ -993,7 +1091,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
     padding-top: 0.1rem;
     padding-bottom: 0.1rem;
     font-size: 0.8rem;
-    color: #5a6673;
+    color: var(--texto-suave);
 }
 
 /* Una referencia sin unidades por caja, y una fila que no esta en el pedido
@@ -1023,7 +1121,7 @@ tr.sin-pedido td { background: #fff8e1; }
     margin: 0.5rem 0 0.9rem;
 }
 
-.volver-taller { font-size: 0.9rem; color: #5a6673; margin-bottom: 0.8rem; }
+.volver-taller { font-size: 0.9rem; color: var(--texto-suave); margin-bottom: 0.8rem; }
 
 /* --- Avisos de etiquetas de caja (pantalla de resultados) ---------------
    El generador emite un aviso por caja y eso llenaba la tarjeta de frases
@@ -1071,6 +1169,13 @@ tr.sin-pedido td { background: #fff8e1; }
     display: inline-block;
     min-width: 5.5rem;
     opacity: 0.8;
+}
+
+/* En la conversión del excel de taller el bloque no tiene destinación
+   encima: la consecuencia va en la misma línea que el triángulo. */
+.resumen-aviso.en-linea {
+    display: inline;
+    margin-left: 0;
 }
 
 .detalle-avisos {
@@ -1132,3 +1237,106 @@ main.ancho-completo { max-width: 96rem; }
 .tabla-pieles tbody.fila-excluida td { background: #eceef0; color: #9aa3ab; }
 .tabla-pieles tbody.fila-excluida td:not(.c-incluir) > * { opacity: 0.55; }
 .acciones-corte { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+
+/* --- Estilo Puntotres ----------------------------------------------------
+   La paleta de la web de la marca, medida de sus capturas (no a ojo): fondo
+   crema #fdfcf8, áreas de texto beige #eee7dd, texto y botones marrón #482922
+   (el párrafo, un tono más suave, #5e423a) y la barra superior en el marrón
+   casi negro #1d0202 con su filete #47312f. Se activa con el interruptor del
+   menú, que pone data-tema en <html> (es el de partida, lo pone un script del
+   <head>); el estilo clásico, el de antes, es el de :root.
+   Los avisos, errores y la banda de colores de los palets conservan su color
+   a propósito: significan algo y no son de la marca. */
+html[data-tema="puntotres"] {
+    --tinta: #482922;
+    --borde: #d9cdbf;
+    --fondo-suave: #fdfcf8;
+    --acento: #482922;
+    --marca: #482922;
+    --gris-fuerte: #7a625a;
+    --superficie: #eee7dd;
+    --superficie-fin: #e7ded2;
+    --pulsada-ini: #e1d7c9;
+    --pulsada-fin: #ebe3d8;
+    --entrada: #f8f4ee;
+    --campo: #fdfcf8;
+    --brillo: #f6f1ea;
+    --borde-tarjeta: #ddd2c4;
+    --borde-tarjeta-fuerte: #c9bbab;
+    --texto-suave: #5e423a;
+    --texto-tenue: #8a746b;
+    --cabecera: #1d0202;
+    --cabecera-filete: #47312f;
+    --texto-cabecera: #fdfcf8;
+    --sombra-rgb: 72, 41, 34;
+    --acento-rgb: 72, 41, 34;
+    --acento-suave-ini: #e6dbcd;
+    --acento-suave-fin: #efe6da;
+}
+
+/* Con :where() estas reglas no suman especificidad: cualquier campo con su
+   propio fondo (la casilla amarilla de "sin descripción", por ejemplo) sigue
+   ganando. */
+:where(html[data-tema="puntotres"]) :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]) {
+    background: var(--campo);
+    color: var(--tinta);
+}
+
+:where(html[data-tema="puntotres"]) :where(.menu-lista, .menu-entrada) { color: var(--texto-suave); }
+
+/* Los enlaces de texto sueltos (no botones ni tarjetas) en el marrón de acción
+   y no en el azul del navegador. */
+html[data-tema="puntotres"] main a:not([class]) { color: var(--acento); }
+
+/* --- Interruptor de estilo, arriba a la derecha del menú ----------------- */
+header.cabecera .interruptor-tema {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0 0 0 auto;
+    padding: 0.2rem 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 500;
+    opacity: 0.85;
+    cursor: pointer;
+}
+
+header.cabecera .interruptor-tema:hover { opacity: 1; }
+
+header.cabecera .interruptor-tema:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+    border-radius: 999px;
+}
+
+.interruptor-pista {
+    position: relative;
+    width: 2.3rem;
+    height: 1.3rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.28);
+    transition: background 0.2s ease;
+}
+
+.interruptor-pista::after {
+    content: "";
+    position: absolute;
+    top: 0.15rem;
+    left: 0.15rem;
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s ease;
+}
+
+.interruptor-tema[aria-checked="true"] .interruptor-pista { background: #c9a98f; }
+.interruptor-tema[aria-checked="true"] .interruptor-pista::after { transform: translateX(1rem); }
+
+@media (prefers-reduced-motion: reduce) {
+    .interruptor-pista, .interruptor-pista::after { transition: none; }
+}

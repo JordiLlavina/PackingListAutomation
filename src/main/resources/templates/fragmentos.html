@@ -5,6 +5,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title th:text="|${titulo} · Packing Lists|">Packing Lists</title>
+    <!-- El estilo elegido en el menú (data-tema en <html>) se pone ANTES de pintar la
+         hoja de estilos: aplicarlo al cargar todo daría un destello del otro estilo
+         en cada pantalla. El estilo Puntotres es el de partida: solo se deja de aplicar
+         si en el menú se eligió expresamente el clásico (y sin localStorage, en
+         navegación privada, siempre sale el Puntotres). -->
+    <script>
+        var clasico = false;
+        try { clasico = localStorage.getItem("tema") === "clasico"; } catch (e) {}
+        if (!clasico) document.documentElement.setAttribute("data-tema", "puntotres");
+    </script>
     <link rel="stylesheet" th:href="@{/estilo.css}">
     <!-- Icono de la pestaña. Los dos PNG salen del logo de client-labels/img-web-icon.jpg:
          cuadrado añadiendo aire (el logo llega a los bordes y recortarlo le cortaría
@@ -25,6 +35,40 @@
         </a>
         <span th:text="${titulo}">título de la sección</span>
     </div>
+</header>
+<!-- La cabecera del menú: la de siempre más el interruptor de estilo arriba a la
+     derecha. Es otro fragmento y no un parámetro de `cabecera` porque Thymeleaf
+     exige pasar todos los parámetros declarados y habría que tocar las quince
+     pantallas que la usan. -->
+<header class="cabecera" th:fragment="cabeceraMenu(titulo)">
+    <div class="titulo">
+        <a th:href="@{/menu}" class="enlace-menu" title="Volver al menú"
+           aria-label="Volver al menú">
+            <img class="marca" th:src="@{/icono-web-180.png}" alt="" aria-hidden="true">
+        </a>
+        <span th:text="${titulo}">título de la sección</span>
+        <button type="button" class="interruptor-tema" id="interruptor-tema" role="switch"
+                aria-checked="false" title="Cambiar el estilo de la aplicación">
+            <span class="interruptor-etiqueta">Estilo Puntotres</span>
+            <span class="interruptor-pista" aria-hidden="true"></span>
+        </button>
+    </div>
+    <script>
+        (function () {
+            var boton = document.getElementById("interruptor-tema");
+            var raiz = document.documentElement;
+            function pintar() {
+                boton.setAttribute("aria-checked", raiz.getAttribute("data-tema") === "puntotres" ? "true" : "false");
+            }
+            boton.addEventListener("click", function () {
+                var puesto = raiz.getAttribute("data-tema") === "puntotres";
+                if (puesto) raiz.removeAttribute("data-tema"); else raiz.setAttribute("data-tema", "puntotres");
+                try { localStorage.setItem("tema", puesto ? "clasico" : "puntotres"); } catch (e) {}
+                pintar();
+            });
+            pintar();
+        })();
+    </script>
 </header>
 <!-- Piel de vaca extendida: el icono de los Documentos del Corte, en el menú
      y en sus resultados. Dibujado y no emoji, como los demás del menú. -->
