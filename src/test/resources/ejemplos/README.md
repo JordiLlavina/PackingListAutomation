@@ -84,3 +84,19 @@ corte: 430×430 px y 8 KB, sacado del repositorio de Openize.HEIC
 (`TestsData/samples/`, con la licencia de ese repo). **No es una foto de
 producto ni personal**, y así tiene que seguir: en el repo no entra ninguna foto
 real. Las demás imágenes de esos tests las dibuja `FotosDePrueba`.
+
+`taller/packing taller fez ejemplo.xlsx` y `taller/packing taller tanger ejemplos.xlsx`
+son packings de taller con **formato propio**, los que entran por "Excel Formato
+Taller" y Claude pasa al formato Puntotres (`ConversionFormatoTallerService`).
+El de Fez tiene cuatro hojas y el packing está en `LISTE DE COL`, con color y
+destinación mezclados en `DESIGNATION`; el de Tánger trae dos envíos, uno por
+hoja, con la destinación y el código juntos (`Korea 690`) y una tablita de cajas
+con defectos debajo. `ConversionFormatoTallerServiceTest` comprueba que el
+volcado a texto que viaja a Claude no se deja nada de eso.
+
+    cp "docs/Packing Lists/Packing List Excel Taller tests/packing taller fez ejemplo.xlsx" \
+       "src/test/resources/ejemplos/taller/packing taller fez ejemplo.xlsx"
+    cp "docs/Packing Lists/Packing List Excel Taller tests/packing taller tanger ejemplos.xlsx" \
+       "src/test/resources/ejemplos/taller/packing taller tanger ejemplos.xlsx"
+Medido en el de Tánger: las filas de la tablita de cajas «MAL» van con **fondo
+rojo**, que es lo que el volcado anota como `[fondo #FF0000]`.

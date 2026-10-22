@@ -24,6 +24,9 @@ public class EnvioForm {
 
     private static final String FORMATO_FECHA = "\\d{2}/\\d{2}/\\d{4}";
 
+    public static final String FORMATO_PUNTOTRES = "PUNTOTRES";
+    public static final String FORMATO_TALLER = "TALLER";
+
     /** Modo de entrada activo: JSON, CLAUDE o FORMULARIO. La pantalla de entrada
      * abre en CLAUDE ("CON IMAGEN"); este valor solo gobierna los envíos que
      * llegan sin el campo, que son texto pegado. */
@@ -50,6 +53,24 @@ public class EnvioForm {
      * cajas y su reparto en bultos se descartan y se regeneran.
      */
     private MultipartFile excelTaller;
+
+    /**
+     * En el modo TALLER, qué excel ha mandado el taller: PUNTOTRES (ya en el
+     * formato que lee el programa, va en {@code excelTaller}) o TALLER (con el
+     * formato propio del taller, va en {@code excelTallerOriginal} y Claude lo
+     * pasa a PUNTOTRES antes de digerirlo). Son dos campos de fichero y no uno
+     * para que el excel sin convertir no llegue nunca a la digestión.
+     */
+    private String formatoExcel = FORMATO_PUNTOTRES;
+
+    private MultipartFile excelTallerOriginal;
+
+    /**
+     * Qué hoja del excel con formato propio convertir, cuando el libro trae
+     * varios envíos y la primera conversión ha dejado otras fuera. Null = que
+     * elija el modelo.
+     */
+    private String hojaElegida;
 
     /**
      * Altura máxima de palet en cm, solo para clientes que no tienen norma
@@ -110,6 +131,21 @@ public class EnvioForm {
 
     public MultipartFile getExcelTaller() { return excelTaller; }
     public void setExcelTaller(MultipartFile excelTaller) { this.excelTaller = excelTaller; }
+
+    public String getFormatoExcel() { return formatoExcel; }
+    public void setFormatoExcel(String formatoExcel) { this.formatoExcel = formatoExcel; }
+
+    public MultipartFile getExcelTallerOriginal() { return excelTallerOriginal; }
+    public void setExcelTallerOriginal(MultipartFile excelTallerOriginal) {
+        this.excelTallerOriginal = excelTallerOriginal;
+    }
+
+    public String getHojaElegida() { return hojaElegida; }
+    public void setHojaElegida(String hojaElegida) {
+        this.hojaElegida = hojaElegida == null || hojaElegida.isBlank() ? null : hojaElegida;
+    }
+
+    public boolean esFormatoTaller() { return FORMATO_TALLER.equals(formatoExcel); }
 
     public Integer getAlturaMaximaPaletCm() { return alturaMaximaPaletCm; }
     public void setAlturaMaximaPaletCm(Integer alturaMaximaPaletCm) {

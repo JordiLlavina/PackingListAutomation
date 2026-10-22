@@ -1,16 +1,23 @@
 package com.puntotres.packinglist.web;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -19,8 +26,11 @@ import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.service.taller.ConversionFormatoTallerService;
 import com.puntotres.packinglist.service.taller.DigestionTaller;
+import com.puntotres.packinglist.service.taller.PedidoParaConversion;
 import com.puntotres.packinglist.service.taller.DigestionTallerService;
 import com.puntotres.packinglist.service.taller.FilaDigerida;
 import com.puntotres.packinglist.service.taller.GeneradorPackingTaller;
@@ -52,31 +62,40 @@ import jakarta.validation.Valid;
 @Controller
 public class PackingListTallerController {
 
+    private static final MediaType TIPO_XLSX = MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+
     private final DigestionTallerService digestionService;
+    private final ConversionFormatoTallerService conversionService;
     private final GeneradorPackingTaller generadorTaller;
     private final PreparacionRevisionService preparacion;
     private final ClientesProperties clientesProperties;
     private final CatalogoTaras catalogoTaras;
     private final ArchivoTemporadas archivoTemporadas;
+    private final TablaColores tablaColores;
     private final AtributosEntrada atributosEntrada;
     private final TallerEnCurso tallerEnCurso;
     private final EnvioEnCurso envioEnCurso;
 
     public PackingListTallerController(DigestionTallerService digestionService,
+                                       ConversionFormatoTallerService conversionService,
                                        GeneradorPackingTaller generadorTaller,
                                        PreparacionRevisionService preparacion,
                                        ClientesProperties clientesProperties,
                                        CatalogoTaras catalogoTaras,
                                        ArchivoTemporadas archivoTemporadas,
+                                       TablaColores tablaColores,
                                        AtributosEntrada atributosEntrada,
                                        TallerEnCurso tallerEnCurso,
                                        EnvioEnCurso envioEnCurso) {
         this.digestionService = digestionService;
+        this.conversionService = conversionService;
         this.generadorTaller = generadorTaller;
         this.preparacion = preparacion;
         this.clientesProperties = clientesProperties;
         this.catalogoTaras = catalogoTaras;
         this.archivoTemporadas = archivoTemporadas;
+        this.tablaColores = tablaColores;
         this.atributosEntrada = atributosEntrada;
         this.tallerEnCurso = tallerEnCurso;
         this.envioEnCurso = envioEnCurso;
@@ -93,15 +112,32 @@ public class PackingListTallerController {
                     "Cliente desconocido: " + envioForm.getCliente());
         }
 
-        // El excel del taller solo hace falta la primera vez: al elegir hoja a
-        // mano se reenvía el formulario y el fichero ya está en sesión.
-        byte[] excelTaller = bytesDe(envioForm.getExcelTaller());
-        if (excelTaller == null) {
-            excelTaller = tallerEnCurso.getExcelTaller();
-        }
-        if (excelTaller == null) {
-            errores.rejectValue("excelTaller", "excelTaller.obligatorio",
-                    "Sube el packing list que ha mandado el taller");
+        // Con "Excel Formato Taller" lo que se digiere es lo que ha devuelto
+        // la conversión, nunca el excel original del taller: ese no lo sabe
+        // leer el programa, y es justo lo que la conversión arregla.
+        byte[] excelTaller;
+        String nombreTaller;
+        if (envioForm.esFormatoTaller()) {
+            excelTaller = tallerEnCurso.getExcelConvertido();
+            nombreTaller = tallerEnCurso.getNombreExcelConvertido();
+            if (excelTaller == null) {
+                errores.rejectValue("excelTallerOriginal", "excelTallerOriginal.sinConvertir",
+                        "Sube el excel del taller y dale a \"Generar Formato con IA\" antes de "
+                                + "digerirlo");
+            }
+        } else {
+            // El excel del taller solo hace falta la primera vez: al elegir
+            // hoja a mano se reenvía el formulario y el fichero ya está en sesión.
+            excelTaller = bytesDe(envioForm.getExcelTaller());
+            nombreTaller = excelTaller == null ? null
+                    : envioForm.getExcelTaller().getOriginalFilename();
+            if (excelTaller == null) {
+                excelTaller = tallerEnCurso.getExcelTaller();
+            }
+            if (excelTaller == null) {
+                errores.rejectValue("excelTaller", "excelTaller.obligatorio",
+                        "Sube el packing list que ha mandado el taller");
+            }
         }
         if (errores.hasErrors()) {
             return volverALaEntrada(envioForm, model, null);
@@ -140,19 +176,133 @@ public class PackingListTallerController {
         } catch (TallerColisExcel.HojaNoEncontradaException e) {
             // Se guarda el fichero para que el usuario pueda elegir la hoja
             // sin volver a subirlo.
-            guardarFicheros(envioForm, excelTaller, excelPedido, nombrePedido);
+            guardarFicheros(excelTaller, nombreTaller, excelPedido, nombrePedido);
             return volverALaEntrada(envioForm, model, e.getMessage(), e.hojasEncontradas());
         } catch (TallerColisExcel.TallerExcelException | IOException e) {
             return volverALaEntrada(envioForm, model, e.getMessage());
         }
 
-        guardarFicheros(envioForm, excelTaller, excelPedido, nombrePedido);
+        guardarFicheros(excelTaller, nombreTaller, excelPedido, nombrePedido);
         tallerEnCurso.setClaveCliente(envioForm.getCliente());
         tallerEnCurso.setCabecera(cabeceraDe(envioForm));
         tallerEnCurso.setAlturaMaximaPaletCm(envioForm.getAlturaMaximaPaletCm());
         tallerEnCurso.setDigestion(digestion);
 
         return pintarAjuste(model, null);
+    }
+
+    // --- Paso 1a bis: un excel de taller con formato propio ---
+
+    /**
+     * "Generar Formato con IA": pasa el excel de un taller con formato propio
+     * al formato Puntotres con Claude, lo guarda en la sesión y contesta en
+     * JSON, sin recargar: la pantalla de entrada sigue siendo la misma etapa,
+     * y lo único que cambia en ella es que aparece la descarga y se enciende
+     * "Digerir Datos Taller".
+     *
+     * El excel de pedido, si lo hay, viaja como catálogo para que la
+     * conversión escriba referencias, colores y códigos como el cliente.
+     */
+    @PostMapping(value = "/packing-list/taller/convertir", produces = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> convertir(@ModelAttribute EnvioForm envioForm) {
+        ClienteConfig cliente = clientesProperties.clientePara(envioForm.getCliente()).orElse(null);
+        if (cliente == null) {
+            return error("Elige primero el cliente: la conversión depende de cómo escribe "
+                    + "cada cliente sus referencias y destinaciones");
+        }
+        byte[] original = bytesDe(envioForm.getExcelTallerOriginal());
+        if (original == null) {
+            return error("Sube el excel que ha mandado el taller");
+        }
+        // Una conversión vieja no puede quedarse a mano mientras se hace la
+        // nueva: si esta falla, digerir no debe encontrar la anterior.
+        tallerEnCurso.setExcelConvertido(null, null);
+
+        byte[] excelPedido = bytesDe(envioForm.getPedidoCliente());
+        if (excelPedido == null) {
+            excelPedido = archivoTemporadas
+                    .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                    .map(TemporadaGuardada::getExcel)
+                    .orElse(null);
+        }
+        // La tabla de colores del cliente (Colores y Pieles) es lo que permite
+        // pasar "Negro" a LZZ; sin ella el pedido de APC no dice nombres.
+        Map<String, String> coloresCliente = new LinkedHashMap<>();
+        tablaColores.de(envioForm.getCliente())
+                .forEach(color -> coloresCliente.put(color.getCodigo(), color.getDescripcion()));
+        PedidoParaConversion pedido = PedidoParaConversion.cargar(cliente.getPlantilla(),
+                excelPedido, coloresCliente, cliente);
+
+        String nombreOriginal = envioForm.getExcelTallerOriginal().getOriginalFilename();
+        ConversionFormatoTallerService.Resultado resultado;
+        try {
+            resultado = conversionService.convertir(original, nombreOriginal,
+                    envioForm.getCliente(), pedido, envioForm.getHojaElegida());
+        } catch (ConversionFormatoTallerService.ConversionException e) {
+            return error(e.getMessage());
+        }
+
+        String nombre = nombreConvertido(nombreOriginal, resultado.packing().hoja(),
+                resultado.packing().hojasNoConvertidas().isEmpty()
+                        && envioForm.getHojaElegida() == null);
+        tallerEnCurso.setExcelConvertido(resultado.excel(), nombre);
+
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("ok", true);
+        respuesta.put("nombreFichero", nombre);
+        respuesta.put("hoja", resultado.packing().hoja());
+        respuesta.put("hojasNoConvertidas", resultado.packing().hojasNoConvertidas());
+        respuesta.put("filas", resultado.packing().filas().size());
+        respuesta.put("notas", resultado.packing().notas().size());
+        // Los avisos como los pinta la pantalla: los del fichero sueltos, los
+        // de fila plegados por consecuencia, y de lo completado solo el recuento.
+        AgrupadorAvisosConversion.Vista avisos = AgrupadorAvisosConversion.agrupar(resultado.packing());
+        respuesta.put("avisos", avisos.generales());
+        respuesta.put("bloques", avisos.bloques());
+        respuesta.put("completados", avisos.completados());
+        respuesta.put("tokens", Map.of("entrada", resultado.uso().tokensEntrada(),
+                "salida", resultado.uso().tokensSalida()));
+        return ResponseEntity.ok(respuesta);
+    }
+
+    /** La descarga del excel convertido: el botón de la impresora de la entrada. */
+    @GetMapping("/packing-list/taller/formato-puntotres")
+    public ResponseEntity<byte[]> descargarConvertido() {
+        if (tallerEnCurso.getExcelConvertido() == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .contentType(TIPO_XLSX)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(tallerEnCurso.getNombreExcelConvertido(), StandardCharsets.UTF_8)
+                        .build().toString())
+                .body(tallerEnCurso.getExcelConvertido());
+    }
+
+    /**
+     * "Packing Fez.xlsx" → "Packing Fez - Formato Puntotres.xlsx". Cuando el
+     * libro tenía varios envíos, el nombre lleva la hoja convertida para que
+     * dos descargas del mismo fichero no se confundan.
+     */
+    static String nombreConvertido(String nombreOriginal, String hoja, boolean hojaUnica) {
+        String base = nombreOriginal == null || nombreOriginal.isBlank()
+                ? "Packing taller" : nombreOriginal.trim();
+        int punto = base.lastIndexOf('.');
+        if (punto > 0) {
+            base = base.substring(0, punto);
+        }
+        if (!hojaUnica && hoja != null && !hoja.isBlank()) {
+            base += " (" + hoja.replaceAll("[\\\\/:*?\"<>|]", "-").trim() + ")";
+        }
+        return base + " - Formato Puntotres.xlsx";
+    }
+
+    private static ResponseEntity<Map<String, Object>> error(String mensaje) {
+        Map<String, Object> respuesta = new LinkedHashMap<>();
+        respuesta.put("ok", false);
+        respuesta.put("error", mensaje);
+        return ResponseEntity.badRequest().body(respuesta);
     }
 
     // --- Paso 1b: ajuste ---
@@ -329,11 +479,14 @@ public class PackingListTallerController {
         return tamanos;
     }
 
-    private void guardarFicheros(EnvioForm envioForm, byte[] excelTaller, byte[] excelPedido,
+    /**
+     * @param nombreTaller el nombre del excel que se acaba de subir o de
+     *                     convertir; null si es el que ya estaba en sesión.
+     */
+    private void guardarFicheros(byte[] excelTaller, String nombreTaller, byte[] excelPedido,
                                  String nombrePedido) {
-        if (envioForm.getExcelTaller() != null && !envioForm.getExcelTaller().isEmpty()) {
-            tallerEnCurso.setExcelTaller(excelTaller,
-                    envioForm.getExcelTaller().getOriginalFilename());
+        if (nombreTaller != null) {
+            tallerEnCurso.setExcelTaller(excelTaller, nombreTaller);
         } else if (tallerEnCurso.getExcelTaller() == null) {
             tallerEnCurso.setExcelTaller(excelTaller, "packing del taller");
         }
@@ -356,6 +509,12 @@ public class PackingListTallerController {
         }
         if (!hojas.isEmpty()) {
             model.addAttribute("hojasDelTaller", hojas);
+        }
+        // Al volver con un error (una fecha que falta, por ejemplo) la
+        // conversión ya hecha sigue valiendo: se enseña su descarga y digerir
+        // sigue encendido, en vez de obligar a esperar otra vez a Claude.
+        if (envioForm.esFormatoTaller() && tallerEnCurso.getExcelConvertido() != null) {
+            model.addAttribute("excelConvertido", tallerEnCurso.getNombreExcelConvertido());
         }
         anadirAtributosDeClientes(model);
         return "entrada";

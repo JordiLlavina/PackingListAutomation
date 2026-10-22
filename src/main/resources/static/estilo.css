@@ -156,6 +156,10 @@ textarea.json {
 
 .aviso-procesando { color: var(--texto-suave); font-size: 1.45rem; font-weight: bold; margin: 0.5rem 0; }
 
+/* El de la conversión del excel de taller va dentro de una tarjeta y a
+   1.45rem partía en dos líneas: más pequeño para que quepa en una. */
+.aviso-procesando.compacto { font-size: 1.05rem; }
+
 /* --- Selector del modo de entrada (JSON / CLAUDE / FORMULARIO) --- */
 
 .selector-modo {

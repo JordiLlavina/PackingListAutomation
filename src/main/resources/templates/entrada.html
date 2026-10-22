@@ -20,7 +20,8 @@
     <form id="formEntrada" th:action="@{/importar}" th:object="${envioForm}"
           method="post" enctype="multipart/form-data"
           th:data-accion-importar="@{/importar}"
-          th:data-accion-taller="@{/packing-list/taller/digerir}">
+          th:data-accion-taller="@{/packing-list/taller/digerir}"
+          th:data-accion-convertir="@{/packing-list/taller/convertir}">
         <input type="hidden" id="modo" th:field="*{modo}">
 
       <div class="tarjeta isla-pedido">
@@ -69,6 +70,37 @@
         </div>
       </div>
 
+        <!-- Solo en el modo TALLER: qué excel ha mandado el taller. Con el
+             formato Puntotres se digiere tal cual; con el suyo propio, Claude
+             lo pasa antes al formato Puntotres. Todo pasa en esta misma
+             pantalla: la tarjeta de debajo cambia, pero la etapa es la misma. -->
+        <input type="hidden" id="formatoExcel" th:field="*{formatoExcel}">
+        <div id="selectorFormato" class="selector-formato" style="display: none">
+            <button type="button" class="boton-formato" data-formato="PUNTOTRES">
+                <svg class="boton-formato-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3.5" y="4" width="17" height="16" rx="1.5"/>
+                    <path d="M3.5 9h17M3.5 14.5h17M9.5 4v16"/>
+                </svg>
+                <span>
+                    <span class="boton-formato-titulo">Excel Formato Puntotres</span>
+                    <span class="boton-formato-detalle">El packing ya viene en nuestro formato</span>
+                </span>
+            </button>
+            <button type="button" class="boton-formato" data-formato="TALLER">
+                <svg class="boton-formato-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3.5" y="4" width="17" height="16" rx="1.5"/>
+                    <path d="M3.5 9h17M8 13h8M8 16.5h5"/>
+                    <path d="m17.5 1.5.5 1.3 1.3.5-1.3.5-.5 1.3-.5-1.3-1.3-.5 1.3-.5z"/>
+                </svg>
+                <span>
+                    <span class="boton-formato-titulo">Excel Formato Taller</span>
+                    <span class="boton-formato-detalle">Cada taller con el suyo: la IA lo pasa al nuestro</span>
+                </span>
+            </button>
+        </div>
+
       <div class="tarjeta isla-envio">
         <div id="bloqueJson">
             <label for="json">JSON del envío</label>
@@ -86,6 +118,7 @@
         </div>
 
         <div id="bloqueTaller" style="display: none">
+          <div id="bloqueFormatoPuntotres">
             <label for="excelTaller">Packing list del taller</label>
             <p class="ayuda">
                 Se aprovecha su información de artículo —cliente, motivo, referencia, color, talla y
@@ -104,6 +137,42 @@
                             th:value="${hoja}" th:text="${hoja}"></option>
                 </select>
             </div>
+          </div>
+
+          <!-- Excel con el formato propio del taller: va en otro campo de
+               fichero (excelTallerOriginal) para que nunca llegue a la
+               digestión sin convertir. La conversión es un fetch: la página no
+               se recarga y lo tecleado en el resto del formulario se queda. -->
+          <div id="bloqueFormatoTaller" style="display: none">
+            <label for="excelTallerOriginal">Packing list del taller, en su formato</label>
+            <p class="ayuda">
+                La IA lo pasa al formato Puntotres. Lo que el taller apunta fuera de la tabla
+                —cajas con defectos, bolsas o etiquetas que faltan— se copia debajo de la tabla
+                para que no se pierda, pero <strong>no cuenta para el packing</strong>.
+            </p>
+            <input type="file" id="excelTallerOriginal" name="excelTallerOriginal"
+                   accept=".xlsx,.xlsm,.xls">
+            <p class="error-campo" th:errors="*{excelTallerOriginal}"></p>
+            <div class="acciones-conversion">
+                <button type="button" id="botonConvertir">Generar Formato con IA</button>
+                <a id="descargaConvertido" class="boton gris" style="display: none"
+                   th:href="@{/packing-list/taller/formato-puntotres}"
+                   title="Descarga el packing del taller ya pasado al formato Puntotres"><span
+                        class="icono">🖨️</span> Packing de Taller Formato Puntotres</a>
+            </div>
+            <p id="esperaConversion" class="aviso-procesando compacto" style="display: none">
+                Generando el Excel en formato Puntotres con la IA... tarda un par de minutos,
+                no cierres ni recargues la página.
+            </p>
+            <div id="resultadoConversion"></div>
+            <!-- Un libro con varios envíos (uno por hoja): la primera conversión
+                 deja las otras hojas fuera y aquí se puede pedir una de ellas. -->
+            <div id="bloqueOtrasHojas" class="campo-en-linea" style="display: none">
+                <label for="hojaElegida">El libro tiene otros packings:</label>
+                <select id="hojaElegida" name="hojaElegida"></select>
+                <button type="button" id="botonConvertirHoja" class="secundario">Convertir esta hoja</button>
+            </div>
+          </div>
 
             <div id="bloqueAlturaPalet">
                 <label for="alturaMaximaPaletCm">Altura máxima de palet (cm)</label>
@@ -175,6 +244,7 @@
       </section>
 
         <button type="submit" id="botonImportar">Importar y revisar</button>
+        <span id="motivoBotonApagado" class="motivo-boton-apagado"></span>
     </form>
     <p id="avisoProcesando" class="aviso-procesando" style="display: none">
         Procesando... con la IA tarda varios minutos (un PDF de 8 hojas, unos 4-5),
@@ -185,6 +255,12 @@
         /*<![CDATA[*/
         const CLIENTES = /*[[${clientesJs}]]*/ {};
         const TEMPORADAS = /*[[${temporadasJs}]]*/ {};
+        // Nombre del excel ya convertido al volver de un error de digerir:
+        // la conversión sigue valiendo y no hay que esperar a Claude otra vez.
+        let convertido = /*[[${excelConvertido}]]*/ null;
+        // Al volver para elegir la hoja a mano, el excel Puntotres ya está en
+        // la sesión aunque el campo de fichero llegue vacío.
+        const EXCEL_TALLER_EN_SESION = /*[[${hojasDelTaller != null}]]*/ false;
         /*]]>*/
 
         const AYUDA_PEDIDO_SUELTO = 'Opcional. En AMI y APC se usa para completar el número de '
@@ -299,7 +375,12 @@
             }
         }
 
-        document.getElementById('cliente').addEventListener('change', actualizarCamposCliente);
+        document.getElementById('cliente').addEventListener('change', function () {
+            // La conversión depende del cliente (sus referencias, su catálogo):
+            // la de otro cliente ya no vale.
+            olvidarConversion();
+            actualizarCamposCliente();
+        });
         document.getElementById('temporadaGuardada')
             .addEventListener('change', aplicarTemporadaGuardada);
         actualizarCamposCliente();
@@ -311,6 +392,7 @@
             document.getElementById('bloqueJson').style.display = modo === 'JSON' ? '' : 'none';
             document.getElementById('bloqueClaude').style.display = modo === 'CLAUDE' ? '' : 'none';
             document.getElementById('bloqueTaller').style.display = modo === 'TALLER' ? '' : 'none';
+            document.getElementById('selectorFormato').style.display = modo === 'TALLER' ? '' : 'none';
             document.querySelectorAll('.selector-modo button').forEach(function (boton) {
                 boton.classList.toggle('activo', boton.dataset.modo === modo);
             });
@@ -326,6 +408,213 @@
                     : modo === 'TALLER' ? 'Digerir Datos Taller'
                     : 'Importar y revisar';
             actualizarCamposCliente();
+            actualizarBotones();
+        }
+
+        // --- Formato del excel del taller (PUNTOTRES / TALLER) ---
+
+        let convirtiendo = false;
+
+        function formatoElegido() {
+            return document.getElementById('formatoExcel').value || 'PUNTOTRES';
+        }
+
+        function seleccionarFormato(formato) {
+            document.getElementById('formatoExcel').value = formato;
+            document.getElementById('bloqueFormatoPuntotres').style.display =
+                formato === 'PUNTOTRES' ? '' : 'none';
+            document.getElementById('bloqueFormatoTaller').style.display =
+                formato === 'TALLER' ? '' : 'none';
+            document.querySelectorAll('.selector-formato .boton-formato').forEach(function (boton) {
+                const activo = boton.dataset.formato === formato;
+                boton.classList.toggle('activo', activo);
+                boton.setAttribute('aria-pressed', activo ? 'true' : 'false');
+            });
+            actualizarBotones();
+        }
+
+        // "Digerir Datos Taller" se apaga, y dice por qué, mientras no haya
+        // nada que digerir: sin excel Puntotres subido, o con el formato del
+        // taller sin convertir todavía o mientras Claude está en ello.
+        function motivoParaNoDigerir() {
+            if (document.getElementById('modo').value !== 'TALLER') {
+                return null;
+            }
+            if (formatoElegido() === 'TALLER') {
+                if (convirtiendo) {
+                    return 'Esperando a que la IA termine de generar el formato Puntotres';
+                }
+                return convertido ? null : 'Primero genera el formato Puntotres con IA';
+            }
+            const subido = document.getElementById('excelTaller').files.length > 0;
+            return subido || EXCEL_TALLER_EN_SESION ? null
+                : 'Sube primero el packing list del taller en formato Puntotres';
+        }
+
+        function actualizarBotones() {
+            const boton = document.getElementById('botonImportar');
+            const motivo = motivoParaNoDigerir();
+            boton.disabled = motivo !== null;
+            boton.title = motivo || '';
+            document.getElementById('motivoBotonApagado').textContent = motivo || '';
+
+            const convertir = document.getElementById('botonConvertir');
+            convertir.disabled = convirtiendo
+                || !document.getElementById('cliente').value
+                || document.getElementById('excelTallerOriginal').files.length === 0;
+            convertir.title = !document.getElementById('cliente').value
+                ? 'Elige primero el cliente' : '';
+            document.getElementById('botonConvertirHoja').disabled = convirtiendo;
+            document.getElementById('descargaConvertido').style.display =
+                convertido && !convirtiendo ? '' : 'none';
+        }
+
+        // Una conversión deja de valer en cuanto cambia lo que se convirtió.
+        function olvidarConversion() {
+            if (convirtiendo) {
+                return;
+            }
+            convertido = null;
+            document.getElementById('resultadoConversion').innerHTML = '';
+            document.getElementById('bloqueOtrasHojas').style.display = 'none';
+            actualizarBotones();
+        }
+
+        function alerta(clase, texto) {
+            const div = document.createElement('div');
+            div.className = 'alerta ' + clase;
+            div.textContent = texto;
+            return div;
+        }
+
+        function pintarConversion(datos) {
+            const caja = document.getElementById('resultadoConversion');
+            caja.innerHTML = '';
+            const otras = document.getElementById('bloqueOtrasHojas');
+            otras.style.display = 'none';
+            if (!datos.ok) {
+                caja.appendChild(alerta('error', datos.error));
+                return;
+            }
+            // Solo qué mirar: los recuentos (líneas, notas, datos completados)
+            // sobraban; están en el excel.
+            caja.appendChild(alerta('ok', 'Las filas que hay que revisar van en amarillo y '
+                + 'con un comentario añadido en las celdas. Descárgalo y revísalo.'));
+            (datos.avisos || []).forEach(function (aviso) {
+                caja.appendChild(alerta('', aviso));
+            });
+            // Los avisos de fila, plegados por consecuencia como los de las
+            // etiquetas de caja: a la vista el recuento y lo que pasa, y el
+            // hecho de cada fila dentro.
+            const bloques = datos.bloques || [];
+            if (bloques.length > 0) {
+                const contenedor = document.createElement('div');
+                contenedor.className = 'avisos-etiquetas';
+                bloques.forEach(function (bloque) {
+                    const detalle = document.createElement('details');
+                    detalle.className = 'bloque-avisos';
+                    const titulo = document.createElement('summary');
+                    const resumenAviso = document.createElement('span');
+                    resumenAviso.className = 'resumen-aviso en-linea';
+                    const recuento = document.createElement('span');
+                    recuento.className = 'recuento';
+                    recuento.textContent = bloque.recuento;
+                    const consecuencia = document.createElement('strong');
+                    consecuencia.textContent = bloque.consecuencia;
+                    resumenAviso.appendChild(recuento);
+                    resumenAviso.appendChild(consecuencia);
+                    titulo.appendChild(resumenAviso);
+                    detalle.appendChild(titulo);
+                    const cuerpo = document.createElement('div');
+                    cuerpo.className = 'detalle-avisos';
+                    bloque.filas.forEach(function (linea) {
+                        const p = document.createElement('p');
+                        p.className = 'linea-detalle';
+                        const rotulo = document.createElement('span');
+                        rotulo.className = 'rotulo-caja';
+                        rotulo.textContent = linea.rotulo;
+                        p.appendChild(rotulo);
+                        p.appendChild(document.createTextNode(linea.texto));
+                        cuerpo.appendChild(p);
+                    });
+                    detalle.appendChild(cuerpo);
+                    contenedor.appendChild(detalle);
+                });
+                caja.appendChild(contenedor);
+            }
+            const hojas = datos.hojasNoConvertidas || [];
+            if (hojas.length > 0) {
+                const select = document.getElementById('hojaElegida');
+                select.innerHTML = '';
+                hojas.forEach(function (hoja) {
+                    const opcion = document.createElement('option');
+                    opcion.value = hoja;
+                    opcion.textContent = hoja;
+                    select.appendChild(opcion);
+                });
+                otras.style.display = '';
+            }
+        }
+
+        function convertir(hojaElegida) {
+            const form = document.getElementById('formEntrada');
+            const datos = new FormData(form);
+            // Solo viaja lo que hace falta convertir: ni el excel Puntotres
+            // ni las imágenes de los otros modos.
+            datos.delete('excelTaller');
+            datos.delete('imagenes');
+            datos.delete('hojaElegida');
+            if (hojaElegida) {
+                datos.append('hojaElegida', hojaElegida);
+            }
+
+            convirtiendo = true;
+            convertido = null;
+            const boton = document.getElementById('botonConvertir');
+            boton.textContent = 'Generando...';
+            document.getElementById('resultadoConversion').innerHTML = '';
+            document.getElementById('esperaConversion').style.display = '';
+            actualizarBotones();
+
+            fetch(form.dataset.accionConvertir, {method: 'POST', body: datos})
+                .then(function (respuesta) {
+                    return respuesta.json().catch(function () {
+                        return {ok: false, error: 'El servidor ha contestado algo que no se '
+                                + 'entiende (código ' + respuesta.status + ')'};
+                    });
+                })
+                .catch(function (error) {
+                    return {ok: false, error: 'No se ha podido hablar con el servidor: '
+                            + error.message};
+                })
+                .then(function (resultado) {
+                    convirtiendo = false;
+                    convertido = resultado.ok ? resultado.nombreFichero : null;
+                    boton.textContent = 'Generar Formato con IA';
+                    document.getElementById('esperaConversion').style.display = 'none';
+                    pintarConversion(resultado);
+                    actualizarBotones();
+                });
+        }
+
+        document.getElementById('botonConvertir').addEventListener('click', function () {
+            convertir(null);
+        });
+        document.getElementById('botonConvertirHoja').addEventListener('click', function () {
+            convertir(document.getElementById('hojaElegida').value);
+        });
+
+        document.querySelectorAll('.selector-formato .boton-formato').forEach(function (boton) {
+            boton.addEventListener('click', function () {
+                seleccionarFormato(boton.dataset.formato);
+            });
+        });
+        document.getElementById('excelTaller').addEventListener('change', actualizarBotones);
+        document.getElementById('excelTallerOriginal').addEventListener('change', olvidarConversion);
+        seleccionarFormato(formatoElegido());
+        if (convertido) {
+            document.getElementById('resultadoConversion').appendChild(alerta('ok',
+                'Formato Puntotres ya generado: ' + convertido));
         }
 
         document.querySelectorAll('.selector-modo button:not([disabled])')
@@ -341,7 +630,19 @@
         // El envío en modo CLAUDE llama a la API y tarda varios minutos
         // (medido: 4-5 con un PDF de 8 hojas manuscritas); sin esto la
         // página se queda igual y parece colgada.
-        document.getElementById('formEntrada').addEventListener('submit', function () {
+        document.getElementById('formEntrada').addEventListener('submit', function (evento) {
+            // Enter en un campo envía el formulario aunque el botón esté
+            // apagado: se para aquí con la misma regla.
+            if (motivoParaNoDigerir() !== null) {
+                evento.preventDefault();
+                return;
+            }
+            // El fichero del otro formato no viaja: un campo desactivado no
+            // se envía, y la página se va a recargar de todas formas.
+            if (document.getElementById('modo').value === 'TALLER') {
+                document.getElementById(formatoElegido() === 'TALLER'
+                    ? 'excelTaller' : 'excelTallerOriginal').disabled = true;
+            }
             const boton = document.getElementById('botonImportar');
             boton.disabled = true;
             boton.textContent = 'Procesando...';

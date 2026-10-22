@@ -32,11 +32,23 @@ public class TallerEnCurso {
     private Integer alturaMaximaPaletCm;
     private DigestionTaller digestion;
 
+    /**
+     * El excel de un taller con formato propio ya pasado al formato Puntotres
+     * por Claude ("Excel Formato Taller"). Va aparte del {@code excelTaller}
+     * porque todavía no es el de la entrega: solo lo es cuando se le da a
+     * digerir con ese formato elegido. Mezclarlos haría que un "Formato
+     * Puntotres" sin fichero digiriera en silencio una conversión anterior.
+     */
+    private byte[] excelConvertido;
+    private String nombreExcelConvertido;
+
     public boolean estaVacio() {
         return digestion == null;
     }
 
     public void reiniciar() {
+        excelConvertido = null;
+        nombreExcelConvertido = null;
         claveCliente = null;
         cabecera = null;
         excelTaller = null;
@@ -59,6 +71,14 @@ public class TallerEnCurso {
     public void setExcelTaller(byte[] contenido, String nombre) {
         this.excelTaller = contenido;
         this.nombreExcelTaller = nombre;
+    }
+
+    public byte[] getExcelConvertido() { return excelConvertido; }
+    public String getNombreExcelConvertido() { return nombreExcelConvertido; }
+
+    public void setExcelConvertido(byte[] contenido, String nombre) {
+        this.excelConvertido = contenido;
+        this.nombreExcelConvertido = nombre;
     }
 
     public byte[] getExcelPedido() { return excelPedido; }
