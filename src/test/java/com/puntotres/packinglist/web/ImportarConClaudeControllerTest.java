@@ -83,7 +83,7 @@ class ImportarConClaudeControllerTest {
         // La revisión avisa de que los datos vienen de Claude.
         mvc.perform(get("/revision").session(sesion))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Datos extraídos por Claude")));
+                .andExpect(content().string(containsString("Datos extraídos por la IA")));
     }
 
     /**
@@ -145,7 +145,7 @@ class ImportarConClaudeControllerTest {
     void siLaExtraccionFallaSeVuelveALaEntradaConElMensaje() throws Exception {
         when(extractorClaude.extraer(anyList(), any(), any())).thenThrow(
                 new ClaudeEnvioExtractionService.ExtraccionException(
-                        "Falta configurar la clave de la API de Claude"));
+                        "Falta configurar la clave del servicio de IA"));
 
         mvc.perform(multipart("/importar").file(imagenDePrueba())
                         .param("modo", "CLAUDE")
@@ -157,7 +157,7 @@ class ImportarConClaudeControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("entrada"))
                 .andExpect(content().string(containsString(
-                        "No se pudo extraer el packing list con Claude")));
+                        "No se pudo extraer el packing list con la IA")));
     }
 
     @Test

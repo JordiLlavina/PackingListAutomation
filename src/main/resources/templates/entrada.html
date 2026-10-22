@@ -177,7 +177,7 @@
         <button type="submit" id="botonImportar">Importar y revisar</button>
     </form>
     <p id="avisoProcesando" class="aviso-procesando" style="display: none">
-        Procesando... con Claude tarda varios minutos (un PDF de 8 hojas, unos 4-5),
+        Procesando... con la IA tarda varios minutos (un PDF de 8 hojas, unos 4-5),
         no cierres ni recargues la página.
     </p>
 
@@ -322,7 +322,7 @@
                 ? form.dataset.accionTaller
                 : form.dataset.accionImportar;
             document.getElementById('botonImportar').textContent =
-                modo === 'CLAUDE' ? 'Extraer con Claude y revisar'
+                modo === 'CLAUDE' ? 'Extraer con la IA y revisar'
                     : modo === 'TALLER' ? 'Digerir Datos Taller'
                     : 'Importar y revisar';
             actualizarCamposCliente();

@@ -423,19 +423,19 @@ public class ClaudeEnvioExtractionService {
         try {
             respuesta = acumular(peticionPara(adjuntos, plantilla, catalogoPedido));
         } catch (AnthropicServiceException e) {
-            throw new ExtraccionException("La API de Claude ha devuelto un error: "
+            throw new ExtraccionException("El servicio de IA ha devuelto un error: "
                     + e.getMessage(), e);
         } catch (AnthropicIoException e) {
-            throw new ExtraccionException("No se pudo conectar con la API de Claude: "
+            throw new ExtraccionException("No se pudo conectar con el servicio de IA: "
                     + e.getMessage(), e);
         }
 
         StopReason motivoParada = respuesta.stopReason().orElse(null);
         if (StopReason.REFUSAL.equals(motivoParada)) {
-            throw new ExtraccionException("Claude ha rechazado procesar los documentos");
+            throw new ExtraccionException("La IA ha rechazado procesar los documentos");
         }
         if (StopReason.MAX_TOKENS.equals(motivoParada)) {
-            throw new ExtraccionException("La respuesta de Claude se ha cortado por longitud "
+            throw new ExtraccionException("La respuesta de la IA se ha cortado por longitud "
                     + "aun con el presupuesto ampliado: parte el envío en menos hojas "
                     + "(por ejemplo, una destinación cada vez) y pega los JSON a mano");
         }
@@ -543,7 +543,7 @@ public class ClaudeEnvioExtractionService {
                             .timeout(TIEMPO_MAXIMO)
                             .build();
                 } catch (RuntimeException e) {
-                    throw new ExtraccionException("Falta configurar la clave de la API de Claude "
+                    throw new ExtraccionException("Falta configurar la clave del servicio de IA "
                             + "(variable de entorno ANTHROPIC_API_KEY)", e);
                 }
             }
@@ -581,13 +581,13 @@ public class ClaudeEnvioExtractionService {
         int inicio = texto.indexOf('{');
         int fin = texto.lastIndexOf('}');
         if (inicio < 0 || fin <= inicio) {
-            throw new ExtraccionException("La respuesta de Claude no contiene un JSON");
+            throw new ExtraccionException("La respuesta de la IA no contiene un JSON");
         }
         String json = normalizarApostrofoDecimal(texto.substring(inicio, fin + 1));
         try {
             return mapper.readValue(json, EnvioInput.class);
         } catch (JsonProcessingException e) {
-            throw new ExtraccionException("El JSON devuelto por Claude no es válido: "
+            throw new ExtraccionException("El JSON devuelto por la IA no es válido: "
                     + e.getOriginalMessage(), e);
         }
     }

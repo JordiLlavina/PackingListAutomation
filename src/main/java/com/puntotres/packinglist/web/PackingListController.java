@@ -207,7 +207,7 @@ public class PackingListController {
                         cliente.getPlantilla(), catalogo.texto());
             } catch (ClaudeEnvioExtractionService.ExtraccionException | IOException e) {
                 model.addAttribute("errorJson",
-                        "No se pudo extraer el packing list con Claude: " + e.getMessage());
+                        "No se pudo extraer el packing list con la IA: " + e.getMessage());
                 anadirAtributosDeClientes(model);
                 return "entrada";
             }
@@ -222,7 +222,7 @@ public class PackingListController {
         }
         if (envio.getDestinos() == null || envio.getDestinos().isEmpty()) {
             model.addAttribute("errorJson", modoClaude
-                    ? "Claude no ha encontrado ninguna destinación en los documentos"
+                    ? "La IA no ha encontrado ninguna destinación en los documentos"
                     : "El JSON no contiene ninguna destinación ('destinos')");
             anadirAtributosDeClientes(model);
             return "entrada";
@@ -270,7 +270,7 @@ public class PackingListController {
         avisosPrevios.addAll(pedido.avisos());
         avisosPrevios.addAll(catalogo.avisos());
         if (modoClaude) {
-            avisosPrevios.add(0, "Datos extraídos por Claude a partir de "
+            avisosPrevios.add(0, "Datos extraídos por la IA a partir de "
                     + imagenesDe(envioForm).size() + " documento(s)"
                     + (catalogo.estaVacio() ? ""
                             : ", con el pedido de la temporada delante para contrastar "

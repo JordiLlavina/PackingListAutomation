@@ -159,11 +159,11 @@ public final class CatalogoPedido {
     private static Catalogo montar(String cabecera, List<String> filas) {
         if (filas.isEmpty()) {
             return Catalogo.sinCatalogo("El excel de pedido no tiene ninguna línea que "
-                    + "enseñarle a Claude: las hojas se han transcrito sin contrastarlas");
+                    + "enseñarle a la IA: las hojas se han transcrito sin contrastarlas");
         }
         if (filas.size() > MAXIMO_LINEAS) {
             return Catalogo.sinCatalogo("El excel de pedido tiene " + filas.size()
-                    + " líneas distintas, demasiadas para enseñárselas a Claude al leer las "
+                    + " líneas distintas, demasiadas para enseñárselas a la IA al leer las "
                     + "hojas: ¿es el pedido de esta temporada? Se han transcrito sin él");
         }
         StringBuilder texto = new StringBuilder("""
