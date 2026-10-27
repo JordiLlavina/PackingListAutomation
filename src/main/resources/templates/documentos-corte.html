@@ -10,12 +10,48 @@
          fotos. La de las fotos no lleva título: se entiende por lo que pide. -->
     <form id="formCorte" th:action="@{/documentos-corte/cargar}" method="post"
           enctype="multipart/form-data">
+
+      <!-- Arriba del todo, de dónde salen las referencias y las cantidades,
+           con los mismos botones que el formato del excel del taller. El
+           excel de producción es el de por defecto y vale para todos los
+           clientes; el de pedido, solo para los que tienen lector. -->
+      <input type="hidden" id="origen" name="origen" th:value="${origen} ?: 'PRODUCCION'">
+      <div id="selectorOrigen" class="selector-formato">
+          <button type="button" class="boton-formato" data-origen="PRODUCCION">
+              <svg class="boton-formato-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3.5" y="4" width="17" height="16" rx="1.5"/>
+                  <path d="M3.5 9h17M3.5 14.5h17M9.5 4v16"/>
+              </svg>
+              <span>
+                  <span class="boton-formato-titulo">Excel Producción de Puntotres</span>
+                  <span class="boton-formato-detalle">Cantidades a cortar, pieles y colores ya escritos</span>
+              </span>
+          </button>
+          <button type="button" class="boton-formato" data-origen="PEDIDO">
+              <svg class="boton-formato-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3.5" y="4" width="17" height="16" rx="1.5"/>
+                  <path d="M3.5 9h17M8 13h8M8 16.5h5"/>
+              </svg>
+              <span>
+                  <span class="boton-formato-titulo">Excel de Pedido de Cliente</span>
+                  <span class="boton-formato-detalle">Cantidades del pedido; pieles y colores recordados</span>
+              </span>
+          </button>
+      </div>
+
       <div class="tarjeta">
         <h3 class="titulo-seccion titulo-entrada-corte">
             <svg th:replace="~{fragmentos :: iconoPiel('icono-titulo')}"></svg>
             Documentos del Corte
         </h3>
-        <p class="ayuda">
+        <p class="ayuda" id="ayudaProduccion">
+            Del excel de producción sale una orden de corte por referencia, piel y color, con la
+            cantidad del taller y la piel y su color tal como están escritos, y de las fotos de cada
+            modelo un Word de fotos. El forro se pone en la pantalla siguiente.
+        </p>
+        <p class="ayuda" id="ayudaPedido">
             Del pedido de la temporada sale una orden de corte por referencia, piel y color, y de las
             fotos de cada modelo un Word de fotos. Los nombres de las pieles se ponen en la pantalla
             siguiente.
@@ -29,12 +65,16 @@
                 <select id="cliente" name="cliente" required>
                     <option th:each="entrada : ${clientes}"
                             th:value="${entrada.key}"
-                            th:text="${entrada.value.disponible ? entrada.value.nombre
-                                      : entrada.value.nombre + ' — en desarrollo'}"
-                            th:disabled="${!entrada.value.disponible}"></option>
+                            th:text="${entrada.value.nombre}"
+                            th:attr="data-nombre=${entrada.value.nombre},
+                                     data-pedido=${entrada.value.conPedido},
+                                     data-temporadas=${entrada.value.conTemporadas}"></option>
                 </select>
             </div>
-            <div>
+            <!-- Solo los clientes con temporadas guardadas. Con el excel de
+                 producción solo pone el nombre de la temporada; con el de
+                 pedido, también el excel. -->
+            <div id="bloqueTemporadaGuardada">
                 <label for="temporadaGuardada" class="etiqueta-con-accion">
                     <span>Temporada</span>
                     <a class="lapiz" th:href="@{/temporadas}"
@@ -46,13 +86,20 @@
             </div>
         </div>
 
-        <!-- Con una temporada guardada elegida, su nombre y su excel ya están: estos dos
-             campos se esconden para que no haya dos "Temporada" a la vez. -->
-        <div id="bloqueSinGuardada">
+        <!-- Con una temporada guardada elegida, su nombre ya está: el campo se
+             esconde para que no haya dos "Temporada" a la vez. El nombre va en
+             el de los documentos que salen. -->
+        <div id="bloqueTemporada">
             <label for="temporada">Temporada</label>
             <input type="text" id="temporada" name="temporada" placeholder="H26">
+        </div>
+        <div id="bloquePedido">
             <label for="pedido">Excel de pedido del cliente</label>
             <input type="file" id="pedido" name="pedido" accept=".xlsx">
+        </div>
+        <div id="bloqueProduccion">
+            <label for="produccion">Excel de producción de Puntotres</label>
+            <input type="file" id="produccion" name="produccion" accept=".xlsx">
         </div>
       </div>
 
@@ -90,42 +137,96 @@
         const TEMPORADAS = /*[[${temporadasJs}]]*/ {};
         /*]]>*/
         (function () {
+            const origen = document.getElementById('origen');
             const cliente = document.getElementById('cliente');
             const guardada = document.getElementById('temporadaGuardada');
             const ayuda = document.getElementById('ayudaTemporadaGuardada');
-            const bloqueSinGuardada = document.getElementById('bloqueSinGuardada');
+            const temporada = document.getElementById('temporada');
+            const pedido = document.getElementById('pedido');
+            const produccion = document.getElementById('produccion');
 
-            function temporadasDelCliente() {
-                return TEMPORADAS[cliente.value] || [];
+            function conPedido() {
+                return origen.value === 'PEDIDO';
             }
 
-            // Se rehace al cambiar de cliente: una temporada elegida de otro
-            // cliente se enviaría igual aunque ya no se vea.
+            function opcionDelCliente() {
+                return cliente.options[cliente.selectedIndex];
+            }
+
+            function temporadasDelCliente() {
+                const opcion = opcionDelCliente();
+                return opcion && opcion.dataset.temporadas === 'true' ? (TEMPORADAS[cliente.value] || []) : [];
+            }
+
+            // Con el excel de pedido, los clientes sin lector se apagan; si el
+            // elegido era uno de ellos, pasa al primero que sí lo tiene.
+            function ajustarClientes() {
+                Array.prototype.forEach.call(cliente.options, function (opcion) {
+                    const apagado = conPedido() && opcion.dataset.pedido !== 'true';
+                    opcion.disabled = apagado;
+                    opcion.textContent = opcion.dataset.nombre + (apagado ? ' — en desarrollo' : '');
+                });
+                if (opcionDelCliente() && opcionDelCliente().disabled) {
+                    const primero = Array.prototype.find.call(cliente.options, function (opcion) {
+                        return !opcion.disabled;
+                    });
+                    if (primero) {
+                        cliente.value = primero.value;
+                    }
+                }
+            }
+
+            // Se rehace al cambiar de cliente o de origen: una temporada elegida
+            // de otro cliente se enviaría igual aunque ya no se vea.
             function rellenar() {
+                const opcion = opcionDelCliente();
+                document.getElementById('bloqueTemporadaGuardada').style.display =
+                    opcion && opcion.dataset.temporadas === 'true' ? '' : 'none';
                 guardada.innerHTML = '';
                 const suelta = document.createElement('option');
                 suelta.value = '';
-                suelta.textContent = '-- otra temporada: subir el excel --';
+                suelta.textContent = conPedido() ? '-- otra temporada: subir el excel --' : '-- otra temporada --';
                 guardada.appendChild(suelta);
-                temporadasDelCliente().forEach(function (temporada) {
-                    const opcion = document.createElement('option');
-                    opcion.value = temporada.id;
-                    opcion.textContent = temporada.temporada;
-                    guardada.appendChild(opcion);
+                temporadasDelCliente().forEach(function (unaTemporada) {
+                    const opcionTemporada = document.createElement('option');
+                    opcionTemporada.value = unaTemporada.id;
+                    opcionTemporada.textContent = unaTemporada.temporada;
+                    guardada.appendChild(opcionTemporada);
                 });
                 aplicar();
             }
 
             function aplicar() {
-                const elegida = temporadasDelCliente().filter(function (temporada) {
-                    return String(temporada.id) === guardada.value;
+                const elegida = temporadasDelCliente().filter(function (unaTemporada) {
+                    return String(unaTemporada.id) === guardada.value;
                 })[0];
-                bloqueSinGuardada.style.display = elegida ? 'none' : '';
-                ayuda.textContent = elegida ? 'Excel de pedido guardado: ' + elegida.fichero : '';
+                document.getElementById('bloqueTemporada').style.display = elegida ? 'none' : '';
+                document.getElementById('bloquePedido').style.display = conPedido() && !elegida ? '' : 'none';
+                document.getElementById('bloqueProduccion').style.display = conPedido() ? 'none' : '';
+                ayuda.textContent = elegida && conPedido() ? 'Excel de pedido guardado: ' + elegida.fichero : '';
+                // Lo escondido se enviaría igual y mandaría sin que se viera.
                 if (elegida) {
-                    document.getElementById('temporada').value = '';
-                    document.getElementById('pedido').value = '';
+                    temporada.value = '';
+                    pedido.value = '';
                 }
+                if (conPedido()) {
+                    produccion.value = '';
+                } else {
+                    pedido.value = '';
+                }
+            }
+
+            function seleccionarOrigen(valor) {
+                origen.value = valor;
+                document.querySelectorAll('#selectorOrigen .boton-formato').forEach(function (boton) {
+                    const activo = boton.dataset.origen === valor;
+                    boton.classList.toggle('activo', activo);
+                    boton.setAttribute('aria-pressed', activo ? 'true' : 'false');
+                });
+                document.getElementById('ayudaProduccion').style.display = conPedido() ? 'none' : '';
+                document.getElementById('ayudaPedido').style.display = conPedido() ? '' : 'none';
+                ajustarClientes();
+                rellenar();
             }
 
             // Carpeta o zip, no los dos: elegir uno vacía el otro.
@@ -142,6 +243,11 @@
                 }
             });
 
+            document.querySelectorAll('#selectorOrigen .boton-formato').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    seleccionarOrigen(boton.dataset.origen);
+                });
+            });
             cliente.addEventListener('change', rellenar);
             guardada.addEventListener('change', aplicar);
             // Las fotos son opcionales: sin ellas no hay nada que subir, así que
@@ -151,7 +257,7 @@
                     document.getElementById('avisoSubiendo').style.display = '';
                 }
             });
-            rellenar();
+            seleccionarOrigen(origen.value === 'PEDIDO' ? 'PEDIDO' : 'PRODUCCION');
         })();
     </script>
 </main>

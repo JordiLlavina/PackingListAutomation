@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
@@ -33,7 +34,7 @@ public class AmiCorte implements ClienteCorte {
     @Override
     public PedidoCorte leerPedido(byte[] excel) throws IOException {
         List<LineaCorte> lineas = lineas(excel).stream()
-                .filter(linea -> !CajaData.esCinturon(ReferenciaCorte.normalizar(linea.referencia())))
+                .filter(linea -> seCorta(linea.referencia()))
                 .toList();
         return PedidoCorte.agrupar(lineas, this::partir);
     }
@@ -59,5 +60,22 @@ public class AmiCorte implements ClienteCorte {
     @Override
     public ReferenciaCorte partir(String referencia) {
         return ReferenciaCorte.deAmi(referencia);
+    }
+
+    @Override
+    public boolean seCorta(String referencia) {
+        return !CajaData.esCinturon(ReferenciaCorte.normalizar(referencia));
+    }
+
+    /**
+     * El código de AMI es la primera palabra si lleva alguna cifra ("0014",
+     * "2221", "A237"), con o sin descripción detrás. Un nombre de color no
+     * lleva cifras.
+     */
+    private static final Pattern COLOR_PRODUCCION = Pattern.compile("(\\S*\\d\\S*)(?:\\s+(.*))?");
+
+    @Override
+    public ColorCorte colorDeProduccion(String texto) {
+        return ClienteCorte.colorConPatron(texto, COLOR_PRODUCCION);
     }
 }

@@ -16,6 +16,7 @@ import com.puntotres.packinglist.service.corte.ArticuloCorte;
 import com.puntotres.packinglist.service.corte.ConversionFotos;
 import com.puntotres.packinglist.service.corte.FilaCorte;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
+import com.puntotres.packinglist.service.corte.OrigenCorte;
 import com.puntotres.packinglist.service.corte.PedidoCorte;
 import com.puntotres.packinglist.service.corte.ResultadoCorte;
 
@@ -49,6 +50,8 @@ public class CorteEnCurso {
      * avisa el lector diciendo qué carpeta no ha reconocido.
      */
     private boolean sinFotos;
+    /** De dónde ha salido la carga: decide si se usa la memoria de pieles. */
+    private OrigenCorte origen = OrigenCorte.PEDIDO;
     private final List<FilaCorte> filas = new ArrayList<>();
     private int columnasCombinacion;
     private final List<String> avisosCarga = new ArrayList<>();
@@ -68,6 +71,14 @@ public class CorteEnCurso {
                                     Path directorio, PedidoCorte pedido, FotosTemporada fotos,
                                     ConversionFotos conversion, boolean sinFotos,
                                     List<String> avisos) {
+        cargar(claveCliente, nombreCliente, temporada, directorio, pedido, fotos, conversion, sinFotos,
+                avisos, OrigenCorte.PEDIDO);
+    }
+
+    public synchronized void cargar(String claveCliente, String nombreCliente, String temporada,
+                                    Path directorio, PedidoCorte pedido, FotosTemporada fotos,
+                                    ConversionFotos conversion, boolean sinFotos,
+                                    List<String> avisos, OrigenCorte origen) {
         if (this.conversion != null && this.conversion != conversion) {
             this.conversion.cancelar();
         }
@@ -81,6 +92,7 @@ public class CorteEnCurso {
         this.fotos = fotos;
         this.conversion = conversion;
         this.sinFotos = sinFotos;
+        this.origen = origen;
         filas.clear();
         for (ArticuloCorte articulo : pedido.articulos()) {
             FilaCorte fila = new FilaCorte(articulo);
@@ -118,6 +130,7 @@ public class CorteEnCurso {
         fotos = null;
         conversion = null;
         sinFotos = false;
+        origen = OrigenCorte.PEDIDO;
         filas.clear();
         columnasCombinacion = 0;
         avisosCarga.clear();
@@ -153,6 +166,8 @@ public class CorteEnCurso {
     public Path getDirectorio() { return directorio; }
     public FotosTemporada getFotos() { return fotos; }
     public boolean isSinFotos() { return sinFotos; }
+    public OrigenCorte getOrigen() { return origen; }
+    public boolean isDeProduccion() { return origen == OrigenCorte.PRODUCCION; }
     public ConversionFotos getConversion() { return conversion; }
     public List<FilaCorte> getFilas() { return filas; }
     public int getColumnasCombinacion() { return columnasCombinacion; }

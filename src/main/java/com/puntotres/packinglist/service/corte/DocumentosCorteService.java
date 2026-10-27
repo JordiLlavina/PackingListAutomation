@@ -6,9 +6,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -19,10 +21,10 @@ import org.springframework.stereotype.Service;
  * lo tecleado en la pantalla de pieles, los documentos que salen.
  *
  * Salen un Excel de órdenes con una hoja por referencia (modelo + piel) y
- * color con bolsos, y un Word de fotos por MODELO con bolsos y
- * fotos: la carpeta ULL027 vale para ULL027.AL0103 y para ULL027.AL0216, y
- * sin pieles en su cabecera los dos Word serían el mismo. Una fila
- * desmarcada en la tabla no saca nada.
+ * color con bolsos, y un solo Word de fotos con todos los MODELOS con bolsos
+ * y fotos ("cliente - temporada - Fotos Artículos.docx"): la carpeta ULL027
+ * vale para ULL027.AL0103 y para ULL027.AL0216, así que cada modelo sale una
+ * sola vez. Una fila desmarcada en la tabla no saca nada.
  */
 @Service
 public class DocumentosCorteService {
@@ -36,6 +38,15 @@ public class DocumentosCorteService {
 
     public DocumentosCorteService(List<ClienteCorte> clientes) {
         this.clientes = List.copyOf(clientes);
+    }
+
+    /**
+     * Las reglas del cliente para el excel de producción, que vale para todos:
+     * las suyas si tiene documentos del corte propios (cómo parte la
+     * referencia y el color, qué no se corta) y, si no, las de un genérico.
+     */
+    public ClienteCorte reglasDeProduccion(String clave) {
+        return clientePara(clave).orElseGet(() -> new ClienteCorteGenerico(clave));
     }
 
     /** El cliente con esa clave, o vacío si todavía no tiene documentos del corte. */
@@ -59,10 +70,11 @@ public class DocumentosCorteService {
         Map<Path, Optional<Imagen>> leidas = new HashMap<>();
         List<String> avisos = new ArrayList<>();
         List<OrdenCorte> fichas = new ArrayList<>();
-        List<DocumentoCorte> documentosFotos = new ArrayList<>();
 
-        // Modelo → nombre del bolso, en el orden de las filas: un Word de fotos por modelo.
+        // Modelo → nombre del bolso y sus referencias, en el orden de las filas:
+        // las fotos son del modelo, así que cada uno sale una sola vez en el Word.
         Map<String, String> modelos = new LinkedHashMap<>();
+        Map<String, Set<String>> referencias = new LinkedHashMap<>();
         for (FilaCorte fila : filas) {
             if (!fila.isIncluida() || !fila.tieneBolsos()) {
                 continue;
@@ -75,27 +87,39 @@ public class DocumentosCorteService {
                 ColorCorte color = colores.get(indice);
                 if (color.bolsos() > 0) {
                     fichas.add(new OrdenCorte(cliente, temporada, fila.referencia().referencia(), modelo,
-                            color.nombre(), color.bolsos(), fila.pieles(indice), principal));
+                            color.nombre(), color.bolsos(), fila.pieles(indice), principal, color.prensa()));
                 }
             }
             modelos.merge(modelo, fila.nombreModelo(),
                     (anterior, nuevo) -> anterior.isEmpty() ? nuevo : anterior);
+            referencias.computeIfAbsent(modelo, clave -> new LinkedHashSet<>())
+                    .add(fila.referencia().referencia());
         }
 
+        List<FotosCorte> albumModelos = new ArrayList<>();
         for (Map.Entry<String, String> modelo : modelos.entrySet()) {
             List<Imagen> imagenes = new ArrayList<>();
             for (FotoModelo foto : fotos.de(modelo.getKey())) {
                 imagen(foto, reducida, leidas, avisos).ifPresent(imagenes::add);
             }
             if (!imagenes.isEmpty()) {
-                FotosCorte album = new FotosCorte(modelo.getKey(), modelo.getValue(), imagenes);
-                String nombre = sanear("Fotos " + modelo.getKey() + ".docx");
-                Path fichero = destino.resolve(nombre);
-                Files.write(fichero, albumes.generar(album));
-                documentosFotos.add(new DocumentoCorte(DocumentoCorte.Tipo.FOTOS, "Fotos de " + album.titulo() + " ("
-                        + imagenes.size() + (imagenes.size() == 1 ? " foto)" : " fotos)"),
-                        nombre, fichero));
+                albumModelos.add(new FotosCorte(modelo.getKey(), modelo.getValue(),
+                        List.copyOf(referencias.get(modelo.getKey())), imagenes));
             }
+        }
+        DocumentoCorte documentoFotos = null;
+        if (!albumModelos.isEmpty()) {
+            String nombre = sanear(cliente + " - " + temporada + " - Fotos Artículos.docx");
+            Path fichero = destino.resolve(nombre);
+            Files.write(fichero, albumes.generar(albumModelos));
+            int total = albumModelos.stream().mapToInt(modelo -> modelo.fotos().size()).sum();
+            List<DocumentoCorte.ContenidoModelo> contenido = albumModelos.stream()
+                    .map(modelo -> new DocumentoCorte.ContenidoModelo(modelo.titulo(),
+                            modelo.referencias(), modelo.fotos().size()))
+                    .toList();
+            documentoFotos = new DocumentoCorte(DocumentoCorte.Tipo.FOTOS, "Fotos de artículo ("
+                    + plural(albumModelos.size(), "modelo", "modelos") + ", "
+                    + plural(total, "foto", "fotos") + ")", nombre, fichero, contenido);
         }
 
         List<DocumentoCorte> documentos = new ArrayList<>();
@@ -109,8 +133,14 @@ public class DocumentosCorteService {
             documentos.add(new DocumentoCorte(DocumentoCorte.Tipo.ORDENES, "Órdenes de corte ("
                     + fichas.size() + (fichas.size() == 1 ? " hoja)" : " hojas)"), nombre, fichero));
         }
-        documentos.addAll(documentosFotos);
+        if (documentoFotos != null) {
+            documentos.add(documentoFotos);
+        }
         return new ResultadoCorte(documentos, avisos);
+    }
+
+    private static String plural(int cuantos, String uno, String varios) {
+        return cuantos + " " + (cuantos == 1 ? uno : varios);
     }
 
     /**

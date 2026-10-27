@@ -10,8 +10,8 @@
             <strong th:text="${cliente}"></strong></li>
         <li><span class="rotulo">Temporada</span>
             <strong th:text="${temporada}"></strong></li>
-        <li><span class="rotulo">Word de fotos</span>
-            <strong th:text="${#lists.size(fotos)}"></strong></li>
+        <li><span class="rotulo">Modelos con fotos</span>
+            <strong th:text="${fotos != null} ? ${#lists.size(fotos.contenido)} : 0"></strong></li>
     </ul>
 
     <!-- Lo primero y a la vista, no dentro de los avisos plegables: explica por
@@ -53,33 +53,51 @@
         <button th:if="${#lists.isEmpty(ordenes)}" type="button" disabled>Descargar</button>
     </section>
 
-    <!-- Sección 2: un Word de fotos por modelo. El nombre del fichero no se
-         enseña: repetía el modelo que ya dice el contenido. -->
+    <!-- Sección 2: un solo Word con las fotos de todos los modelos, cada uno
+         en hoja nueva. Lo que lleva dentro se despliega debajo. -->
     <section class="tarjeta seccion-salida">
         <h3 class="titulo-seccion">📷 Fotos de Artículo</h3>
-        <p th:if="${#lists.isEmpty(fotos)}"
+        <p th:if="${fotos == null}"
            th:text="${sinFotos} ? 'No se han adjuntado fotos de la temporada.'
                     : 'Ningún modelo con bolsos ha traído fotos.'"></p>
-        <table th:unless="${#lists.isEmpty(fotos)}">
-            <thead>
-            <tr>
-                <th>Contenido</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="documento : ${fotos}">
-                <td th:text="${documento.descripcion}"></td>
-                <td>
-                    <a th:href="@{/documentos-corte/descargar/{nombre}(nombre=${documento.nombreFichero})}">
-                        Descargar</a>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <a class="boton" th:unless="${#lists.isEmpty(fotos)}"
-           th:href="@{/documentos-corte/descargar-fotos}">Descargar todo (ZIP)</a>
-        <button th:if="${#lists.isEmpty(fotos)}" type="button" disabled>Descargar todo (ZIP)</button>
+        <th:block th:if="${fotos != null}">
+            <table>
+                <thead>
+                <tr>
+                    <th>Fichero</th>
+                    <th>Contenido</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td th:text="${fotos.nombreFichero}"></td>
+                    <td th:text="${fotos.descripcion}"></td>
+                </tr>
+                </tbody>
+            </table>
+            <details class="avisos-plegables" id="contenidoFotos">
+                <summary>Contenido: fotos por modelo y referencia</summary>
+                <table>
+                    <thead>
+                    <tr>
+                        <th>Modelo</th>
+                        <th>Referencias</th>
+                        <th>Fotos</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="modelo : ${fotos.contenido}">
+                        <td th:text="${modelo.titulo}"></td>
+                        <td th:text="${#strings.listJoin(modelo.referencias, ', ')}"></td>
+                        <td th:text="${modelo.fotos}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </details>
+            <a class="boton"
+               th:href="@{/documentos-corte/descargar/{nombre}(nombre=${fotos.nombreFichero})}">Descargar</a>
+        </th:block>
+        <button th:if="${fotos == null}" type="button" disabled>Descargar</button>
     </section>
 
     <!-- Salir de la pantalla no es una descarga más: al pie y en gris, como en

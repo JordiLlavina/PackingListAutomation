@@ -17,8 +17,10 @@ public record FilaPielesVista(int indice, boolean incluida, String referencia, S
      * Un color del bolso con sus bolsos y el color de cada piel. El código va
      * aparte porque es con lo que la pantalla reconoce "el mismo color" en
      * otros modelos al rellenar los colores del forro y de las combinaciones.
+     * {@code prensa}: los bolsos de prensa de ese color, que salen en su
+     * propia orden y se llaman igual que los de venta.
      */
     public record ColorVista(int indice, String codigo, String nombre, int bolsos, String colorPiel,
-                             String colorForro, List<String> coloresCombinacion) {
+                             String colorForro, List<String> coloresCombinacion, boolean prensa) {
     }
 }

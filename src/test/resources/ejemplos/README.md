@@ -85,6 +85,18 @@ corte: 430×430 px y 8 KB, sacado del repositorio de Openize.HEIC
 producto ni personal**, y así tiene que seguir: en el repo no entra ninguna foto
 real. Las demás imágenes de esos tests las dibuja `FotosDePrueba`.
 
+`corte/PROD_APC_SPRING27.xlsx` es el **excel de producción de Puntotres** de APC
+Spring 27 (`docs/Documentos de Corte/prod APC excel.xlsx`), el que lee
+`ProduccionPuntotresExcel`. Es un documento nuestro y sus cantidades son
+reales (la columna F cuadra exacta con el pedido de Spring 27), pero la copia
+va **sin las fotos de producto** que el original lleva incrustadas en la
+columna B: se copiaron solo las celdas, las fórmulas y las celdas combinadas.
+Para regenerarla hay que volver a copiar las celdas, no el fichero entero.
+`corte/PROD_AMI_SS27.xlsx` es lo mismo para AMI SS27 (`docs/Documentos de
+Corte/prod AMI SS27 excel.xlsx`), también sin sus fotos. Su disposición es
+distinta de la de APC (ver `ProduccionPuntotresExcel`), y su pedido (E) más su
+PRESS (G) cuadran exactos con `EAN PUNTOTRES SS27.xlsx`.
+
 `taller/packing taller fez ejemplo.xlsx` y `taller/packing taller tanger ejemplos.xlsx`
 son packings de taller con **formato propio**, los que entran por "Excel Formato
 Taller" y Claude pasa al formato Puntotres (`ConversionFormatoTallerService`).

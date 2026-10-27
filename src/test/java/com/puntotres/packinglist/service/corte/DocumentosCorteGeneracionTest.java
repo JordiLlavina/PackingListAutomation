@@ -51,7 +51,7 @@ class DocumentosCorteGeneracionTest {
                 fila("ULL712.AL0103", 5),
                 fila("ULL999.AL0001", 0)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.xlsx", "Fotos ULL027.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.xlsx", "AMI - H26 - Fotos Artículos.docx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
         XSSFWorkbook ordenes = abrirExcel(resultado.documentos().get(0));
         assertEquals(List.of("ULL027.AL0103 - 001 BLACK", "ULL712.AL0103 - 001 BLACK"),
@@ -89,15 +89,42 @@ class DocumentosCorteGeneracionTest {
     }
 
     @Test
-    void laFotoEsDelModeloYSaleUnSoloWordDeFotosParaTodasSusPieles() throws IOException {
+    void laFotoEsDelModeloYSaleUnaSolaVezParaTodasSusPieles() throws IOException {
         ResultadoCorte resultado = generar("H26", List.of(
                 fila("ULL027.AL0103", 1), fila("ULL027.AL0216", 1)));
 
-        assertEquals(List.of("Ordenes de corte AMI H26.xlsx", "Fotos ULL027.docx"),
+        assertEquals(List.of("Ordenes de corte AMI H26.xlsx", "AMI - H26 - Fotos Artículos.docx"),
                 resultado.documentos().stream().map(DocumentoCorte::nombreFichero).toList());
         XSSFWorkbook ordenes = abrirExcel(resultado.documentos().get(0));
         assertEquals(List.of("ULL027.AL0103 - 001 BLACK", "ULL027.AL0216 - 001 BLACK"),
                 ExcelDePrueba.nombresDeHoja(ordenes), "el mismo modelo y color en dos pieles: la piel las distingue");
+        DocumentoCorte album = resultado.documentos().get(1);
+        assertEquals(List.of(new DocumentoCorte.ContenidoModelo("ULL027",
+                List.of("ULL027.AL0103", "ULL027.AL0216"), 2)), album.contenido());
+        assertEquals(1, abrir(album).getTables().size(), "las dos fotos, una sola vez");
+    }
+
+    @Test
+    void todosLosModelosVanEnUnSoloWordDeFotos() throws IOException {
+        FotoModelo fotoC = new FotoModelo("ULL712", "c.jpg", dir.resolve("00003.jpg"));
+        reducidas.put(fotoC.original(), escribir("c-reducida.jpg", Color.GREEN));
+        fotos = new FotosTemporada(Map.of("ULL027", List.of(fotoA, fotoB), "ULL712", List.of(fotoC)), List.of());
+
+        ResultadoCorte resultado = generar("H26", List.of(
+                fila("ULL027.AL0103", 1), fila("ULL712.AL0103", 1), fila("ULL999.AL0001", 1)));
+
+        assertEquals(1, resultado.fotos().size());
+        DocumentoCorte album = resultado.fotos().get(0);
+        assertEquals("AMI - H26 - Fotos Artículos.docx", album.nombreFichero());
+        assertEquals("Fotos de artículo (2 modelos, 3 fotos)", album.descripcion());
+        assertEquals(List.of(
+                new DocumentoCorte.ContenidoModelo("ULL027", List.of("ULL027.AL0103"), 2),
+                new DocumentoCorte.ContenidoModelo("ULL712", List.of("ULL712.AL0103"), 1)),
+                album.contenido(), "ULL999 no trae fotos y no sale");
+        List<String> titulos = abrir(album).getParagraphs().stream()
+                .filter(parrafo -> "Heading1".equals(parrafo.getStyleID()))
+                .map(parrafo -> parrafo.getText()).toList();
+        assertEquals(List.of("ULL027", "ULL712"), titulos);
     }
 
     @Test

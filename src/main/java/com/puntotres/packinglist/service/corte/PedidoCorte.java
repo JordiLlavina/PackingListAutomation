@@ -30,6 +30,18 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
 
     public static PedidoCorte agrupar(List<LineaCorte> lineas,
                                       Function<String, ReferenciaCorte> partir) {
+        return agrupar(lineas, partir, true);
+    }
+
+    /**
+     * {@code avisarSinPiel} = false para el excel de producción: ahí el
+     * nombre de la piel ya viene escrito, y la referencia de piel solo sirve
+     * para la memoria, que ese camino no usa. Avisar de cada referencia de un
+     * cliente genérico, que nunca la separa, enterraría lo que sí hay que leer.
+     */
+    public static PedidoCorte agrupar(List<LineaCorte> lineas,
+                                      Function<String, ReferenciaCorte> partir,
+                                      boolean avisarSinPiel) {
         Map<String, Map<String, ColorCorte>> porReferencia = new LinkedHashMap<>();
         Map<String, String> nombres = new LinkedHashMap<>();
         for (LineaCorte linea : lineas) {
@@ -40,15 +52,17 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
             if (!linea.nombreModelo().isEmpty()) {
                 nombres.putIfAbsent(referencia, linea.nombreModelo());
             }
-            // Sin código (un pedido raro), el color es su descripción.
-            String clave = linea.codigoColor().isEmpty() ? linea.descripcionColor() : linea.codigoColor();
+            // Sin código (un pedido raro), el color es su descripción. La
+            // prensa del mismo color se suma aparte: es otra orden de corte.
+            String clave = (linea.prensa() ? "PRENSA " : "")
+                    + (linea.codigoColor().isEmpty() ? linea.descripcionColor() : linea.codigoColor());
             porReferencia.computeIfAbsent(referencia, r -> new LinkedHashMap<>())
                     .merge(clave, new ColorCorte(linea.codigoColor(), linea.descripcionColor(),
-                                    Math.max(0, linea.cantidad())),
+                                    Math.max(0, linea.cantidad()), linea.prensa()),
                             (anterior, nuevo) -> new ColorCorte(anterior.codigo(),
                                     anterior.descripcion().isEmpty() ? nuevo.descripcion()
                                             : anterior.descripcion(),
-                                    anterior.bolsos() + nuevo.bolsos()));
+                                    anterior.bolsos() + nuevo.bolsos(), anterior.prensa()));
         }
 
         List<ArticuloCorte> articulos = new ArrayList<>();
@@ -66,7 +80,7 @@ public record PedidoCorte(List<ArticuloCorte> articulos, List<String> avisos) {
                 .thenComparing(articulo -> articulo.referencia().piel()));
 
         List<String> avisos = new ArrayList<>();
-        if (!sinPiel.isEmpty()) {
+        if (avisarSinPiel && !sinPiel.isEmpty()) {
             avisos.add("Referencias del pedido sin la piel separada, que salen con el modelo "
                     + "entero y la piel en blanco: " + String.join(", ", sinPiel));
         }

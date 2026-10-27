@@ -3,14 +3,17 @@ package com.puntotres.packinglist.service.corte;
 import java.util.List;
 
 /**
- * Un Word de fotos: las de un modelo, con su nombre de bolso si el pedido lo
- * trae (vacío si no). Es uno por modelo y no por piel: sin las pieles en la
- * cabecera, los de dos pieles del mismo modelo serían el mismo documento.
+ * Las fotos de un modelo dentro del Word de fotos, con su nombre de bolso si
+ * el pedido lo trae (vacío si no) y las referencias del pedido que comparten
+ * esas fotos. Es uno por modelo y no por piel: la carpeta ULL027 vale para
+ * ULL027.AL0103 y para ULL027.AL0216, y sin las pieles en el título las dos
+ * serían las mismas hojas.
  */
-public record FotosCorte(String modelo, String nombreBolso, List<Imagen> fotos) {
+public record FotosCorte(String modelo, String nombreBolso, List<String> referencias, List<Imagen> fotos) {
 
     public FotosCorte {
         nombreBolso = nombreBolso == null ? "" : nombreBolso.trim();
+        referencias = List.copyOf(referencias);
         fotos = List.copyOf(fotos);
     }
 

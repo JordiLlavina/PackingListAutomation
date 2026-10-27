@@ -9,12 +9,21 @@ package com.puntotres.packinglist.service.corte;
  * AMI trae las dos cosas en su pedido; APC solo el código, y la descripción
  * sale de la Tabla colores Clientes. Sin descripción, el color es el código a
  * secas.
+ *
+ * {@code prensa}: los bolsos de PRENSA (marketing) del excel de producción,
+ * que van en su propia orden de corte, aparte de los del mismo color para
+ * la venta. Son otro color a todos los efectos salvo el nombre, que es el
+ * mismo: lo que los distingue es la marca.
  */
-public record ColorCorte(String codigo, String descripcion, int bolsos) {
+public record ColorCorte(String codigo, String descripcion, int bolsos, boolean prensa) {
 
     public ColorCorte {
         codigo = limpio(codigo);
         descripcion = limpio(descripcion);
+    }
+
+    public ColorCorte(String codigo, String descripcion, int bolsos) {
+        this(codigo, descripcion, bolsos, false);
     }
 
     /** Lo que se enseña: "LZZ NOIR", o "LZZ" si el color no tiene descripción. */
@@ -26,11 +35,15 @@ public record ColorCorte(String codigo, String descripcion, int bolsos) {
     }
 
     public ColorCorte conBolsos(int otros) {
-        return new ColorCorte(codigo, descripcion, otros);
+        return new ColorCorte(codigo, descripcion, otros, prensa);
     }
 
     public ColorCorte conDescripcion(String otra) {
-        return new ColorCorte(codigo, otra, bolsos);
+        return new ColorCorte(codigo, otra, bolsos, prensa);
+    }
+
+    public ColorCorte dePrensa() {
+        return new ColorCorte(codigo, descripcion, bolsos, true);
     }
 
     private static String limpio(String texto) {

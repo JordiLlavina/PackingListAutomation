@@ -17,19 +17,20 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTStyle;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STStyleType;
 
 /**
- * Escribe el Word de fotos de un modelo: todas sus fotos, seis por A4 en una
- * cuadrícula de 2 columnas por 3 filas que llena la hoja con márgenes
- * estrechos, sin pie de foto (el nombre del fichero no dice nada). Tantas
- * hojas como hagan falta.
+ * Escribe el Word de fotos de la temporada: un solo documento con todos los
+ * modelos, y de cada uno todas sus fotos, seis por A4 en una cuadrícula de 2
+ * columnas por 3 filas que llena la hoja con márgenes estrechos, sin pie de
+ * foto (el nombre del fichero no dice nada). Tantas hojas como hagan falta, y
+ * cada modelo empieza en hoja nueva.
  *
  * Cada hoja empieza por el título —el modelo y, si el pedido lo trae, el
  * nombre del bolso—, así se repite en cada una, que se separan al imprimir.
  * Va en el CUERPO y no en la cabecera de página a propósito: Word pinta la
  * cabecera en gris mientras se trabaja en el documento, y el usuario lo
  * quiere a todo color. Estilo integrado "Título 1", en negrita, centrado, en
- * negro y a 22 pt; ni temporada ni pieles, que el Word es del modelo y vale
- * para todas. Sin plantilla .docx: la maquetación son las constantes de esta
- * clase.
+ * negro y a 22 pt; ni temporada ni pieles, que las fotos son del modelo y
+ * valen para todas. Sin plantilla .docx: la maquetación son las constantes de
+ * esta clase.
  */
 public class FotosCorteDocBuilder {
 
@@ -55,18 +56,28 @@ public class FotosCorteDocBuilder {
     private static final int TAMANO_TITULO = 22;
     private static final String NEGRO = "000000";
 
-    public byte[] generar(FotosCorte fotos) throws IOException {
+    /**
+     * Un solo Word con todos los modelos, en el orden de la lista. Cada modelo
+     * empieza en hoja nueva: una hoja nunca mezcla las fotos de dos bolsos.
+     * Los modelos sin fotos no ocupan ninguna hoja.
+     */
+    public byte[] generar(List<FotosCorte> modelos) throws IOException {
         try (XWPFDocument doc = new XWPFDocument()) {
             WordCorte.configurarPagina(doc, ANCHO_PAGINA, ALTO_PAGINA, false,
                     MARGEN, MARGEN, MARGEN, MARGEN / 2);
             crearEstiloTitulo(doc);
-            List<Imagen> imagenes = fotos.fotos();
-            int paginas = (imagenes.size() + FOTOS_POR_PAGINA - 1) / FOTOS_POR_PAGINA;
-            for (int pagina = 0; pagina < paginas; pagina++) {
-                escribirTitulo(doc, fotos.titulo());
-                escribirRejilla(doc, imagenes.subList(pagina * FOTOS_POR_PAGINA,
-                        Math.min(imagenes.size(), (pagina + 1) * FOTOS_POR_PAGINA)));
-                WordCorte.separador(doc, pagina < paginas - 1);
+            List<FotosCorte> conFotos = modelos.stream().filter(modelo -> !modelo.fotos().isEmpty()).toList();
+            for (int indice = 0; indice < conFotos.size(); indice++) {
+                FotosCorte modelo = conFotos.get(indice);
+                List<Imagen> imagenes = modelo.fotos();
+                int paginas = (imagenes.size() + FOTOS_POR_PAGINA - 1) / FOTOS_POR_PAGINA;
+                for (int pagina = 0; pagina < paginas; pagina++) {
+                    escribirTitulo(doc, modelo.titulo());
+                    escribirRejilla(doc, imagenes.subList(pagina * FOTOS_POR_PAGINA,
+                            Math.min(imagenes.size(), (pagina + 1) * FOTOS_POR_PAGINA)));
+                    boolean ultima = indice == conFotos.size() - 1 && pagina == paginas - 1;
+                    WordCorte.separador(doc, !ultima);
+                }
             }
             return WordCorte.escribir(doc);
         }

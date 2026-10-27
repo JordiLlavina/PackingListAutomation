@@ -74,6 +74,25 @@ class OrdenCorteExcelBuilderTest {
         assertEquals("F67008", texto(libro.getSheetAt(2).getRow(1), 1));
     }
 
+    /** La prensa de un color va en su propia hoja, con PRENSA al final del nombre aunque se recorte. */
+    @Test
+    void laPrensaVaEnSuHojaConPrensaAlFinalDelNombre() throws IOException {
+        OrdenCorte venta = orden("ULL772.AL245", "NEGRO", 271, sinCombinaciones(), null);
+        OrdenCorte prensa = new OrdenCorte("AMI", "SS27", "ULL772.AL245", "ULL772", "NEGRO", 6,
+                sinCombinaciones(), null, true);
+        OrdenCorte larga = new OrdenCorte("AMI", "SS27", "ULL754.AL0103", "ULL754",
+                "225 CHOCOLATE/LAITON VIBRE", 2, sinCombinaciones(), null, true);
+
+        XSSFWorkbook libro = generar(List.of(venta, prensa, larga));
+
+        List<String> nombres = ExcelDePrueba.nombresDeHoja(libro);
+        assertEquals("ULL772.AL245 - NEGRO", nombres.get(0));
+        assertEquals("ULL772.AL245 - NEGRO PRENSA", nombres.get(1));
+        assertTrue(nombres.get(2).endsWith(" PRENSA") && nombres.get(2).length() == 31, nombres.get(2));
+        assertEquals("A (2) PRENSA", OrdenCorteExcelBuilder.nombreUnico("A", " PRENSA",
+                new LinkedHashSet<>(Set.of("a prensa"))));
+    }
+
     @Test
     void llevaLosDatosQueElCortadorTieneQueVerConElColorDeCadaPiel() throws IOException {
         PielesArticulo pieles = new PielesArticulo(new PielCorte("Box calf", "NOIR"),
@@ -82,7 +101,7 @@ class OrdenCorteExcelBuilderTest {
         String texto = ExcelDePrueba.texto(generar(List.of(
                 orden("PXCBC-F67008", "LZZ NOIR", 169, pieles, APAISADA))));
 
-        for (String esperado : List.of("AMI | Temporada H26", "F67008", "Color  LZZ NOIR", "Bolsos  169",
+        for (String esperado : List.of("AMI | Temporada H26", "F67008", "Color  LZZ NOIR", "Cantidad  169",
                 "PIEL\nBox calf", "COLOR\nNOIR", "COMBINACIÓN 1\nAnte", "COLOR\nMARRON",
                 "COMBINACIÓN 2\nCharol", "FORRO\nCabretilla", "COLOR\nNEGRO")) {
             assertTrue(texto.contains(esperado), "falta '" + esperado + "' en:\n" + texto);

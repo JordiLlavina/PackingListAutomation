@@ -8,8 +8,15 @@ package com.puntotres.packinglist.service.corte;
  * modelo en el mismo color va a menudo en dos pieles. {@code color} es el
  * color del bolso tal como se enseña, código y descripción ("LZZ NOIR"), y
  * las pieles llevan el suyo de ese color. {@code fotoPrincipal} es null
- * cuando el modelo no ha traído fotos legibles.
+ * cuando el modelo no ha traído fotos legibles. {@code prensa}: los bolsos
+ * de prensa de ese color, en su propia hoja con PRENSA al final del nombre.
  */
 public record OrdenCorte(String cliente, String temporada, String referencia, String modelo,
-                         String color, int bolsos, PielesArticulo pieles, Imagen fotoPrincipal) {
+                         String color, int bolsos, PielesArticulo pieles, Imagen fotoPrincipal,
+                         boolean prensa) {
+
+    public OrdenCorte(String cliente, String temporada, String referencia, String modelo,
+                      String color, int bolsos, PielesArticulo pieles, Imagen fotoPrincipal) {
+        this(cliente, temporada, referencia, modelo, color, bolsos, pieles, fotoPrincipal, false);
+    }
 }

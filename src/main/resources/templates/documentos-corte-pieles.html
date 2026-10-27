@@ -38,7 +38,10 @@
     </details>
 
     <form class="tarjeta" id="formPieles" method="post" th:action="@{/documentos-corte/generar}">
-        <p class="ayuda">Los campos se pueden dejar vacíos. Se puede generar sin fotografías.
+        <p class="ayuda" th:if="${deProduccion}">Los bolsos, las pieles y sus colores vienen del
+            excel de producción y se pueden corregir aquí; falta el forro. Lo tecleado no se guarda
+            para otra temporada. Se puede generar sin fotografías.</p>
+        <p class="ayuda" th:unless="${deProduccion}">Los campos se pueden dejar vacíos. Se puede generar sin fotografías.
             El color de la piel principal empieza con el del bolso; los del forro y las
             combinaciones, al escribirlos por primera vez, se copian a los demás modelos del
             mismo color que los tengan vacíos.</p>
@@ -83,6 +86,9 @@
                     </th:block>
                     <td class="c-color">
                         <label th:for="|bolsos-${fila.indice}-${color.indice}|" th:text="${color.nombre}"></label>
+                        <!-- Se llama igual que el de venta: sin la marca no se distinguirían. -->
+                        <span class="marca-prensa" th:if="${color.prensa}"
+                              title="Bolsos de prensa: salen en su propia orden de corte">PRENSA</span>
                     </td>
                     <td class="c-bolsos">
                         <input type="number" min="0"

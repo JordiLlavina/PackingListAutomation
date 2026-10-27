@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Lo que cambia de un cliente a otro en los documentos del corte: cómo se
@@ -31,6 +33,38 @@ public interface ClienteCorte {
      * ULL027.
      */
     ReferenciaCorte partir(String referencia);
+
+    /**
+     * ¿Se corta esta referencia? Lo que no se corta (los cinturones de AMI)
+     * no sale ni del pedido ni del excel de producción.
+     */
+    default boolean seCorta(String referencia) {
+        return true;
+    }
+
+    /**
+     * Un color tal como lo escribe el excel de producción ("LZZ NEGRO",
+     * "0014 NOIR") partido en código y descripción, con la regla exacta de
+     * cada cliente: nunca se busca un parecido en la Tabla colores Clientes.
+     * Sin regla, o si el texto no la cumple, todo es descripción y el color
+     * se identifica por ella. Sale con 0 bolsos: los pone quien lee la fila.
+     */
+    default ColorCorte colorDeProduccion(String texto) {
+        return new ColorCorte("", texto, 0);
+    }
+
+    /**
+     * Parte un color de producción con un patrón de dos grupos, código y
+     * descripción; si no casa, todo es descripción.
+     */
+    static ColorCorte colorConPatron(String texto, Pattern patron) {
+        String limpio = texto == null ? "" : texto.trim();
+        Matcher partes = patron.matcher(limpio);
+        if (!partes.matches()) {
+            return new ColorCorte("", limpio, 0);
+        }
+        return new ColorCorte(partes.group(1), partes.group(2) == null ? "" : partes.group(2), 0);
+    }
 
     /**
      * Todos los colores del excel de pedido, código → descripción (vacía si

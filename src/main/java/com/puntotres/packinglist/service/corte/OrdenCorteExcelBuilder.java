@@ -125,6 +125,9 @@ public class OrdenCorteExcelBuilder {
     private static final int COL_COLOR = 1;
     private static final int COL_RECUADRO = 2;
 
+    /** Al final del nombre de la hoja de una orden de prensa, por decisión del usuario. */
+    static final String SUFIJO_PRENSA = " PRENSA";
+
     /** Excel no admite más de 31 caracteres en el nombre de una hoja. */
     private static final int MAXIMO_NOMBRE_HOJA = 31;
     private static final String PROHIBIDOS_EN_HOJA = "[\\\\/?*\\[\\]:]";
@@ -139,7 +142,7 @@ public class OrdenCorteExcelBuilder {
             Map<Imagen, Integer> fotos = new IdentityHashMap<>();
             Set<String> usados = new LinkedHashSet<>();
             for (OrdenCorte orden : ordenes) {
-                String nombre = nombreUnico(nombreHoja(orden), usados);
+                String nombre = nombreUnico(nombreHoja(orden), orden.prensa() ? SUFIJO_PRENSA : "", usados);
                 escribirHoja(libro, libro.createSheet(nombre), orden, estilos, fotos);
             }
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
@@ -165,15 +168,24 @@ public class OrdenCorteExcelBuilder {
      * mayúsculas en los nombres de hoja.
      */
     static String nombreUnico(String deseado, Set<String> usados) {
+        return nombreUnico(deseado, "", usados);
+    }
+
+    /**
+     * {@code fin} va siempre al final y entero (" PRENSA"): lo que se
+     * recorta para que quepa es lo de delante, y el " (2)" va antes de él.
+     */
+    static String nombreUnico(String deseado, String fin, Set<String> usados) {
+        int sitio = MAXIMO_NOMBRE_HOJA - fin.length();
         String nombre = recortar(deseado.replaceAll(PROHIBIDOS_EN_HOJA, "-").replaceAll("\\s+", " ")
-                .trim().replaceAll("^'+|'+$", ""), MAXIMO_NOMBRE_HOJA);
+                .trim().replaceAll("^'+|'+$", ""), sitio);
         if (nombre.isEmpty()) {
             nombre = "Orden";
         }
-        String unico = nombre;
+        String unico = nombre + fin;
         for (int intento = 2; usados.contains(unico.toLowerCase(Locale.ROOT)); intento++) {
             String sufijo = " (" + intento + ")";
-            unico = recortar(nombre, MAXIMO_NOMBRE_HOJA - sufijo.length()) + sufijo;
+            unico = recortar(nombre, sitio - sufijo.length()) + sufijo + fin;
         }
         usados.add(unico.toLowerCase(Locale.ROOT));
         return unico;
@@ -223,7 +235,7 @@ public class OrdenCorteExcelBuilder {
         datoDeBanda(hoja, inicio + 2, estilos.rotuloYValor("Color  ", 12, orden.color(),
                 tamanoEnUnaLinea(orden.color(), anchoDatos - anchoTexto("Color  ", 12),
                         TAMANOS_COLOR_MODELO)), estilos.derecha);
-        datoDeBanda(hoja, inicio + 3, estilos.rotuloYValor("Bolsos  ", 12,
+        datoDeBanda(hoja, inicio + 3, estilos.rotuloYValor("Cantidad  ", 12,
                 String.valueOf(orden.bolsos()), 40), estilos.derecha);
         // Sin foto el hueco se queda en blanco: un rótulo ahí no le dice nada al cortador.
         if (orden.fotoPrincipal() != null) {

@@ -14,15 +14,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.awt.Color;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
 
 import org.junit.jupiter.api.AfterEach;
@@ -36,6 +33,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.MemoriaPieles;
 import com.puntotres.packinglist.testutil.FotosDePrueba;
 import com.puntotres.packinglist.testutil.ExcelDePrueba;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
@@ -59,6 +57,9 @@ class DocumentosCorteControllerTest {
     @Autowired
     private ArchivoTemporadas archivoTemporadas;
 
+    @Autowired
+    private MemoriaPieles memoria;
+
     private final MockHttpSession sesion = new MockHttpSession();
 
     @AfterEach
@@ -72,13 +73,29 @@ class DocumentosCorteControllerTest {
                 .andExpect(content().string(containsString("href=\"/documentos-corte\"")));
     }
 
+    /**
+     * Arranca en el excel de producción, que vale para todos los clientes:
+     * ninguno sale apagado desde el servidor. Cuáles tienen lector de pedido
+     * va en la opción, y el script apaga los demás al pasar al excel de pedido.
+     */
     @Test
-    void laEntradaOfreceAmiYApcYLosGenericosEnDesarrollo() throws Exception {
-        mvc.perform(get("/documentos-corte"))
+    void laEntradaArrancaEnElExcelDeProduccionConTodosLosClientes() throws Exception {
+        String pagina = mvc.perform(get("/documentos-corte"))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Ackermann — en desarrollo")))
-                .andExpect(content().string(containsString("A.P.C.")))
-                .andExpect(content().string(not(containsString("AMI — en desarrollo"))));
+                .andReturn().getResponse().getContentAsString();
+
+        int selector = pagina.indexOf("id=\"selectorOrigen\"");
+        assertTrue(selector > 0 && selector < pagina.indexOf("class=\"tarjeta\""),
+                "los dos botones van arriba del todo");
+        assertTrue(pagina.contains("Excel Producción de Puntotres")
+                && pagina.contains("Excel de Pedido de Cliente"), "los dos orígenes");
+        assertTrue(pagina.contains("id=\"origen\" name=\"origen\" value=\"PRODUCCION\""),
+                "el de producción, por defecto");
+        assertTrue(pagina.contains("id=\"produccion\" name=\"produccion\""), "el excel de producción");
+        assertTrue(!pagina.matches("(?s).*<option[^>]*disabled.*"), "ningún cliente apagado de entrada");
+        assertTrue(pagina.matches("(?s).*<option value=\"ACKERMANN\"[^>]*data-pedido=\"false\".*"), pagina);
+        assertTrue(pagina.matches("(?s).*<option value=\"APC\"[^>]*data-pedido=\"true\"[^>]*"
+                + "data-temporadas=\"true\".*"), pagina);
     }
 
     @Test
@@ -103,10 +120,132 @@ class DocumentosCorteControllerTest {
     }
 
     @Test
-    void unClienteGenericoNoPasa() throws Exception {
+    void unClienteGenericoNoPasaConElExcelDePedido() throws Exception {
         mvc.perform(cargar("ACKERMANN", "H26", pedidoAmi("ULL100"), zipFotos("ULL100")))
                 .andExpect(redirectedUrl("/documentos-corte"))
-                .andExpect(flash().attribute("error", containsString("en desarrollo")));
+                .andExpect(flash().attribute("error", containsString("usa el excel de producción")))
+                .andExpect(flash().attribute("origen", "PEDIDO"));
+    }
+
+    // --- Excel de producción ---
+
+    /**
+     * Con el excel de producción real de APC: la tabla sale con la piel y su
+     * color escritos en él, sale una orden por referencia y color con la
+     * cantidad del taller y, como hay fotos, el Word de fotos, igual que con
+     * el excel de pedido. La memoria de pieles no se escribe.
+     */
+    @Test
+    void conElExcelDeProduccionLaTablaSaleRellenaYSalenLasOrdenesYElWordDeFotos() throws Exception {
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccionApc()))
+                        .file(new MockMultipartFile("fotos", "S27.zip", "application/zip", zipFotos("F67008")))
+                        .param("origen", "PRODUCCION").param("cliente", "APC")
+                        .param("temporada", "SPRING 27").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(tabla.contains("18</span> referencias"), tabla.substring(0, 800));
+        assertTrue(tabla.contains("value=\"ALPACA\"") && tabla.contains("value=\"NOBILE\""), "las pieles escritas");
+        assertTrue(tabla.contains("value=\"AMARILLO CLARO\"") && tabla.contains("value=\"GRIS GUIJARRO\""),
+                "el bicolor: la piel principal y su combinación");
+        assertTrue(tabla.contains("value=\"520\""), "la cantidad del taller del negro de PXCBC-F67008");
+        assertTrue(tabla.contains("falta el forro"), "la ayuda del excel de producción");
+
+        esperarFotos();
+        mvc.perform(post("/documentos-corte/generar").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        String resultados = mvc.perform(get("/documentos-corte/resultados").session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(resultados.contains("29 hojas"), resultados);
+        // F67008 es un modelo con cuatro referencias (cuatro pieles): sale una vez, con sus dos fotos.
+        assertTrue(resultados.contains("Fotos de artículo (1 modelo, 2 fotos)"), resultados);
+        assertTrue(resultados.contains("Fotos Artículos.docx"), resultados);
+        assertEquals("", memoria.buscar("APC", "PXCEU", "PXCEU-F67008").nombrePiel(),
+                "el excel de producción no escribe la memoria de pieles");
+    }
+
+    /** La prensa del excel de AMI sale marcada en la tabla y en sus propias hojas, con PRENSA al final. */
+    @Test
+    void conElExcelDeProduccionLaPrensaVaEnSusPropiasHojas() throws Exception {
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccion("PROD_AMI_SS27.xlsx")))
+                        .param("origen", "PRODUCCION").param("cliente", "AMI")
+                        .param("temporada", "SS27").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("class=\"marca-prensa\"")));
+
+        mvc.perform(post("/documentos-corte/generar").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+        // 12 colores de venta y 6 de prensa.
+        mvc.perform(get("/documentos-corte/resultados").session(sesion))
+                .andExpect(content().string(containsString("18 hojas")));
+        byte[] excel = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI SS27.xlsx")
+                        .session(sesion))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        List<String> hojas = ExcelDePrueba.nombresDeHoja(ExcelDePrueba.abrir(excel));
+        assertTrue(hojas.contains("ULL772.AL245 - NEGRO") && hojas.contains("ULL772.AL245 - NEGRO PRENSA"),
+                hojas.toString());
+    }
+
+    @Test
+    void conElExcelDeProduccionPasaUnClienteGenerico() throws Exception {
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccionApc()))
+                        .param("origen", "PRODUCCION").param("cliente", "ACKERMANN")
+                        .param("temporada", "SS27").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        // Sin regla para partirla, la referencia entera es el modelo.
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("PXCBC-F67008")))
+                .andExpect(content().string(containsString("value=\"ALPACA\"")));
+    }
+
+    /** La temporada guardada solo pone el nombre: su excel de pedido no se lee. */
+    @Test
+    void conElExcelDeProduccionLaTemporadaGuardadaSoloPoneElNombre() throws Exception {
+        Long id = archivoTemporadas.guardar(null, "APC", "SP27-GUARDADA", "pedido.xlsx",
+                "no es un excel".getBytes()).getId();
+
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccionApc()))
+                        .param("origen", "PRODUCCION").param("cliente", "APC")
+                        .param("temporadaGuardadaId", String.valueOf(id)).session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("SP27-GUARDADA")));
+    }
+
+    @Test
+    void conElExcelDeProduccionSinFicheroOConElPedidoNoPasa() throws Exception {
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .param("origen", "PRODUCCION").param("cliente", "APC")
+                        .param("temporada", "SPRING 27").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("Sube el excel de producción")))
+                .andExpect(flash().attribute("origen", "PRODUCCION"));
+
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("produccion", "pedido.xlsx", XLSX, pedidoAmi("ULL120")))
+                        .param("origen", "PRODUCCION").param("cliente", "AMI")
+                        .param("temporada", "H26").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("excel de producción")));
+
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccionApc()))
+                        .param("origen", "PRODUCCION").param("cliente", "APC").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(flash().attribute("error", containsString("Falta el nombre de la temporada")));
     }
 
     /**
@@ -152,8 +291,8 @@ class DocumentosCorteControllerTest {
                 .andReturn().getResponse().getContentAsByteArray();
         assertEquals('P', excel[0]);
         assertEquals('K', excel[1]);
-        // Ningún Word de fotos: el zip de fotos no existe.
-        mvc.perform(get("/documentos-corte/descargar-fotos").session(sesion))
+        // Ningún Word de fotos.
+        mvc.perform(get("/documentos-corte/descargar/AMI - H26 - Fotos Artículos.docx").session(sesion))
                 .andExpect(status().isNotFound());
     }
 
@@ -257,9 +396,14 @@ class DocumentosCorteControllerTest {
         String apartadoOrdenes = resultados.substring(ordenes, fotos);
         String apartadoFotos = resultados.substring(fotos);
         assertTrue(apartadoOrdenes.contains("Ordenes de corte AMI H26.xlsx"), apartadoOrdenes);
-        assertTrue(apartadoFotos.contains("Fotos de ULL105 (2 fotos)"), apartadoFotos);
-        assertTrue(!apartadoFotos.contains("<th>Fichero</th>"), "el fichero es redundante con el contenido");
-        assertTrue(apartadoFotos.contains("href=\"/documentos-corte/descargar-fotos\""), apartadoFotos);
+        // Un solo Word con todos los modelos, y lo que lleva dentro en un desplegable.
+        assertTrue(apartadoFotos.contains("AMI - H26 - Fotos Artículos.docx"), apartadoFotos);
+        assertTrue(apartadoFotos.contains("Fotos de artículo (1 modelo, 2 fotos)"), apartadoFotos);
+        String desplegable = apartadoFotos.substring(apartadoFotos.indexOf("id=\"contenidoFotos\""),
+                apartadoFotos.indexOf("</details>"));
+        assertTrue(desplegable.contains("<td>ULL105</td>") && desplegable.contains("<td>ULL105.AL0103</td>")
+                && desplegable.contains("<td>2</td>"), desplegable);
+        assertTrue(!apartadoFotos.contains("ZIP"), "con un solo Word no hay zip");
         // Salir de la pantalla, al pie y en gris: menú, pieles y otra temporada.
         String pie = resultados.substring(resultados.indexOf("salidas-pantalla"));
         for (String salida : List.of("href=\"/menu\"", "href=\"/documentos-corte/pieles\"",
@@ -275,14 +419,14 @@ class DocumentosCorteControllerTest {
                 .andReturn().getResponse().getContentAsByteArray();
         assertEquals('P', excel[0]);
         assertEquals('K', excel[1]);
-        mvc.perform(get("/documentos-corte/descargar/Fotos ULL105.docx").session(sesion))
-                .andExpect(content().contentType(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"));
-
-        byte[] zip = mvc.perform(get("/documentos-corte/descargar-fotos").session(sesion))
+        String disposicion = mvc.perform(get("/documentos-corte/descargar/AMI - H26 - Fotos Artículos.docx")
+                        .session(sesion))
                 .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsByteArray();
-        assertEquals(List.of("Fotos ULL105.docx"), entradas(zip), "solo los Word de fotos");
+                .andExpect(content().contentType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .andReturn().getResponse().getHeader("Content-Disposition");
+        assertTrue(disposicion.contains("filename*=UTF-8''AMI%20-%20H26%20-%20Fotos%20Art%C3%ADculos.docx"),
+                "el nombre con su tilde: " + disposicion);
     }
 
     @Test
@@ -349,7 +493,7 @@ class DocumentosCorteControllerTest {
                 .andExpect(redirectedUrl("/documentos-corte/resultados"));
 
         mvc.perform(get("/documentos-corte/resultados").session(sesion))
-                .andExpect(content().string(not(containsString("Fotos ULL113"))));
+                .andExpect(content().string(not(containsString("Fotos Artículos"))));
         byte[] excel = mvc.perform(get("/documentos-corte/descargar/Ordenes de corte AMI H26.xlsx")
                 .session(sesion)).andReturn().getResponse().getContentAsByteArray();
         String texto = ExcelDePrueba.texto(ExcelDePrueba.abrir(excel));
@@ -554,6 +698,19 @@ class DocumentosCorteControllerTest {
                 .session(sesion);
     }
 
+    /** La copia sin fotos del excel de producción real de APC, Spring 27. */
+    static byte[] produccionApc() throws IOException {
+        return produccion("PROD_APC_SPRING27.xlsx");
+    }
+
+    /** Una copia sin fotos de un excel de producción real. */
+    static byte[] produccion(String fichero) throws IOException {
+        try (var entrada = DocumentosCorteControllerTest.class
+                .getResourceAsStream("/ejemplos/corte/" + fichero)) {
+            return entrada.readAllBytes();
+        }
+    }
+
     /** Un modelo con dos colores y ULL745, que no trae carpeta de fotos. */
     static byte[] pedidoAmi(String modelo) {
         return pedidoAmi(modelo, "AL0103");
@@ -582,17 +739,5 @@ class DocumentosCorteControllerTest {
             }
         }
         return salida.toByteArray();
-    }
-
-    private static List<String> entradas(byte[] zip) throws IOException {
-        List<String> nombres = new ArrayList<>();
-        try (ZipInputStream entrada = new ZipInputStream(new ByteArrayInputStream(zip))) {
-            ZipEntry actual;
-            while ((actual = entrada.getNextEntry()) != null) {
-                nombres.add(actual.getName());
-            }
-        }
-        assertTrue(!nombres.isEmpty());
-        return nombres;
     }
 }

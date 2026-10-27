@@ -882,7 +882,9 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
 .titulo-entrada-corte { margin-bottom: 1rem; }
 .fila-fotos { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
 .fila-fotos > div { flex: 1 1 16rem; }
-.fila-fotos label { margin-top: 0; }
+/* Más aire bajo los rótulos que en el resto de campos: la caja de subir
+   ficheros va punteada y pegada al rótulo se leía como un bloque. */
+.fila-fotos label { margin-top: 0; margin-bottom: 0.6rem; }
 .isla-fotos .ayuda { margin: 0.8rem 0 0; }
 
 /* Entrada del packing list en islas. El primer rótulo de cada una no lleva el
@@ -1224,6 +1226,17 @@ main.ancho-completo { max-width: 96rem; }
 .tabla-pieles tbody.referencia > tr:first-child > td { border-top: 2px solid var(--borde); }
 .tabla-pieles td.c-color { white-space: nowrap; vertical-align: middle; }
 .tabla-pieles td.c-color label { display: inline; margin: 0; font-weight: normal; }
+/* Los bolsos de prensa se llaman igual que los de venta del mismo color. */
+.tabla-pieles .marca-prensa {
+    margin-left: 0.4rem;
+    padding: 0.05rem 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--acento);
+    border: 1px solid var(--acento);
+    border-radius: 3px;
+}
 .tabla-pieles td input[type="number"] { width: 5rem; }
 .tabla-pieles td input[type="text"] { width: 100%; min-width: 9rem; }
 /* El color de cada piel es una palabra ("NOIR"): casilla más estrecha que la del nombre. */

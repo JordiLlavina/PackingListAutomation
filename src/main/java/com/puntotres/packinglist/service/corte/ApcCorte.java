@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
@@ -52,5 +53,18 @@ public class ApcCorte implements ClienteCorte {
     @Override
     public ReferenciaCorte partir(String referencia) {
         return ReferenciaCorte.deApc(referencia);
+    }
+
+    /**
+     * El código de APC son tres letras o cifras delante de la descripción
+     * ("LZZ NEGRO", "DAB AMARILLO CLARO"). Tiene que llevar descripción
+     * detrás: una palabra suelta de tres letras puede ser el color mismo
+     * ("ORO"), y un bicolor ("AMARILLO CLARO") no trae código.
+     */
+    private static final Pattern COLOR_PRODUCCION = Pattern.compile("([A-Z0-9]{3})\\s+(\\S.*)");
+
+    @Override
+    public ColorCorte colorDeProduccion(String texto) {
+        return ClienteCorte.colorConPatron(texto, COLOR_PRODUCCION);
     }
 }

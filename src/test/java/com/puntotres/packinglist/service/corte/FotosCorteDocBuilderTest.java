@@ -95,14 +95,35 @@ class FotosCorteDocBuilderTest {
     }
 
     @Test
+    void todosLosModelosEnUnSoloWordYCadaUnoEmpiezaEnHojaNueva() throws IOException {
+        // 7 fotos (dos hojas) + 2 (una hoja) + un modelo sin fotos, que no ocupa ninguna.
+        XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(new FotosCorteDocBuilder()
+                .generar(List.of(
+                        new FotosCorte("ULL729", "", List.of(), fotos(7)),
+                        new FotosCorte("ULL800", "", List.of(), List.of()),
+                        new FotosCorte("F67043", "Sac Le Neige", List.of(), fotos(2))))));
+
+        List<String> titulos = doc.getParagraphs().stream()
+                .filter(parrafo -> "Heading1".equals(parrafo.getStyleID()))
+                .map(XWPFParagraph::getText).toList();
+        assertEquals(List.of("ULL729", "ULL729", "F67043 - Sac Le Neige"), titulos);
+        assertEquals(3, doc.getTables().size());
+        assertEquals(1, fotosDe(doc.getTables().get(1)).size());
+        assertEquals(2, fotosDe(doc.getTables().get(2)).size(), "el segundo modelo no aprovecha la hoja del primero");
+        assertEquals(2, saltosDePagina(doc), "tres hojas, sin hoja en blanco al final");
+    }
+
+    @Test
     void conElNombreDelBolsoElTituloEsModeloGuionNombre() {
-        assertEquals("F67043 - Sac Le Neige", new FotosCorte("F67043", "Sac Le Neige", List.of()).titulo());
-        assertEquals("F67043", new FotosCorte("F67043", "", List.of()).titulo());
+        assertEquals("F67043 - Sac Le Neige", new FotosCorte("F67043", "Sac Le Neige", List.of(), List.of()).titulo());
+        assertEquals("F67043", new FotosCorte("F67043", "", List.of(), List.of()).titulo());
     }
 
     @Test
     void dejaUnEjemploEnTargetParaRevisarAOjo() throws IOException {
-        byte[] word = new FotosCorteDocBuilder().generar(new FotosCorte("ULL729", "", fotos(8)));
+        byte[] word = new FotosCorteDocBuilder().generar(List.of(
+                new FotosCorte("ULL729", "", List.of("ULL729.AL0103"), fotos(8)),
+                new FotosCorte("F67043", "Sac Le Neige", List.of("PXCBC-F67043"), fotos(3))));
 
         Path destino = Path.of("target", "Fotos ejemplo.docx");
         Files.createDirectories(destino.getParent());
@@ -112,7 +133,7 @@ class FotosCorteDocBuilderTest {
 
     private static XWPFDocument generar(List<Imagen> fotos) throws IOException {
         return new XWPFDocument(new ByteArrayInputStream(new FotosCorteDocBuilder()
-                .generar(new FotosCorte("ULL729", "", fotos))));
+                .generar(List.of(new FotosCorte("ULL729", "", List.of(), fotos)))));
     }
 
     /** Alterna apaisadas y verticales, para ver cómo encaja cada una. */

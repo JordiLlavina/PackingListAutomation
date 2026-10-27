@@ -1,7 +1,7 @@
 package com.puntotres.packinglist.web;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.IntStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -44,9 +42,12 @@ import com.puntotres.packinglist.service.corte.FilaCorte;
 import com.puntotres.packinglist.service.corte.FotoModelo;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
 import com.puntotres.packinglist.service.corte.LectorFotos;
+import com.puntotres.packinglist.service.corte.OrigenCorte;
 import com.puntotres.packinglist.service.corte.PedidoCorte;
 import com.puntotres.packinglist.service.corte.PielCorte;
 import com.puntotres.packinglist.service.corte.PielesArticulo;
+import com.puntotres.packinglist.service.corte.ProduccionCorte;
+import com.puntotres.packinglist.service.corte.ProduccionPuntotresExcel;
 import com.puntotres.packinglist.service.corte.ResultadoCorte;
 
 /**
@@ -69,6 +70,8 @@ public class DocumentosCorteController {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     private static final String PEDIDO_ILEGIBLE =
             "no tiene el formato esperado: revisa que sea el excel de pedido de ese cliente";
+    private static final String PRODUCCION_ILEGIBLE =
+            "no tiene el formato esperado: revisa que sea el excel de producción de Puntotres (.xlsx)";
     /**
      * Un envío de la tabla sin nada cargado es una sesión caducada (o el
      * servidor reiniciado): se dice, porque volver a la entrada sin más
@@ -78,8 +81,13 @@ public class DocumentosCorteController {
             + "aplicación) y se ha perdido lo cargado: vuelve a subir el pedido y las fotos. Los "
             + "nombres de piel solo se guardan al generar";
 
-    /** Un cliente del desplegable: los que no tienen documentos del corte salen deshabilitados. */
-    public record OpcionCliente(String nombre, boolean disponible) {
+    /**
+     * Un cliente del desplegable. Con el excel de producción valen todos; con
+     * el de pedido, solo los que tienen lector ({@code conPedido}), y los
+     * demás se apagan en la pantalla. {@code conTemporadas}: los de
+     * {@code pedido-cliente: true}, los únicos con temporadas guardadas.
+     */
+    public record OpcionCliente(String nombre, boolean conPedido, boolean conTemporadas) {
     }
 
     private final DocumentosCorteService servicio;
@@ -112,35 +120,104 @@ public class DocumentosCorteController {
         return "documentos-corte";
     }
 
+    /**
+     * {@code origen} sin enviar es el excel de pedido, el camino de siempre,
+     * para no cambiarle el sentido a quien ya llamaba sin él; la pantalla lo
+     * manda siempre, y arranca en el excel de producción.
+     */
     @PostMapping("/documentos-corte/cargar")
     public String cargar(@RequestParam String cliente,
+                         @RequestParam(defaultValue = "PEDIDO") String origen,
                          @RequestParam(required = false) Long temporadaGuardadaId,
                          @RequestParam(required = false) String temporada,
                          @RequestParam(required = false) MultipartFile pedido,
+                         @RequestParam(required = false) MultipartFile produccion,
                          @RequestParam(required = false) MultipartFile fotos,
                          @RequestParam(required = false) List<MultipartFile> carpeta,
                          RedirectAttributes redirect) {
-        ClienteCorte clienteCorte = servicio.clientePara(cliente).orElse(null);
-        if (clienteCorte == null) {
-            return error(redirect, "El cliente '" + cliente
-                    + "' todavía no tiene documentos del corte: está en desarrollo");
+        boolean deProduccion = OrigenCorte.PRODUCCION.name().equalsIgnoreCase(origen.trim());
+        // Si algo falla se vuelve a la entrada con el mismo origen elegido, no al de por defecto.
+        redirect.addFlashAttribute("origen", deProduccion ? OrigenCorte.PRODUCCION.name()
+                : OrigenCorte.PEDIDO.name());
+        ClienteCorte clienteCorte;
+        String nombreTemporada;
+        PedidoCorte pedidoCorte;
+        ProduccionCorte deLaProduccion = null;
+        List<String> avisosLectura = new ArrayList<>();
+        if (deProduccion) {
+            // El excel de producción vale para todos los clientes del catálogo.
+            if (clientesProperties.clientePara(cliente).isEmpty()) {
+                return error(redirect, "El cliente '" + cliente + "' no está en el catálogo");
+            }
+            clienteCorte = servicio.reglasDeProduccion(cliente);
+            // La temporada guardada solo pone el nombre: su excel de pedido no se usa.
+            Optional<TemporadaGuardada> guardada =
+                    archivoTemporadas.paraElEnvio(temporadaGuardadaId, clienteCorte.clave());
+            if (temporadaGuardadaId != null && guardada.isEmpty()) {
+                return error(redirect, "La temporada elegida ya no existe o no es de este cliente: "
+                        + "vuelve a elegirla o escribe su nombre");
+            }
+            nombreTemporada = guardada.map(TemporadaGuardada::getTemporada)
+                    .orElse(temporada == null ? "" : temporada.trim());
+            if (nombreTemporada.isBlank()) {
+                return error(redirect, "Falta el nombre de la temporada");
+            }
+            if (produccion == null || produccion.isEmpty()) {
+                return error(redirect, "Sube el excel de producción de Puntotres");
+            }
+            try {
+                deLaProduccion = ProduccionPuntotresExcel.leer(produccion.getBytes(), clienteCorte);
+            } catch (IllegalArgumentException e) {
+                return error(redirect, "No se pudo leer el excel de producción: " + e.getMessage());
+            } catch (IOException | RuntimeException e) {
+                return error(redirect, "No se pudo leer el excel de producción: " + PRODUCCION_ILEGIBLE);
+            }
+            pedidoCorte = deLaProduccion.pedido();
+            if (pedidoCorte.articulos().isEmpty()) {
+                return error(redirect, "El excel de producción no trae ninguna referencia con color y "
+                        + "cantidad: no hay nada que cortar");
+            }
+            avisosLectura.addAll(pedidoCorte.avisos());
+            avisosLectura.addAll(deLaProduccion.avisos());
+        } else {
+            clienteCorte = servicio.clientePara(cliente).orElse(null);
+            if (clienteCorte == null) {
+                return error(redirect, "El cliente '" + cliente
+                        + "' todavía no tiene documentos del corte con el excel de pedido: usa el excel "
+                        + "de producción");
+            }
+            boolean conExcel = pedido != null && !pedido.isEmpty();
+            // Solo si es de este cliente: el desplegable se rellena en el navegador
+            // y cambiar de cliente después de elegir dejaría enviada la de otro.
+            Optional<TemporadaGuardada> guardada = conExcel ? Optional.empty()
+                    : archivoTemporadas.paraElEnvio(temporadaGuardadaId, clienteCorte.clave());
+            if (!conExcel && guardada.isEmpty()) {
+                return error(redirect, temporadaGuardadaId != null
+                        ? "La temporada elegida ya no existe o no es de este cliente: vuelve a elegirla "
+                                + "o sube el excel de pedido"
+                        : "Elige una temporada guardada o sube el excel de pedido");
+            }
+            nombreTemporada = temporada != null && !temporada.isBlank() ? temporada.trim()
+                    : guardada.map(TemporadaGuardada::getTemporada).orElse("");
+            if (nombreTemporada.isBlank()) {
+                return error(redirect, "Falta el nombre de la temporada");
+            }
+            try {
+                byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
+                pedidoCorte = clienteCorte.leerPedido(excel);
+            } catch (IllegalArgumentException e) {
+                return error(redirect, "No se pudo leer el excel de pedido: "
+                        + (e.getMessage() != null ? e.getMessage() : PEDIDO_ILEGIBLE));
+            } catch (IOException | RuntimeException e) {
+                return error(redirect, "No se pudo leer el excel de pedido: " + PEDIDO_ILEGIBLE);
+            }
+            if (pedidoCorte.articulos().isEmpty()) {
+                return error(redirect, "El excel de pedido no trae ninguna referencia: no hay nada que cortar");
+            }
+            avisosLectura.addAll(pedidoCorte.avisos());
+            pedidoCorte = describirColores(clienteCorte.clave(), pedidoCorte, avisosLectura);
         }
-        boolean conExcel = pedido != null && !pedido.isEmpty();
-        // Solo si es de este cliente: el desplegable se rellena en el navegador
-        // y cambiar de cliente después de elegir dejaría enviada la de otro.
-        Optional<TemporadaGuardada> guardada = conExcel ? Optional.empty()
-                : archivoTemporadas.paraElEnvio(temporadaGuardadaId, clienteCorte.clave());
-        if (!conExcel && guardada.isEmpty()) {
-            return error(redirect, temporadaGuardadaId != null
-                    ? "La temporada elegida ya no existe o no es de este cliente: vuelve a elegirla "
-                            + "o sube el excel de pedido"
-                    : "Elige una temporada guardada o sube el excel de pedido");
-        }
-        String nombreTemporada = temporada != null && !temporada.isBlank() ? temporada.trim()
-                : guardada.map(TemporadaGuardada::getTemporada).orElse("");
-        if (nombreTemporada.isBlank()) {
-            return error(redirect, "Falta el nombre de la temporada");
-        }
+
         boolean conZip = fotos != null && !fotos.isEmpty();
         // Un selector de carpeta sin elegir manda igual una parte sin nombre.
         List<MultipartFile> ficheros = carpeta == null ? List.of() : carpeta.stream()
@@ -155,22 +232,6 @@ public class DocumentosCorteController {
         if (conZip && !ficheros.isEmpty()) {
             return error(redirect, "Sube la carpeta de fotos o su zip, no los dos");
         }
-
-        PedidoCorte pedidoCorte;
-        try {
-            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
-            pedidoCorte = clienteCorte.leerPedido(excel);
-        } catch (IllegalArgumentException e) {
-            return error(redirect, "No se pudo leer el excel de pedido: "
-                    + (e.getMessage() != null ? e.getMessage() : PEDIDO_ILEGIBLE));
-        } catch (IOException | RuntimeException e) {
-            return error(redirect, "No se pudo leer el excel de pedido: " + PEDIDO_ILEGIBLE);
-        }
-        if (pedidoCorte.articulos().isEmpty()) {
-            return error(redirect, "El excel de pedido no trae ninguna referencia: no hay nada que cortar");
-        }
-        List<String> avisosColores = new ArrayList<>();
-        pedidoCorte = describirColores(clienteCorte.clave(), pedidoCorte, avisosColores);
 
         enCurso.reiniciar();
         Path directorio = null;
@@ -188,11 +249,11 @@ public class DocumentosCorteController {
                         .toList(), pedidoCorte.modelos(), clienteCorte::partir, directorio);
             }
             ConversionFotos conversion = conversor.convertir(leidas.todas(), directorio);
-            List<String> avisos = new ArrayList<>(pedidoCorte.avisos());
-            avisos.addAll(avisosColores);
+            List<String> avisos = new ArrayList<>(avisosLectura);
             avisos.addAll(leidas.avisos());
             enCurso.cargar(clienteCorte.clave(), nombreDe(clienteCorte.clave()), nombreTemporada,
-                    directorio, pedidoCorte, leidas, conversion, sinFotos, avisos);
+                    directorio, pedidoCorte, leidas, conversion, sinFotos, avisos,
+                    deProduccion ? OrigenCorte.PRODUCCION : OrigenCorte.PEDIDO);
         } catch (IllegalArgumentException e) {
             CorteEnCurso.borrar(directorio);
             return error(redirect, "No se pudo usar la carpeta de fotos: " + e.getMessage());
@@ -202,15 +263,27 @@ public class DocumentosCorteController {
                     : "No se pudieron leer las fotos de la carpeta: vuelve a elegirla");
         }
 
+        if (deLaProduccion != null) {
+            // El excel de producción ya dice la piel y su color: la memoria no se consulta.
+            deLaProduccion.rellenar(enCurso.getFilas());
+        } else {
+            recordarPieles(clienteCorte.clave());
+        }
+        enCurso.ajustarColumnasALasFilas();
+        return "redirect:/documentos-corte/pieles";
+    }
+
+    /** Lo que la memoria de pieles recuerda de cada fila, para no teclearlo cada temporada. */
+    private void recordarPieles(String cliente) {
         for (FilaCorte fila : enCurso.getFilas()) {
-            MemoriaPieles.Recordadas recordadas = memoria.buscar(clienteCorte.clave(),
+            MemoriaPieles.Recordadas recordadas = memoria.buscar(cliente,
                     fila.referencia().piel(), fila.referencia().referencia());
             fila.setNombrePiel(recordadas.nombrePiel());
             fila.setForro(recordadas.forro());
             fila.setCombinaciones(recordadas.combinaciones());
             List<ColorCorte> colores = fila.colores();
             for (int indice = 0; indice < colores.size(); indice++) {
-                MemoriaPieles.ColoresRecordados recordados = memoria.buscarColores(clienteCorte.clave(),
+                MemoriaPieles.ColoresRecordados recordados = memoria.buscarColores(cliente,
                         fila.referencia().referencia(), colores.get(indice).codigo());
                 // Sin color recordado, la piel principal se queda con el del bolso.
                 if (!recordados.colorPiel().isEmpty()) {
@@ -220,8 +293,6 @@ public class DocumentosCorteController {
                 fila.setColoresCombinacion(indice, recordados.coloresCombinacion());
             }
         }
-        enCurso.ajustarColumnasALasFilas();
-        return "redirect:/documentos-corte/pieles";
     }
 
     // --- Paso 2: pieles ---
@@ -247,6 +318,7 @@ public class DocumentosCorteController {
         // A la vista y no en los avisos plegables: de las fotos que faltan se
         // entera quien está a punto de generar, no quien despliega la lista.
         model.addAttribute("sinFotos", enCurso.isSinFotos());
+        model.addAttribute("deProduccion", enCurso.isDeProduccion());
         model.addAttribute("avisos", enCurso.getAvisosCarga());
         return "documentos-corte-pieles";
     }
@@ -297,20 +369,8 @@ public class DocumentosCorteController {
                     + "): el botón de generar se activa en cuanto acaben");
             return "redirect:/documentos-corte/pieles";
         }
-        for (FilaCorte fila : enCurso.getFilas()) {
-            memoria.recordar(enCurso.getClaveCliente(), fila.referencia().piel(),
-                    fila.referencia().referencia(), fila.getNombrePiel(), fila.getForro(),
-                    fila.getCombinaciones());
-            List<ColorCorte> colores = fila.colores();
-            for (int indice = 0; indice < colores.size(); indice++) {
-                // Las de las combinaciones, emparejadas con las que tienen nombre:
-                // es como se guardan los nombres y como se vuelven a leer.
-                PielesArticulo pieles = fila.pieles(indice);
-                memoria.recordarColores(enCurso.getClaveCliente(), fila.referencia().referencia(),
-                        colores.get(indice).codigo(), fila.getNombrePiel(), pieles.principal().color(),
-                        pieles.forro().color(),
-                        pieles.combinaciones().stream().map(PielCorte::color).toList());
-            }
+        if (!enCurso.isDeProduccion()) {
+            guardarPieles();
         }
         try {
             enCurso.getConversion().esperar();
@@ -332,6 +392,28 @@ public class DocumentosCorteController {
         return "redirect:/documentos-corte/resultados";
     }
 
+    /**
+     * Lo tecleado pasa a la memoria de pieles. Solo con el excel de pedido:
+     * el de producción ya trae las pieles escritas y no la usa.
+     */
+    private void guardarPieles() {
+        for (FilaCorte fila : enCurso.getFilas()) {
+            memoria.recordar(enCurso.getClaveCliente(), fila.referencia().piel(),
+                    fila.referencia().referencia(), fila.getNombrePiel(), fila.getForro(),
+                    fila.getCombinaciones());
+            List<ColorCorte> colores = fila.colores();
+            for (int indice = 0; indice < colores.size(); indice++) {
+                // Las de las combinaciones, emparejadas con las que tienen nombre:
+                // es como se guardan los nombres y como se vuelven a leer.
+                PielesArticulo pieles = fila.pieles(indice);
+                memoria.recordarColores(enCurso.getClaveCliente(), fila.referencia().referencia(),
+                        colores.get(indice).codigo(), fila.getNombrePiel(), pieles.principal().color(),
+                        pieles.forro().color(),
+                        pieles.combinaciones().stream().map(PielCorte::color).toList());
+            }
+        }
+    }
+
     // --- Paso 3: resultados ---
 
     @GetMapping("/documentos-corte/resultados")
@@ -345,7 +427,8 @@ public class DocumentosCorteController {
         model.addAttribute("cliente", enCurso.getNombreCliente());
         model.addAttribute("temporada", enCurso.getTemporada());
         model.addAttribute("ordenes", enCurso.getResultado().ordenes());
-        model.addAttribute("fotos", enCurso.getResultado().fotos());
+        // Un solo Word con todos los modelos, o ninguno.
+        model.addAttribute("fotos", enCurso.getResultado().fotos().stream().findFirst().orElse(null));
         model.addAttribute("sinFotos", enCurso.isSinFotos());
         model.addAttribute("avisos", avisos);
         return "documentos-corte-resultados";
@@ -365,31 +448,9 @@ public class DocumentosCorteController {
         return ResponseEntity.ok()
                 .contentType(nombreFichero.endsWith(".xlsx") ? TIPO_XLSX : TIPO_DOCX)
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(documento.get().nombreFichero()).build().toString())
+                        // UTF-8: el Word de fotos se llama "... - Fotos Artículos.docx".
+                        .filename(documento.get().nombreFichero(), StandardCharsets.UTF_8).build().toString())
                 .body(Files.readAllBytes(documento.get().fichero()));
-    }
-
-    /** Todos los Word de fotos en un zip: el de órdenes es uno solo y tiene su botón. */
-    @GetMapping("/documentos-corte/descargar-fotos")
-    public ResponseEntity<byte[]> descargarFotos() throws IOException {
-        if (enCurso.getResultado() == null || enCurso.getResultado().fotos().isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        ByteArrayOutputStream salida = new ByteArrayOutputStream();
-        try (ZipOutputStream zip = new ZipOutputStream(salida)) {
-            for (DocumentoCorte documento : enCurso.getResultado().fotos()) {
-                zip.putNextEntry(new ZipEntry(documento.nombreFichero()));
-                zip.write(Files.readAllBytes(documento.fichero()));
-                zip.closeEntry();
-            }
-        }
-        String nombreZip = ("Fotos de articulo " + enCurso.getNombreCliente() + " "
-                + enCurso.getTemporada() + ".zip").replaceAll("[\\\\/:*?\"<>|]+", "_");
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("application/zip"))
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
-                        .filename(nombreZip).build().toString())
-                .body(salida.toByteArray());
     }
 
     @GetMapping("/documentos-corte/nuevo")
@@ -494,7 +555,8 @@ public class DocumentosCorteController {
             for (int color = 0; color < colores.size(); color++) {
                 coloresVista.add(new FilaPielesVista.ColorVista(color, colores.get(color).codigo(),
                         colores.get(color).nombre(), colores.get(color).bolsos(), fila.getColorPiel(color),
-                        fila.getColorForro(color), unaPorColumna(fila.getColoresCombinacion(color), columnas)));
+                        fila.getColorForro(color), unaPorColumna(fila.getColoresCombinacion(color), columnas),
+                        colores.get(color).prensa()));
             }
             List<String> fotos = enCurso.getFotos().de(fila.referencia().modelo()).stream()
                     .map(FotoModelo::nombreOriginal).toList();
@@ -529,7 +591,8 @@ public class DocumentosCorteController {
     private Map<String, OpcionCliente> opcionesDeCliente() {
         Map<String, OpcionCliente> opciones = new LinkedHashMap<>();
         clientesProperties.getClientes().forEach((clave, config) -> opciones.put(clave,
-                new OpcionCliente(nombreDe(config, clave), servicio.clientePara(clave).isPresent())));
+                new OpcionCliente(nombreDe(config, clave), servicio.clientePara(clave).isPresent(),
+                        config.isPedidoCliente())));
         return opciones;
     }
 
