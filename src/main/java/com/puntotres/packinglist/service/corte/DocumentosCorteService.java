@@ -81,13 +81,14 @@ public class DocumentosCorteService {
             }
             String modelo = fila.referencia().modelo();
             List<FotoModelo> delModelo = fotos.de(modelo);
-            Imagen principal = principal(delModelo, fila.getFotoPrincipal(), reducida, leidas, avisos);
+            List<Imagen> deLaOrden = fotosDeLaOrden(delModelo, fila.getFotoPrincipal(), reducida, leidas, avisos);
             List<ColorCorte> colores = fila.colores();
             for (int indice = 0; indice < colores.size(); indice++) {
                 ColorCorte color = colores.get(indice);
                 if (color.bolsos() > 0) {
                     fichas.add(new OrdenCorte(cliente, temporada, fila.referencia().referencia(), modelo,
-                            color.nombre(), color.bolsos(), fila.pieles(indice), principal, color.prensa()));
+                            fila.nombreModelo(), color.nombre(), color.bolsos(), fila.pieles(indice), deLaOrden,
+                            color.prensa()));
                 }
             }
             modelos.merge(modelo, fila.nombreModelo(),
@@ -144,25 +145,31 @@ public class DocumentosCorteService {
     }
 
     /**
-     * La elegida y, si no se pudo convertir, la primera legible del modelo:
-     * una orden sin foto teniendo fotos del bolso sería un fallo que no se ve
-     * hasta el puesto de corte.
+     * Las fotos de la ficha, hasta {@link OrdenCorte#MAXIMO_FOTOS}: la elegida
+     * en la tabla de pieles primero y detrás las demás del modelo, que ya
+     * vienen por orden alfabético; con más de tres, por decisión del usuario,
+     * las primeras. Sin tocar el desplegable la elegida es la que se llama
+     * «principal», que por orden alfabético ya iba delante. Una foto que no se
+     * pudo convertir deja su sitio a la siguiente legible: una orden con menos
+     * fotos de las que tiene el bolso sería un fallo que no se ve hasta el
+     * puesto de corte.
      */
-    private static Imagen principal(List<FotoModelo> fotos, int elegida,
-                                    Function<FotoModelo, Optional<Path>> reducida,
-                                    Map<Path, Optional<Imagen>> leidas, List<String> avisos) {
+    private static List<Imagen> fotosDeLaOrden(List<FotoModelo> fotos, int elegida,
+                                               Function<FotoModelo, Optional<Path>> reducida,
+                                               Map<Path, Optional<Imagen>> leidas, List<String> avisos) {
         List<FotoModelo> candidatas = new ArrayList<>();
         if (elegida >= 0 && elegida < fotos.size()) {
             candidatas.add(fotos.get(elegida));
         }
-        candidatas.addAll(fotos);
+        fotos.stream().filter(foto -> !candidatas.contains(foto)).forEach(candidatas::add);
+        List<Imagen> elegidas = new ArrayList<>();
         for (FotoModelo foto : candidatas) {
-            Optional<Imagen> imagen = imagen(foto, reducida, leidas, avisos);
-            if (imagen.isPresent()) {
-                return imagen.get();
+            if (elegidas.size() == OrdenCorte.MAXIMO_FOTOS) {
+                break;
             }
+            imagen(foto, reducida, leidas, avisos).ifPresent(elegidas::add);
         }
-        return null;
+        return elegidas;
     }
 
     private static Optional<Imagen> imagen(FotoModelo foto,

@@ -76,6 +76,33 @@ class DocumentosCorteGeneracionTest {
                 fotoPrincipal(resultado));
     }
 
+    /**
+     * Hasta tres fotos por ficha: la elegida primero y detrás las demás por
+     * orden alfabético. Con más de tres, las primeras; una que no se pudo
+     * convertir deja su sitio a la siguiente.
+     */
+    @Test
+    void laFichaLlevaHastaTresFotosConLaElegidaPrimeroYLasDemasPorOrdenAlfabetico() throws IOException {
+        FotoModelo fotoC = new FotoModelo("ULL027", "c.jpg", dir.resolve("00003.jpg"));
+        FotoModelo fotoD = new FotoModelo("ULL027", "d.jpg", dir.resolve("00004.jpg"));
+        FotoModelo fotoE = new FotoModelo("ULL027", "e.jpg", dir.resolve("00005.jpg"));
+        fotos = new FotosTemporada(Map.of("ULL027", List.of(fotoA, fotoB, fotoC, fotoD, fotoE)), List.of());
+        reducidas.put(fotoC.original(), escribir("c-reducida.jpg", Color.GREEN));
+        reducidas.put(fotoD.original(), escribir("d-reducida.jpg", Color.YELLOW));
+        reducidas.put(fotoE.original(), escribir("e-reducida.jpg", Color.MAGENTA));
+        reducidas.remove(fotoB.original());
+        FilaCorte fila = fila("ULL027.AL0103", 10);
+        fila.setFotoPrincipal(3);
+
+        List<byte[]> enLaFicha = fotosDeLaFicha(generar("H26", List.of(fila)));
+
+        // d (la elegida), a, y c en el sitio de b, que no se pudo convertir; e se queda fuera.
+        assertEquals(3, enLaFicha.size());
+        assertArrayEquals(Files.readAllBytes(reducidas.get(fotoD.original())), enLaFicha.get(0));
+        assertArrayEquals(Files.readAllBytes(reducidas.get(fotoA.original())), enLaFicha.get(1));
+        assertArrayEquals(Files.readAllBytes(reducidas.get(fotoC.original())), enLaFicha.get(2));
+    }
+
     @Test
     void siLaElegidaNoSeHaPodidoConvertirSaleLaSiguienteLegible() throws IOException {
         reducidas.remove(fotoB.original());
@@ -197,6 +224,16 @@ class DocumentosCorteGeneracionTest {
 
     private static XSSFWorkbook abrirExcel(DocumentoCorte documento) throws IOException {
         return ExcelDePrueba.abrir(Files.readAllBytes(documento.fichero()));
+    }
+
+    /** Las fotos de la primera ficha, de izquierda a derecha. */
+    private static List<byte[]> fotosDeLaFicha(ResultadoCorte resultado) throws IOException {
+        return ExcelDePrueba.fotosDe(abrirExcel(resultado.documentos().get(0)).getSheetAt(0)).stream()
+                .sorted(java.util.Comparator.comparingInt((org.apache.poi.xssf.usermodel.XSSFPicture foto) ->
+                                foto.getClientAnchor().getCol1())
+                        .thenComparingInt(foto -> foto.getClientAnchor().getDx1()))
+                .map(foto -> foto.getPictureData().getData())
+                .toList();
     }
 
     private static byte[] fotoPrincipal(ResultadoCorte resultado) throws IOException {

@@ -162,6 +162,98 @@ class OrdenCorteExcelBuilderTest {
         assertTrue(ExcelDePrueba.fotosDe(libro.getSheetAt(1)).isEmpty());
     }
 
+    /**
+     * Dos y tres fotos van en fila, de izquierda a derecha en el orden de la
+     * orden, sin deformarse, sin pisarse, dentro de la banda y sin pasar por
+     * debajo del texto de la derecha, que se encoge. Tres empiezan debajo de
+     * la línea de cliente y temporada.
+     */
+    @Test
+    void dosYTresFotosVanEnFilaSinPisarseNiPisarElTexto() throws IOException {
+        Imagen tercera = imagen(1000, 1000, "3", Color.GRAY);
+        for (List<Imagen> imagenes : List.of(List.of(APAISADA, VERTICAL), List.of(APAISADA, VERTICAL, tercera))) {
+            XSSFSheet hoja = generar(List.of(new OrdenCorte("A.P.C.", "SPRING 27", "PXCBC-F63033", "F63033",
+                    "AMARILLO CLARO / GRIS GUIJARRO", 1104, sinCombinaciones(), imagenes, false))).getSheetAt(0);
+
+            List<XSSFPicture> fotos = new java.util.ArrayList<>(ExcelDePrueba.fotosDe(hoja));
+            assertEquals(imagenes.size(), fotos.size());
+            fotos.sort(java.util.Comparator.comparingDouble(foto -> izquierda(foto.getClientAnchor())));
+            double finAnterior = 0;
+            for (int i = 0; i < fotos.size(); i++) {
+                XSSFClientAnchor ancla = fotos.get(i).getClientAnchor();
+                double ancho = derecha(ancla) - izquierda(ancla);
+                double alto = altoEnPuntos(hoja, ancla);
+                assertEquals((double) imagenes.get(i).ancho() / imagenes.get(i).alto(), ancho / alto, 0.02,
+                        "la foto " + (i + 1) + " va en su sitio y sin deformarse");
+                assertTrue(izquierda(ancla) > finAnterior, "la foto " + (i + 1) + " no pisa la anterior");
+                assertTrue(arriba(hoja, ancla) + alto <= OrdenCorteExcelBuilder.ALTO_BANDA, "dentro de la banda");
+                if (imagenes.size() == 3) {
+                    assertTrue(arriba(hoja, ancla) >= OrdenCorteExcelBuilder.FILAS_BANDA[0],
+                            "tres fotos no tapan la línea de cliente y temporada");
+                }
+                finAnterior = derecha(ancla);
+            }
+            // El texto de la derecha cabe en lo que dejan libre las fotos, también
+            // un color largo con tres fotos: si hace falta, las fotos se estrechan.
+            double libre = OrdenCorteExcelBuilder.anchoDatos(finAnterior);
+            double color = OrdenCorteExcelBuilder.anchoTexto("Color  ", 12)
+                    + OrdenCorteExcelBuilder.anchoTexto("AMARILLO CLARO / GRIS GUIJARRO", 14);
+            assertTrue(color <= libre, imagenes.size() + " fotos: el color pide " + color + " y quedan " + libre);
+            assertTrue(libre < OrdenCorteExcelBuilder.anchoDatos(0), "las fotos le quitan sitio");
+        }
+    }
+
+    @Test
+    void conMasDeTresFotosSoloSalenLasTresPrimeras() throws IOException {
+        Imagen cuarta = imagen(500, 500, "4", Color.RED);
+        OrdenCorte orden = new OrdenCorte("AMI", "H26", "ULL027.AL0103", "ULL027", "001 BLACK", 1,
+                sinCombinaciones(), List.of(APAISADA, VERTICAL, APAISADA, cuarta), false);
+
+        assertEquals(List.of(APAISADA, VERTICAL, APAISADA), orden.fotos());
+        assertEquals(3, ExcelDePrueba.fotosDe(generar(List.of(orden)).getSheetAt(0)).size());
+    }
+
+    /**
+     * Entre el modelo y el color va el nombre del bolso, en mayúsculas; sin
+     * nombre la fila se queda vacía. La banda mide lo mismo que antes de
+     * tener esa fila, para que las fotos sigan donde el usuario las colocó.
+     */
+    @Test
+    void elNombreDelBolsoVaEntreElModeloYElColor() throws IOException {
+        XSSFWorkbook libro = generar(List.of(
+                new OrdenCorte("A.P.C.", "SPRING 27", "PXCBC-F67008", "F67008", "le neige", "LZZ NEGRO", 520,
+                        sinCombinaciones(), List.of(APAISADA), false),
+                orden("ULL027.AL0103", "001 BLACK", 10, sinCombinaciones(), APAISADA)));
+
+        XSSFSheet conNombre = libro.getSheetAt(0);
+        assertEquals("F67008", texto(conNombre.getRow(1), 1));
+        assertEquals("LE NEIGE", texto(conNombre.getRow(2), 1));
+        assertTrue(texto(conNombre.getRow(3), 1).startsWith("Color"), texto(conNombre.getRow(3), 1));
+        assertTrue(texto(conNombre.getRow(4), 1).startsWith("Cantidad"), texto(conNombre.getRow(4), 1));
+        assertEquals("", texto(libro.getSheetAt(1).getRow(2), 1), "sin nombre, la fila vacía");
+        assertEquals(198.4, OrdenCorteExcelBuilder.ALTO_BANDA, 0.01);
+    }
+
+    /** Una piel sola baja al pie de la página, por decisión del usuario; con más no hay aire que repartir. */
+    @Test
+    void unaPielSolaVaAlPieDeLaPagina() throws IOException {
+        XSSFSheet sola = generar(List.of(orden("A", "001", 1, sinCombinaciones(), APAISADA))).getSheetAt(0);
+        XSSFRow piel = renglonesDePiel(sola).get(0);
+        double encima = 0;
+        for (int fila = 0; fila < piel.getRowNum(); fila++) {
+            encima += sola.getRow(fila).getHeightInPoints();
+        }
+        double fin = encima + piel.getHeightInPoints();
+        assertTrue(fin <= OrdenCorteExcelBuilder.ALTO_UTIL, "cabe en la página: " + fin);
+        assertTrue(fin >= OrdenCorteExcelBuilder.ALTO_UTIL - OrdenCorteExcelBuilder.RESERVA - 1,
+                "llega al pie: acaba en " + fin + " de " + OrdenCorteExcelBuilder.ALTO_UTIL);
+
+        XSSFSheet dos = generar(List.of(orden("A", "001", 1,
+                new PielesArticulo("Box", "Tela", List.of()), APAISADA))).getSheetAt(0);
+        assertEquals(OrdenCorteExcelBuilder.SEPARACION,
+                dos.getRow(OrdenCorteExcelBuilder.FILAS_BANDA.length).getHeightInPoints());
+    }
+
     @Test
     void unaFotoQueSaleEnVariasFichasSeGuardaUnaSolaVez() throws IOException {
         XSSFWorkbook libro = generar(List.of(
@@ -251,7 +343,16 @@ class OrdenCorteExcelBuilderTest {
                         new PielCorte("Cabretilla doublure", "SAND/CHOCOLATE BROWN"),
                         List.of(new PielCorte("Ante velours", "CHOCOLATE BROWN"), new PielCorte("Charol", "NOIR"),
                                 new PielCorte("Nappa agneau", "MASTIC BEIGE"), new PielCorte("Box calf", "TRUFFLE"))),
-                        APAISADA)));
+                        APAISADA),
+                // Dos y tres fotos, con una piel sola (al pie) y con una combinación.
+                new OrdenCorte("A.P.C.", "SPRING 27", "PXCBC-F63033", "F63033", "porte-monnaie neige rond", "LZZ NEGRO", 92,
+                        new PielesArticulo(new PielCorte("ALPACA", "NEGRO"), PielCorte.NINGUNA, List.of()),
+                        List.of(APAISADA, VERTICAL), false),
+                new OrdenCorte("A.P.C.", "SPRING 27", "PXCFV-F63023", "F63023", "la pochette neige clou",
+                        "AMARILLO CLARO / GRIS GUIJARRO",
+                        1104, new PielesArticulo(new PielCorte("ALPACA BICOLOR", "AMARILLO CLARO"), PielCorte.NINGUNA,
+                        List.of(new PielCorte("ALPACA BICOLOR", "GRIS GUIJARRO"))),
+                        List.of(APAISADA, VERTICAL, imagen(1000, 1000, "3", Color.GRAY)), false)));
 
         Path destino = Path.of("target", "Ordenes de corte ejemplo.xlsx");
         Files.createDirectories(destino.getParent());
@@ -278,6 +379,32 @@ class OrdenCorteExcelBuilderTest {
 
     private static String texto(XSSFRow fila, int columna) {
         return fila == null || fila.getCell(columna) == null ? "" : fila.getCell(columna).getStringCellValue();
+    }
+
+    /** Dónde empieza el ancla, en puntos desde la izquierda de la ficha. */
+    private static double izquierda(XSSFClientAnchor ancla) {
+        return inicioDeColumna(ancla.getCol1()) + (double) ancla.getDx1() / Units.EMU_PER_POINT;
+    }
+
+    private static double derecha(XSSFClientAnchor ancla) {
+        return inicioDeColumna(ancla.getCol2()) + (double) ancla.getDx2() / Units.EMU_PER_POINT;
+    }
+
+    private static double inicioDeColumna(int columna) {
+        double[] anchos = {OrdenCorteExcelBuilder.ANCHO_NOMBRE_CM, OrdenCorteExcelBuilder.ANCHO_COLOR_CM};
+        double cm = 0;
+        for (int i = 0; i < columna; i++) {
+            cm += anchos[i];
+        }
+        return cm * 72 / 2.54;
+    }
+
+    private static double arriba(XSSFSheet hoja, XSSFClientAnchor ancla) {
+        double alto = 0;
+        for (int fila = 0; fila < ancla.getRow1(); fila++) {
+            alto += hoja.getRow(fila).getHeightInPoints();
+        }
+        return alto + (double) ancla.getDy1() / Units.EMU_PER_POINT;
     }
 
     private static double altoEnPuntos(XSSFSheet hoja, XSSFClientAnchor ancla) {

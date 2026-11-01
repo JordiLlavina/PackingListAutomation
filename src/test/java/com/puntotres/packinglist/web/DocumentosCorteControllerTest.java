@@ -190,9 +190,13 @@ class DocumentosCorteControllerTest {
                         .session(sesion))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsByteArray();
-        List<String> hojas = ExcelDePrueba.nombresDeHoja(ExcelDePrueba.abrir(excel));
+        var libro = ExcelDePrueba.abrir(excel);
+        List<String> hojas = ExcelDePrueba.nombresDeHoja(libro);
         assertTrue(hojas.contains("ULL772.AL245 - NEGRO") && hojas.contains("ULL772.AL245 - NEGRO PRENSA"),
                 hojas.toString());
+        // El nombre del bolso, del excel de producción, entre el modelo y el color.
+        assertEquals("AMI CANDY POUCH BAG", libro.getSheet("ULL772.AL245 - NEGRO").getRow(2).getCell(1)
+                .getStringCellValue());
     }
 
     @Test
@@ -449,7 +453,8 @@ class DocumentosCorteControllerTest {
                 && progreso.contains("boton neutro"), progreso);
         assertTrue(pagina.contains("Los campos se pueden dejar vacíos. Se puede generar sin fotografías."));
         assertTrue(!pagina.contains("Los nombres valen para todos los colores"));
-        assertTrue(pagina.contains("<th>Foto para Orden de Corte</th>")
+        // La orden lleva hasta tres fotos: el desplegable elige cuál va primera.
+        assertTrue(pagina.contains(">Primera foto de la Orden de Corte</th>")
                 && !pagina.contains("Foto principal"), "cabecera de la columna de la foto");
     }
 

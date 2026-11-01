@@ -39,12 +39,13 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  * con el modelo solo no se distinguirían. Cada ficha es una página A4
  * apaisada al imprimir.
  *
- * La ficha es la del Word que el usuario retocó a mano: arriba, la foto del
- * modelo a la izquierda y a la derecha cliente y temporada en pequeño, y en
- * grande el modelo, el color y los bolsos. Debajo, las pieles —principal, de
- * combinación y forro—, una por renglón: el nombre a la derecha de la primera
- * columna, su COLOR en la segunda y un recuadro vacío en la tercera, donde se
- * pega la muestra de piel una vez impresa.
+ * La ficha es la del Word que el usuario retocó a mano: arriba, hasta tres
+ * fotos del modelo a la izquierda (ver HUECOS_FOTOS) y a la derecha cliente y
+ * temporada en pequeño, y en grande el modelo, el color y la cantidad. Debajo,
+ * las pieles —principal, de combinación y forro—, una por renglón: el nombre a
+ * la derecha de la primera columna, su COLOR en la segunda y un recuadro
+ * vacío en la tercera, donde se pega la muestra de piel una vez impresa. Una
+ * piel sola va al pie de la página.
  *
  * Todo en puntos, que es como mide Excel el alto de las filas. Cada ficha
  * tiene que caber en UNA página, porque se le pega la muestra y se cuelga en
@@ -81,8 +82,13 @@ public class OrdenCorteExcelBuilder {
     static final double ANCHO_COLOR_CM = 5;
     static final double ANCHO_RECUADRO_CM = 11.5;
 
-    /** Banda superior de 7 cm: foto a la izquierda, datos a la derecha. */
-    static final float[] FILAS_BANDA = {20, 52, 40, 52, 34.4f};
+    /**
+     * Banda superior de 7 cm: fotos a la izquierda y, a la derecha, cliente y
+     * temporada, modelo, nombre del bolso, color y cantidad. La fila del
+     * nombre salió del aire de debajo de la cantidad (34,4 → 10,4), para que
+     * la banda mida lo mismo y las fotos sigan donde el usuario las colocó.
+     */
+    static final float[] FILAS_BANDA = {20, 52, 24, 40, 52, 10.4f};
     static final double ALTO_BANDA = suma(FILAS_BANDA);
     /** Aire entre la banda y la primera piel. */
     static final float SEPARACION = 17;
@@ -120,6 +126,42 @@ public class OrdenCorteExcelBuilder {
     private static final double HOLGURA = 3;
     /** Aire alrededor de la foto, para que no toque el borde de la página. */
     private static final double AIRE_FOTO = 4;
+
+    /**
+     * Dónde van las fotos de la banda, según cuántas son: de {@code x0} a
+     * {@code x1} y de {@code y0} a {@code y1}, en puntos desde la esquina de
+     * la ficha, partido en tantos huecos iguales como fotos, con
+     * {@code separacion} entre uno y otro. Cada foto se encaja en su hueco
+     * sin deformarla y centrada.
+     */
+    record HuecoFotos(double x0, double x1, double y0, double y1, double separacion) {
+    }
+
+    /**
+     * Copiados de las fichas que el usuario colocó a mano en el ejemplo
+     * ("ejemplos de varias fotos corte.xlsx"). Una: en la columna de la
+     * izquierda, como siempre. Dos: una al lado de la otra, del mismo alto,
+     * hasta debajo del texto de la derecha. Tres: más pequeñas, en fila y
+     * empezando debajo de la línea de cliente y temporada, que si no
+     * taparían; la tercera llega hasta la columna del recuadro.
+     */
+    static final HuecoFotos[] HUECOS_FOTOS = {
+            null,
+            new HuecoFotos(AIRE_FOTO, ANCHO_NOMBRE_CM * PUNTOS_POR_CM - AIRE_FOTO,
+                    AIRE_FOTO, ALTO_BANDA - AIRE_FOTO, 0),
+            new HuecoFotos(40.5, 448.6, AIRE_FOTO, ALTO_BANDA - AIRE_FOTO, 15),
+            new HuecoFotos(17.7, 587.6, FILAS_BANDA[0], ALTO_BANDA - AIRE_FOTO, 9)};
+
+    /** Lo que mide la ficha de ancho, sus tres columnas, en puntos. */
+    static final double ANCHO_FICHA = (ANCHO_NOMBRE_CM + ANCHO_COLOR_CM + ANCHO_RECUADRO_CM) * PUNTOS_POR_CM;
+
+    /** Aire entre la última foto y el texto de la derecha, que se encoge para no quedar debajo. */
+    private static final double AIRE_DATOS = 9;
+
+    private static final int[] TAMANOS_CLIENTE = {12, 11, 10, 9};
+    private static final int[] TAMANOS_MODELO = {40, 36, 32, 28, 24, 20};
+    private static final int[] TAMANOS_NOMBRE_MODELO = {16, 14, 12, 11, 10};
+    private static final int[] TAMANOS_CANTIDAD = {40, 36, 32, 28, 24, 20};
 
     private static final int COL_NOMBRE = 0;
     private static final int COL_COLOR = 1;
@@ -228,24 +270,49 @@ public class OrdenCorteExcelBuilder {
         for (int i = 0; i < FILAS_BANDA.length; i++) {
             hoja.createRow(inicio + i).setHeightInPoints(FILAS_BANDA[i]);
         }
-        datoDeBanda(hoja, inicio, estilos.texto(orden.cliente().toUpperCase(Locale.ROOT)
-                + " | Temporada " + orden.temporada(), 12, false, GRIS), estilos.derecha);
-        datoDeBanda(hoja, inicio + 1, estilos.texto(orden.modelo(), 40, true, NEGRO), estilos.derecha);
-        double anchoDatos = puntos(ANCHO_COLOR_CM + ANCHO_RECUADRO_CM) - 2 * MARGEN_CELDA;
-        datoDeBanda(hoja, inicio + 2, estilos.rotuloYValor("Color  ", 12, orden.color(),
+        String cliente = orden.cliente().toUpperCase(Locale.ROOT) + " | Temporada " + orden.temporada();
+        String cantidad = String.valueOf(orden.bolsos());
+        // En mayúsculas, como el MODÈLE del packing de APC: el excel de
+        // producción ya lo escribe así y la Désignation del pedido no.
+        String nombreBolso = orden.nombreModelo().toUpperCase(Locale.ROOT);
+        // El texto va alineado a la derecha y nunca pasa por debajo de las
+        // fotos: con dos o tres, que entran en su columna, primero se encoge,
+        // y si ni con la letra más pequeña cabe, las fotos se estrechan.
+        double necesario = Math.max(Math.max(anchoTexto(orden.modelo(), ultimo(TAMANOS_MODELO)),
+                        nombreBolso.isEmpty() ? 0 : anchoTexto(nombreBolso, ultimo(TAMANOS_NOMBRE_MODELO))), Math.max(
+                anchoTexto("Color  ", 12) + anchoTexto(orden.color(), ultimo(TAMANOS_COLOR_MODELO)),
+                anchoTexto("Cantidad  ", 12) + anchoTexto(cantidad, ultimo(TAMANOS_CANTIDAD))));
+        // Sin foto el hueco se queda en blanco: un rótulo ahí no le dice nada al
+        // cortador. El punto de más es para que un empate de decimales no deje
+        // el texto una milésima más ancho que su sitio y lo encoja de más.
+        Colocacion colocacion = fotos(libro, dibujo, hoja, inicio, orden.fotos(),
+                ANCHO_FICHA - 2 * MARGEN_CELDA - necesario - AIRE_DATOS - 1, fotos);
+        double anchoDatos = anchoDatos(colocacion.fin());
+        // La línea de cliente y temporada solo se encoge si alguna foto llega a su altura.
+        double anchoCliente = colocacion.arriba() >= FILAS_BANDA[0] ? anchoDatos(0) : anchoDatos;
+        datoDeBanda(hoja, inicio, estilos.texto(cliente,
+                tamanoEnUnaLinea(cliente, anchoCliente, TAMANOS_CLIENTE), false, GRIS), estilos.derecha);
+        datoDeBanda(hoja, inicio + 1, estilos.texto(orden.modelo(),
+                tamanoEnUnaLinea(orden.modelo(), anchoDatos, TAMANOS_MODELO), true, NEGRO), estilos.derecha);
+        // Sin nombre (el pedido de AMI no lo trae) la fila se queda vacía: la
+        // banda mide siempre lo mismo y las fotos no se mueven.
+        if (!nombreBolso.isEmpty()) {
+            datoDeBanda(hoja, inicio + 2, estilos.texto(nombreBolso,
+                    tamanoEnUnaLinea(nombreBolso, anchoDatos, TAMANOS_NOMBRE_MODELO), false, NEGRO), estilos.derecha);
+        }
+        datoDeBanda(hoja, inicio + 3, estilos.rotuloYValor("Color  ", 12, orden.color(),
                 tamanoEnUnaLinea(orden.color(), anchoDatos - anchoTexto("Color  ", 12),
                         TAMANOS_COLOR_MODELO)), estilos.derecha);
-        datoDeBanda(hoja, inicio + 3, estilos.rotuloYValor("Cantidad  ", 12,
-                String.valueOf(orden.bolsos()), 40), estilos.derecha);
-        // Sin foto el hueco se queda en blanco: un rótulo ahí no le dice nada al cortador.
-        if (orden.fotoPrincipal() != null) {
-            foto(libro, dibujo, hoja, inicio, orden.fotoPrincipal(), fotos);
-        }
+        datoDeBanda(hoja, inicio + 4, estilos.rotuloYValor("Cantidad  ", 12, cantidad,
+                tamanoEnUnaLinea(cantidad, anchoDatos - anchoTexto("Cantidad  ", 12), TAMANOS_CANTIDAD)),
+                estilos.derecha);
 
         int fila = inicio + FILAS_BANDA.length;
-        hoja.createRow(fila++).setHeightInPoints(SEPARACION);
         List<String[]> renglones = renglones(orden.pieles());
         float alto = altoPiel(renglones.size());
+        // Una piel sola va al pie del A4, por decisión del usuario: arriba
+        // dejaba media página en blanco debajo del recuadro.
+        hoja.createRow(fila++).setHeightInPoints(separacion(renglones.size(), alto));
         for (int i = 0; i < renglones.size(); i++) {
             String[] renglon = renglones.get(i);
             XSSFRow filaPiel = hoja.createRow(fila);
@@ -291,31 +358,95 @@ public class OrdenCorteExcelBuilder {
         hoja.addMergedRegion(new CellRangeAddress(fila, fila, COL_COLOR, COL_RECUADRO));
     }
 
-    /**
-     * La foto encajada en el hueco de la izquierda de la banda sin deformarla
-     * (manda el lado que antes llega al borde) y centrada en él. Una foto que
-     * sale en varias fichas se guarda una sola vez en el libro.
-     */
-    private static void foto(XSSFWorkbook libro, XSSFDrawing dibujo, XSSFSheet hoja, int inicio,
-                             Imagen imagen, Map<Imagen, Integer> fotos) {
-        double anchoHueco = puntos(ANCHO_NOMBRE_CM) - 2 * AIRE_FOTO;
-        double altoHueco = ALTO_BANDA - 2 * AIRE_FOTO;
-        double escala = Math.min(anchoHueco / imagen.ancho(), altoHueco / imagen.alto());
-        double ancho = imagen.ancho() * escala;
-        double alto = imagen.alto() * escala;
-        double x = AIRE_FOTO + (anchoHueco - ancho) / 2;
-        double y = AIRE_FOTO + (altoHueco - alto) / 2;
-        int indice = fotos.computeIfAbsent(imagen,
-                foto -> libro.addPicture(foto.jpeg(), Workbook.PICTURE_TYPE_JPEG));
+    /** Dónde han quedado las fotos: dónde acaba la última por la derecha y dónde empieza la más alta. */
+    record Colocacion(double fin, double arriba) {
+        static final Colocacion NINGUNA = new Colocacion(0, Double.MAX_VALUE);
+    }
 
-        int[] desde = filaYResto(hoja, inicio, y);
-        int[] hasta = filaYResto(hoja, inicio, y + alto);
-        XSSFClientAnchor ancla = new XSSFClientAnchor(
-                (int) Math.round(x * Units.EMU_PER_POINT), desde[1],
-                (int) Math.round((x + ancho) * Units.EMU_PER_POINT), hasta[1],
-                COL_NOMBRE, desde[0], COL_NOMBRE, hasta[0]);
-        ancla.setAnchorType(XSSFClientAnchor.AnchorType.MOVE_AND_RESIZE);
-        dibujo.createPicture(ancla, indice);
+    /**
+     * Las fotos de la banda, cada una encajada en su hueco (ver
+     * {@link #HUECOS_FOTOS}) sin deformarla —manda el lado que antes llega al
+     * borde— y centrada en él. {@code limiteDerecho}: hasta dónde pueden
+     * llegar sin tapar el texto de la derecha; si el hueco del ejemplo se
+     * pasa, se estrecha, aunque nunca por debajo de la columna de la
+     * izquierda. Una foto que sale en varias fichas se guarda una sola vez en
+     * el libro.
+     */
+    private static Colocacion fotos(XSSFWorkbook libro, XSSFDrawing dibujo, XSSFSheet hoja, int inicio,
+                                    List<Imagen> imagenes, double limiteDerecho, Map<Imagen, Integer> fotos) {
+        int cuantas = Math.min(imagenes.size(), OrdenCorte.MAXIMO_FOTOS);
+        if (cuantas == 0) {
+            return Colocacion.NINGUNA;
+        }
+        HuecoFotos hueco = HUECOS_FOTOS[cuantas];
+        double minimo = Math.min(hueco.x1(), puntos(ANCHO_NOMBRE_CM) - AIRE_FOTO);
+        double x1 = Math.max(minimo, Math.min(hueco.x1(), limiteDerecho));
+        double anchoHueco = (x1 - hueco.x0() - (cuantas - 1) * hueco.separacion()) / cuantas;
+        double altoHueco = hueco.y1() - hueco.y0();
+        double fin = 0;
+        double arriba = Double.MAX_VALUE;
+        for (int i = 0; i < cuantas; i++) {
+            Imagen imagen = imagenes.get(i);
+            double escala = Math.min(anchoHueco / imagen.ancho(), altoHueco / imagen.alto());
+            double ancho = imagen.ancho() * escala;
+            double alto = imagen.alto() * escala;
+            double x = hueco.x0() + i * (anchoHueco + hueco.separacion()) + (anchoHueco - ancho) / 2;
+            double y = hueco.y0() + (altoHueco - alto) / 2;
+            int indice = fotos.computeIfAbsent(imagen,
+                    foto -> libro.addPicture(foto.jpeg(), Workbook.PICTURE_TYPE_JPEG));
+
+            // Cada esquina con su columna: una foto que pasa a la siguiente
+            // columna no puede anclarse con un desplazamiento más ancho que la
+            // suya, que Excel no respeta.
+            int[] izquierda = columnaYResto(x);
+            int[] derecha = columnaYResto(x + ancho);
+            int[] desde = filaYResto(hoja, inicio, y);
+            int[] hasta = filaYResto(hoja, inicio, y + alto);
+            XSSFClientAnchor ancla = new XSSFClientAnchor(izquierda[1], desde[1], derecha[1], hasta[1],
+                    izquierda[0], desde[0], derecha[0], hasta[0]);
+            ancla.setAnchorType(XSSFClientAnchor.AnchorType.MOVE_AND_RESIZE);
+            dibujo.createPicture(ancla, indice);
+            fin = Math.max(fin, x + ancho);
+            arriba = Math.min(arriba, y);
+        }
+        return new Colocacion(fin, arriba);
+    }
+
+    private static int ultimo(int[] tamanos) {
+        return tamanos[tamanos.length - 1];
+    }
+
+    /**
+     * Lo que queda para el texto de la derecha de la banda: desde lo que
+     * acabe más a la derecha —el principio de su columna o la última foto,
+     * con aire— hasta el borde de la ficha.
+     */
+    static double anchoDatos(double finFotos) {
+        double desde = Math.max(puntos(ANCHO_NOMBRE_CM), finFotos > 0 ? finFotos + AIRE_DATOS : 0);
+        return ANCHO_FICHA - desde - 2 * MARGEN_CELDA;
+    }
+
+    /** La columna donde cae una distancia en puntos desde la izquierda y lo que sobra, en EMU. */
+    private static int[] columnaYResto(double puntos) {
+        double[] anchos = {puntos(ANCHO_NOMBRE_CM), puntos(ANCHO_COLOR_CM), puntos(ANCHO_RECUADRO_CM)};
+        int columna = 0;
+        double restante = puntos;
+        while (columna < anchos.length - 1 && restante > anchos[columna]) {
+            restante -= anchos[columna];
+            columna++;
+        }
+        return new int[] {COL_NOMBRE + columna, (int) Math.round(Math.max(0, restante) * Units.EMU_PER_POINT)};
+    }
+
+    /**
+     * El aire entre la banda y la primera piel. Una piel sola baja al pie de
+     * la página: el aire se queda con todo lo que ella no ocupa.
+     */
+    static float separacion(int pieles, float altoPiel) {
+        if (pieles != 1) {
+            return SEPARACION;
+        }
+        return (float) Math.floor(ALTO_UTIL - ALTO_BANDA - RESERVA - altoPiel);
     }
 
     /** La fila (desde {@code inicio}) donde cae una altura en puntos y lo que sobra, en EMU. */
@@ -374,7 +505,7 @@ public class OrdenCorteExcelBuilder {
     }
 
     /** Lo que mide el texto en puntos, letra a letra. */
-    private static double anchoTexto(String texto, int tamano) {
+    static double anchoTexto(String texto, int tamano) {
         double cuerpos = 0;
         for (char letra : (texto == null ? "" : texto).toCharArray()) {
             cuerpos += Character.isWhitespace(letra) ? ANCHO_ESPACIO
