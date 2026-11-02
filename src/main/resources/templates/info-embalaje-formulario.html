@@ -46,7 +46,7 @@
                         </div>
                         <div>
                             <label for="referencia">Referencia</label>
-                            <input type="text" th:field="*{referencia}" maxlength="80">
+                            <input type="text" th:field="*{referencia}" maxlength="80" required>
                             <div class="embalaje-pareja">
                                 <div>
                                     <label for="codigoColor">Código de color</label>
@@ -77,8 +77,8 @@
                         <div>
                             <label for="numeroEnvio">Nº de envío</label>
                             <input type="number" th:field="*{numeroEnvio}" min="1" step="1">
-                            <p class="ayuda" th:if="${partida == null}">El siguiente del contador de Puntotres.</p>
-                            <p class="ayuda" th:if="${partida != null}"
+                            <p class="ayuda" id="ayudaNumeroEnvio" th:if="${partida == null}">El siguiente del contador de Puntotres.</p>
+                            <p class="ayuda" id="ayudaNumeroEnvio" th:if="${partida != null}"
                                th:text="|El de la hoja importada. El siguiente libre es el ${siguienteNumero}.|"></p>
                         </div>
                         <div>
@@ -336,7 +336,8 @@
                         return {
                             blob: blob,
                             nombre: nombreDeFichero(respuesta.headers.get('Content-Disposition')),
-                            numero: respuesta.headers.get('X-Numero-Envio')
+                            numero: respuesta.headers.get('X-Numero-Envio'),
+                            siguiente: respuesta.headers.get('X-Siguiente-Numero')
                         };
                     });
                 })
@@ -350,8 +351,14 @@
                     setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 10000);
                     avisar('ok', 'Guardada como envío ' + hoja.numero + '. Se ha descargado «'
                             + hoja.nombre + '».');
-                    const numero = parseInt(hoja.numero, 10);
-                    if (!isNaN(numero)) numeroEnvio.value = numero + 1;
+                    // El siguiente lo dice el contador del servidor, no «este + 1»:
+                    // tras repetir un envío importado, ese número puede estar usado.
+                    const siguiente = parseInt(hoja.siguiente, 10);
+                    if (!isNaN(siguiente)) {
+                        numeroEnvio.value = siguiente;
+                        document.getElementById('ayudaNumeroEnvio').textContent =
+                                'El siguiente libre del contador de Puntotres es el ' + siguiente + '.';
+                    }
                 })
                 .catch(function (error) {
                     avisar('error', error.message || 'No se ha podido hablar con el servidor');

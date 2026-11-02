@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.awt.Color;
 import java.io.ByteArrayInputStream;
 import java.time.LocalDate;
 import java.util.List;
@@ -32,7 +33,11 @@ import com.puntotres.packinglist.model.DatosHojaEmbalaje.DestinacionHoja;
 import com.puntotres.packinglist.persistence.ArchivoHojasEmbalaje;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.HojaEmbalaje;
+import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
+import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
+import com.puntotres.packinglist.testutil.FotosDePrueba;
 
 /**
  * Las pantallas de «Info de embalaje para taller»: cargar el pedido, rellenar
@@ -61,6 +66,12 @@ class InfoEmbalajeControllerTest {
     @Autowired
     private ArchivoTemporadas temporadas;
 
+    @Autowired
+    private FotosCatalogo fotos;
+
+    @Autowired
+    private CatalogoModelos catalogo;
+
     private static byte[] recurso(String ruta) throws Exception {
         try (var entrada = InfoEmbalajeControllerTest.class.getResourceAsStream(ruta)) {
             return entrada.readAllBytes();
@@ -86,11 +97,16 @@ class InfoEmbalajeControllerTest {
 
     /** El POST de generar con los datos de la foto de Tánger y dos destinaciones. */
     private static MockHttpServletRequestBuilder generar(MockHttpSession sesion, String nota) {
+        return generar(sesion, nota, "270", "PXCBC-F67008");
+    }
+
+    private static MockHttpServletRequestBuilder generar(MockHttpSession sesion, String nota,
+                                                         String numeroEnvio, String referencia) {
         return post("/info-embalaje/generar").session(sesion)
                 .param("taller", "TÁNGER")
-                .param("numeroEnvio", "270")
+                .param("numeroEnvio", numeroEnvio)
                 .param("nota", nota)
-                .param("referencia", "PXCBC-F67008")
+                .param("referencia", referencia)
                 .param("codigoColor", "LZZ")
                 .param("descripcionColor", "NOIR")
                 .param("nombreBolso", "SAC LE NEIGE")
@@ -294,6 +310,70 @@ class InfoEmbalajeControllerTest {
         mvc.perform(get("/info-embalaje/formulario").session(sesion))
                 .andExpect(content().string(containsString(
                         "value=\"" + archivo.siguienteNumeroEnvio() + "\"")));
+    }
+
+    @Test
+    void elSiguienteNumeroLoDiceElContadorYNoElEnvioMasUno() throws Exception {
+        // Un envío alto guardado antes y luego se repite el 270 (importado):
+        // el siguiente libre no es el 271 sino el del contador.
+        MockHttpSession sesion = cargarApc();
+        mvc.perform(generar(sesion, "alto", "5000", "PXCBC-F67008")).andExpect(status().isOk());
+
+        MockHttpServletResponse respuesta = mvc.perform(generar(sesion, "repetido"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Numero-Envio", "270"))
+                .andReturn().getResponse();
+
+        int siguiente = Integer.parseInt(respuesta.getHeader("X-Siguiente-Numero"));
+        assertEquals(archivo.siguienteNumeroEnvio(), siguiente);
+        assertTrue(siguiente >= 5001, "el 271 podría estar ya usado: manda el contador");
+    }
+
+    @Test
+    void generarSinReferenciaNoGuardaNada() throws Exception {
+        MockHttpSession sesion = cargarApc();
+        int antes = archivo.todas().size();
+        mvc.perform(generar(sesion, "sin artículo", "270", "  "))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string(containsString("Elige o escribe el artículo")));
+        assertEquals(antes, archivo.todas().size());
+
+        String html = mvc.perform(get("/info-embalaje/formulario").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(html.matches("(?s).*<input[^>]*\\brequired\\b[^>]*name=\"referencia\"[^>]*>.*")
+                || html.matches("(?s).*<input[^>]*name=\"referencia\"[^>]*\\brequired\\b[^>]*>.*"),
+                "la referencia es obligatoria también en el navegador");
+    }
+
+    @Test
+    void importarSinTemporadaTraeLaFotoDelCatalogoYLaHojaLaImprime() throws Exception {
+        catalogo.asegurarModelo("APC", "H99997", "");
+        ResumenFoto foto = fotos.guardar("APC", "H99997", "principal.jpg", FotosDePrueba.jpeg(40, 40, Color.RED));
+        DatosHojaEmbalaje datos = new DatosHojaEmbalaje("APC", "A.P.C.", "Fall 26", "FEZ", 98, "con foto",
+                LocalDate.of(2026, 1, 15), "PXTEST-H99997", "CAW", "CAMEL", "SAC FOTO", "H99997", "", null,
+                "", "", "", List.of(new DestinacionHoja("JAPAN", "4100999998", 6)), "", "", "");
+        Long id = archivo.guardar(datos, 999999L).getId();
+
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(post("/info-embalaje/importar").param("id", String.valueOf(id)).session(sesion))
+                .andExpect(redirectedUrl("/info-embalaje/formulario"));
+        String html = mvc.perform(get("/info-embalaje/formulario").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(html.contains("name=\"fotoId\" value=\"" + foto.id() + "\""), "el fotoId del catálogo");
+        assertTrue(html.contains("\"fotoId\":" + foto.id()), "también en el artículo del desplegable");
+
+        // Generada desde el formulario, la hoja lleva la foto y el QR, como al
+        // descargarla desde antiguos.
+        byte[] word = mvc.perform(post("/info-embalaje/generar").session(sesion)
+                        .param("referencia", "PXTEST-H99997")
+                        .param("codigoModelo", "H99997")
+                        .param("fotoId", String.valueOf(foto.id()))
+                        .param("enlaceVideo", "https://youtu.be/guia"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(word))) {
+            assertEquals(2, doc.getAllPictures().size(), "foto del modelo + QR");
+        }
     }
 
     @Test

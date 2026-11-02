@@ -46,6 +46,20 @@ class FotosCatalogoTest {
     }
 
     @Test
+    void laFotoDelModeloEsLaPrincipalYSinFotosNoHayNinguna() {
+        catalogo.asegurarModelo("AMI", "ULL948", "");
+        assertTrue(fotos.principalDe("AMI", "ULL948").isEmpty(), "un modelo sin fotos no tiene foto");
+
+        fotos.guardar("AMI", "ULL948", "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
+        ResumenFoto b = fotos.guardar("AMI", "ULL948", "b.jpg", FotosDePrueba.jpeg(20, 20, Color.BLUE));
+        fotos.marcarPrincipal("AMI", "ULL948", b.id());
+
+        assertEquals(b.id(), fotos.principalDe("AMI", "ULL948").orElseThrow(),
+                "la principal, aunque no sea la primera");
+        assertTrue(fotos.principalDe("AMI", "").isEmpty());
+    }
+
+    @Test
     void marcarPrincipalQuitaLaAnterior() {
         catalogo.asegurarModelo("AMI", "ULL941", "");
         ResumenFoto a = fotos.guardar("AMI", "ULL941", "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));

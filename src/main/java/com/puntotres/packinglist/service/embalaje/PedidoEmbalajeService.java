@@ -20,7 +20,6 @@ import com.puntotres.packinglist.persistence.ArchivoHojasEmbalaje;
 import com.puntotres.packinglist.persistence.Articulo;
 import com.puntotres.packinglist.persistence.ColorCliente;
 import com.puntotres.packinglist.persistence.Modelo;
-import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.service.ApcPedidoExcel;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
@@ -209,10 +208,7 @@ public class PedidoEmbalajeService {
         String medida = articulo.map(Articulo::getMedidaCaja).orElse("");
         Integer unidades = articulo.map(Articulo::getUnidadesPorCaja).orElse(null);
 
-        List<ResumenFoto> deLaFoto = fotos.de(cliente, codigoModelo);
-        Long fotoId = deLaFoto.stream().filter(ResumenFoto::principal).findFirst()
-                .or(() -> deLaFoto.stream().findFirst())
-                .map(ResumenFoto::id).orElse(null);
+        Long fotoId = fotos.principalDe(cliente, codigoModelo).orElse(null);
 
         Optional<DatosHojaEmbalaje> ultima = hojas.ultimaDe(cliente, codigoModelo);
 

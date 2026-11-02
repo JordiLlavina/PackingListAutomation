@@ -31,7 +31,6 @@ import com.puntotres.packinglist.persistence.ArchivoHojasEmbalaje;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.FotoCatalogo;
 import com.puntotres.packinglist.persistence.HojaEmbalaje;
-import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.persistence.ResumenHojaEmbalaje;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
@@ -179,18 +178,24 @@ public class InfoEmbalajeController {
      * Guarda la hoja y devuelve el Word. La pantalla lo pide con {@code fetch}
      * y descarga el blob en vez de enviar el formulario: así no se recarga,
      * lo tecleado sigue ahí para la hoja del siguiente artículo, y puede
-     * enseñar con qué número se ha guardado (cabecera {@code X-Numero-Envio}).
+     * enseñar con qué número se ha guardado (cabecera {@code X-Numero-Envio})
+     * y cuál es el siguiente libre ({@code X-Siguiente-Numero}). El siguiente
+     * lo dice el contador y no la pantalla: tras repetir el envío 270 de una
+     * hoja importada, el 271 puede estar ya usado.
      * Sin JavaScript, el envío normal del formulario descarga igual el Word.
      */
     @PostMapping("/info-embalaje/generar")
     public ResponseEntity<?> generar(@ModelAttribute HojaEmbalajeForm form) throws IOException {
+        // Los rechazos van en texto plano y no como redirección: quien llama
+        // es el fetch de la pantalla, que enseña el texto tal cual.
         if (enCurso.estaVacio()) {
-            // Un 409 con el motivo y no una redirección: quien llama es el
-            // fetch de la pantalla, que enseña el texto tal cual.
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
-                    .body("La sesión ha caducado o no hay pedido cargado: vuelve a cargar el pedido "
-                            + "desde la entrada. No se ha guardado nada.");
+            return rechazo(HttpStatus.CONFLICT, "La sesión ha caducado o no hay pedido cargado: vuelve a "
+                    + "cargar el pedido desde la entrada. No se ha guardado nada.");
+        }
+        // Una hoja sin artículo no le dice nada al taller y gastaría un número de envío.
+        if (form.getReferencia() == null || form.getReferencia().isBlank()) {
+            return rechazo(HttpStatus.BAD_REQUEST, "Elige o escribe el artículo: sin referencia no se "
+                    + "ha guardado nada.");
         }
         DatosHojaEmbalaje datos = form.aDatos(enCurso, LocalDate.now(), archivo::siguienteNumeroEnvio);
         byte[] foto = fotos.conBytes(form.getFotoId()).map(FotoCatalogo::getJpeg).orElse(null);
@@ -201,7 +206,14 @@ public class InfoEmbalajeController {
         return word(datos, contenido)
                 .header("X-Hoja-Id", String.valueOf(guardada.getId()))
                 .header("X-Numero-Envio", String.valueOf(guardada.getNumeroEnvio()))
+                .header("X-Siguiente-Numero", String.valueOf(archivo.siguienteNumeroEnvio()))
                 .body(contenido);
+    }
+
+    private static ResponseEntity<String> rechazo(HttpStatus estado, String motivo) {
+        return ResponseEntity.status(estado)
+                .contentType(new MediaType(MediaType.TEXT_PLAIN, StandardCharsets.UTF_8))
+                .body(motivo);
     }
 
     // --- Pantalla 3: hojas antiguas ---
@@ -296,18 +308,22 @@ public class InfoEmbalajeController {
                 .findFirst();
     }
 
-    /** El artículo de una hoja guardada, para el desplegable cuando no hay pedido del que sacarlo. */
-    private static ArticuloEmbalaje articuloDe(DatosHojaEmbalaje datos) {
+    /**
+     * El artículo de una hoja guardada, para el desplegable cuando no hay
+     * pedido del que sacarlo. La foto se busca en el catálogo igual que al
+     * descargar una antigua: si no, la misma hoja saldría con foto desde la
+     * pantalla de antiguos y sin ella al generarla desde el formulario.
+     */
+    private ArticuloEmbalaje articuloDe(DatosHojaEmbalaje datos) {
+        Long fotoId = fotos.principalDe(datos.cliente(), datos.codigoModelo()).orElse(null);
         return new ArticuloEmbalaje(datos.referencia(), datos.codigoColor(), datos.descripcionColor(),
-                datos.nombreBolso(), datos.codigoModelo(), null, datos.medidaCaja(), datos.unidadesPorCaja(),
+                datos.nombreBolso(), datos.codigoModelo(), fotoId, datos.medidaCaja(), datos.unidadesPorCaja(),
                 datos.bolsaTela(), datos.etiquetaInterior(), datos.instruccionEspecial(), datos.destinaciones());
     }
 
     private byte[] fotoPrincipal(String cliente, String codigoModelo) {
-        List<ResumenFoto> deLaFoto = fotos.de(cliente, codigoModelo);
-        return deLaFoto.stream().filter(ResumenFoto::principal).findFirst()
-                .or(() -> deLaFoto.stream().findFirst())
-                .flatMap(foto -> fotos.conBytes(foto.id()))
+        return fotos.principalDe(cliente, codigoModelo)
+                .flatMap(fotos::conBytes)
                 .map(FotoCatalogo::getJpeg).orElse(null);
     }
 

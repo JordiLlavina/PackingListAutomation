@@ -53,6 +53,20 @@ public class FotosCatalogo {
         return repositorio.resumenes(clave(cliente), List.of(clave(codigoModelo)));
     }
 
+    /**
+     * La foto que representa al modelo en un documento de una sola foto (la
+     * hoja de embalaje): la principal; si ninguna lo es, la primera; si no
+     * tiene fotos, vacío. Una sola regla para todos los que la necesitan: con
+     * una copia en cada sitio, la misma hoja salía con foto o sin ella según
+     * por dónde se generara.
+     */
+    public Optional<Long> principalDe(String cliente, String codigoModelo) {
+        List<ResumenFoto> fotos = de(cliente, codigoModelo);
+        return fotos.stream().filter(ResumenFoto::principal).findFirst()
+                .or(() -> fotos.stream().findFirst())
+                .map(ResumenFoto::id);
+    }
+
     /** Modelo → sus fotos, solo para los modelos que tienen alguna. */
     public Map<String, List<ResumenFoto>> de(String cliente, Collection<String> modelos) {
         Map<String, List<ResumenFoto>> porModelo = new LinkedHashMap<>();
