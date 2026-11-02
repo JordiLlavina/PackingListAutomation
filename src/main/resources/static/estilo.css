@@ -949,7 +949,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
 /* El título "Cliente" y su desplegable en la misma línea. */
 .cabecera-cliente { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem 1.2rem; }
 .cabecera-cliente .titulo-seccion { margin: 0; }
-.form-pedido-colores input[type="file"] { width: 24rem; max-width: 100%; }
+.form-pedido-colores .zona-subida { width: 24rem; max-width: 100%; }
 .form-pedido-colores .fila-cliente label { margin-top: 0; }
 .tabla-colores .codigo-color { font-weight: 600; white-space: nowrap; }
 .tabla-colores input[type="text"] { width: 16rem; }
@@ -1504,6 +1504,7 @@ main.catalogo { max-width: 100rem; }
 .galeria-foto form { display: inline; }
 .galeria-foto button.mini { padding: 0.1rem 0.4rem; font-size: 0.75rem; margin: 0; }
 .galeria-subir { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.galeria-subir .zona-subida { flex: 1 1 14rem; }
 .tabla-catalogo td.c-foto { position: relative; }
 
 /* --- Info de embalaje para taller -----------------------------------------
@@ -1661,7 +1662,10 @@ main.catalogo { max-width: 100rem; }
    display: block, así que el campo los esconde él mismo: si no, en cada
    página que no lo arreglara salían dos selectores más debajo de la zona. */
 .campo-fotos [hidden] { display: none !important; }
-.zona-fotos {
+/* El fondo, entre el crudo de la pantalla y el beige de las tarjetas, más
+   cerca del crudo: clarito, y aun así se distingue de la tarjeta en la que
+   va. Con color-mix sigue a la paleta de cada estilo sin repetirla. */
+.zona-fotos, .zona-subida {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1669,13 +1673,34 @@ main.catalogo { max-width: 100rem; }
     padding: 1.2rem 1rem;
     border: 2px dashed var(--borde-tarjeta-fuerte);
     border-radius: 8px;
-    background: var(--superficie);
+    background: color-mix(in srgb, var(--fondo-suave) 70%, var(--superficie));
     text-align: center;
     cursor: pointer;
 }
-.zona-fotos:hover, .zona-fotos.encima { border-color: var(--acento); background: var(--acento-suave-fin); }
+.zona-fotos:hover, .zona-fotos.encima,
+.zona-subida:hover, .zona-subida.encima { border-color: var(--acento); background: var(--acento-suave-fin); }
 .zona-fotos:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 .campo-fotos.con-fotos .zona-fotos { border-style: solid; border-color: var(--ok-borde); }
+
+/* Zona de cualquier otro campo de fichero (campo-fichero.js): el input va
+   encima, transparente y a toda la zona, que es lo que recoge el clic y lo
+   soltado. Un poco más baja que la de fotos: lleva una sola línea. */
+.zona-subida { position: relative; padding: 0.9rem 1rem; }
+.zona-subida input[type="file"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+.zona-subida:focus-within { outline: 2px solid var(--acento); outline-offset: 2px; }
+.zona-subida.con-fichero { border-style: solid; border-color: var(--ok-borde); }
+.zona-subida.con-fichero .zona-titulo { color: var(--ok-borde); overflow-wrap: anywhere; }
+.zona-subida:has(input:disabled) { opacity: 0.6; cursor: default; }
 .zona-icono { width: 2rem; height: 2rem; color: var(--acento); }
 .zona-titulo { font-weight: 600; }
 .zona-detalle { font-size: 0.85rem; color: var(--texto-suave); }
@@ -1702,7 +1727,7 @@ button.enlace:hover { background: none; color: var(--acento); }
     border-bottom: 1px solid var(--borde);
 }
 .fila-excel label { margin: 0; min-width: 16rem; }
-.fila-excel input[type="file"] { width: auto; flex: 0 1 22rem; margin: 0; }
+.fila-excel .zona-subida { flex: 0 1 22rem; }
 .fila-excel .excel-guardado { flex-basis: 100%; margin: 0 0 0 6.6rem; }
 .marca-campo {
     display: inline-block;

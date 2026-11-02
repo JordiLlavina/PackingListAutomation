@@ -16,6 +16,8 @@
         if (!clasico) document.documentElement.setAttribute("data-tema", "puntotres");
     </script>
     <link rel="stylesheet" th:href="@{/estilo.css}">
+    <!-- Cada campo de fichero, en una zona de "Suelta aquí el Archivo". -->
+    <script th:src="@{/campo-fichero.js}" defer></script>
     <!-- Icono de la pestaña. Los dos PNG salen del logo de client-labels/img-web-icon.jpg:
          cuadrado añadiendo aire (el logo llega a los bordes y recortarlo le cortaría
          piezas) y sin el fondo blanco, para que se vea igual en pestaña clara u oscura. -->
