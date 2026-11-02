@@ -35,16 +35,6 @@ create table color_cliente (
     primary key (cliente, codigo)
 );
 
-create table memoria_caja_referencia (
-    cliente varchar(60) not null,
-    referencia varchar(80) not null,
-    medida_caja varchar(40) not null,
-    unidades_por_caja integer not null,
-    peso_neto_kg float(53),
-    fecha_actualizacion timestamp(6) not null,
-    primary key (cliente, referencia)
-);
-
 create table memoria_piel (
     cliente varchar(60) not null,
     ref_piel varchar(80) not null,

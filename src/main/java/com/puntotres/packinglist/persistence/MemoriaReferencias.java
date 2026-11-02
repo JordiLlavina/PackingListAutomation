@@ -1,19 +1,24 @@
 package com.puntotres.packinglist.persistence;
 
-import java.util.Locale;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
+
 /**
  * Memoria del programa entre envíos: qué cartón y cuántas unidades por caja
- * usa cada referencia de cada cliente.
+ * usa cada referencia de cada cliente. Es una fachada sobre el ARTÍCULO del
+ * catálogo de modelos ({@link Articulo}): la misma interfaz de siempre para
+ * el taller, y los datos donde la pantalla del catálogo los enseña y edita.
  *
  * Solo se guarda lo que un humano ha dado por bueno: una referencia con las
  * unidades por caja sin rellenar NO se memoriza, porque memorizar el valor
  * por defecto lo daría por bueno la próxima vez y el error se propagaría en
- * silencio de un envío al siguiente.
+ * silencio de un envío al siguiente. Y aquí no se propaga nada a las demás
+ * pieles del modelo: eso lo hace solo la pantalla del catálogo, donde quien
+ * teclea ve a qué hermanos llega.
  */
 @Service
 public class MemoriaReferencias {
@@ -26,19 +31,22 @@ public class MemoriaReferencias {
     public record DatosCaja(String medidaCaja, int unidadesPorCaja, Double pesoNetoKg) {
     }
 
-    private final MemoriaCajaReferenciaRepository repositorio;
+    private final CatalogoModelos catalogo;
 
-    public MemoriaReferencias(MemoriaCajaReferenciaRepository repositorio) {
-        this.repositorio = repositorio;
+    public MemoriaReferencias(CatalogoModelos catalogo) {
+        this.catalogo = catalogo;
     }
 
+    /**
+     * Vacío si la referencia no está en el catálogo o está pero nadie ha
+     * decidido todavía su cartón y sus unidades: para el taller las dos
+     * cosas son "no se sabe".
+     */
     public Optional<DatosCaja> buscar(String cliente, String referencia) {
-        if (cliente == null || referencia == null) {
-            return Optional.empty();
-        }
-        return repositorio.findById(clave(cliente, referencia))
-                .map(fila -> new DatosCaja(fila.getMedidaCaja(), fila.getUnidadesPorCaja(),
-                        fila.getPesoNetoKg()));
+        return catalogo.articulo(cliente, referencia)
+                .filter(articulo -> !articulo.getMedidaCaja().isEmpty() && articulo.getUnidadesPorCaja() != null)
+                .map(articulo -> new DatosCaja(articulo.getMedidaCaja(), articulo.getUnidadesPorCaja(),
+                        articulo.getPesoNetoKg()));
     }
 
     /**
@@ -58,7 +66,8 @@ public class MemoriaReferencias {
      * El peso es opcional y un null NO borra el que hubiera: pesar una caja
      * cuesta bajarla a la báscula, y perder ese dato porque el envío siguiente
      * se generó sin pesar sería tirar el trabajo de alguien. Un peso que no
-     * sea positivo se descarta igual que un campo vacío.
+     * sea positivo se descarta igual que un campo vacío. Si la referencia no
+     * estaba en el catálogo, se da de alta con su modelo y su piel.
      */
     @Transactional
     public void recordar(String cliente, String referencia, String medidaCaja,
@@ -67,22 +76,11 @@ public class MemoriaReferencias {
                 || unidadesPorCaja == null || unidadesPorCaja <= 0) {
             return;
         }
-        Double peso = pesoNetoKg != null && pesoNetoKg > 0 ? pesoNetoKg : null;
-        MemoriaCajaReferenciaId clave = clave(cliente, referencia);
-        repositorio.findById(clave).ifPresentOrElse(
-                fila -> fila.actualizar(medidaCaja, unidadesPorCaja, peso),
-                () -> repositorio.save(new MemoriaCajaReferencia(
-                        clave.cliente(), clave.referencia(), medidaCaja, unidadesPorCaja, peso)));
-    }
-
-    /**
-     * Cliente y referencia en mayúsculas y sin espacios de sobra: la
-     * referencia llega tecleada a mano o leída de un excel, y "ull164" y
-     * "ULL164 " son la misma.
-     */
-    private static MemoriaCajaReferenciaId clave(String cliente, String referencia) {
-        return new MemoriaCajaReferenciaId(
-                cliente.trim().toUpperCase(Locale.ROOT),
-                referencia.trim().toUpperCase(Locale.ROOT));
+        Articulo articulo = catalogo.asegurarArticulo(cliente, referencia);
+        articulo.setMedidaCaja(medidaCaja);
+        articulo.setUnidadesPorCaja(unidadesPorCaja);
+        if (pesoNetoKg != null && pesoNetoKg > 0) {
+            articulo.setPesoNetoKg(pesoNetoKg);
+        }
     }
 }

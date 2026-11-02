@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
+
 /**
  * Lo que el programa aprende de cada referencia entre envíos: qué cartón usa
  * y cuántas unidades le caben. Sin esto habría que teclearlo entero en cada
@@ -18,6 +20,9 @@ class MemoriaReferenciasTest {
 
     @Autowired
     private MemoriaReferencias memoria;
+
+    @Autowired
+    private CatalogoModelos catalogo;
 
     @Test
     void loRecordadoSeEncuentraPorClienteYReferencia() {
@@ -115,5 +120,26 @@ class MemoriaReferenciasTest {
     @Test
     void unaReferenciaQueNoSeHaVistoNuncaNoSeInventa() {
         assertTrue(memoria.buscar("AMI", "JAMAS-VISTA").isEmpty());
+    }
+
+    // --- La memoria es una fachada sobre el artículo del catálogo ---
+
+    @Test
+    void recordarDaDeAltaElArticuloEnElCatalogo() {
+        memoria.recordar("AMI", "ULL910.AL0100", "60x40x40", 6, 2.0);
+
+        Articulo articulo = catalogo.articulo("AMI", "ULL910.AL0100").orElseThrow();
+        assertEquals("ULL910", articulo.getCodigoModelo());
+        assertEquals(6, articulo.getUnidadesPorCaja());
+        assertEquals(2.0, articulo.getPesoNetoKg());
+    }
+
+    @Test
+    void unArticuloSinCartonNoSaleEnBuscar() {
+        // Dado de alta desde el catálogo pero sin decidir cómo se empaqueta:
+        // para el taller es una referencia que no se ha visto nunca.
+        catalogo.asegurarArticulo("AMI", "ULL911.AL0100");
+
+        assertTrue(memoria.buscar("AMI", "ULL911.AL0100").isEmpty());
     }
 }
