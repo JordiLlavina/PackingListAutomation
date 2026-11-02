@@ -792,7 +792,7 @@ header.cabecera .enlace-menu:hover {
    el que `.tarjeta` le da a las de al lado, para arrancar a la misma altura. */
 .menu-paneles {
     display: grid;
-    grid-template-rows: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr);
     gap: 1rem;
     align-self: stretch;
     margin-top: 1rem;
@@ -1581,3 +1581,9 @@ main.catalogo { max-width: 100rem; }
 .embalaje-texto { white-space: pre-line; margin: 0; }
 .embalaje-acciones { display: flex; flex-wrap: wrap; align-items: center; }
 .embalaje-acciones form { display: inline; }
+
+/* Comentarios tipo de embalaje: el texto es largo, así que su campo ocupa el
+   ancho que deja el nombre en vez de los 9 rem de un input de la fila. */
+.comentario-form { align-items: flex-start; }
+.comentario-texto { flex: 1 1 24rem; }
+.comentario-form button { margin-top: 1.9rem; }

@@ -35,7 +35,10 @@ class RutasTest {
                 .andExpect(content().string(
                         org.hamcrest.Matchers.containsString("href=\"/packing-list\"")))
                 .andExpect(content().string(
-                        org.hamcrest.Matchers.containsString("href=\"/etiquetas-articulo\"")));
+                        org.hamcrest.Matchers.containsString("href=\"/etiquetas-articulo\"")))
+                // Los comentarios tipo de embalaje se mantienen desde un panel de ajustes.
+                .andExpect(content().string(
+                        org.hamcrest.Matchers.containsString("href=\"/comentarios-embalaje\"")));
     }
 
     @Test
