@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,7 +58,10 @@ class TemporadasControllerTest {
                         .file(pedido(fichero, "pedido de " + temporada))
                         .param("cliente", cliente)
                         .param("temporada", temporada))
-                .andExpect(redirectedUrl("/temporadas"));
+                .andExpect(redirectedUrl("/temporadas"))
+                // Un alta rechazada también redirige aquí: sin esto, el helper
+                // devolvería el id de la temporada que ya existía.
+                .andExpect(flash().attribute("mensaje", containsString("Guardada")));
         return archivo.de(cliente).stream()
                 .filter(guardada -> guardada.temporada().equals(temporada))
                 .map(ResumenTemporada::id)
@@ -88,18 +92,20 @@ class TemporadasControllerTest {
     void editarElNombreSinSubirFicheroConservaElExcel() throws Exception {
         // Corregir una temporada mal tecleada no puede costar volver a buscar
         // el excel en el disco: es justo el trabajo que esto ahorra.
-        Long id = alta("AMI", "H27", "EAN H27.xlsx");
+        // Clave propia: la base en memoria es la misma para toda la suite y
+        // DocumentosCorteControllerTest ya guarda una "H27" de AMI.
+        Long id = alta("AMI", "H27-EDITADA", "EAN H27.xlsx");
 
         mvc.perform(multipart("/temporadas")
                         .param("id", String.valueOf(id))
                         .param("cliente", "AMI")
-                        .param("temporada", "H27 CORREGIDA"))
+                        .param("temporada", "H27-EDITADA CORREGIDA"))
                 .andExpect(redirectedUrl("/temporadas"));
 
         TemporadaGuardada guardada = archivo.conFichero(id).orElseThrow();
-        assertEquals("H27 CORREGIDA", guardada.getTemporada());
+        assertEquals("H27-EDITADA CORREGIDA", guardada.getTemporada());
         assertEquals("EAN H27.xlsx", guardada.getNombreFichero());
-        assertArrayEquals("pedido de H27".getBytes(), guardada.getExcel());
+        assertArrayEquals("pedido de H27-EDITADA".getBytes(), guardada.getExcel());
     }
 
     @Test
@@ -131,16 +137,16 @@ class TemporadasControllerTest {
     void unaTemporadaRepetidaDelMismoClienteNoSeGuardaDosVeces() throws Exception {
         // Dos entradas con el mismo nombre son indistinguibles en el
         // desplegable, y elegir la que no toca no se ve hasta el documento.
-        alta("APC", "E28", "APC E28.xlsx");
+        alta("APC", "E28-REPETIDA", "APC E28.xlsx");
 
         mvc.perform(multipart("/temporadas")
                         .file(pedido("otro.xlsx", "otro"))
                         .param("cliente", "APC")
-                        .param("temporada", "e28"))
+                        .param("temporada", "e28-repetida"))
                 .andExpect(redirectedUrl("/temporadas"));
 
         List<ResumenTemporada> deApc = archivo.de("APC").stream()
-                .filter(temporada -> temporada.temporada().equalsIgnoreCase("E28"))
+                .filter(temporada -> temporada.temporada().equalsIgnoreCase("E28-REPETIDA"))
                 .toList();
         assertEquals(1, deApc.size(), "el nombre no distingue mayúsculas");
     }
@@ -173,7 +179,7 @@ class TemporadasControllerTest {
         // El desplegable lo rellena el navegador con el mapa que va inline en la
         // página: si el atributo del modelo no llega, la constante sale nula y
         // el JS de la pantalla revienta entero, no solo esta parte.
-        alta("AMI", "H31", "EAN H31.xlsx");
+        alta("AMI", "H31-LISTADA", "EAN H31.xlsx");
 
         mvc.perform(get("/packing-list"))
                 .andExpect(status().isOk())

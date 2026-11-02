@@ -14,13 +14,17 @@ spring:
   # de taras tienen que sobrevivir al reinicio. El fichero vive junto al
   # ejecutable y no se versiona; borrarlo solo pierde lo aprendido, no rompe
   # nada, porque las taras se resiembran del bloque packing-list.taras.
+  #
+  # El esquema lo crea Flyway (db/migration) y Hibernate solo lo valida. Una
+  # base creada antes de Flyway (sin flyway_schema_history) no arranca: hay
+  # que borrar ./datos, que es lo que se hizo al pasar a esta versión.
   datasource:
     url: jdbc:h2:file:./datos/packinglist;DB_CLOSE_DELAY=-1
     username: sa
     password:
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
 
   # El CSS y el JS se sirven con un hash del contenido en el nombre

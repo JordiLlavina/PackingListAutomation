@@ -64,6 +64,13 @@
             <artifactId>h2</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Flyway crea el esquema (db/migration) y Hibernate solo lo valida:
+             una entidad que no cuadra con el SQL rompe el primer arranque en
+             vez de dejar una tabla a medias. -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
 
         <!-- Apache POI: lectura/escritura de .xlsx (formato OOXML).
              No la gestiona Boot, por eso lleva versión explícita. -->

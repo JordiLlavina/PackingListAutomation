@@ -1,9 +1,23 @@
 # Perfil de los tests que necesitan base de datos: en memoria y recreada en
 # cada arranque, para que la suite no toque el fichero real del almacén ni
 # dependa de lo que haya aprendido el programa en esta máquina.
+#
+# El nombre de la base lleva un sufijo aleatorio (una vez por contexto de
+# Spring, no por test) para que dos @SpringBootTest con propiedades distintas
+# —por ejemplo las taras fijas de PackingListControllerTest— no compartan la
+# misma base en memoria: con Flyway + validate ya no hay create-drop que la
+# vacíe en cada arranque, y una base con el nombre fijo dejaría lo sembrado
+# por el primer contexto visible al siguiente.
+#
+# CASE_INSENSITIVE_IDENTIFIERS=TRUE evita un desajuste de mayúsculas propio de
+# H2: Flyway crea su tabla flyway_schema_history entrecomillada y en
+# minúsculas (para que su nombre no dependa de cada motor), mientras que nuestro
+# propio V1__esquema_inicial.sql, sin entrecomillar, lo escribe H2 en
+# mayúsculas por defecto. Sin esto, una consulta sin entrecomillar contra
+# flyway_schema_history no encontraría la tabla.
 spring:
   datasource:
-    url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:mem:test-${random.uuid};DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: validate
