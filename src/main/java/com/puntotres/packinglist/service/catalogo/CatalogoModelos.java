@@ -1,0 +1,340 @@
+package com.puntotres.packinglist.service.catalogo;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.puntotres.packinglist.persistence.Articulo;
+import com.puntotres.packinglist.persistence.ArticuloId;
+import com.puntotres.packinglist.persistence.ArticuloRepository;
+import com.puntotres.packinglist.persistence.Modelo;
+import com.puntotres.packinglist.persistence.ModeloId;
+import com.puntotres.packinglist.persistence.ModeloRepository;
+import com.puntotres.packinglist.persistence.Piel;
+import com.puntotres.packinglist.persistence.PielId;
+import com.puntotres.packinglist.persistence.PielRepository;
+import com.puntotres.packinglist.persistence.TipoArticulo;
+import com.puntotres.packinglist.service.corte.DocumentosCorteService;
+import com.puntotres.packinglist.service.corte.ReferenciaCorte;
+
+/**
+ * El catálogo de modelos: lo que el programa sabe de cada modelo de cada
+ * cliente, en dos niveles. El MODELO es la forma del bolso ("ULL027"); el
+ * ARTÍCULO es el modelo en una piel ("ULL027.AL0103"), que es la referencia
+ * que escribe el cliente. Las memorias del taller y del corte
+ * ({@code MemoriaReferencias}, {@code MemoriaPieles}) son fachadas sobre
+ * estas tablas.
+ *
+ * Cómo se parte una referencia en modelo y piel lo dice la regla de cada
+ * cliente ({@code ClienteCorte.partir}, vía {@link DocumentosCorteService}):
+ * AMI por el punto, APC por el guion, un genérico no la parte. No se
+ * normaliza nada más: "AL245" y "AL0245" son dos pieles (decisión del
+ * usuario; el día que el excel de producción se genere desde el de pedido el
+ * duplicado desaparece solo). Una referencia que la regla no sabe partir se
+ * guarda tal cual, con modelo = la referencia y sin piel, y queda fuera de la
+ * herencia y la propagación: no se sabe de qué modelo es de verdad.
+ *
+ * Herencia y propagación entre las pieles de un modelo: un artículo nuevo
+ * arranca con el cartón, las unidades, el forro y las combinaciones que
+ * TODOS sus hermanos con dato comparten (el peso no: cambia con la piel); y
+ * al cambiar uno de esos campos desde la pantalla, el cambio se copia a los
+ * hermanos que decían lo mismo o estaban vacíos y respeta a los que no. Es
+ * la regla que ya usaba el nombre de piel en la tabla del corte. El taller
+ * NO propaga: {@code MemoriaReferencias.recordar} escribe solo su artículo.
+ */
+@Service
+public class CatalogoModelos {
+
+    public static final int MAXIMO_COMBINACIONES = 4;
+
+    /** Los campos del artículo que se editan celda a celda. */
+    public enum CampoArticulo {
+        MEDIDA_CAJA, UNIDADES_POR_CAJA, PESO_NETO_KG, FORRO, COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4;
+
+        /** El peso es de la piel y no se copia a las hermanas. */
+        public boolean sePropaga() {
+            return this != PESO_NETO_KG;
+        }
+
+        /** Lo que vale ahora en el artículo, como texto: lo que la pantalla enseña y lo que se compara al propagar. */
+        String leer(Articulo articulo) {
+            return switch (this) {
+                case MEDIDA_CAJA -> articulo.getMedidaCaja();
+                case UNIDADES_POR_CAJA -> articulo.getUnidadesPorCaja() == null ? ""
+                        : String.valueOf(articulo.getUnidadesPorCaja());
+                case PESO_NETO_KG -> articulo.getPesoNetoKg() == null ? "" : String.valueOf(articulo.getPesoNetoKg());
+                case FORRO -> articulo.getForro();
+                case COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4 ->
+                        articulo.getCasillasCombinacion().get(indiceCombinacion());
+            };
+        }
+
+        /** Escribe el valor ya validado; vacío borra el campo. */
+        void escribir(Articulo articulo, String valor) {
+            switch (this) {
+                case MEDIDA_CAJA -> articulo.setMedidaCaja(valor);
+                case UNIDADES_POR_CAJA -> articulo.setUnidadesPorCaja(valor.isEmpty() ? null : Integer.valueOf(valor));
+                case PESO_NETO_KG -> articulo.setPesoNetoKg(valor.isEmpty() ? null : Double.valueOf(valor));
+                case FORRO -> articulo.setForro(valor);
+                case COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4 ->
+                        articulo.setCombinacion(indiceCombinacion(), valor);
+            }
+        }
+
+        private int indiceCombinacion() {
+            return ordinal() - COMBINACION1.ordinal();
+        }
+
+        /**
+         * Normaliza y valida lo tecleado. Los textos van en mayúsculas y sin
+         * espacios de sobra, para que "badana" y "BADANA" sean lo mismo; los
+         * números tienen que serlo y ser positivos.
+         */
+        String validar(String valor) {
+            String limpio = valor == null ? "" : valor.trim();
+            if (limpio.isEmpty()) {
+                return "";
+            }
+            return switch (this) {
+                case UNIDADES_POR_CAJA -> {
+                    try {
+                        int unidades = Integer.parseInt(limpio);
+                        if (unidades <= 0) {
+                            throw new NumberFormatException();
+                        }
+                        yield String.valueOf(unidades);
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException(
+                                "Las unidades por caja son un número entero mayor que cero");
+                    }
+                }
+                case PESO_NETO_KG -> {
+                    try {
+                        double peso = Double.parseDouble(limpio.replace(',', '.'));
+                        if (!(peso > 0)) {
+                            throw new NumberFormatException();
+                        }
+                        yield String.valueOf(peso);
+                    } catch (NumberFormatException e) {
+                        throw new IllegalArgumentException("El peso es un número de kilos mayor que cero");
+                    }
+                }
+                case MEDIDA_CAJA -> limpio.toLowerCase(Locale.ROOT);
+                default -> limpio.toUpperCase(Locale.ROOT);
+            };
+        }
+    }
+
+    /** Los campos del modelo que se editan celda a celda. */
+    public enum CampoModelo { NOMBRE, TIPO }
+
+    /** Una referencia tocada por la propagación y lo que decía antes, para poder deshacer. */
+    public record Propagada(String referencia, String anterior) {
+    }
+
+    public record Propagacion(List<Propagada> propagadas) {
+
+        public Propagacion {
+            propagadas = List.copyOf(propagadas);
+        }
+    }
+
+    private final ModeloRepository modelos;
+    private final ArticuloRepository articulos;
+    private final PielRepository pieles;
+    private final DocumentosCorteService reglas;
+
+    public CatalogoModelos(ModeloRepository modelos, ArticuloRepository articulos, PielRepository pieles,
+                           DocumentosCorteService reglas) {
+        this.modelos = modelos;
+        this.articulos = articulos;
+        this.pieles = pieles;
+        this.reglas = reglas;
+    }
+
+    public Optional<Modelo> modelo(String cliente, String codigo) {
+        if (vacio(cliente) || vacio(codigo)) {
+            return Optional.empty();
+        }
+        return modelos.findById(new ModeloId(clave(cliente), clave(codigo)));
+    }
+
+    public Optional<Articulo> articulo(String cliente, String referencia) {
+        if (vacio(cliente) || vacio(referencia)) {
+            return Optional.empty();
+        }
+        return articulos.findById(new ArticuloId(clave(cliente), clave(referencia)));
+    }
+
+    public List<Modelo> modelosDe(String cliente) {
+        return vacio(cliente) ? List.of() : modelos.findByClienteOrderByCodigo(clave(cliente));
+    }
+
+    public List<Articulo> articulosDe(String cliente) {
+        return vacio(cliente) ? List.of() : articulos.findByClienteOrderByReferencia(clave(cliente));
+    }
+
+    /** Los artículos del modelo que tienen piel, por referencia: los que heredan y propagan entre sí. */
+    public List<Articulo> hermanos(String cliente, String codigoModelo) {
+        if (vacio(cliente) || vacio(codigoModelo)) {
+            return List.of();
+        }
+        return articulos.findByClienteAndCodigoModeloOrderByReferencia(clave(cliente), clave(codigoModelo)).stream()
+                .filter(Articulo::tienePiel)
+                .toList();
+    }
+
+    /** Devuelve el modelo, creándolo si falta. Un nombre que llega solo rellena el hueco: lo tecleado no se pisa. */
+    @Transactional
+    public Modelo asegurarModelo(String cliente, String codigo, String nombre) {
+        return asegurarModelo(clave(cliente), clave(codigo), nombre, TipoArticulo.porReferencia(codigo));
+    }
+
+    private Modelo asegurarModelo(String elCliente, String elCodigo, String nombre, TipoArticulo tipo) {
+        String elNombre = nombre == null ? "" : nombre.trim();
+        Modelo modelo = modelos.findById(new ModeloId(elCliente, elCodigo)).orElse(null);
+        if (modelo == null) {
+            return modelos.save(new Modelo(elCliente, elCodigo, elNombre.isEmpty() ? null : elNombre, tipo));
+        }
+        if (modelo.getNombre().isEmpty() && !elNombre.isEmpty()) {
+            modelo.setNombre(elNombre);
+        }
+        return modelo;
+    }
+
+    /**
+     * Devuelve el artículo, creando la piel, el modelo y el artículo si
+     * faltan. El artículo nuevo hereda de sus hermanos lo que todos
+     * comparten; uno sin piel no hereda nada.
+     */
+    @Transactional
+    public Articulo asegurarArticulo(String cliente, String referencia) {
+        if (vacio(cliente) || vacio(referencia)) {
+            throw new IllegalArgumentException("El artículo necesita cliente y referencia");
+        }
+        String elCliente = clave(cliente);
+        String laReferencia = clave(referencia);
+        Articulo existente = articulos.findById(new ArticuloId(elCliente, laReferencia)).orElse(null);
+        if (existente != null) {
+            return existente;
+        }
+        ReferenciaCorte partida = reglas.reglasDeProduccion(elCliente).partir(laReferencia);
+        String refPiel = partida.tienePiel() ? partida.piel() : null;
+        String codigoModelo = partida.tienePiel() ? partida.modelo() : laReferencia;
+        if (refPiel != null && pieles.findById(new PielId(elCliente, refPiel)).isEmpty()) {
+            pieles.save(new Piel(elCliente, refPiel, ""));
+        }
+        asegurarModelo(elCliente, codigoModelo, "", TipoArticulo.porReferencia(laReferencia));
+        Articulo nuevo = new Articulo(elCliente, laReferencia, codigoModelo, refPiel);
+        if (refPiel != null) {
+            heredar(nuevo, hermanos(elCliente, codigoModelo));
+        }
+        return articulos.save(nuevo);
+    }
+
+    /** Copia a {@code nuevo} cada campo heredable en el que todos los hermanos con dato dicen lo mismo. */
+    private static void heredar(Articulo nuevo, List<Articulo> hermanos) {
+        if (hermanos.isEmpty()) {
+            return;
+        }
+        for (CampoArticulo campo : CampoArticulo.values()) {
+            if (!campo.sePropaga()) {
+                continue;
+            }
+            String comun = valorComun(hermanos, campo::leer);
+            if (comun != null) {
+                campo.escribir(nuevo, comun);
+            }
+        }
+    }
+
+    /** El valor que todos los que lo tienen comparten, o null si ninguno lo tiene o no coinciden. */
+    private static String valorComun(List<Articulo> hermanos, Function<Articulo, String> leer) {
+        String comun = null;
+        for (Articulo hermano : hermanos) {
+            String valor = leer.apply(hermano);
+            if (valor.isEmpty()) {
+                continue;
+            }
+            if (comun == null) {
+                comun = valor;
+            } else if (!comun.equals(valor)) {
+                return null;
+            }
+        }
+        return comun;
+    }
+
+    /**
+     * Escribe el campo en el artículo (creándolo si falta) y, con
+     * {@code propagar}, lo copia a los hermanos con piel que tenían el mismo
+     * valor antiguo o estaban vacíos. Vacío borra el campo. Lanza
+     * IllegalArgumentException con un mensaje en español si el valor no vale.
+     */
+    @Transactional
+    public Propagacion guardarCampo(String cliente, String referencia, CampoArticulo campo, String valor,
+                                    boolean propagar) {
+        String validado = campo.validar(valor);
+        Articulo articulo = asegurarArticulo(cliente, referencia);
+        String anterior = campo.leer(articulo);
+        campo.escribir(articulo, validado);
+        List<Propagada> propagadas = new ArrayList<>();
+        if (propagar && campo.sePropaga() && articulo.tienePiel()) {
+            for (Articulo hermano : hermanos(articulo.getCliente(), articulo.getCodigoModelo())) {
+                if (hermano.getReferencia().equals(articulo.getReferencia())) {
+                    continue;
+                }
+                String suyo = campo.leer(hermano);
+                if (suyo.isEmpty() || suyo.equals(anterior)) {
+                    campo.escribir(hermano, validado);
+                    propagadas.add(new Propagada(hermano.getReferencia(), suyo));
+                }
+            }
+        }
+        return new Propagacion(propagadas);
+    }
+
+    @Transactional
+    public void guardarCampoModelo(String cliente, String codigo, CampoModelo campo, String valor) {
+        Modelo modelo = modelo(cliente, codigo).orElseThrow(() -> new IllegalArgumentException(
+                "No hay ningún modelo " + codigo + " de " + cliente));
+        String limpio = valor == null ? "" : valor.trim();
+        switch (campo) {
+            case NOMBRE -> modelo.setNombre(limpio.isEmpty() ? null : limpio.toUpperCase(Locale.ROOT));
+            case TIPO -> {
+                try {
+                    modelo.setTipo(TipoArticulo.valueOf(limpio.toUpperCase(Locale.ROOT)));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("El tipo es BOLSO o CINTURON");
+                }
+            }
+        }
+    }
+
+    /** Borra el modelo; sus artículos, colores, fotos y temporadas caen con él (FK del esquema). */
+    @Transactional
+    public void borrarModelo(String cliente, String codigo) {
+        modelo(cliente, codigo).ifPresent(modelos::delete);
+    }
+
+    /** Borra el artículo; sus colores caen con él (FK del esquema). El modelo se queda aunque sea el último. */
+    @Transactional
+    public void borrarArticulo(String cliente, String referencia) {
+        articulo(cliente, referencia).ifPresent(articulos::delete);
+    }
+
+    private static boolean vacio(String texto) {
+        return texto == null || texto.isBlank();
+    }
+
+    /** Las claves se teclean o se leen de un excel: "ull027.al0103 " y "ULL027.AL0103" son el mismo artículo. */
+    static String clave(String texto) {
+        return Objects.requireNonNull(texto).trim().toUpperCase(Locale.ROOT);
+    }
+}
