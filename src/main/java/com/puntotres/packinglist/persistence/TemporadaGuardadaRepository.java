@@ -18,7 +18,7 @@ public interface TemporadaGuardadaRepository extends JpaRepository<TemporadaGuar
 
     String RESUMEN = """
             select new com.puntotres.packinglist.persistence.ResumenTemporada(
-                t.id, t.cliente, t.temporada, t.nombreFichero, t.fechaActualizacion)
+                t.id, t.cliente, t.temporada, t.nombreFichero, t.fechaActualizacion, t.tipoExcel)
             from TemporadaGuardada t""";
 
     @Query(RESUMEN + " order by t.cliente, t.temporada")

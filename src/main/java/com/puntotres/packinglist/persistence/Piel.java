@@ -1,0 +1,65 @@
+package com.puntotres.packinglist.persistence;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
+import jakarta.persistence.Table;
+
+/**
+ * Cómo se llama una piel del cliente. El pedido solo trae su referencia
+ * ("AL0103"); el nombre lo teclea quien prepara el corte, y es del MATERIAL:
+ * la misma piel se llama igual en todos los bolsos que la usan.
+ */
+@Entity
+@Table(name = "piel")
+@IdClass(PielId.class)
+public class Piel {
+
+    @Id
+    @Column(name = "cliente", length = 60)
+    private String cliente;
+
+    @Id
+    @Column(name = "ref_piel", length = 80)
+    private String refPiel;
+
+    @Column(name = "nombre", length = 200, nullable = false)
+    private String nombre;
+
+    @Column(name = "fecha_actualizacion", nullable = false)
+    private LocalDateTime fechaActualizacion;
+
+    protected Piel() {
+        // Constructor para JPA.
+    }
+
+    public Piel(String cliente, String refPiel, String nombre) {
+        this.cliente = cliente;
+        this.refPiel = refPiel;
+        actualizar(nombre);
+    }
+
+    public String getCliente() {
+        return cliente;
+    }
+
+    public String getRefPiel() {
+        return refPiel;
+    }
+
+    public String getNombre() {
+        return nombre == null ? "" : nombre;
+    }
+
+    public LocalDateTime getFechaActualizacion() {
+        return fechaActualizacion;
+    }
+
+    public void actualizar(String nombre) {
+        this.nombre = nombre;
+        this.fechaActualizacion = LocalDateTime.now();
+    }
+}

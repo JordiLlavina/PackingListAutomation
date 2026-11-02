@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -59,6 +61,11 @@ public class TemporadaGuardada {
     @Column(name = "excel", nullable = false)
     private byte[] excel;
 
+    /** Qué excel es: el de pedido del cliente o el de producción de Puntotres (ver TipoExcelTemporada). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_excel", length = 20, nullable = false)
+    private TipoExcelTemporada tipoExcel;
+
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
@@ -67,7 +74,13 @@ public class TemporadaGuardada {
     }
 
     public TemporadaGuardada(String cliente, String temporada, String nombreFichero, byte[] excel) {
+        this(cliente, temporada, nombreFichero, excel, TipoExcelTemporada.PEDIDO);
+    }
+
+    public TemporadaGuardada(String cliente, String temporada, String nombreFichero, byte[] excel,
+                             TipoExcelTemporada tipoExcel) {
         this.cliente = cliente;
+        this.tipoExcel = tipoExcel;
         this.temporada = temporada;
         this.nombreFichero = nombreFichero;
         this.excel = excel;
@@ -92,6 +105,10 @@ public class TemporadaGuardada {
 
     public byte[] getExcel() {
         return excel;
+    }
+
+    public TipoExcelTemporada getTipoExcel() {
+        return tipoExcel;
     }
 
     public LocalDateTime getFechaActualizacion() {

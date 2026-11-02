@@ -12,5 +12,6 @@ import java.time.LocalDateTime;
  * megas— para enseñar cuatro nombres.
  */
 public record ResumenTemporada(Long id, String cliente, String temporada,
-                               String nombreFichero, LocalDateTime fechaActualizacion) {
+                               String nombreFichero, LocalDateTime fechaActualizacion,
+                               TipoExcelTemporada tipoExcel) {
 }
