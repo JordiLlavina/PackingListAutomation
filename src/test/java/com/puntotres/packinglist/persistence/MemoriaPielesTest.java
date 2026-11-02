@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
+
 /**
  * Lo que el programa recuerda de las pieles entre temporadas. Cada test usa
  * sus propias referencias: la base de datos en memoria es la misma para toda
@@ -21,12 +23,15 @@ class MemoriaPielesTest {
     @Autowired
     private MemoriaPieles memoria;
 
+    @Autowired
+    private CatalogoModelos catalogo;
+
     @Test
     void elNombreDeLaPielValeParaTodosLosBolsosQueLaUsan() {
         memoria.recordar("AMI", "AL0901", "ULL729.AL0901", "Box calf", "", List.of());
 
         MemoriaPieles.Recordadas otroBolso = memoria.buscar("AMI", "AL0901", "ULL712.AL0901");
-        assertEquals("Box calf", otroBolso.nombrePiel());
+        assertEquals("BOX CALF", otroBolso.nombrePiel());
         assertTrue(otroBolso.combinaciones().isEmpty(), "las combinaciones son del bolso, no de la piel");
         assertEquals("", otroBolso.forro());
     }
@@ -37,8 +42,8 @@ class MemoriaPielesTest {
                 "Cabretilla", Arrays.asList("Ante", "", null, "Charol"));
 
         MemoriaPieles.Recordadas recordadas = memoria.buscar("AMI", "AL0902", "ULL027.AL0902");
-        assertEquals("Cabretilla", recordadas.forro());
-        assertEquals(List.of("Ante", "Charol"), recordadas.combinaciones());
+        assertEquals("CABRETILLA", recordadas.forro());
+        assertEquals(List.of("ANTE", "CHAROL"), recordadas.combinaciones());
     }
 
     @Test
@@ -47,9 +52,9 @@ class MemoriaPielesTest {
         memoria.recordar("AMI", "AL0903", "ULL027.AL0903", "  ", "", List.of());
 
         MemoriaPieles.Recordadas recordadas = memoria.buscar("AMI", "AL0903", "ULL027.AL0903");
-        assertEquals("Nappa", recordadas.nombrePiel());
-        assertEquals("Tela", recordadas.forro());
-        assertEquals(List.of("Ante"), recordadas.combinaciones());
+        assertEquals("NAPPA", recordadas.nombrePiel());
+        assertEquals("TELA", recordadas.forro());
+        assertEquals(List.of("ANTE"), recordadas.combinaciones());
     }
 
     @Test
@@ -63,10 +68,10 @@ class MemoriaPielesTest {
     }
 
     @Test
-    void lasClavesNoDistinguenMayusculasPeroElNombreSeGuardaComoSeTeclea() {
+    void lasClavesYLosNombresSeGuardanEnMayusculas() {
         memoria.recordar("ami", " al0905 ", "ull729.al0905", "Vachette Grainée", "", List.of());
 
-        assertEquals("Vachette Grainée", memoria.buscar("AMI", "AL0905", "ULL729.AL0905").nombrePiel());
+        assertEquals("VACHETTE GRAINÉE", memoria.buscar("AMI", "AL0905", "ULL729.AL0905").nombrePiel());
     }
 
     @Test
@@ -84,7 +89,7 @@ class MemoriaPielesTest {
 
         MemoriaPieles.Recordadas recordadas = memoria.buscar("AMI", "", "MUESTRA9");
         assertEquals("", recordadas.nombrePiel(), "sin ref de piel no hay dónde guardar su nombre");
-        assertEquals(List.of("Ante"), recordadas.combinaciones());
+        assertEquals(List.of("ANTE"), recordadas.combinaciones());
     }
 
     @Test
@@ -111,8 +116,8 @@ class MemoriaPielesTest {
 
         assertEquals(List.of("PZ2"), incorporacion.anadidos());
         assertEquals(List.of("PZ1"), incorporacion.yaEstaban());
-        assertEquals(List.of("PZ1", "PZ2"), memoria.pielesDe("PRUEBAP").stream().map(MemoriaPiel::getRefPiel).toList());
-        assertEquals("Box calf", memoria.buscar("PRUEBAP", "PZ1", "X.PZ1").nombrePiel());
+        assertEquals(List.of("PZ1", "PZ2"), memoria.pielesDe("PRUEBAP").stream().map(Piel::getRefPiel).toList());
+        assertEquals("BOX CALF", memoria.buscar("PRUEBAP", "PZ1", "X.PZ1").nombrePiel());
         assertEquals("", memoria.buscar("PRUEBAP", "PZ2", "X.PZ2").nombrePiel());
     }
 
@@ -133,5 +138,45 @@ class MemoriaPielesTest {
         memoria.recordarColores("AMI", "ULL027.AL0907", "001", " ", "OTRO", "", List.of());
 
         assertEquals("BLACK", memoria.buscarColores("AMI", "ULL027.AL0907", "001").colorPiel());
+    }
+
+    // --- La memoria es una fachada sobre el catálogo de modelos ---
+
+    @Test
+    void recordarPielesDelArticuloNoTocaElNombreDeLaPiel() {
+        // El camino del excel de producción: ahí la piel es texto concatenado
+        // ("SERRAJE ALABAMA") y no debe pisar el nombre que alguien tecleó.
+        memoria.guardarPiel("AMI", "AL0930", "ALPACA");
+
+        memoria.recordarPielesDelArticulo("AMI", "ULL930.AL0930", "BADANA", List.of("ANTE"));
+
+        MemoriaPieles.Recordadas recordadas = memoria.buscar("AMI", "AL0930", "ULL930.AL0930");
+        assertEquals("ALPACA", recordadas.nombrePiel());
+        assertEquals("BADANA", recordadas.forro());
+        assertEquals(List.of("ANTE"), recordadas.combinaciones());
+    }
+
+    @Test
+    void loRecordadoSeVeComoArticuloDelCatalogo() {
+        memoria.recordar("AMI", "AL0931", "ULL931.AL0931", "Nappa", "Tela", List.of("Ante"));
+
+        Articulo articulo = catalogo.articulo("AMI", "ULL931.AL0931").orElseThrow();
+        assertEquals("ULL931", articulo.getCodigoModelo());
+        assertEquals("TELA", articulo.getForro());
+    }
+
+    @Test
+    void losTextosSeGuardanEnMayusculas() {
+        memoria.recordar("AMI", "AL0932", "ULL932.AL0932", "nappa", " badana ", List.of("ante"));
+        memoria.recordarColores("AMI", "ULL932.AL0932", "001", "nappa", " negro", "gris", List.of("beis"));
+
+        MemoriaPieles.Recordadas recordadas = memoria.buscar("AMI", "AL0932", "ULL932.AL0932");
+        assertEquals("NAPPA", recordadas.nombrePiel());
+        assertEquals("BADANA", recordadas.forro());
+        assertEquals(List.of("ANTE"), recordadas.combinaciones());
+        MemoriaPieles.ColoresRecordados colores = memoria.buscarColores("AMI", "ULL932.AL0932", "001");
+        assertEquals("NEGRO", colores.colorPiel());
+        assertEquals("GRIS", colores.colorForro());
+        assertEquals(List.of("BEIS"), colores.coloresCombinacion());
     }
 }

@@ -559,8 +559,8 @@ class DocumentosCorteControllerTest {
         mvc.perform(cargar("AMI", "H27", pedidoAmi("ULL109", "AL0909"), zipFotos("ULL109")));
 
         mvc.perform(get("/documentos-corte/pieles").session(sesion))
-                .andExpect(content().string(containsString("value=\"Vachette recordada\"")))
-                .andExpect(content().string(containsString("value=\"Cabretilla recordada\"")));
+                .andExpect(content().string(containsString("value=\"VACHETTE RECORDADA\"")))
+                .andExpect(content().string(containsString("value=\"CABRETILLA RECORDADA\"")));
     }
 
     @Test
@@ -626,7 +626,7 @@ class DocumentosCorteControllerTest {
         mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL116", "AL0920"), zipFotos("ULL116")));
 
         mvc.perform(get("/documentos-corte/pieles").session(sesion))
-                .andExpect(content().string(containsString("value=\"Vachette de la tabla\"")));
+                .andExpect(content().string(containsString("value=\"VACHETTE DE LA TABLA\"")));
     }
 
     @Test

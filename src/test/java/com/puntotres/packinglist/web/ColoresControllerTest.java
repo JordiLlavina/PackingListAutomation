@@ -227,7 +227,7 @@ class ColoresControllerTest {
                 .andExpect(content().string(containsString("\"ok\":true")));
         mvc.perform(get("/colores").param("cliente", "LGN"))
                 .andExpect(content().string(containsString(">PL01<")))
-                .andExpect(content().string(containsString("value=\"Vachette\"")));
+                .andExpect(content().string(containsString("value=\"VACHETTE\"")));
 
         mvc.perform(post("/colores/pieles/fila").param("cliente", "LGN").param("codigo", " "))
                 .andExpect(status().isBadRequest())
