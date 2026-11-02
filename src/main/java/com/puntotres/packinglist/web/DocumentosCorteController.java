@@ -303,7 +303,7 @@ public class DocumentosCorteController {
             List<ColorCorte> colores = fila.colores();
             for (int indice = 0; indice < colores.size(); indice++) {
                 MemoriaPieles.ColoresRecordados recordados = memoria.buscarColores(cliente,
-                        fila.referencia().referencia(), colores.get(indice).codigo());
+                        fila.referencia().referencia(), colores.get(indice).claveCatalogo());
                 if (fila.getColorForro(indice).isEmpty()) {
                     fila.setColorForro(indice, recordados.colorForro());
                 }
@@ -326,7 +326,7 @@ public class DocumentosCorteController {
             List<ColorCorte> colores = fila.colores();
             for (int indice = 0; indice < colores.size(); indice++) {
                 MemoriaPieles.ColoresRecordados recordados = memoria.buscarColores(cliente,
-                        fila.referencia().referencia(), colores.get(indice).codigo());
+                        fila.referencia().referencia(), colores.get(indice).claveCatalogo());
                 // Sin color recordado, la piel principal se queda con el del bolso.
                 if (!recordados.colorPiel().isEmpty()) {
                     fila.setColorPiel(indice, recordados.colorPiel());
@@ -418,7 +418,14 @@ public class DocumentosCorteController {
         }
         try {
             enCurso.getConversion().esperar();
-            guardarFotosEnCatalogo();
+            try {
+                guardarFotosEnCatalogo();
+            } catch (IOException | RuntimeException e) {
+                // El catálogo es memoria para la próxima vez; los documentos de hoy no esperan por él.
+                enCurso.getAvisosCarga().add("No se han podido guardar las fotos en el catálogo de modelos: "
+                        + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName())
+                        + ". Los documentos salen igual.");
+            }
             Path salida = enCurso.getDirectorio().resolve("documentos");
             CorteEnCurso.borrar(salida);
             ResultadoCorte resultado = servicio.generar(enCurso.getNombreCliente(),
@@ -461,15 +468,10 @@ public class DocumentosCorteController {
             // es como se guardan los nombres y como se vuelven a leer.
             PielesArticulo pieles = fila.pieles(indice);
             memoria.recordarColores(enCurso.getClaveCliente(), fila.referencia().referencia(),
-                    claveColor(colores.get(indice)), fila.getNombrePiel(), pieles.principal().color(),
+                    colores.get(indice).claveCatalogo(), fila.getNombrePiel(), pieles.principal().color(),
                     pieles.forro().color(),
                     pieles.combinaciones().stream().map(PielCorte::color).toList());
         }
-    }
-
-    /** La clave con la que el catálogo guarda un color del bolso: su código o, si no tiene, su descripción. */
-    private static String claveColor(ColorCorte color) {
-        return color.codigo().isEmpty() ? color.descripcion() : color.codigo();
     }
 
     /**
@@ -524,7 +526,7 @@ public class DocumentosCorteController {
                 // es como se guardan los nombres y como se vuelven a leer.
                 PielesArticulo pieles = fila.pieles(indice);
                 memoria.recordarColores(enCurso.getClaveCliente(), fila.referencia().referencia(),
-                        colores.get(indice).codigo(), fila.getNombrePiel(), pieles.principal().color(),
+                        colores.get(indice).claveCatalogo(), fila.getNombrePiel(), pieles.principal().color(),
                         pieles.forro().color(),
                         pieles.combinaciones().stream().map(PielCorte::color).toList());
             }

@@ -116,10 +116,18 @@ public class TemporadasController {
                     + "guarda para no tener que buscarlo en cada envío.");
         }
 
+        // Si una temporada cambia de cliente, sus vínculos con los modelos del
+        // cliente viejo no pueden quedarse: se sueltan y se vuelve a leer el
+        // excel para el nuevo (con el tipo que le toque a ese cliente).
+        boolean cambiaDeCliente = !esAlta && archivo.conFichero(id)
+                .map(anterior -> !anterior.getCliente().equals(cliente)).orElse(false);
         TemporadaGuardada guardada = archivo.guardar(id, cliente, nombreTemporada, nombreFichero, excel, tipo);
         redirect.addFlashAttribute("mensaje", "Guardada la temporada " + nombreTemporada
                 + " de " + config.getNombre() + ".");
-        if (excel != null) {
+        if (cambiaDeCliente) {
+            catalogo.desvincularTemporada(guardada.getId());
+        }
+        if (excel != null || cambiaDeCliente) {
             incorporarAlCatalogo(guardada, redirect);
         }
         return "redirect:/temporadas";

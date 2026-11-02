@@ -314,6 +314,34 @@ class TemporadasControllerTest {
     }
 
     @Test
+    void cambiarElClienteDeUnaTemporadaCambiaSuTipoYSueltaSusModelos() throws Exception {
+        mvc.perform(multipart("/temporadas")
+                        .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx", TIPO_XLSX,
+                                recurso("/ejemplos/EAN PUNTOTRES H26.xlsx")))
+                        .param("cliente", "AMI")
+                        .param("temporada", "CAT-MUDA"))
+                .andExpect(redirectedUrl("/temporadas"));
+        Long id = archivo.de("AMI").stream()
+                .filter(temporada -> temporada.temporada().equals("CAT-MUDA"))
+                .map(ResumenTemporada::id).findFirst().orElseThrow();
+        assertTrue(!catalogo.codigosDeModeloEn("AMI", id).isEmpty());
+
+        // Se edita sin fichero: el excel se queda, pero el cliente nuevo es un
+        // genérico, así que el tipo pasa a producción y los vínculos con los
+        // modelos de AMI no pueden quedarse.
+        mvc.perform(multipart("/temporadas")
+                        .param("id", String.valueOf(id))
+                        .param("cliente", "KAMI")
+                        .param("temporada", "CAT-MUDA"))
+                .andExpect(redirectedUrl("/temporadas"));
+
+        TemporadaGuardada mudada = archivo.conFichero(id).orElseThrow();
+        assertEquals("KAMI", mudada.getCliente());
+        assertEquals(TipoExcelTemporada.PRODUCCION, mudada.getTipoExcel());
+        assertTrue(catalogo.codigosDeModeloEn("AMI", id).isEmpty(), "los modelos de AMI ya no son de esta temporada");
+    }
+
+    @Test
     void elDesplegableDeLaEntradaNoOfreceTemporadasDeProduccion() throws Exception {
         mvc.perform(multipart("/temporadas")
                         .file(pedido("prod.xlsx", "x"))

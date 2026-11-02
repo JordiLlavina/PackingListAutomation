@@ -22,7 +22,10 @@
                 </select>
             </label>
             <label>Buscar
-                <input type="search" id="buscar" placeholder="Referencia, modelo, nombre o piel" autocomplete="off">
+                <!-- form="ninguno": no pertenece al formulario GET, así Enter no lo
+                     envía y no se pierde el filtro tecleado. Filtra en el navegador. -->
+                <input type="search" id="buscar" form="ninguno" placeholder="Referencia, modelo, nombre o piel"
+                       autocomplete="off">
             </label>
             <label>Temporada
                 <select name="temporada" id="temporada" onchange="this.form.submit()">
@@ -429,12 +432,12 @@
                 decir(celda, 'Guardando…');
                 const valor = celda.value;
                 enviar(BASE + celda.dataset.url.replace(/^\//, ''), datosDe(celda, valor)).then(function (json) {
-                    celda.defaultValue = valor;
+                    celda.defaultValue = valor; celda.dataset.inicial = valor;
                     const propagadas = json.propagadas || [];
                     if (propagadas.length === 0) { decir(celda, 'Guardado', 'guardado'); return; }
                     propagadas.forEach(function (p) {
                         const hermana = celdaHermana(p.referencia, celda.dataset.campo);
-                        if (hermana) { hermana.value = valor; hermana.defaultValue = valor; }
+                        if (hermana) { hermana.value = valor; hermana.defaultValue = valor; hermana.dataset.inicial = valor; }
                     });
                     const estado = estadoDe(celda);
                     estado.className = 'estado-celda propagado';
@@ -449,7 +452,7 @@
                             const datos = {campo: celda.dataset.campo, valor: p.anterior, referencia: p.referencia, propagar: 'false'};
                             return enviar(BASE + 'catalogo/articulo/celda', datos).then(function () {
                                 const hermana = celdaHermana(p.referencia, celda.dataset.campo);
-                                if (hermana) { hermana.value = p.anterior; hermana.defaultValue = p.anterior; }
+                                if (hermana) { hermana.value = p.anterior; hermana.defaultValue = p.anterior; hermana.dataset.inicial = p.anterior; }
                             });
                         })).then(function () { decir(celda, 'Deshecho en las demás', 'guardado'); })
                           .catch(function (error) { decir(celda, error.message, 'error'); });
@@ -457,11 +460,14 @@
                     estado.appendChild(deshacer);
                 }).catch(function (error) { decir(celda, error.message, 'error'); });
             }
+            // El valor con el que se pintó cada celda, para Escape: un <select> no
+            // tiene defaultValue y restaurarlo desde ahí lo dejaba en blanco.
             document.querySelectorAll('.celda').forEach(function (celda) {
+                celda.dataset.inicial = celda.value;
                 celda.addEventListener('change', function () { guardar(celda); });
                 celda.addEventListener('keydown', function (evento) {
                     if (evento.key === 'Enter') { evento.preventDefault(); celda.blur(); }
-                    if (evento.key === 'Escape') { celda.value = celda.defaultValue; celda.blur(); }
+                    if (evento.key === 'Escape') { celda.value = celda.dataset.inicial; celda.blur(); }
                 });
             });
         })();

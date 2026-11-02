@@ -154,14 +154,14 @@ public class ArchivoTemporadas {
      * Alta o corrección. Un {@code id} nulo da de alta; un {@code excel} nulo
      * conserva el que ya tuviera (se editó el nombre, no el fichero). El tipo
      * lo fija el cliente (con pedido-cliente, PEDIDO; si no, PRODUCCION) y
-     * no cambia al editar.
+     * sigue al cliente también al editar.
      */
     @Transactional
     public TemporadaGuardada guardar(Long id, String cliente, String temporada,
                                      String nombreFichero, byte[] excel, TipoExcelTemporada tipo) {
         Optional<TemporadaGuardada> existente = conFichero(id);
         if (existente.isPresent()) {
-            existente.get().actualizar(cliente, temporada, nombreFichero, excel);
+            existente.get().actualizar(cliente, temporada, nombreFichero, excel, tipo);
             return existente.get();
         }
         return repositorio.save(new TemporadaGuardada(cliente, temporada, nombreFichero, excel, tipo));

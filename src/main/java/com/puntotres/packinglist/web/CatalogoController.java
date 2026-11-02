@@ -91,9 +91,14 @@ public class CatalogoController {
         model.addAttribute("clientes", clientes);
         model.addAttribute("cliente", elegido);
         model.addAttribute("nombreCliente", elegido == null ? "" : clientes.get(elegido));
-        model.addAttribute("temporadas", elegido == null ? List.of() : temporadas.de(elegido));
-        model.addAttribute("temporadaId", temporada);
-        model.addAttribute("filas", elegido == null ? List.of() : filas(elegido, temporada));
+        List<ResumenTemporada> delCliente = elegido == null ? List.of() : temporadas.de(elegido);
+        // El selector de cliente envía el formulario entero, con la temporada del
+        // cliente anterior: una que no sea de este no filtra nada.
+        Long laTemporada = temporada != null && delCliente.stream().anyMatch(t -> t.id().equals(temporada))
+                ? temporada : null;
+        model.addAttribute("temporadas", delCliente);
+        model.addAttribute("temporadaId", laTemporada);
+        model.addAttribute("filas", elegido == null ? List.of() : filas(elegido, laTemporada));
         model.addAttribute("tamanos", taras.tamanosDeMayorAMenor());
         model.addAttribute("tipos", TipoArticulo.values());
         model.addAttribute("coloresCliente", elegido == null ? List.of() : tablaColores.de(elegido));

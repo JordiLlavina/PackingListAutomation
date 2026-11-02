@@ -103,6 +103,21 @@ class CatalogoControllerTest {
     }
 
     @Test
+    void unaTemporadaDeOtroClienteNoFiltra() throws Exception {
+        // El selector de cliente envía el formulario entero, con la temporada
+        // del cliente anterior: esa no es de este y no puede dejar la tabla vacía.
+        TemporadaGuardada deOtro = archivo.guardar(null, "KAMI", "CAT-AJENA", "p.xlsx", new byte[] {1},
+                com.puntotres.packinglist.persistence.TipoExcelTemporada.PRODUCCION);
+        catalogo.asegurarArticulo("AMI", "ULL959.AL0001");
+
+        MvcResult resultado = mvc.perform(get("/catalogo").param("cliente", "AMI")
+                .param("temporada", String.valueOf(deOtro.getId()))).andReturn();
+
+        assertEquals(null, resultado.getModelAndView().getModel().get("temporadaId"));
+        assertTrue(filas(resultado).stream().anyMatch(fila -> fila.codigoModelo().equals("ULL959")));
+    }
+
+    @Test
     void guardarUnaCeldaContestaJsonConLasPropagadas() throws Exception {
         catalogo.asegurarArticulo("AMI", "ULL953.AL0001");
         catalogo.asegurarArticulo("AMI", "ULL953.AL0002");

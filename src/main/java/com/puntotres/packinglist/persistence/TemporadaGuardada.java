@@ -121,8 +121,15 @@ public class TemporadaGuardada {
      * por no haberlo readjuntado sería justo el trabajo que esto ahorra.
      */
     public void actualizar(String cliente, String temporada, String nombreFichero, byte[] excel) {
+        actualizar(cliente, temporada, nombreFichero, excel, this.tipoExcel);
+    }
+
+    /** Con el tipo: sigue al cliente, que es quien lo decide (un genérico guarda el excel de producción). */
+    public void actualizar(String cliente, String temporada, String nombreFichero, byte[] excel,
+                           TipoExcelTemporada tipoExcel) {
         this.cliente = cliente;
         this.temporada = temporada;
+        this.tipoExcel = tipoExcel;
         if (excel != null) {
             this.nombreFichero = nombreFichero;
             this.excel = excel;

@@ -186,18 +186,30 @@ public class MemoriaPieles {
                 () -> pieles.save(new Piel(id.cliente(), id.refPiel(), nombre)));
     }
 
-    /** Devuelve si había algo que borrar. Los artículos de esa piel se quedan, sin piel (FK del esquema). */
+    /**
+     * Devuelve si había algo que borrar. Los artículos de esa piel se quedan,
+     * sin piel: se les quita aquí antes de borrarla, porque la FK es compuesta
+     * (cliente + ref_piel) y un ON DELETE SET NULL pondría a null también el
+     * cliente, que es parte de la clave, y el borrado reventaría.
+     */
     @Transactional
     public boolean borrarPiel(String cliente, String refPiel) {
         if (vacio(cliente) || vacio(refPiel)) {
             return false;
         }
         PielId id = new PielId(clave(cliente), clave(refPiel));
-        if (pieles.existsById(id)) {
-            pieles.deleteById(id);
-            return true;
+        if (!pieles.existsById(id)) {
+            return false;
         }
-        return false;
+        for (Articulo articulo : catalogo.articulosDe(id.cliente())) {
+            if (articulo.getRefPiel().equals(id.refPiel())) {
+                articulo.quitarPiel();
+            }
+        }
+        // Hibernate vuelca las actualizaciones antes que los borrados: los
+        // artículos ya no apuntan a la piel cuando se borra.
+        pieles.deleteById(id);
+        return true;
     }
 
     /**

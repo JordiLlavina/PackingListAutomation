@@ -166,6 +166,19 @@ class MemoriaPielesTest {
     }
 
     @Test
+    void borrarUnaPielConArticulosLosDejaSinPielYNoRevienta() {
+        // La FK compuesta no puede hacer SET NULL (pondría a null también el
+        // cliente, que es parte de la clave): la fachada quita la piel primero.
+        catalogo.asegurarArticulo("AMI", "ULL935.AL0935");
+
+        assertTrue(memoria.borrarPiel("AMI", "AL0935"));
+
+        Articulo articulo = catalogo.articulo("AMI", "ULL935.AL0935").orElseThrow();
+        assertTrue(!articulo.tienePiel(), "el artículo sobrevive, sin piel");
+        assertEquals("", memoria.buscar("AMI", "AL0935", "ULL935.AL0935").nombrePiel());
+    }
+
+    @Test
     void losTextosSeGuardanEnMayusculas() {
         memoria.recordar("AMI", "AL0932", "ULL932.AL0932", "nappa", " badana ", List.of("ante"));
         memoria.recordarColores("AMI", "ULL932.AL0932", "001", "nappa", " negro", "gris", List.of("beis"));

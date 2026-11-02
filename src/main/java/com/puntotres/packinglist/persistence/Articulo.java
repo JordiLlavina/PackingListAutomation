@@ -144,6 +144,16 @@ public class Articulo {
         return fechaActualizacion;
     }
 
+    /**
+     * Deja el artículo sin piel. Lo usa el borrado de una piel: la FK es
+     * compuesta (cliente + ref_piel) y un ON DELETE SET NULL pondría a null
+     * también el cliente, que es parte de la clave.
+     */
+    public void quitarPiel() {
+        this.refPiel = null;
+        tocar();
+    }
+
     public void setForro(String forro) {
         this.forro = vacioANulo(forro);
         tocar();

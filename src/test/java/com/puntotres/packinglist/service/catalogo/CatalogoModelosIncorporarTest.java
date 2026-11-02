@@ -97,6 +97,7 @@ class CatalogoModelosIncorporarTest {
         ResumenAlta alta = catalogo.incorporarTemporada(temporada);
 
         assertTrue(alta.articulos() > 0);
+        assertTrue(alta.modelosNuevos() > 0, "el emergente dice cuántos modelos son nuevos: " + alta);
         List<Articulo> articulos = catalogo.articulosDe("KAMI");
         assertFalse(articulos.isEmpty());
         assertTrue(articulos.stream().noneMatch(Articulo::tienePiel), "un genérico no parte la referencia");

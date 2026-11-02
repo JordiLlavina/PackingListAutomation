@@ -74,8 +74,11 @@ create table articulo (
     primary key (cliente, referencia),
     constraint fk_articulo_modelo foreign key (cliente, codigo_modelo)
         references modelo (cliente, codigo) on delete cascade,
+    -- Sin ON DELETE SET NULL: en una FK compuesta pondría a null también el
+    -- cliente, que es parte de la clave. Quien borra una piel quita antes la
+    -- referencia de sus artículos (MemoriaPieles.borrarPiel).
     constraint fk_articulo_piel foreign key (cliente, ref_piel)
-        references piel (cliente, ref_piel) on delete set null
+        references piel (cliente, ref_piel)
 );
 
 -- codigo_color es el código del color del bolso o, si no tiene, su

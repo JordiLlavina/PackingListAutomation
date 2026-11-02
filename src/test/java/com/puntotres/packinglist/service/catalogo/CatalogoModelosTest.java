@@ -135,7 +135,26 @@ class CatalogoModelosTest {
 
         Articulo articulo = catalogo.articulo("AMI", "ULL905.AL0001").orElseThrow();
         assertEquals("BADANA", articulo.getForro());
-        assertEquals(List.of("", "ANTE", "", ""), articulo.getCasillasCombinacion());
+        // Escrita en la casilla 2 con la 1 vacía, se compacta: el corte las lee sin huecos.
+        assertEquals(List.of("ANTE", "", "", ""), articulo.getCasillasCombinacion());
+    }
+
+    @Test
+    void vaciarUnaCombinacionCompactaLosNombresYSusColores() {
+        // El corte lee las combinaciones compactadas y las empareja por posición
+        // con sus colores: un hueco dejado desde la pantalla desalinearía ambos.
+        catalogo.asegurarArticulo("AMI", "ULL936.AL0001");
+        catalogo.guardarCampo("AMI", "ULL936.AL0001", CampoArticulo.COMBINACION1, "A", false);
+        catalogo.guardarCampo("AMI", "ULL936.AL0001", CampoArticulo.COMBINACION2, "B", false);
+        catalogo.asegurarColor("AMI", "ULL936.AL0001", "001");
+        catalogo.guardarCampoColor("AMI", "ULL936.AL0001", "001", CatalogoModelos.CampoColor.COLOR_COMBINACION1, "CA");
+        catalogo.guardarCampoColor("AMI", "ULL936.AL0001", "001", CatalogoModelos.CampoColor.COLOR_COMBINACION2, "CB");
+
+        catalogo.guardarCampo("AMI", "ULL936.AL0001", CampoArticulo.COMBINACION1, "", false);
+
+        Articulo articulo = catalogo.articulo("AMI", "ULL936.AL0001").orElseThrow();
+        assertEquals(List.of("B", "", "", ""), articulo.getCasillasCombinacion());
+        assertEquals(List.of("CB"), catalogo.coloresDe("AMI", "ULL936.AL0001").get(0).getColoresCombinacion());
     }
 
     @Test

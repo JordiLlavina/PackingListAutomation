@@ -243,11 +243,14 @@ public class CatalogoModelos {
                 continue;
             }
             boolean habiaArticulo = articulos.existsById(new ArticuloId(elCliente, referencia));
+            // El modelo se mira ANTES de asegurar el artículo, que ya lo crea.
+            ReferenciaCorte partida = reglas.reglasDeProduccion(elCliente).partir(referencia);
+            String codigoModelo = partida.tienePiel() ? partida.modelo() : referencia;
+            boolean habiaModelo = modelos.existsById(new ModeloId(elCliente, codigoModelo));
             Articulo articulo = asegurarArticulo(elCliente, referencia);
             if (!habiaArticulo) {
                 articulosNuevos++;
             }
-            boolean habiaModelo = modelos.existsById(new ModeloId(elCliente, articulo.getCodigoModelo()));
             asegurarModelo(elCliente, articulo.getCodigoModelo(), entrada.nombreModelo());
             if (!habiaModelo) {
                 modelosNuevos++;
@@ -345,6 +348,14 @@ public class CatalogoModelos {
             combinaciones.addAll(articulo.getCombinaciones());
         }
         return new TextosConocidos(List.copyOf(forros), List.copyOf(combinaciones));
+    }
+
+    /** Suelta los modelos de una temporada (al cambiarla de cliente): los modelos se quedan, el vínculo no. */
+    @Transactional
+    public void desvincularTemporada(Long temporadaId) {
+        if (temporadaId != null) {
+            temporadasDeModelo.deleteByTemporadaId(temporadaId);
+        }
     }
 
     /** Los códigos de modelo que fueron en una temporada, en orden. */
@@ -504,10 +515,45 @@ public class CatalogoModelos {
                 if (suyo.isEmpty() || suyo.equals(anterior)) {
                     campo.escribir(hermano, validado);
                     propagadas.add(new Propagada(hermano.getReferencia(), suyo));
+                    compactarCombinaciones(hermano);
                 }
             }
         }
+        compactarCombinaciones(articulo);
         return new Propagacion(propagadas);
+    }
+
+    /**
+     * Quita los huecos de las combinaciones de un artículo y corre con ellas
+     * los colores de combinación de todos sus colores del bolso. El corte lee
+     * las combinaciones compactadas y las empareja con sus colores por
+     * posición: un hueco dejado desde la pantalla pondría a cada combinación
+     * el color de otra.
+     */
+    private void compactarCombinaciones(Articulo articulo) {
+        List<String> casillas = articulo.getCasillasCombinacion();
+        List<Integer> conNombre = new ArrayList<>();
+        for (int i = 0; i < casillas.size(); i++) {
+            if (!casillas.get(i).isEmpty()) {
+                conNombre.add(i);
+            }
+        }
+        boolean yaCompactas = conNombre.size() == casillas.size()
+                || conNombre.isEmpty() && casillas.stream().allMatch(String::isEmpty)
+                || conNombre.get(conNombre.size() - 1) == conNombre.size() - 1;
+        if (yaCompactas) {
+            return;
+        }
+        articulo.setCombinaciones(conNombre.stream().map(casillas::get).toList());
+        for (ArticuloColor color : coloresDeArticulo.findByClienteAndReferenciaOrderByCodigoColor(
+                articulo.getCliente(), articulo.getReferencia())) {
+            List<String> colores = new ArrayList<>(color.getColoresCombinacion());
+            while (colores.size() < MAXIMO_COMBINACIONES) {
+                colores.add("");
+            }
+            color.actualizar(color.getColorPiel(), color.getColorForro(),
+                    conNombre.stream().map(colores::get).toList());
+        }
     }
 
     @Transactional

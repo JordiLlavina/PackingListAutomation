@@ -34,6 +34,15 @@ public record ColorCorte(String codigo, String descripcion, int bolsos, boolean 
         return codigo.isEmpty() ? descripcion : codigo + " " + descripcion;
     }
 
+    /**
+     * La clave con la que el catálogo de modelos guarda los colores de piel de
+     * este color del bolso: el código o, si no tiene (el bicolor de AMI, los de
+     * un genérico), la descripción entera. La misma al guardar y al leer.
+     */
+    public String claveCatalogo() {
+        return codigo.isEmpty() ? descripcion : codigo;
+    }
+
     public ColorCorte conBolsos(int otros) {
         return new ColorCorte(codigo, descripcion, otros, prensa);
     }
