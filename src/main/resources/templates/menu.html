@@ -94,15 +94,6 @@
              pequeños y no en una tarjeta. En la columna caben cinco (la
              rejilla de .menu-paneles tiene cinco filas); un sexto la reparte. -->
         <div class="menu-paneles">
-            <a class="menu-panel" th:href="@{/taras}">
-                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 4v16M8 20h8M4 7h16"/>
-                    <path d="M4 7 1.5 13h5zM20 7l-2.5 6h5z"/>
-                </svg>
-                <span class="menu-panel-titulo">Taras de los cartones</span>
-            </a>
-
             <a class="menu-panel" th:href="@{/temporadas}">
                 <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -110,6 +101,15 @@
                     <path d="M10 12h4"/>
                 </svg>
                 <span class="menu-panel-titulo">Guarda Temporadas y Ficheros</span>
+            </a>
+
+            <a class="menu-panel" th:href="@{/catalogo}">
+                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/>
+                    <path d="M4 7.5 12 12l8-4.5M12 12v9"/>
+                </svg>
+                <span class="menu-panel-titulo">Catálogo de modelos</span>
             </a>
 
             <a class="menu-panel" th:href="@{/colores}">
@@ -123,15 +123,6 @@
                 <span class="menu-panel-titulo">Colores y Pieles de Cliente</span>
             </a>
 
-            <a class="menu-panel" th:href="@{/catalogo}">
-                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/>
-                    <path d="M4 7.5 12 12l8-4.5M12 12v9"/>
-                </svg>
-                <span class="menu-panel-titulo">Catálogo de modelos</span>
-            </a>
-
             <a class="menu-panel" th:href="@{/comentarios-embalaje}">
                 <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -139,6 +130,15 @@
                     <path d="M8 9.5h8M8 12.5h5"/>
                 </svg>
                 <span class="menu-panel-titulo">Comentarios de embalaje</span>
+            </a>
+
+            <a class="menu-panel" th:href="@{/taras}">
+                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 4v16M8 20h8M4 7h16"/>
+                    <path d="M4 7 1.5 13h5zM20 7l-2.5 6h5z"/>
+                </svg>
+                <span class="menu-panel-titulo">Taras de los cartones</span>
             </a>
         </div>
     </div>
