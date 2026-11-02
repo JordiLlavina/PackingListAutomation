@@ -136,6 +136,20 @@ class RutasTest {
     }
 
     @Test
+    void elCampoDeFotosEscondeSusDosInputsDeFichero() throws Exception {
+        // La regla general de input[type="file"] les da display: block y gana
+        // al atributo hidden: sin esto, debajo de la zona de soltar salían dos
+        // selectores de fichero más en cada página que usa el campo.
+        String css = new String(new org.springframework.core.io.ClassPathResource(
+                "static/estilo.css").getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.contains(".campo-fotos [hidden] { display: none !important; }"),
+                "el campo de fotos esconde lo que lleva hidden");
+    }
+
+    @Test
     void losAvisosDePaletDeLasEtiquetasSeTinenAparteDeLosDeCaja() throws Exception {
         // El usuario los mira en otro momento —cuando ya está montando el
         // bulto—, así que mezclados con los de caja se pierden. Y cada

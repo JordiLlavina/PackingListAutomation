@@ -1629,7 +1629,11 @@ main.catalogo { max-width: 100rem; }
    Una zona punteada que acepta la carpeta o su zip soltados encima, y que al
    pincharla abre el selector de carpeta; el zip tiene su enlace dentro. Se
    ilumina al arrastrar encima y se queda con borde lleno cuando ya hay fotos
-   elegidas, para que se vea sin leer el texto. */
+   elegidas, para que se vea sin leer el texto. Los dos inputs de fichero van
+   escondidos con hidden, y la regla general de input[type="file"] les da
+   display: block, así que el campo los esconde él mismo: si no, en cada
+   página que no lo arreglara salían dos selectores más debajo de la zona. */
+.campo-fotos [hidden] { display: none !important; }
 .zona-fotos {
     display: flex;
     flex-direction: column;
