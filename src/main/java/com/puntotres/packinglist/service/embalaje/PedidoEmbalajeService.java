@@ -170,16 +170,15 @@ public class PedidoEmbalajeService {
         List<ArticuloEmbalaje> articulos = new ArrayList<>();
         for (List<ApcPedidoExcel.LineaCatalogo> lineas : porArticulo.values()) {
             ApcPedidoExcel.LineaCatalogo primera = lineas.get(0);
-            Set<String> pedidos = new LinkedHashSet<>();
-            lineas.forEach(l -> pedidos.add(l.pedido()));
-
+            // Cantidad de ESTE artículo y color, no del Document d'achat entero:
+            // un pedido puede llevar varios colores (ver ApcPedidoExcel.comandasDe).
             List<DestinacionHoja> destinaciones = new ArrayList<>();
-            for (String numero : pedidos) {
-                pedido.comandaDe(numero)
-                        .filter(c -> c.cantidad() > 0)
-                        .ifPresent(c -> destinaciones.add(new DestinacionHoja(
-                                c.destino() == null ? "" : c.destino().toUpperCase(Locale.ROOT),
-                                numero, c.cantidad())));
+            for (ApcPedidoExcel.Comanda c : pedido.comandasDe(primera.referencia(), primera.color())) {
+                if (c.cantidad() > 0) {
+                    destinaciones.add(new DestinacionHoja(
+                            c.destino() == null ? "" : c.destino().toUpperCase(Locale.ROOT),
+                            c.pedido(), c.cantidad()));
+                }
             }
 
             String descripcion = colores.buscar(APC, primera.color())

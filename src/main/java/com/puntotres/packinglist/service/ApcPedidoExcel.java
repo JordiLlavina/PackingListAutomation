@@ -120,16 +120,26 @@ public final class ApcPedidoExcel {
     public record LineaConCantidad(String referencia, String color, int cantidad, String designacion) {
     }
 
+    /**
+     * La cantidad de UNA fila del fichero con su artículo, color y pedido.
+     * Es lo que permite sumar por artículo + color sin arrastrar los demás
+     * colores del mismo {@code Document d'achat}.
+     */
+    private record CantidadPorLinea(String referencia, String color, String pedido, int cantidad) {
+    }
+
     /** Filas únicas (referencia + pedido), en el orden del fichero. */
     private final List<FilaPedido> filas;
     private final Map<String, Comanda> comandas;
     private final List<LineaCatalogo> catalogo;
     private final List<LineaConCantidad> lineasConCantidad;
+    private final List<CantidadPorLinea> cantidadesPorLinea;
     private final List<String> avisos;
 
     private ApcPedidoExcel(List<FilaPedido> filas, Map<String, Comanda> comandas,
                            List<LineaCatalogo> catalogo, List<LineaConCantidad> lineasConCantidad,
-                           List<String> avisos) {
+                           List<CantidadPorLinea> cantidadesPorLinea, List<String> avisos) {
+        this.cantidadesPorLinea = List.copyOf(cantidadesPorLinea);
         this.filas = List.copyOf(filas);
         this.comandas = Map.copyOf(comandas);
         this.catalogo = List.copyOf(catalogo);
@@ -159,6 +169,7 @@ public final class ApcPedidoExcel {
             List<FilaPedido> filas = new ArrayList<>();
             List<LineaCatalogo> catalogo = new ArrayList<>();
             List<LineaConCantidad> lineasConCantidad = new ArrayList<>();
+            List<CantidadPorLinea> cantidadesPorLinea = new ArrayList<>();
             Set<FilaPedido> vistas = new LinkedHashSet<>();
             Map<String, String> pedidoPorClave = new LinkedHashMap<>();
             Set<String> ambiguas = new LinkedHashSet<>();
@@ -187,6 +198,8 @@ public final class ApcPedidoExcel {
                         color,
                         colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)),
                         textoOpcional(hoja, fila, colDesignacion)));
+                cantidadesPorLinea.add(new CantidadPorLinea(entrada.referencia(), color, entrada.pedido(),
+                        colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad))));
                 acumularComanda(comandas, destinosMezclados, entrada.pedido(),
                         colDestino < 0 ? "" : texto(hoja, fila, colDestino),
                         colCantidad < 0 ? 0 : entero(texto(hoja, fila, colCantidad)));
@@ -223,7 +236,8 @@ public final class ApcPedidoExcel {
                 avisos.add("En el excel de pedido, el sku " + sku + " no empieza por su artículo:"
                         + " esas líneas se quedan sin color");
             }
-            return new ApcPedidoExcel(filas, comandas, catalogo, lineasConCantidad, avisos);
+            return new ApcPedidoExcel(filas, comandas, catalogo, lineasConCantidad,
+                    cantidadesPorLinea, avisos);
         }
     }
 
@@ -379,6 +393,34 @@ public final class ApcPedidoExcel {
             }
         }
         return colores;
+    }
+
+    /**
+     * Las comandas de un artículo y un color, una por {@code Document d'achat}
+     * distinto de sus filas y en el orden del fichero, sumando <b>solo las
+     * unidades de ese artículo y ese color</b>.
+     *
+     * No vale {@link #comandaDe}: esa suma el pedido ENTERO, y un
+     * {@code Document d'achat} puede llevar varios colores (en el fichero
+     * real, 4100128863 lleva LAW, KAN y CAW). Una hoja que habla de un
+     * artículo + color con la cantidad de todos los colores le diría al taller
+     * que empaquete de más. La destinación sí es la del pedido, que es una
+     * sola. El color se compara sin mayúsculas ni espacios de más.
+     */
+    public List<Comanda> comandasDe(String referencia, String color) {
+        String ref = referencia == null ? "" : referencia.trim();
+        String col = color == null ? "" : color.trim();
+        Map<String, Integer> porPedido = new LinkedHashMap<>();
+        for (CantidadPorLinea linea : cantidadesPorLinea) {
+            if (linea.referencia().equalsIgnoreCase(ref) && linea.color().trim().equalsIgnoreCase(col)) {
+                porPedido.merge(linea.pedido(), linea.cantidad(), Integer::sum);
+            }
+        }
+        List<Comanda> resultado = new ArrayList<>();
+        porPedido.forEach((pedido, cantidad) -> resultado.add(new Comanda(pedido,
+                Optional.ofNullable(comandas.get(pedido)).map(Comanda::destino).orElse(""),
+                cantidad)));
+        return resultado;
     }
 
     /** Avisos de nivel de fichero (claves ambiguas). Nunca null. */

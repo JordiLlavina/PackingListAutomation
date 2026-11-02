@@ -25,6 +25,33 @@ class ApcPedidoExcelTest {
         }
     }
 
+    /**
+     * 4100128863 lleva tres colores (LAW, KAN y CAW): la cantidad de uno solo
+     * es menor que la del pedido entero y las de los tres suman exactamente
+     * el pedido. Lo que usa la hoja de embalaje, que es de un artículo + color.
+     */
+    @Test
+    void laCantidadPorArticuloYColorNoArrastraLosDemasColoresDelPedido() throws IOException {
+        ApcPedidoExcel pedido = pedidoReal();
+        String numero = "4100128863";
+        int total = pedido.comandaDe(numero).orElseThrow().cantidad();
+        List<String> colores = List.copyOf(pedido.coloresDe(numero));
+        assertTrue(colores.containsAll(List.of("LAW", "KAN", "CAW")), colores.toString());
+        String referencia = pedido.catalogo().stream()
+                .filter(l -> l.pedido().equals(numero)).findFirst().orElseThrow().referencia();
+
+        int suma = 0;
+        for (String color : colores) {
+            // La misma referencia y color van a otros pedidos: solo cuenta el de este número.
+            ApcPedidoExcel.Comanda comanda = pedido.comandasDe(referencia, color).stream()
+                    .filter(c -> c.pedido().equals(numero)).findFirst().orElseThrow();
+            assertEquals(pedido.comandaDe(numero).orElseThrow().destino(), comanda.destino());
+            assertTrue(comanda.cantidad() < total, color + " " + comanda.cantidad());
+            suma += comanda.cantidad();
+        }
+        assertEquals(total, suma);
+    }
+
     @Test
     void encuentraElPedidoCompletoPorReferenciaYTresDigitos() throws IOException {
         assertEquals(Optional.of("4100128721"),
