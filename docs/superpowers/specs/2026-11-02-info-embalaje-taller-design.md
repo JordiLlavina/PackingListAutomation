@@ -95,17 +95,17 @@ create table comentario_embalaje (
 
 ## El documento Word
 
-`InfoEmbalajeDocBuilder` (`service/embalaje/`), Apache POI XWPF, sin plantilla: la maquetación son constantes de la clase, como `PackingPuntotresDocBuilder`. A4 vertical, márgenes 1,5 cm, Calibri. Diseño: moderno, aire entre secciones, fácil de leer en un sobre a un metro.
+`InfoEmbalajeDocBuilder` (`service/embalaje/`), Apache POI XWPF, sin plantilla: la maquetación son constantes de la clase, como `PackingPuntotresDocBuilder`. A4 vertical, márgenes laterales de 1,5 cm y de 1 cm arriba y abajo, Calibri. Diseño: pocos elementos, la jerarquía solo por tamaño y peso, una sola familia, y **todo en negros y grises** —texto `000000`, secundario `404040`, rótulos pequeños `808080`, rellenos `F2F2F2`, filetes y bordes `BFBFBF`—, fácil de leer en un sobre a un metro.
 
-Orden y aspecto (de arriba abajo):
+Orden y aspecto (de arriba abajo), revisado en noviembre de 2026 sobre las marcas que el usuario hizo en la primera hoja impresa:
 
-1. **Banda de cabecera**: tabla de dos columnas sin bordes. Izquierda: «INSTRUCCIONES DE EMBALAJE» (22 pt, negrita), debajo en gris `Cliente · Temporada · Taller`. Derecha, **solo si hay enlace**: recuadro con borde fino (1,5 pt, tinta) titulado **«Guide d'emballage du sac»** (9 pt, negrita, mayúsculas pequeñas) y el QR a 3,5 cm. El QR lo genera ZXing (`CodigoQr.png(texto, pixeles)`), se pega 1:1.
-2. **Tres fichas de envío** en fila (tabla de 3 celdas con fondo `F2F4F6`, sin bordes): `Nº ENVÍO` / `NOTA ICSUITE` / `FECHA`, rótulo 8 pt gris mayúsculas, valor 20 pt negrita.
-3. **Artículo**: tabla de dos columnas. Izquierda, la foto (5 cm de ancho, proporción conservada; sin foto, celda vacía). Derecha: referencia (26 pt, negrita), color `código descripción` (14 pt), nombre del bolso (12 pt, mayúsculas, gris), y **TOTAL N UNIDADES** (16 pt, negrita).
-4. **Sección «Embalaje»**: título de sección (11 pt, negrita, mayúsculas, con filete naranja `FF8900` de 1,5 pt debajo —el naranja de la marca—). Lista rótulo/valor en tabla de dos columnas sin bordes: Caja, Unidades por caja, Bolsa de tela, Etiqueta cartón interior (la frase de arriba), Instrucción especial (**valor en naranja y negrita, 13 pt**; la fila no sale si está vacía).
-5. **Sección «Destinaciones»**: tabla con cabecera gris (`Destinación · Nº pedido · Cantidad`), filetes horizontales finos `D4DAE1`, cantidad alineada a la derecha, fila final **Total** en negrita.
-6. **Sección «Reparto en cajas»**: el texto libre, una línea por párrafo, 11 pt. No sale si está vacío.
-7. **Sección «Comentarios»**: recuadro con fondo `FFF7E0` y borde `E6C34A` (los colores de aviso de la app), texto 12 pt negrita. No sale si está vacío.
+1. **Cabecera**: tabla de dos columnas sin bordes. Izquierda, apilados: el **título** `Cliente · Temporada · Taller` (22 pt, negrita, negro; el antiguo «INSTRUCCIONES DE EMBALAJE» se quitó), el **artículo** —referencia (26 pt, negrita), color `código descripción` (14 pt, `404040`) y nombre del bolso (12 pt, mayúsculas, `404040`)— y las **tres fichas de envío** en fila (tabla dentro de la celda, fondo `F2F2F2`, sin bordes): `Nº ENVÍO` / `NOTA ICSUITE` / `FECHA`, rótulo 8 pt `808080` mayúsculas, valor 20 pt negrita. Derecha, **solo si hay enlace**: recuadro con borde fino (1,5 pt, `404040`) titulado **«Guide d'emballage du sac»** (9 pt, negrita, mayúsculas pequeñas) y el QR a 3,5 cm. El QR lo genera ZXing (`CodigoQr.png(texto, pixeles)`), se pega 1:1.
+2. **Foto y embalaje**: tabla de dos columnas. Izquierda, la foto (5 cm de ancho, proporción conservada, como mucho 4 cm de alto; **sin foto la celda conserva su ancho y se queda en blanco**). Derecha: **TOTAL N UNIDADES** (16 pt, negrita) y debajo la lista rótulo/valor (tabla dentro de la celda): Caja, Unidades por caja, Bolsa de tela, Etiqueta cartón interior (la frase de arriba), Instrucción especial (**negro, negrita, 13 pt**; la fila no sale si está vacía). Rótulos 10 pt `808080`, valores 12 pt negrita.
+3. **Destinaciones**, sin título: tabla con cabecera gris (`Destinación · Nº pedido · Cantidad`, fondo `F2F2F2`, rótulos `808080`), filetes horizontales finos `BFBFBF`, cantidad alineada a la derecha, filas algo más altas que en la primera versión y fila final **Total** a 14 pt en negrita con un filete negro encima.
+4. **Reparto en cajas**, sin título: el texto libre, una línea por párrafo, 11 pt. No sale si está vacío.
+5. **Comentarios**, el **único bloque con título** («COMENTARIOS», 11 pt, negrita): recuadro con fondo `F2F2F2` y borde `BFBFBF`, texto 12 pt negrita. No sale si está vacío.
+
+Entre bloques solo hay aire: ni filetes de sección ni naranja (los de la primera versión se quitaron por decisión del usuario).
 
 Todo tiene que caber en **un A4** con 6 destinaciones, 8 líneas de reparto y 4 de comentarios; si no cabe, Word sigue en otra página, no se recorta nada.
 
