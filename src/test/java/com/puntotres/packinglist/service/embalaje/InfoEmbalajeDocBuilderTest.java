@@ -132,6 +132,26 @@ class InfoEmbalajeDocBuilderTest {
     }
 
     @Test
+    void sinDestinacionesElTotalEsCero() throws Exception {
+        DatosHojaEmbalaje d = datosEjemplo();
+        DatosHojaEmbalaje sin = new DatosHojaEmbalaje(d.cliente(), d.nombreCliente(), d.temporada(),
+                d.taller(), d.numeroEnvio(), d.nota(), d.fecha(), d.referencia(), d.codigoColor(),
+                d.descripcionColor(), d.nombreBolso(), d.codigoModelo(), d.medidaCaja(),
+                d.unidadesPorCaja(), d.bolsaTela(), d.etiquetaInterior(), d.instruccionEspecial(),
+                List.of(), d.repartoCajas(), d.comentarios(), d.enlaceVideo());
+        try (XWPFDocument doc = abrir(sin, null)) {
+            XWPFTable tabla = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getTableCells().size() == 3
+                            && t.getRow(0).getCell(0).getText().trim().equals("Destinación"))
+                    .findFirst().orElseThrow();
+            XWPFTableRow ultima = tabla.getRow(tabla.getRows().size() - 1);
+            assertEquals("Total", ultima.getCell(0).getText().trim());
+            assertEquals("0", ultima.getCell(2).getText().trim());
+            assertTrue(texto(doc).contains("TOTAL 0 UNIDADES"));
+        }
+    }
+
+    @Test
     void elQrSoloSaleConEnlace() throws Exception {
         try (XWPFDocument conEnlace = abrir(datosEjemplo(), null);
              XWPFDocument sinEnlace = abrir(con(datosEjemplo(), "PARIS", "X", "R", "C", ""), null)) {

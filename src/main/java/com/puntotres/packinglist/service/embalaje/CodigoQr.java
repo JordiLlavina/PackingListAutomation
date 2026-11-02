@@ -25,21 +25,21 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
  */
 public final class CodigoQr {
 
-    /** Margen de la zona muda alrededor del símbolo, en módulos. */
-    private static final int MARGEN_MODULOS = 1;
+    /** Zona muda alrededor del símbolo, en módulos: los 4 que exige la norma ISO para que lo lea cualquier móvil. */
+    private static final int ZONA_MUDA_MODULOS = 4;
 
     private CodigoQr() {
     }
 
     /**
      * PNG cuadrado de {@code pixeles} de lado con el QR de {@code texto},
-     * corrección de errores M y un módulo de margen. El texto ya viene
+     * corrección de errores M y la zona muda de 4 módulos. El texto ya viene
      * recortado por quien llama (aquí no se limpia ni se valida).
      */
     public static byte[] png(String texto, int pixeles) {
         Map<EncodeHintType, Object> pistas = Map.of(
                 EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M,
-                EncodeHintType.MARGIN, MARGEN_MODULOS,
+                EncodeHintType.MARGIN, ZONA_MUDA_MODULOS,
                 EncodeHintType.CHARACTER_SET, StandardCharsets.UTF_8.name());
         try {
             BitMatrix matriz = new QRCodeWriter()

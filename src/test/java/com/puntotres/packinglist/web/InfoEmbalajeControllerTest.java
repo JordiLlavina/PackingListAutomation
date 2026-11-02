@@ -162,6 +162,11 @@ class InfoEmbalajeControllerTest {
         assertTrue(html.contains("href=\"/comentarios-embalaje\""), "lápiz a los comentarios");
         assertTrue(html.contains("<datalist id=\"talleres\""), "sugerencias de taller");
         assertTrue(html.contains("href=\"/info-embalaje\""), "empezar de nuevo");
+        // Cambiar de artículo vacía lo que es de cada artículo (reparto y enlace)
+        // y no el comentario; el lápiz abre los comentarios en otra pestaña.
+        assertTrue(html.contains("const POR_ARTICULO = ['repartoCajas', 'enlaceVideo']"),
+                "reparto y enlace se vacían al cambiar de artículo");
+        assertTrue(html.contains("target=\"_blank\" rel=\"noopener\""), "lápiz en otra pestaña");
     }
 
     @Test

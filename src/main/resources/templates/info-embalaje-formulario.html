@@ -165,8 +165,8 @@
 
             <label for="comentarios" class="etiqueta-con-accion">
                 <span>Comentarios</span>
-                <a class="lapiz" th:href="@{/comentarios-embalaje}"
-                   title="Añadir, editar o borrar comentarios guardados"
+                <a class="lapiz" th:href="@{/comentarios-embalaje}" target="_blank" rel="noopener"
+                   title="Añadir, editar o borrar comentarios guardados (se abre en otra pestaña)"
                    aria-label="Editar los comentarios guardados">&#9998;</a>
             </label>
             <select id="comentarioGuardado" class="embalaje-comentario-guardado"
@@ -207,6 +207,9 @@
         const fotoId = document.getElementById('fotoId');
         const CAMPOS = ['referencia', 'codigoColor', 'descripcionColor', 'nombreBolso', 'codigoModelo',
             'medidaCaja', 'unidadesPorCaja', 'bolsaTela', 'etiquetaInterior', 'instruccionEspecial'];
+        // Campos que son de CADA artículo y no del sobre: el reparto en cajas es
+        // el de ese bolso y el enlace es la guía de ese bolso. Se vacían al cambiar.
+        const POR_ARTICULO = ['repartoCajas', 'enlaceVideo'];
 
         // Los nombres se rehacen tras cada alta o baja: Spring une destinos[i]
         // por índice, y un hueco en la numeración llegaría como fila vacía.
@@ -250,14 +253,19 @@
             }
         }
 
-        // Elegir un artículo pisa todo lo suyo, también lo ya tecleado: es
-        // otro sobre, y mezclar campos de dos artículos daría una hoja falsa.
+        // Elegir un artículo pisa los campos de CAMPOS, la foto y las destinaciones
+        // (también lo ya tecleado) y VACÍA repartoCajas y enlaceVideo: es otro
+        // bolso, y mezclar datos de dos artículos daría una hoja falsa. Los
+        // comentarios se conservan: son del sobre y valen para varios artículos.
         articulo.addEventListener('change', function () {
             const elegido = ARTICULOS[articulo.value];
             if (!elegido) return;
             CAMPOS.forEach(function (campo) {
                 const valor = elegido[campo];
                 document.getElementById(campo).value = valor === null || valor === undefined ? '' : valor;
+            });
+            POR_ARTICULO.forEach(function (campo) {
+                document.getElementById(campo).value = '';
             });
             fotoId.value = elegido.fotoId === null || elegido.fotoId === undefined ? '' : elegido.fotoId;
             pintarFoto(elegido.fotoId);
@@ -317,6 +325,15 @@
             caja.textContent = texto;
             resultado.appendChild(caja);
         }
+
+        // Enter dentro de un campo no envía el formulario: generar es
+        // irreversible (inserta una fila y gasta un número de envío) y no debe
+        // dispararse al dar por bueno un dato. En los textarea Enter es un salto.
+        form.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter' && evento.target.tagName === 'INPUT') {
+                evento.preventDefault();
+            }
+        });
 
         form.addEventListener('submit', function (evento) {
             evento.preventDefault();

@@ -104,6 +104,25 @@ class ComentariosEmbalajeControllerTest {
     }
 
     @Test
+    void volverLlevaALaEntradaSinPedidoYAlFormularioConPedidoCargado() throws Exception {
+        MockHttpSession sesion = new MockHttpSession();
+        mvc.perform(get("/comentarios-embalaje").session(sesion))
+                .andExpect(content().string(containsString("href=\"/info-embalaje\">← Volver")));
+
+        try (var entrada = getClass().getResourceAsStream("/ejemplos/APC_PEDIDO_SPRING27.xlsx")) {
+            mvc.perform(multipart("/info-embalaje/cargar")
+                            .file(new MockMultipartFile("pedido", "APC_PEDIDO_SPRING27.xlsx",
+                                    TIPO_XLSX, entrada.readAllBytes()))
+                            .param("cliente", "APC")
+                            .param("temporada", "Spring 27")
+                            .session(sesion))
+                    .andExpect(redirectedUrl("/info-embalaje/formulario"));
+        }
+        mvc.perform(get("/comentarios-embalaje").session(sesion))
+                .andExpect(content().string(containsString("href=\"/info-embalaje/formulario\">← Volver")));
+    }
+
+    @Test
     void elFormularioDeEmbalajeOfreceLosComentarios() throws Exception {
         mvc.perform(post("/comentarios-embalaje")
                         .param("nombre", PREFIJO + "Frágil EMB")

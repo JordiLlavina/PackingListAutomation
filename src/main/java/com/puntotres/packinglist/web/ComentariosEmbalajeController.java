@@ -28,13 +28,20 @@ public class ComentariosEmbalajeController {
 
     private final ArchivoComentariosEmbalaje archivo;
 
-    public ComentariosEmbalajeController(ArchivoComentariosEmbalaje archivo) {
+    private final EmbalajeEnCurso enCurso;
+
+    public ComentariosEmbalajeController(ArchivoComentariosEmbalaje archivo, EmbalajeEnCurso enCurso) {
         this.archivo = archivo;
+        this.enCurso = enCurso;
     }
 
     @GetMapping("/comentarios-embalaje")
     public String comentarios(Model model) {
         model.addAttribute("comentarios", archivo.todos());
+        // Con un pedido ya cargado se vuelve al formulario y no a la entrada,
+        // que obligaría a cargarlo otra vez.
+        model.addAttribute("rutaVolver",
+                enCurso.estaVacio() ? "/info-embalaje" : "/info-embalaje/formulario");
         return "comentarios-embalaje";
     }
 
