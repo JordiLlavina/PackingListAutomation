@@ -10,6 +10,7 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -25,6 +26,7 @@ import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 
 import org.apache.poi.openxml4j.opc.PackagePart;
+import org.apache.poi.xwpf.usermodel.TableRowAlign;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFPicture;
@@ -575,6 +577,47 @@ class InfoEmbalajeDocBuilderTest {
                     assertTrue(run.getFontSizeAsDouble() > tamanoDato);
                 }
             }
+        }
+    }
+
+    @Test
+    void elRepartoVaATamano14() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            List<XWPFParagraph> reparto = doc.getParagraphs().stream()
+                    .filter(p -> p.getText().startsWith("CAJA"))
+                    .toList();
+            assertEquals(5, reparto.size(), "una línea de reparto por párrafo");
+            for (XWPFParagraph parrafo : reparto) {
+                for (XWPFRun run : parrafo.getRuns()) {
+                    assertEquals(14.0, run.getFontSizeAsDouble(), 0.01, "«" + run.text() + "»");
+                }
+            }
+        }
+    }
+
+    @Test
+    void laTablaDeDestinacionesOcupaElSetentaPorCiento() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            var seccion = doc.getDocument().getBody().getSectPr();
+            long anchoUtil = ((BigInteger) seccion.getPgSz().getW()).longValue()
+                    - ((BigInteger) seccion.getPgMar().getLeft()).longValue()
+                    - ((BigInteger) seccion.getPgMar().getRight()).longValue();
+            long esperado = Math.round(anchoUtil * 0.70);
+
+            XWPFTable tabla = tablaDestinaciones(doc);
+            var propiedades = tabla.getCTTbl().getTblPr();
+            assertEquals(esperado, ((BigInteger) propiedades.getTblW().getW()).longValue(), "tblW");
+            long rejilla = 0;
+            List<Long> columnas = new ArrayList<>();
+            for (var columna : tabla.getCTTbl().getTblGrid().getGridColList()) {
+                columnas.add(((BigInteger) columna.getW()).longValue());
+                rejilla += columnas.get(columnas.size() - 1);
+            }
+            assertEquals(esperado, rejilla, "la rejilla suma lo mismo que la tabla");
+            // Las proporciones de siempre: destinación > pedido > cantidad.
+            assertTrue(columnas.get(0) > columnas.get(1) && columnas.get(1) > columnas.get(2), columnas.toString());
+            assertEquals(4400.0 / 10306, columnas.get(0) / (double) esperado, 0.001);
+            assertEquals(TableRowAlign.LEFT, tabla.getTableAlignment(), "pegada a la izquierda");
         }
     }
 

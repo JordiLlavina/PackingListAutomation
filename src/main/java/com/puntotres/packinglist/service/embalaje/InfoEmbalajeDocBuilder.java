@@ -14,6 +14,7 @@ import javax.imageio.ImageIO;
 import org.apache.poi.common.usermodel.PictureType;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.xwpf.usermodel.ParagraphAlignment;
+import org.apache.poi.xwpf.usermodel.TableRowAlign;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
@@ -113,7 +114,8 @@ public class InfoEmbalajeDocBuilder {
     /** La tabla de destinaciones, cabecera y filas; solo la fila Total es mayor. */
     private static final int TAMANO_TABLA = 12;
     private static final int TAMANO_TOTAL_TABLA = 14;
-    private static final int TAMANO_REPARTO = 11;
+    /** El reparto en cajas: el taller lo lee caja a caja, así que va al tamaño de la fila Total. */
+    private static final int TAMANO_REPARTO = 14;
     private static final int TAMANO_COMENTARIOS = 14;
 
     // Filetes en octavos de punto.
@@ -143,8 +145,8 @@ public class InfoEmbalajeDocBuilder {
     private static final int ESPACIO_TRAS_TITULO = 80;
     private static final int ESPACIO_ANTES_NOMBRE = 40;
     private static final int ESPACIO_ANTES_FICHAS = 200;
-    /** Alto de línea del reparto: la letra de 11 pt con un punto y medio de aire, menos que el automático. */
-    private static final double ALTO_LINEA_REPARTO_PT = 12.5;
+    /** Alto de línea del reparto: la letra de 14 pt con dos puntos de aire, menos que el automático. */
+    private static final double ALTO_LINEA_REPARTO_PT = 16;
     private static final int MARGEN_CELDA_FICHA = 50;
     private static final int MARGEN_LATERAL_FICHA = 160;
     private static final int MARGEN_CELDA_FILA = 10;
@@ -180,7 +182,16 @@ public class InfoEmbalajeDocBuilder {
     private static final int HUECO_FOTO = 340;
     /** Ancho de los rótulos del embalaje: el mayor, «ETIQUETA CARTÓN INTERIOR», cabe en una línea a 12 pt. */
     private static final int ANCHO_ROTULO_FILA = 3500;
-    private static final int[] ANCHOS_DESTINACIONES = {4400, 3400, 2506};
+    /**
+     * Parte del ancho útil que ocupa la tabla de destinaciones, pegada a la
+     * izquierda (decisión del usuario): a todo el ancho, entre el destino y su
+     * cantidad quedaba un hueco que la vista tenía que recorrer entero.
+     */
+    static final double FRACCION_ANCHO_DESTINACIONES = 0.70;
+    /** Proporciones de las columnas Destinación / Nº pedido / Cantidad: las de cuando iba a todo el ancho. */
+    private static final int[] PROPORCIONES_DESTINACIONES = {4400, 3400, 2506};
+    private static final int[] ANCHOS_DESTINACIONES = repartir(
+            (int) Math.round(ANCHO_UTIL * FRACCION_ANCHO_DESTINACIONES), PROPORCIONES_DESTINACIONES);
 
     private static final String[] CABECERAS_DESTINACIONES = {"Destinación", "Nº pedido", "Cantidad"};
     private static final String TITULO_QR = "Guide d'emballage du sac";
@@ -392,6 +403,7 @@ public class InfoEmbalajeDocBuilder {
     private void escribirDestinaciones(XWPFDocument doc, DatosHojaEmbalaje datos) {
         List<DestinacionHoja> destinaciones = datos.destinaciones();
         XWPFTable tabla = nuevaTabla(doc, destinaciones.size() + 2, ANCHOS_DESTINACIONES);
+        tabla.setTableAlignment(TableRowAlign.LEFT);
         tabla.setInsideHBorder(XWPFTable.XWPFBorderType.SINGLE, FILETE_FINO, 0, GRIS_FILETE);
         tabla.setCellMargins(MARGEN_VERTICAL_TABLA, MARGEN_LATERAL_TABLA, MARGEN_VERTICAL_TABLA, MARGEN_LATERAL_TABLA);
 
@@ -417,6 +429,25 @@ public class InfoEmbalajeDocBuilder {
         for (int i = 0; i < valores.length; i++) {
             texto(parrafo(fila.getCell(i), alineacionDeColumna(i)), valores[i], tamano, negrita, NEGRO);
         }
+    }
+
+    /**
+     * Reparte {@code total} entre las columnas según sus proporciones; la
+     * última se lleva el redondeo, para que la suma sea exactamente el total.
+     */
+    private static int[] repartir(int total, int... proporciones) {
+        int suma = 0;
+        for (int proporcion : proporciones) {
+            suma += proporcion;
+        }
+        int[] anchos = new int[proporciones.length];
+        int usado = 0;
+        for (int i = 0; i < proporciones.length - 1; i++) {
+            anchos[i] = (int) Math.round(total * (double) proporciones[i] / suma);
+            usado += anchos[i];
+        }
+        anchos[proporciones.length - 1] = total - usado;
+        return anchos;
     }
 
     /** La cantidad (última columna) a la derecha para que las cifras se sumen a ojo. */
