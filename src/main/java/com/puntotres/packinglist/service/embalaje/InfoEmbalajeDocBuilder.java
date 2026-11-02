@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
@@ -48,10 +49,12 @@ import com.puntotres.packinglist.model.DatosHojaEmbalaje.DestinacionHoja;
  * Se lee a un metro de distancia, así que manda el aire y el tamaño de la
  * letra: pocos elementos, la jerarquía solo por tamaño y peso, una sola
  * familia (Gentium Basic, incrustada en el fichero: ver
- * {@link FuenteIncrustada}) y todo en negros y grises, sin ningún color.
+ * {@link FuenteIncrustada}), todo en negros y grises, sin ningún color, y
+ * <b>todo el texto en mayúsculas</b> (se pasa en un solo sitio, el de los
+ * runs: {@code texto}).
  * Arriba, la cabecera en una fila de tres columnas: la foto, el artículo
  * (cliente · temporada · taller, referencia, color, nombre del bolso y las
- * fichas del envío) y el QR. Debajo, a todo el ancho, el total y el
+ * fichas del envío) y el QR, sin marco. Debajo, a todo el ancho, el
  * embalaje; luego las destinaciones, el reparto y los comentarios. Ningún
  * bloque lleva título de sección: se separan con aire, sin filetes
  * (decisión del usuario sobre la hoja impresa).
@@ -92,7 +95,7 @@ public class InfoEmbalajeDocBuilder {
     private static final String GRIS_ROTULO = "808080";
     /** Rellenos: las fichas, la cabecera de la tabla y el recuadro de comentarios. */
     private static final String GRIS_FONDO = "F2F2F2";
-    /** Filetes y bordes de recuadro, también el marco del QR. */
+    /** Filetes y bordes de recuadro. */
     private static final String GRIS_FILETE = "BFBFBF";
     private static final String BLANCO = "FFFFFF";
 
@@ -105,21 +108,17 @@ public class InfoEmbalajeDocBuilder {
     private static final int TAMANO_REFERENCIA = 26;
     private static final int TAMANO_COLOR = 14;
     private static final int TAMANO_NOMBRE = 12;
-    private static final int TAMANO_TOTAL = 16;
-    private static final int TAMANO_ROTULO_FILA = 10;
-    private static final int TAMANO_VALOR_FILA = 12;
-    private static final int TAMANO_INSTRUCCION = 13;
-    private static final int TAMANO_TABLA = 11;
+    /** La lista del embalaje, rótulos y valores (también la instrucción especial). */
+    private static final int TAMANO_EMBALAJE = 12;
+    /** La tabla de destinaciones, cabecera y filas; solo la fila Total es mayor. */
+    private static final int TAMANO_TABLA = 12;
     private static final int TAMANO_TOTAL_TABLA = 14;
-    private static final int TAMANO_CABECERA_TABLA = 9;
     private static final int TAMANO_REPARTO = 11;
-    private static final int TAMANO_COMENTARIOS = 12;
+    private static final int TAMANO_COMENTARIOS = 14;
 
     // Filetes en octavos de punto.
     private static final int FILETE_FINO = 4;
     private static final int FILETE_TOTAL = 12;
-    /** El marco del QR: medio punto, en el gris de los filetes, para que no compita con el código. */
-    private static final int FILETE_QR = 4;
     private static final int FILETE_COMENTARIOS = 8;
 
     /** Medidas de las imágenes. Un centímetro son 360.000 EMU, la unidad de Word. */
@@ -144,8 +143,6 @@ public class InfoEmbalajeDocBuilder {
     private static final int ESPACIO_TRAS_TITULO = 80;
     private static final int ESPACIO_ANTES_NOMBRE = 40;
     private static final int ESPACIO_ANTES_FICHAS = 200;
-    /** Aire entre el total y la primera fila del embalaje, en veinteavos. */
-    private static final int ESPACIO_TRAS_TOTAL = 120;
     /** Alto de línea del reparto: la letra de 11 pt con un punto y medio de aire, menos que el automático. */
     private static final double ALTO_LINEA_REPARTO_PT = 12.5;
     private static final int MARGEN_CELDA_FICHA = 50;
@@ -160,29 +157,35 @@ public class InfoEmbalajeDocBuilder {
     private static final int MARGEN_LATERAL_TABLA = 100;
     private static final int MARGEN_CELDA_COMENTARIOS = 70;
     private static final int MARGEN_LATERAL_COMENTARIOS = 180;
-    /** Aire de arriba y abajo dentro del marco del QR, en veinteavos. */
-    private static final int AIRE_MARCO_QR = 40;
+    /** Aire entre el título del QR y el código, en veinteavos. */
     private static final int AIRE_TRAS_TITULO_QR = 30;
-    /** Hueco blanco entre las dos fichas del envío, en octavos de punto (es un filete blanco). */
-    private static final int HUECO_ENTRE_FICHAS = 48;
+    /**
+     * Cada ficha del envío mide lo que su contenido pide (3,5 cm), a la
+     * izquierda y con el resto de la fila vacío: ancho fijo, para que no se
+     * estiren con o sin QR. El hueco blanco entre las dos (0,25 cm, 57 octavos
+     * de punto) es un filete blanco que come algo de cada una.
+     */
+    private static final int ANCHO_FICHA = (int) Math.round(3.5 * TWIPS_POR_CM);
+    private static final int HUECO_ENTRE_FICHAS = 57;
 
     /**
-     * Columnas de la cabecera, en veinteavos: la foto (4,5 cm), el QR (4 cm)
+     * Columnas de la cabecera, en veinteavos: la foto (4,5 cm), el QR (4,5 cm: el título en francés cabe en una línea)
      * y el artículo, que se queda con el resto. Sin enlace no hay columna del
      * QR y el artículo se queda también con su ancho; sin foto la columna se
      * conserva en blanco.
      */
     private static final int ANCHO_COLUMNA_FOTO = (int) Math.round(4.5 * TWIPS_POR_CM);
-    private static final int ANCHO_COLUMNA_QR = (int) Math.round(4.0 * TWIPS_POR_CM);
+    private static final int ANCHO_COLUMNA_QR = (int) Math.round(4.5 * TWIPS_POR_CM);
     /** Separación entre la foto y el artículo: la foto nunca llega al borde derecho de su columna. */
     private static final int HUECO_FOTO = 340;
-    /** Separación entre las fichas del artículo y el marco del QR. */
-    private static final int HUECO_QR = 280;
-    private static final int ANCHO_ROTULO_FILA = 2700;
+    /** Ancho de los rótulos del embalaje: el mayor, «ETIQUETA CARTÓN INTERIOR», cabe en una línea a 12 pt. */
+    private static final int ANCHO_ROTULO_FILA = 3500;
     private static final int[] ANCHOS_DESTINACIONES = {4400, 3400, 2506};
 
     private static final String[] CABECERAS_DESTINACIONES = {"Destinación", "Nº pedido", "Cantidad"};
     private static final String TITULO_QR = "Guide d'emballage du sac";
+    /** Los textos se pasan a mayúsculas con las reglas del castellano; los acentos se conservan. */
+    private static final Locale CASTELLANO = Locale.forLanguageTag("es");
     private static final String SEPARADOR_TITULO = " · ";
 
     /**
@@ -269,7 +272,7 @@ public class InfoEmbalajeDocBuilder {
                 : nuevaTabla(doc, 1, ANCHO_COLUMNA_FOTO, anchoArticulo);
         XWPFTableRow fila = tabla.getRow(0);
         escribirFoto(fila.getCell(0), fotoJpeg);
-        escribirArticulo(fila.getCell(1), anchoArticulo - (conQr ? HUECO_QR : 0), datos);
+        escribirArticulo(fila.getCell(1), datos);
         if (conQr) {
             escribirQr(fila.getCell(2), datos);
         }
@@ -302,7 +305,7 @@ public class InfoEmbalajeDocBuilder {
      * sin negrita: es contexto), la referencia en grande, el color, el nombre
      * del bolso y las dos fichas del envío.
      */
-    private void escribirArticulo(XWPFTableCell celda, int anchoFichas, DatosHojaEmbalaje datos) {
+    private void escribirArticulo(XWPFTableCell celda, DatosHojaEmbalaje datos) {
         texto(parrafo(celda, ParagraphAlignment.LEFT), titulo(datos), TAMANO_TITULO, false, GRIS_OSCURO);
 
         XWPFParagraph referencia = parrafo(celda, ParagraphAlignment.LEFT);
@@ -315,23 +318,22 @@ public class InfoEmbalajeDocBuilder {
         if (!datos.nombreBolso().isBlank()) {
             XWPFParagraph nombre = parrafo(celda, ParagraphAlignment.LEFT);
             nombre.setSpacingBefore(ESPACIO_ANTES_NOMBRE);
-            texto(nombre, datos.nombreBolso().toUpperCase(), TAMANO_NOMBRE, false, GRIS_OSCURO);
+            texto(nombre, datos.nombreBolso(), TAMANO_NOMBRE, false, GRIS_OSCURO);
         }
         espacioEnCelda(celda, ESPACIO_ANTES_FICHAS);
-        escribirFichasDeEnvio(celda, anchoFichas, datos);
+        escribirFichasDeEnvio(celda, datos);
     }
 
     /**
-     * Dos fichas en fila, Nº envío y nota del ERP, con un hueco blanco entre
-     * ellas. La fecha no se imprime (decisión del usuario): sigue guardada en
-     * la hoja, pero en el papel no le dice nada al taller.
+     * Dos fichas en fila, Nº envío y nota, de ancho fijo y con un hueco blanco
+     * entre ellas. La fecha no se imprime (decisión del usuario): sigue
+     * guardada en la hoja, pero en el papel no le dice nada al taller.
      */
-    private void escribirFichasDeEnvio(XWPFTableCell celda, int anchoTotal, DatosHojaEmbalaje datos) {
-        int ancho = anchoTotal / 2;
-        XWPFTable tabla = tablaEnCelda(celda, 1, ancho, anchoTotal - ancho);
+    private void escribirFichasDeEnvio(XWPFTableCell celda, DatosHojaEmbalaje datos) {
+        XWPFTable tabla = tablaEnCelda(celda, 1, ANCHO_FICHA, ANCHO_FICHA);
         tabla.setInsideVBorder(XWPFTable.XWPFBorderType.SINGLE, HUECO_ENTRE_FICHAS, 0, BLANCO);
         tabla.setCellMargins(MARGEN_CELDA_FICHA, MARGEN_LATERAL_FICHA, MARGEN_CELDA_FICHA, MARGEN_LATERAL_FICHA);
-        String[] rotulos = {"Nº ENVÍO", "NOTA ICSUITE"};
+        String[] rotulos = {"Nº envío", "Nota"};
         String[] valores = {String.valueOf(datos.numeroEnvio()), datos.nota()};
         for (int i = 0; i < rotulos.length; i++) {
             XWPFTableCell ficha = tabla.getRow(0).getCell(i);
@@ -342,36 +344,25 @@ public class InfoEmbalajeDocBuilder {
     }
 
     /**
-     * El QR de la guía dentro de un marco fino gris con su título en francés.
-     * El marco es una tabla dentro de la celda, no el borde de la celda: así
-     * mide lo que el QR y no se estira hasta el alto de la foto.
+     * El QR de la guía con su título en francés encima, sin marco (decisión
+     * del usuario), centrados en su columna.
      */
     private static void escribirQr(XWPFTableCell celda, DatosHojaEmbalaje datos) throws IOException {
-        XWPFTable marco = tablaEnCelda(celda, 1, ANCHO_COLUMNA_QR);
-        XWPFTableCell recuadro = marco.getRow(0).getCell(0);
-        bordes(recuadro, FILETE_QR, GRIS_FILETE);
-        XWPFParagraph titulo = parrafo(recuadro, ParagraphAlignment.CENTER);
-        titulo.setSpacingBefore(AIRE_MARCO_QR);
+        XWPFParagraph titulo = parrafo(celda, ParagraphAlignment.CENTER);
         titulo.setSpacingAfter(AIRE_TRAS_TITULO_QR);
-        XWPFRun run = texto(titulo, TITULO_QR, TAMANO_TITULO_QR, true, NEGRO);
-        run.setSmallCaps(true);
-        XWPFParagraph qr = parrafo(recuadro, ParagraphAlignment.CENTER);
-        qr.setSpacingAfter(AIRE_MARCO_QR);
+        texto(titulo, TITULO_QR, TAMANO_TITULO_QR, true, NEGRO);
+        XWPFParagraph qr = parrafo(celda, ParagraphAlignment.CENTER);
         imagen(qr, CodigoQr.png(datos.enlaceVideo().trim(), PIXELES_QR), PictureType.PNG,
                 "qr.png", ANCHO_QR_CM, ANCHO_QR_CM);
     }
 
     /**
-     * El total de unidades y, debajo, a todo el ancho, el embalaje: caja,
-     * unidades por caja, bolsa, etiqueta interior y, destacada, la
-     * instrucción especial.
+     * El embalaje, a todo el ancho y todo a 12 pt: caja, unidades por caja,
+     * bolsa, etiqueta interior y, si la hay, la instrucción especial. El total
+     * de unidades no se repite aquí: ya lo dice la fila Total de las
+     * destinaciones.
      */
     private void escribirEmbalaje(XWPFDocument doc, DatosHojaEmbalaje datos) {
-        XWPFParagraph total = parrafo(doc.createParagraph(), ParagraphAlignment.LEFT);
-        total.setSpacingAfter(ESPACIO_TRAS_TOTAL);
-        total.setKeepNext(true);
-        texto(total, "TOTAL " + datos.totalUnidades() + " UNIDADES", TAMANO_TOTAL, true, NEGRO);
-
         List<String[]> filas = new ArrayList<>();
         filas.add(new String[] {"Caja", datos.medidaCaja()});
         filas.add(new String[] {"Unidades por caja",
@@ -385,12 +376,11 @@ public class InfoEmbalajeDocBuilder {
         XWPFTable tabla = nuevaTabla(doc, filas.size(), ANCHO_ROTULO_FILA, ANCHO_UTIL - ANCHO_ROTULO_FILA);
         tabla.setCellMargins(MARGEN_CELDA_FILA, 0, MARGEN_CELDA_FILA, MARGEN_INFERIOR_FILA);
         for (int i = 0; i < filas.size(); i++) {
-            boolean instruccion = filas.get(i)[0].startsWith("Instrucción");
             XWPFTableRow fila = tabla.getRow(i);
             texto(parrafo(fila.getCell(0), ParagraphAlignment.LEFT), filas.get(i)[0],
-                    TAMANO_ROTULO_FILA, false, GRIS_ROTULO);
+                    TAMANO_EMBALAJE, false, GRIS_ROTULO);
             texto(parrafo(fila.getCell(1), ParagraphAlignment.LEFT), filas.get(i)[1],
-                    instruccion ? TAMANO_INSTRUCCION : TAMANO_VALOR_FILA, true, NEGRO);
+                    TAMANO_EMBALAJE, true, NEGRO);
         }
     }
 
@@ -409,7 +399,7 @@ public class InfoEmbalajeDocBuilder {
             XWPFTableCell celda = tabla.getRow(0).getCell(i);
             celda.setColor(GRIS_FONDO);
             texto(parrafo(celda, alineacionDeColumna(i)), CABECERAS_DESTINACIONES[i],
-                    TAMANO_CABECERA_TABLA, true, GRIS_ROTULO);
+                    TAMANO_TABLA, true, GRIS_ROTULO);
         }
         for (int i = 0; i < destinaciones.size(); i++) {
             DestinacionHoja destinacion = destinaciones.get(i);
@@ -630,13 +620,17 @@ public class InfoEmbalajeDocBuilder {
         return parrafo;
     }
 
+    /**
+     * El único sitio donde se escribe texto: aquí se pasa todo a mayúsculas
+     * (decisión del usuario), para que ningún bloque pueda quedarse sin pasar.
+     */
     private static XWPFRun texto(XWPFParagraph parrafo, String valor, int tamano, boolean negrita, String color) {
         XWPFRun run = parrafo.createRun();
         run.setFontFamily(FUENTE);
         run.setFontSize(tamano);
         run.setBold(negrita);
         run.setColor(color);
-        run.setText(valor);
+        run.setText(valor.toUpperCase(CASTELLANO));
         return run;
     }
 
