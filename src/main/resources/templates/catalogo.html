@@ -52,6 +52,17 @@
             Colores y nombres de piel en <a th:href="@{/colores(cliente=${cliente})}">Colores y Pieles</a>;
             temporadas en <a th:href="@{/temporadas}">Temporadas</a>.
         </p>
+        <!-- Solo con una temporada elegida y con modelos: deshace de una vez lo
+             que entró al guardarla (un excel equivocado, una prueba). -->
+        <form th:if="${temporadaId != null and !#lists.isEmpty(filas)}" class="quitar-temporada"
+              th:action="@{/catalogo/temporada/quitar-modelos}" method="post"
+              th:attr="data-confirmar=|¿Quitar del catálogo los ${#lists.size(filas)} modelos de la temporada ${nombreTemporada}? Los que solo van en esta temporada se borran con sus artículos, colores y fotos; los que también van en otra se quedan, solo sin esta.|"
+              onsubmit="return confirm(this.dataset.confirmar)">
+            <input type="hidden" name="cliente" th:value="${cliente}">
+            <input type="hidden" name="temporada" th:value="${temporadaId}">
+            <button type="submit" class="secundario"
+                    th:text="|Quitar los modelos de la temporada ${nombreTemporada}|">Quitar los modelos de la temporada</button>
+        </form>
     </section>
 
     <section class="tarjeta" th:if="${cliente == null}">

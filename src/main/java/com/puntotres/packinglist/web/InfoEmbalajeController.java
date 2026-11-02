@@ -119,7 +119,7 @@ public class InfoEmbalajeController {
 
         ArticulosEmbalaje leidos;
         try {
-            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
+            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcelPedido();
             leidos = pedidoEmbalaje.articulosDe(cliente, excel);
         } catch (IllegalArgumentException e) {
             // Nuestras IllegalArgumentException ya llevan mensaje en español.
@@ -273,7 +273,7 @@ public class InfoEmbalajeController {
         }
         if (guardada.isPresent() && pedidoEmbalaje.soporta(partida.cliente())) {
             try {
-                ArticulosEmbalaje leidos = pedidoEmbalaje.articulosDe(partida.cliente(), guardada.get().getExcel());
+                ArticulosEmbalaje leidos = pedidoEmbalaje.articulosDe(partida.cliente(), guardada.get().getExcelPedido());
                 enCurso.getArticulos().addAll(leidos.articulos());
                 enCurso.getAvisos().addAll(leidos.avisos());
             } catch (IOException | RuntimeException e) {

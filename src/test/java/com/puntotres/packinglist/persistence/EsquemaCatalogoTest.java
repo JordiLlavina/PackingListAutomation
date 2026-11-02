@@ -78,20 +78,24 @@ class EsquemaCatalogoTest {
     }
 
     @Test
-    void laTemporadaLlevaSuTipoDeExcel() {
-        TemporadaGuardada guardada = temporadas.save(
+    void laTemporadaGuardaSusDosExcelsYElResumenDiceCualesTiene() {
+        TemporadaGuardada conPedido = temporadas.save(
                 new TemporadaGuardada("CAT1", "X", "p.xlsx", new byte[] {1}));
-        assertEquals(TipoExcelTemporada.PEDIDO, guardada.getTipoExcel());
+        assertTrue(conPedido.tienePedido());
+        assertFalse(conPedido.tieneProduccion());
 
-        TemporadaGuardada produccion = temporadas.save(new TemporadaGuardada("CAT1", "Y", "prod.xlsx",
-                new byte[] {1}, TipoExcelTemporada.PRODUCCION));
+        TemporadaGuardada soloProduccion = new TemporadaGuardada("CAT1", "Y");
+        soloProduccion.sustituirProduccion(new FicheroExcel("prod.xlsx", new byte[] {2}));
+        TemporadaGuardada guardada = temporadas.save(soloProduccion);
         ResumenTemporada resumen = temporadas.resumenesDe("CAT1").stream()
-                .filter(t -> t.id().equals(produccion.getId())).findFirst().orElseThrow();
-        assertEquals(TipoExcelTemporada.PRODUCCION, resumen.tipoExcel());
+                .filter(t -> t.id().equals(guardada.getId())).findFirst().orElseThrow();
+        assertFalse(resumen.conPedido());
+        assertTrue(resumen.conProduccion());
+        assertEquals("prod.xlsx", resumen.nombreFicheroProduccion());
 
         modelos.save(new Modelo("CAT1", "ULL029", "", TipoArticulo.BOLSO));
-        modeloTemporadas.save(new ModeloTemporada("CAT1", "ULL029", guardada.getId()));
-        assertEquals(1, modeloTemporadas.findByClienteAndTemporadaId("CAT1", guardada.getId()).size());
+        modeloTemporadas.save(new ModeloTemporada("CAT1", "ULL029", conPedido.getId()));
+        assertEquals(1, modeloTemporadas.findByClienteAndTemporadaId("CAT1", conPedido.getId()).size());
     }
 
     @Test

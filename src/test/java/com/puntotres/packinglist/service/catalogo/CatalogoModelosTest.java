@@ -12,14 +12,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.Articulo;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.PielId;
 import com.puntotres.packinglist.persistence.PielRepository;
 import com.puntotres.packinglist.persistence.TipoArticulo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.CampoArticulo;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos.ModelosQuitados;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.Propagacion;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.Propagada;
+import com.puntotres.packinglist.service.corte.ArticuloCorte;
+import com.puntotres.packinglist.service.corte.ColorCorte;
+import com.puntotres.packinglist.service.corte.PedidoCorte;
+import com.puntotres.packinglist.service.corte.ReferenciaCorte;
 
 /**
  * El alta de artículos en el catálogo y lo que una piel de un modelo hereda y
@@ -36,6 +42,9 @@ class CatalogoModelosTest {
 
     @Autowired
     private PielRepository pieles;
+
+    @Autowired
+    private ArchivoTemporadas archivo;
 
     @Test
     void asegurarCreaPielModeloYArticulo() {
@@ -166,5 +175,31 @@ class CatalogoModelosTest {
 
         assertTrue(catalogo.modelo("AMI", "ULL906").isEmpty());
         assertTrue(catalogo.articulo("AMI", "ULL906.AL0001").isEmpty());
+    }
+
+    @Test
+    void quitarLosModelosDeUnaTemporadaBorraLosSuyosYSoloDesvinculaLosCompartidos() {
+        Long esta = archivo.guardar(null, "AMI", "CAT-QUITAR-1", "p.xlsx", new byte[] {1}).getId();
+        Long otra = archivo.guardar(null, "AMI", "CAT-QUITAR-2", "p.xlsx", new byte[] {1}).getId();
+        catalogo.incorporar("AMI", pedidoDe("ULL937.AL0001", "ULL938.AL0001"), esta);
+        catalogo.incorporar("AMI", pedidoDe("ULL938.AL0001"), otra);
+
+        ModelosQuitados quitados = catalogo.quitarModelosDeTemporada("AMI", esta);
+
+        assertEquals(new ModelosQuitados(1, 1), quitados);
+        assertTrue(catalogo.modelo("AMI", "ULL937").isEmpty(), "solo iba en esta: se borra");
+        assertTrue(catalogo.articulo("AMI", "ULL937.AL0001").isEmpty());
+        assertTrue(catalogo.modelo("AMI", "ULL938").isPresent(), "también va en otra: se queda");
+        assertEquals(List.of(otra), catalogo.temporadasDe("AMI", "ULL938"));
+        assertTrue(catalogo.codigosDeModeloEn("AMI", esta).isEmpty());
+    }
+
+    private static PedidoCorte pedidoDe(String... referencias) {
+        return new PedidoCorte(java.util.Arrays.stream(referencias)
+                .map(referencia -> new ArticuloCorte(new ReferenciaCorte(referencia,
+                        referencia.substring(0, referencia.indexOf('.')),
+                        referencia.substring(referencia.indexOf('.') + 1)),
+                        List.of(new ColorCorte("001", "NOIR", 1))))
+                .toList(), List.of());
     }
 }

@@ -155,8 +155,8 @@ public class PackingListTallerController {
                     .conPedidoParaElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
                     .orElse(null);
             if (guardada != null) {
-                excelPedido = guardada.getExcel();
-                nombrePedido = guardada.getNombreFichero();
+                excelPedido = guardada.getExcelPedido();
+                nombrePedido = guardada.getNombreFicheroPedido();
             }
         }
         if (excelPedido == null) {
@@ -223,7 +223,7 @@ public class PackingListTallerController {
         if (excelPedido == null) {
             excelPedido = archivoTemporadas
                     .conPedidoParaElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
-                    .map(TemporadaGuardada::getExcel)
+                    .map(TemporadaGuardada::getExcelPedido)
                     .orElse(null);
         }
         // La tabla de colores del cliente (Colores y Pieles) es lo que permite

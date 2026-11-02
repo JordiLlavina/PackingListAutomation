@@ -34,6 +34,13 @@ import com.puntotres.packinglist.service.corte.ConversorHeicWindows.Trabajo;
 @Service
 public class ConversorFotos {
 
+    /**
+     * Prefijo de los directorios temporales donde se convierten fotos (el
+     * corte y la importación de fotos de una temporada): por él los reconoce
+     * y borra al arrancar LimpiezaDirectoriosCorte si se quedaron a medias.
+     */
+    public static final String PREFIJO_DIRECTORIO = "documentos-corte-";
+
     /** Hilos del camino Java: pocos, porque cada foto ya pide mucha memoria. */
     private static final int HILOS_JAVA = Math.max(1,
             Math.min(4, Runtime.getRuntime().availableProcessors() / 2));

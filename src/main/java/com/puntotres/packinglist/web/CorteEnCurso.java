@@ -14,6 +14,7 @@ import org.springframework.web.context.annotation.SessionScope;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
 import com.puntotres.packinglist.service.corte.ArticuloCorte;
 import com.puntotres.packinglist.service.corte.ConversionFotos;
+import com.puntotres.packinglist.service.corte.ConversorFotos;
 import com.puntotres.packinglist.service.corte.FilaCorte;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
 import com.puntotres.packinglist.service.corte.OrigenCorte;
@@ -35,7 +36,7 @@ import jakarta.annotation.PreDestroy;
 public class CorteEnCurso {
 
     /** Prefijo del directorio temporal de cada carga; por él lo reconoce LimpiezaDirectoriosCorte. */
-    static final String PREFIJO_DIRECTORIO = "documentos-corte-";
+    static final String PREFIJO_DIRECTORIO = ConversorFotos.PREFIJO_DIRECTORIO;
 
     private String claveCliente;
     private String nombreCliente;
