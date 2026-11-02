@@ -40,6 +40,9 @@
     --acento-rgb: 26, 111, 235;
     --acento-suave-ini: #eaf2fe;
     --acento-suave-fin: #f4f8ff;
+    /* La flecha de los desplegables: una imagen no lee variables, así que
+       lleva escrito el color de --texto-suave de cada paleta. */
+    --flecha-desplegable: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.2 1.6 6 6.4l4.8-4.8' fill='none' stroke='%235a6673' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 * { box-sizing: border-box; }
@@ -124,6 +127,31 @@ input[type="text"], textarea {
     border-radius: 4px;
     font: inherit;
 }
+
+/* Todos los desplegables con el mismo aspecto, el de los de /catalogo: borde
+   fino, esquinas redondeadas y una flecha propia algo mayor que la del
+   navegador. Sin appearance: none, uno sin estilo propio sale con el de
+   Windows (cuadrado y con borde gris oscuro) y otro con fondo, con el plano
+   de Chrome. La flecha es una imagen de fondo, así que las reglas de abajo
+   ponen background-color y nunca el atajo background, que la borraría; y el
+   hueco de la derecha es suyo, así que una regla que cambie el padding de un
+   desplegable tiene que dejarle su padding-right. */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    background-color: var(--campo);
+    background-image: var(--flecha-desplegable);
+    background-repeat: no-repeat;
+    background-position: right 0.55em center;
+    background-size: 0.8em auto;
+    padding: 1px 1.6em 1px 0.3rem;
+    color: var(--tinta);
+    cursor: pointer;
+}
+
+select:disabled { opacity: 0.6; cursor: default; }
 
 /* Sin las flechitas de incremento del navegador: aquí se teclea, no se
    pulsa, y en una tabla de campos estrechos solo estorban. */
@@ -443,12 +471,11 @@ section.destino td input.c-peso,
 section.destino td input.c-peso-palet,
 section.destino td.c-caja input[type="number"] { width: 3.5rem; }
 
+/* Estrecho: la flecha más pegada al borde para no comerse la medida. */
 section.destino td select.c-tamano {
-    padding: calc(0.25rem - 2px) 0.2rem;
-    border: 1px solid var(--borde);
-    border-radius: 4px;
+    padding: calc(0.25rem - 1px) 1.35em calc(0.25rem - 1px) 0.2rem;
+    background-position: right 0.35em center;
     font: inherit;
-    background: var(--campo);
 }
 
 /* Las celdas de la revisión aprietan en horizontal: son doce y casi todas
@@ -915,10 +942,7 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
    descripción, la casilla resaltada, que es la que hay que rellenar. */
 .selector-cliente {
     min-width: 18rem;
-    padding: 0.5rem 0.7rem;
-    border: 1px solid var(--borde);
-    border-radius: 4px;
-    background: var(--campo);
+    padding: calc(0.5rem + 1px) 2em calc(0.5rem + 1px) 0.7rem;
     font: inherit;
     font-size: 1.05rem;
 }
@@ -1289,13 +1313,14 @@ html[data-tema="puntotres"] {
     --acento-rgb: 72, 41, 34;
     --acento-suave-ini: #e6dbcd;
     --acento-suave-fin: #efe6da;
+    --flecha-desplegable: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.2 1.6 6 6.4l4.8-4.8' fill='none' stroke='%235e423a' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 /* Con :where() estas reglas no suman especificidad: cualquier campo con su
    propio fondo (la casilla amarilla de "sin descripción", por ejemplo) sigue
    ganando. */
 :where(html[data-tema="puntotres"]) :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]) {
-    background: var(--campo);
+    background-color: var(--campo);
     color: var(--tinta);
 }
 
@@ -1429,11 +1454,12 @@ main.catalogo { max-width: 100rem; }
 .tabla-catalogo .miniatura { max-width: 5rem; max-height: 5rem; border-radius: 4px; display: block; margin: 0 auto; }
 .tabla-catalogo .sin-foto { color: var(--texto-tenue); }
 .tabla-catalogo input.celda, .tabla-catalogo select.celda {
-    width: 100%; min-width: 5rem; border: 1px solid transparent; background: transparent; padding: 0.25rem 0.3rem;
+    width: 100%; min-width: 5rem; border: 1px solid transparent; background-color: transparent; padding: 0.25rem 0.3rem;
     border-radius: 4px; font: inherit;
 }
 .tabla-catalogo input.celda:hover, .tabla-catalogo select.celda:hover { border-color: var(--borde); }
-.tabla-catalogo input.celda:focus, .tabla-catalogo select.celda:focus { border-color: var(--acento); background: var(--campo); outline: 0; }
+.tabla-catalogo input.celda:focus, .tabla-catalogo select.celda:focus { border-color: var(--acento); background-color: var(--campo); outline: 0; }
+.tabla-catalogo select.celda { padding: calc(0.25rem + 1px) 1.6em calc(0.25rem + 1px) 0.3rem; background-position: right 0.4em center; }
 .tabla-catalogo input.c-numero { max-width: 6rem; }
 .tabla-catalogo .estado-celda { display: block; font-size: 0.75rem; color: var(--texto-tenue); min-height: 1em; }
 .tabla-catalogo .estado-celda.guardado { color: var(--ok-borde); }
@@ -1509,8 +1535,9 @@ main.catalogo { max-width: 100rem; }
     border: 1px solid var(--borde);
     border-radius: 4px;
     font: inherit;
-    background: var(--campo);
+    background-color: var(--campo);
 }
+.embalaje-formulario select { padding: calc(0.45rem + 1px) 2em calc(0.45rem + 1px) 0.6rem; border-radius: 6px; }
 
 .embalaje-pareja {
     display: grid;
