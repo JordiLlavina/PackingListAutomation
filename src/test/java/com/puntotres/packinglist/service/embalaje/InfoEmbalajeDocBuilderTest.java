@@ -226,6 +226,15 @@ class InfoEmbalajeDocBuilderTest {
     }
 
     @Test
+    void unaFotoIlegibleDejaLaCeldaVaciaSinFallar() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), "no soy un jpeg".getBytes())) {
+            assertEquals(1, doc.getAllPictures().size(), "solo el QR");
+            assertTrue(texto(doc).contains("PXCBC-F67008"));
+            assertTrue(texto(doc).contains("TOTAL 520 UNIDADES"));
+        }
+    }
+
+    @Test
     void elNombreDeFicheroSeSanea() {
         assertEquals("Info embalaje A.P.C. 270 PXCBC-F67008 LZZ.docx",
                 InfoEmbalajeDocBuilder.nombreFichero(datosEjemplo()));

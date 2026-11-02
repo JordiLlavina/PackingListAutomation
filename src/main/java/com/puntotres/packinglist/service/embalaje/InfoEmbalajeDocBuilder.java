@@ -408,13 +408,22 @@ public class InfoEmbalajeDocBuilder {
         return lineas;
     }
 
-    /** Ancho y alto en píxeles de la foto, o null si no se deja leer: sin proporción no se puede colocar. */
-    private static double[] medidaFoto(byte[] fotoJpeg) throws IOException {
+    /**
+     * Ancho y alto en píxeles de la foto, o null si no se deja leer: sin
+     * proporción no se puede colocar. Una foto rota o en un formato que Java no
+     * lee (un JPEG corrupto, uno CMYK) se trata igual que «sin foto», con la
+     * celda vacía: una foto mala del catálogo no puede dejar al taller sin hoja.
+     */
+    private static double[] medidaFoto(byte[] fotoJpeg) {
         if (fotoJpeg == null || fotoJpeg.length == 0) {
             return null;
         }
-        var imagen = ImageIO.read(new ByteArrayInputStream(fotoJpeg));
-        return imagen == null ? null : new double[] {imagen.getWidth(), imagen.getHeight()};
+        try {
+            var imagen = ImageIO.read(new ByteArrayInputStream(fotoJpeg));
+            return imagen == null ? null : new double[] {imagen.getWidth(), imagen.getHeight()};
+        } catch (IOException | RuntimeException ilegible) {
+            return null;
+        }
     }
 
     // --- Piezas de maquetación ---
