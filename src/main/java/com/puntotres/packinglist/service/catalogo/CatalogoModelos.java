@@ -1,26 +1,46 @@
 package com.puntotres.packinglist.service.catalogo;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.puntotres.packinglist.persistence.Articulo;
+import com.puntotres.packinglist.persistence.ArticuloColor;
+import com.puntotres.packinglist.persistence.ArticuloColorId;
+import com.puntotres.packinglist.persistence.ArticuloColorRepository;
 import com.puntotres.packinglist.persistence.ArticuloId;
 import com.puntotres.packinglist.persistence.ArticuloRepository;
+import com.puntotres.packinglist.persistence.Incorporacion;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloId;
 import com.puntotres.packinglist.persistence.ModeloRepository;
+import com.puntotres.packinglist.persistence.ModeloTemporada;
+import com.puntotres.packinglist.persistence.ModeloTemporadaId;
+import com.puntotres.packinglist.persistence.ModeloTemporadaRepository;
 import com.puntotres.packinglist.persistence.Piel;
 import com.puntotres.packinglist.persistence.PielId;
 import com.puntotres.packinglist.persistence.PielRepository;
+import com.puntotres.packinglist.persistence.TablaColores;
+import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.persistence.TipoArticulo;
+import com.puntotres.packinglist.persistence.TipoExcelTemporada;
+import com.puntotres.packinglist.service.corte.ArticuloCorte;
+import com.puntotres.packinglist.service.corte.ClienteCorte;
+import com.puntotres.packinglist.service.corte.ColorCorte;
 import com.puntotres.packinglist.service.corte.DocumentosCorteService;
+import com.puntotres.packinglist.service.corte.PedidoCorte;
+import com.puntotres.packinglist.service.corte.ProduccionPuntotresExcel;
 import com.puntotres.packinglist.service.corte.ReferenciaCorte;
 
 /**
@@ -145,17 +165,145 @@ public class CatalogoModelos {
         }
     }
 
+    /** Lo que ha pasado al meter un excel de temporada en el catálogo: para el aviso emergente. */
+    public record ResumenAlta(int articulos, int articulosNuevos, int modelosNuevos, int colores,
+                              int coloresNuevos, List<String> avisos) {
+
+        public ResumenAlta {
+            avisos = List.copyOf(avisos);
+        }
+    }
+
     private final ModeloRepository modelos;
     private final ArticuloRepository articulos;
     private final PielRepository pieles;
+    private final ArticuloColorRepository coloresDeArticulo;
+    private final ModeloTemporadaRepository temporadasDeModelo;
+    private final TablaColores tablaColores;
     private final DocumentosCorteService reglas;
 
     public CatalogoModelos(ModeloRepository modelos, ArticuloRepository articulos, PielRepository pieles,
-                           DocumentosCorteService reglas) {
+                           ArticuloColorRepository coloresDeArticulo, ModeloTemporadaRepository temporadasDeModelo,
+                           TablaColores tablaColores, DocumentosCorteService reglas) {
         this.modelos = modelos;
         this.articulos = articulos;
         this.pieles = pieles;
+        this.coloresDeArticulo = coloresDeArticulo;
+        this.temporadasDeModelo = temporadasDeModelo;
+        this.tablaColores = tablaColores;
         this.reglas = reglas;
+    }
+
+    // --- Alta automática desde el excel de una temporada ---
+
+    /**
+     * Lee el excel de la temporada con el lector de su tipo —el pedido del
+     * cliente (entero, cinturones incluidos) o el excel de producción de
+     * Puntotres— y mete lo que trae en el catálogo. Lanza
+     * IllegalArgumentException o IOException si el excel no se deja leer;
+     * quien llama decide qué hacer (la pantalla guarda la temporada y avisa).
+     */
+    @Transactional
+    public ResumenAlta incorporarTemporada(TemporadaGuardada temporada) throws IOException {
+        String cliente = temporada.getCliente();
+        PedidoCorte pedido;
+        if (temporada.getTipoExcel() == TipoExcelTemporada.PRODUCCION) {
+            pedido = ProduccionPuntotresExcel.leer(temporada.getExcel(), reglas.reglasDeProduccion(cliente)).pedido();
+        } else {
+            ClienteCorte lector = reglas.clientePara(cliente).orElseThrow(() -> new IllegalArgumentException(
+                    "El pedido de " + cliente + " todavía no se sabe leer"));
+            pedido = lector.pedidoEntero(temporada.getExcel());
+        }
+        return incorporar(cliente, pedido, temporada.getId());
+    }
+
+    /**
+     * Mete un pedido (visto desde el corte: una entrada por referencia con
+     * sus colores) en el catálogo: pieles, modelos y artículos que falten,
+     * el código de cada color en la tabla de colores del cliente, el
+     * artículo en cada color, y el vínculo de cada modelo con la temporada.
+     * Lo que ya existía NO se toca: solo se rellenan huecos (el nombre de un
+     * modelo, la descripción de un color).
+     *
+     * Un color sin código (el bicolor de AMI, los de un genérico) entra en el
+     * artículo por su descripción entera y no toca la tabla de colores: esa
+     * tabla es de códigos.
+     */
+    @Transactional
+    public ResumenAlta incorporar(String cliente, PedidoCorte pedido, Long temporadaId) {
+        String elCliente = clave(cliente);
+        int articulosNuevos = 0;
+        int modelosNuevos = 0;
+        Set<String> coloresVistos = new LinkedHashSet<>();
+        Map<String, String> codigosDeColor = new LinkedHashMap<>();
+        Set<String> modelosDelPedido = new LinkedHashSet<>();
+        for (ArticuloCorte entrada : pedido.articulos()) {
+            String referencia = clave(entrada.referencia().referencia());
+            if (referencia.isEmpty()) {
+                continue;
+            }
+            boolean habiaArticulo = articulos.existsById(new ArticuloId(elCliente, referencia));
+            Articulo articulo = asegurarArticulo(elCliente, referencia);
+            if (!habiaArticulo) {
+                articulosNuevos++;
+            }
+            boolean habiaModelo = modelos.existsById(new ModeloId(elCliente, articulo.getCodigoModelo()));
+            asegurarModelo(elCliente, articulo.getCodigoModelo(), entrada.nombreModelo());
+            if (!habiaModelo) {
+                modelosNuevos++;
+            }
+            modelosDelPedido.add(articulo.getCodigoModelo());
+            for (ColorCorte color : entrada.colores()) {
+                String codigo = clave(color.codigo());
+                String descripcion = color.descripcion() == null ? "" : color.descripcion().trim();
+                String claveColor = codigo.isEmpty() ? descripcion.toUpperCase(Locale.ROOT) : codigo;
+                if (claveColor.isEmpty()) {
+                    continue;
+                }
+                if (!codigo.isEmpty()) {
+                    codigosDeColor.merge(codigo, descripcion, (antes, nueva) -> antes.isEmpty() ? nueva : antes);
+                }
+                coloresVistos.add(claveColor);
+                ArticuloColorId id = new ArticuloColorId(elCliente, referencia, claveColor);
+                if (!coloresDeArticulo.existsById(id)) {
+                    // La piel principal arranca con el color del bolso, como en la tabla del corte.
+                    coloresDeArticulo.save(new ArticuloColor(elCliente, referencia, claveColor,
+                            descripcion.toUpperCase(Locale.ROOT), "", List.of()));
+                }
+            }
+        }
+        Incorporacion enLaTabla = tablaColores.incorporar(elCliente, codigosDeColor);
+        if (temporadaId != null) {
+            for (String modelo : modelosDelPedido) {
+                ModeloTemporadaId id = new ModeloTemporadaId(elCliente, modelo, temporadaId);
+                if (!temporadasDeModelo.existsById(id)) {
+                    temporadasDeModelo.save(new ModeloTemporada(elCliente, modelo, temporadaId));
+                }
+            }
+        }
+        return new ResumenAlta(pedido.articulos().size(), articulosNuevos, modelosNuevos, coloresVistos.size(),
+                enLaTabla.anadidos().size(), pedido.avisos());
+    }
+
+    /** Los códigos de modelo que fueron en una temporada, en orden. */
+    public Set<String> codigosDeModeloEn(String cliente, Long temporadaId) {
+        if (vacio(cliente) || temporadaId == null) {
+            return Set.of();
+        }
+        Set<String> codigos = new LinkedHashSet<>();
+        temporadasDeModelo.findByClienteAndTemporadaId(clave(cliente), temporadaId)
+                .forEach(vinculo -> codigos.add(vinculo.getCodigoModelo()));
+        return codigos;
+    }
+
+    /** Los ids de las temporadas en que ha ido un modelo. */
+    public List<Long> temporadasDe(String cliente, String codigoModelo) {
+        if (vacio(cliente) || vacio(codigoModelo)) {
+            return List.of();
+        }
+        return temporadasDeModelo.findByClienteAndCodigoModelo(clave(cliente), clave(codigoModelo)).stream()
+                .map(ModeloTemporada::getTemporadaId)
+                .toList();
     }
 
     public Optional<Modelo> modelo(String cliente, String codigo) {

@@ -6,11 +6,38 @@
 <main>
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+    <div class="alerta error" th:if="${aviso}" th:text="${aviso}"></div>
+
+    <!-- Lo que ha entrado al catálogo al guardar la temporada. Un <dialog>
+         abierto desde el servidor: se ve nada más volver, sin JavaScript. -->
+    <dialog class="emergente" id="altaCatalogo" open th:if="${altaCatalogo}">
+        <h3>Artículos guardados en el catálogo</h3>
+        <p>
+            Se han guardado los artículos de la temporada
+            <strong th:text="${altaTemporada}">H26</strong>:
+            <span th:text="${altaCatalogo.articulos}">38</span> artículos
+            (<span th:text="${altaCatalogo.articulosNuevos}">12</span> nuevos,
+            <span th:text="${altaCatalogo.modelosNuevos}">4</span> modelos nuevos)
+            y <span th:text="${altaCatalogo.colores}">13</span> colores
+            (<span th:text="${altaCatalogo.coloresNuevos}">2</span> nuevos en la tabla de colores).
+        </p>
+        <ul class="ayuda" th:if="${!#lists.isEmpty(altaCatalogo.avisos)}">
+            <li th:each="unAviso : ${altaCatalogo.avisos}" th:text="${unAviso}"></li>
+        </ul>
+        <div class="acciones-emergente">
+            <form method="dialog"><button type="submit" class="secundario">Cerrar</button></form>
+            <a class="boton" th:href="@{/catalogo(cliente=${altaCliente}, temporada=${altaTemporadaId})}">
+                Ver en el catálogo
+            </a>
+        </div>
+    </dialog>
 
     <section class="tarjeta">
         <p class="ayuda">
-            El excel de pedido de un cliente es el mismo documento durante toda una temporada.
-            Guardándolo aquí una vez, luego se podrán cargar para usarlos en los packing lists.
+            El excel de una temporada es el mismo documento durante toda ella: el de pedido del
+            cliente (AMI, A.P.C.) o, para los demás clientes, el excel de producción de Puntotres.
+            Guardándolo aquí una vez, luego se elige en un desplegable en el packing list, en los
+            documentos del corte y en el catálogo, y sus artículos entran solos al catálogo de modelos.
         </p>
     </section>
 
@@ -43,7 +70,7 @@
             <form th:action="@{/temporadas/borrar}" method="post" class="form-borrar">
                 <input type="hidden" name="id" th:value="${temporada.id}">
                 <button type="submit" class="mini"
-                        onclick="return confirm('¿Borrar esta temporada? Se borra también su excel de pedido.')">Borrar</button>
+                        onclick="return confirm('¿Borrar esta temporada? Se borra también su excel. Los modelos del catálogo se quedan.')">Borrar</button>
             </form>
             <!-- Pie de la fila, siempre debajo de los campos: el nombre del excel
                  mide lo que mide y entre los campos descolocaba todo lo demás.
@@ -51,11 +78,10 @@
                  el nombre del fichero no siempre lo dice. -->
             <p class="ayuda pie-temporada">
                 <span>Última vez: <span th:text="${#temporals.format(temporada.fechaActualizacion, 'dd/MM/yyyy')}"></span></span>
-                <span>Documento usado:
-                    <a class="fichero-guardado"
-                       th:href="@{/temporadas/descargar/{id}(id=${temporada.id})}"
-                       th:text="${temporada.nombreFichero}">pedido.xlsx</a>
-                </span>
+                <span th:text="${temporada.tipoExcel.name() == 'PEDIDO'} ? 'Excel de pedido del cliente:' : 'Excel de producción de Puntotres:'">Excel:</span>
+                <a class="fichero-guardado"
+                   th:href="@{/temporadas/descargar/{id}(id=${temporada.id})}"
+                   th:text="${temporada.nombreFichero}">pedido.xlsx</a>
             </p>
         </div>
     </section>
@@ -67,13 +93,14 @@
             <label for="clienteNuevo">Cliente
                 <select id="clienteNuevo" name="cliente">
                     <option th:each="entrada : ${clientes}"
-                            th:value="${entrada.key}" th:text="${entrada.value.nombre}"></option>
+                            th:value="${entrada.key}" th:text="${entrada.value.nombre}"
+                            th:attr="data-tipo=${tiposExcel[entrada.key]}"></option>
                 </select>
             </label>
             <label for="temporadaNueva">Temporada
                 <input type="text" id="temporadaNueva" name="temporada" placeholder="H26" required>
             </label>
-            <label for="pedidoNuevo">Excel de pedido
+            <label for="pedidoNuevo"><span id="rotuloExcel">Excel de pedido del cliente</span>
                 <input type="file" id="pedidoNuevo" name="pedido" accept=".xlsx" required>
             </label>
             <button type="submit">Añadir</button>
@@ -83,6 +110,23 @@
     <p class="menu-ajustes">
         <a class="boton secundario" th:href="@{/packing-list}">← Volver</a>
     </p>
+
+    <script>
+        // El rótulo del fichero sigue al cliente: un genérico guarda el excel de
+        // producción de Puntotres, no un pedido. El tipo lo decide el servidor
+        // por el cliente; esto solo lo dice.
+        (function () {
+            const cliente = document.getElementById('clienteNuevo');
+            const rotulo = document.getElementById('rotuloExcel');
+            function ajustar() {
+                const opcion = cliente.options[cliente.selectedIndex];
+                rotulo.textContent = opcion && opcion.dataset.tipo === 'PRODUCCION'
+                    ? 'Excel de producción de Puntotres' : 'Excel de pedido del cliente';
+            }
+            cliente.addEventListener('change', ajustar);
+            ajustar();
+        })();
+    </script>
 </main>
 </body>
 </html>

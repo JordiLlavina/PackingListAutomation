@@ -26,6 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.ResumenTemporada;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.persistence.TipoExcelTemporada;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 
 /**
  * El archivo de temporadas y su efecto en la entrada del envío: guardar el
@@ -47,6 +49,15 @@ class TemporadasControllerTest {
 
     @Autowired
     private ArchivoTemporadas archivo;
+
+    @Autowired
+    private CatalogoModelos catalogo;
+
+    private static byte[] recurso(String ruta) throws Exception {
+        try (var entrada = TemporadasControllerTest.class.getResourceAsStream(ruta)) {
+            return entrada.readAllBytes();
+        }
+    }
 
     private static MockMultipartFile pedido(String nombre, String contenido) {
         return new MockMultipartFile("pedido", nombre, TIPO_XLSX, contenido.getBytes());
@@ -164,14 +175,18 @@ class TemporadasControllerTest {
     }
 
     @Test
-    void unClienteQueNoTrabajaConExcelDePedidoNoTieneTemporadas() throws Exception {
+    void unClienteSinExcelDePedidoGuardaElExcelDeProduccion() throws Exception {
+        // Los genéricos no tienen pedido del cliente que leer: su temporada
+        // guarda el excel de producción de Puntotres, de donde salen sus modelos.
         mvc.perform(multipart("/temporadas")
-                        .file(pedido("pedido.xlsx", "x"))
+                        .file(pedido("prod.xlsx", "x"))
                         .param("cliente", "ACKERMANN")
                         .param("temporada", "H26"))
                 .andExpect(redirectedUrl("/temporadas"));
 
-        assertTrue(archivo.de("ACKERMANN").isEmpty());
+        ResumenTemporada guardada = archivo.de("ACKERMANN").stream()
+                .filter(temporada -> temporada.temporada().equals("H26")).findFirst().orElseThrow();
+        assertEquals(TipoExcelTemporada.PRODUCCION, guardada.tipoExcel());
     }
 
     @Test
@@ -242,5 +257,79 @@ class TemporadasControllerTest {
                         .param("fechaFactura", "10/07/2026")
                         .param("fechaEnvio", "24/07/2026"))
                 .andExpect(redirectedUrl("/revision"));
+    }
+
+    // --- Lo que hace por el catálogo de modelos ---
+
+    @Test
+    void guardarUnaTemporadaConExcelRealDejaElAvisoEmergente() throws Exception {
+        mvc.perform(multipart("/temporadas")
+                        .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx", TIPO_XLSX,
+                                recurso("/ejemplos/EAN PUNTOTRES H26.xlsx")))
+                        .param("cliente", "AMI")
+                        .param("temporada", "CAT-H26"))
+                .andExpect(redirectedUrl("/temporadas"))
+                .andExpect(flash().attributeExists("altaCatalogo"))
+                .andExpect(flash().attribute("altaCliente", "AMI"));
+
+        Long id = archivo.de("AMI").stream()
+                .filter(temporada -> temporada.temporada().equals("CAT-H26"))
+                .map(ResumenTemporada::id).findFirst().orElseThrow();
+        assertTrue(!catalogo.codigosDeModeloEn("AMI", id).isEmpty(), "los modelos del pedido entran al catálogo");
+    }
+
+    @Test
+    void unExcelQueNoSeDejaLeerGuardaLaTemporadaYAvisa() throws Exception {
+        // La regla del proyecto: no bloquear por algo que se arregla después.
+        // Se guarda, y el aviso dice que el catálogo no ha cogido nada.
+        mvc.perform(multipart("/temporadas")
+                        .file(pedido("raro.xlsx", "esto no es un excel"))
+                        .param("cliente", "AMI")
+                        .param("temporada", "CAT-ILEGIBLE"))
+                .andExpect(redirectedUrl("/temporadas"))
+                .andExpect(flash().attribute("mensaje", containsString("Guardada")))
+                .andExpect(flash().attribute("aviso", containsString("no se han podido extraer")));
+
+        assertTrue(archivo.de("AMI").stream().anyMatch(t -> t.temporada().equals("CAT-ILEGIBLE")));
+    }
+
+    @Test
+    void borrarUnaTemporadaNoBorraNingunModelo() throws Exception {
+        mvc.perform(multipart("/temporadas")
+                        .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx", TIPO_XLSX,
+                                recurso("/ejemplos/EAN PUNTOTRES H26.xlsx")))
+                        .param("cliente", "AMI")
+                        .param("temporada", "CAT-BORRABLE"))
+                .andExpect(redirectedUrl("/temporadas"));
+        Long id = archivo.de("AMI").stream()
+                .filter(temporada -> temporada.temporada().equals("CAT-BORRABLE"))
+                .map(ResumenTemporada::id).findFirst().orElseThrow();
+        String modelo = catalogo.codigosDeModeloEn("AMI", id).iterator().next();
+
+        mvc.perform(post("/temporadas/borrar").param("id", String.valueOf(id)))
+                .andExpect(redirectedUrl("/temporadas"));
+
+        assertTrue(catalogo.codigosDeModeloEn("AMI", id).isEmpty());
+        assertTrue(catalogo.modelo("AMI", modelo).isPresent(), "el modelo sobrevive a su temporada");
+    }
+
+    @Test
+    void elDesplegableDeLaEntradaNoOfreceTemporadasDeProduccion() throws Exception {
+        mvc.perform(multipart("/temporadas")
+                        .file(pedido("prod.xlsx", "x"))
+                        .param("cliente", "KAMI")
+                        .param("temporada", "CAT-PROD"))
+                .andExpect(redirectedUrl("/temporadas"));
+        Long id = archivo.de("KAMI").stream()
+                .filter(temporada -> temporada.temporada().equals("CAT-PROD"))
+                .map(ResumenTemporada::id).findFirst().orElseThrow();
+
+        assertTrue(!archivo.paraElDesplegable().containsKey("KAMI"),
+                "el packing list lee el excel como pedido: una de producción no sirve ahí");
+        List<java.util.Map<String, String>> delCorte = archivo.paraElDesplegableDelCorte().get("KAMI");
+        assertTrue(delCorte.stream().anyMatch(t -> t.get("id").equals(String.valueOf(id))
+                && "PRODUCCION".equals(t.get("tipo"))));
+        assertTrue(archivo.conPedidoParaElEnvio(id, "KAMI").isEmpty());
+        assertTrue(archivo.paraElEnvio(id, "KAMI").isPresent(), "por el nombre sí sigue valiendo");
     }
 }

@@ -153,9 +153,15 @@
                 return cliente.options[cliente.selectedIndex];
             }
 
+            // Con el excel de pedido solo valen las temporadas que guardan ese
+            // excel: una de producción leída como pedido daría un documento
+            // plausible y equivocado. Con el de producción la temporada solo
+            // pone el nombre, así que valen todas.
             function temporadasDelCliente() {
-                const opcion = opcionDelCliente();
-                return opcion && opcion.dataset.temporadas === 'true' ? (TEMPORADAS[cliente.value] || []) : [];
+                const todas = TEMPORADAS[cliente.value] || [];
+                return todas.filter(function (unaTemporada) {
+                    return !conPedido() || unaTemporada.tipo !== 'PRODUCCION';
+                });
             }
 
             // Con el excel de pedido, los clientes sin lector se apagan; si el
@@ -179,9 +185,10 @@
             // Se rehace al cambiar de cliente o de origen: una temporada elegida
             // de otro cliente se enviaría igual aunque ya no se vea.
             function rellenar() {
-                const opcion = opcionDelCliente();
+                // El bloque se enseña si el cliente tiene alguna temporada que
+                // valga con el origen elegido (un genérico puede tenerlas de producción).
                 document.getElementById('bloqueTemporadaGuardada').style.display =
-                    opcion && opcion.dataset.temporadas === 'true' ? '' : 'none';
+                    temporadasDelCliente().length > 0 ? '' : 'none';
                 guardada.innerHTML = '';
                 const suelta = document.createElement('option');
                 suelta.value = '';

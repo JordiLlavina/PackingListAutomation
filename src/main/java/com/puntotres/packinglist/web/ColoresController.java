@@ -122,7 +122,7 @@ public class ColoresController {
         // El cliente está fijado en la página, así que el desplegable de
         // temporadas se pinta en el servidor y no hace falta rehacerlo en el
         // navegador como en las pantallas de entrada.
-        model.addAttribute("temporadas", admitePedido ? archivoTemporadas.de(elegido) : List.of());
+        model.addAttribute("temporadas", admitePedido ? archivoTemporadas.dePedido(elegido) : List.of());
         return "colores";
     }
 
@@ -153,7 +153,7 @@ public class ColoresController {
         }
         boolean conExcel = pedido != null && !pedido.isEmpty();
         Optional<TemporadaGuardada> guardada = conExcel ? Optional.empty()
-                : archivoTemporadas.paraElEnvio(temporadaGuardadaId, lector.get().clave());
+                : archivoTemporadas.conPedidoParaElEnvio(temporadaGuardadaId, lector.get().clave());
         if (!conExcel && guardada.isEmpty()) {
             redirect.addFlashAttribute("mensajeError", temporadaGuardadaId != null
                     ? "La temporada elegida ya no existe o no es de este cliente: vuelve a elegirla "

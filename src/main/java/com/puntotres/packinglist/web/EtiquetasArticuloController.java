@@ -115,7 +115,7 @@ public class EtiquetasArticuloController {
         // cambiar de cliente después de elegir dejaría enviada la de otro.
         boolean conExcel = pedido != null && !pedido.isEmpty();
         Optional<TemporadaGuardada> guardada = conExcel ? Optional.empty()
-                : archivoTemporadas.paraElEnvio(temporadaGuardadaId, cliente);
+                : archivoTemporadas.conPedidoParaElEnvio(temporadaGuardadaId, cliente);
         if (!conExcel && guardada.isEmpty()) {
             redirect.addFlashAttribute("error", temporadaGuardadaId != null
                     ? "La temporada elegida ya no existe o no es de este cliente: vuelve a elegirla "

@@ -39,6 +39,12 @@ public class AmiCorte implements ClienteCorte {
         return PedidoCorte.agrupar(lineas, this::partir);
     }
 
+    /** Con los cinturones, que el corte deja fuera pero el catálogo de modelos no. */
+    @Override
+    public PedidoCorte pedidoEntero(byte[] excel) throws IOException {
+        return PedidoCorte.agrupar(lineas(excel), this::partir);
+    }
+
     /** Con los de los cinturones, que el corte deja fuera pero la tabla de colores no. */
     @Override
     public Map<String, String> coloresDelPedido(byte[] excel) throws IOException {

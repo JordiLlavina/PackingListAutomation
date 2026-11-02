@@ -116,7 +116,7 @@ public class DocumentosCorteController {
     @GetMapping("/documentos-corte")
     public String entrada(Model model) {
         model.addAttribute("clientes", opcionesDeCliente());
-        model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegable());
+        model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegableDelCorte());
         return "documentos-corte";
     }
 
@@ -190,7 +190,7 @@ public class DocumentosCorteController {
             // Solo si es de este cliente: el desplegable se rellena en el navegador
             // y cambiar de cliente después de elegir dejaría enviada la de otro.
             Optional<TemporadaGuardada> guardada = conExcel ? Optional.empty()
-                    : archivoTemporadas.paraElEnvio(temporadaGuardadaId, clienteCorte.clave());
+                    : archivoTemporadas.conPedidoParaElEnvio(temporadaGuardadaId, clienteCorte.clave());
             if (!conExcel && guardada.isEmpty()) {
                 return error(redirect, temporadaGuardadaId != null
                         ? "La temporada elegida ya no existe o no es de este cliente: vuelve a elegirla "

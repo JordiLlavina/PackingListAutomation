@@ -21,18 +21,26 @@ import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.persistence.TipoExcelTemporada;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos.ResumenAlta;
 
 /**
- * Pantalla del archivo de temporadas: guardar el excel de pedido de una
- * temporada una sola vez y elegirla luego en la entrada del envío.
+ * Pantalla del archivo de temporadas: guardar el excel de una temporada una
+ * sola vez y elegirla luego en la entrada del envío, del corte o del
+ * catálogo.
  *
- * El excel de pedido de un cliente es el mismo documento durante toda una
- * temporada, así que subirlo en cada envío es trabajo repetido y una ocasión
- * de equivocarse de fichero. Aquí se da de alta, se corrige y se borra.
+ * Para los clientes que trabajan con excel de pedido ({@code pedido-cliente}
+ * en application.yml: AMI, APC) el fichero es ese pedido, el mismo documento
+ * durante toda la temporada. Para los demás es el excel de producción de
+ * Puntotres, que es de donde salen sus modelos. El tipo lo fija el cliente,
+ * no lo elige el usuario.
  *
- * Solo se ofrecen los clientes que trabajan con excel de pedido
- * ({@code pedido-cliente} en application.yml): para el resto, una temporada
- * guardada no tendría ningún fichero que ahorrar.
+ * Al guardar una temporada con su excel, sus artículos entran solos en el
+ * catálogo de modelos y un aviso emergente dice qué ha entrado. Un excel que
+ * no se deja leer no impide guardar la temporada: se guarda y se avisa de
+ * que el catálogo no ha cogido nada (regla del proyecto: no bloquear por
+ * algo que se arregla después).
  */
 @Controller
 public class TemporadasController {
@@ -42,16 +50,20 @@ public class TemporadasController {
 
     private final ArchivoTemporadas archivo;
     private final ClientesProperties clientesProperties;
+    private final CatalogoModelos catalogo;
 
-    public TemporadasController(ArchivoTemporadas archivo, ClientesProperties clientesProperties) {
+    public TemporadasController(ArchivoTemporadas archivo, ClientesProperties clientesProperties,
+                                CatalogoModelos catalogo) {
         this.archivo = archivo;
         this.clientesProperties = clientesProperties;
+        this.catalogo = catalogo;
     }
 
     @GetMapping("/temporadas")
     public String temporadas(Model model) {
         model.addAttribute("temporadas", archivo.todas());
-        model.addAttribute("clientes", clientesConPedido());
+        model.addAttribute("clientes", clientesProperties.getClientes());
+        model.addAttribute("tiposExcel", tiposPorCliente());
         return "temporadas";
     }
 
@@ -67,10 +79,10 @@ public class TemporadasController {
                           @RequestParam(required = false) MultipartFile pedido,
                           RedirectAttributes redirect) {
         ClienteConfig config = clientesProperties.clientePara(cliente).orElse(null);
-        if (config == null || !config.isPedidoCliente()) {
-            return error(redirect, "Cliente desconocido o que no trabaja con excel de pedido: "
-                    + cliente + ".");
+        if (config == null) {
+            return error(redirect, "Cliente desconocido: " + cliente + ".");
         }
+        TipoExcelTemporada tipo = tipoDe(config);
         String nombreTemporada = temporada == null ? "" : temporada.trim();
         if (nombreTemporada.isBlank()) {
             return error(redirect, "La temporada necesita un nombre: es el que se escribe "
@@ -86,7 +98,7 @@ public class TemporadasController {
         String nombreFichero = null;
         if (pedido != null && !pedido.isEmpty()) {
             if (!esExcel(pedido.getOriginalFilename())) {
-                return error(redirect, "El pedido del cliente es un excel (.xlsx): '"
+                return error(redirect, rotuloDe(tipo) + " es un excel (.xlsx): '"
                         + pedido.getOriginalFilename() + "' no lo es.");
             }
             try {
@@ -98,16 +110,38 @@ public class TemporadasController {
         }
         // Al dar de alta el fichero es obligatorio: una temporada sin él no
         // ahorra nada y en la entrada saldría un desplegable que no trae
-        // ningún pedido, sin decir por qué.
+        // ningún excel, sin decir por qué.
         if (esAlta && excel == null) {
-            return error(redirect, "Sube el excel de pedido de la temporada: es lo que se "
+            return error(redirect, "Sube " + rotuloDe(tipo).toLowerCase() + " de la temporada: es lo que se "
                     + "guarda para no tener que buscarlo en cada envío.");
         }
 
-        archivo.guardar(id, cliente, nombreTemporada, nombreFichero, excel);
+        TemporadaGuardada guardada = archivo.guardar(id, cliente, nombreTemporada, nombreFichero, excel, tipo);
         redirect.addFlashAttribute("mensaje", "Guardada la temporada " + nombreTemporada
                 + " de " + config.getNombre() + ".");
+        if (excel != null) {
+            incorporarAlCatalogo(guardada, redirect);
+        }
         return "redirect:/temporadas";
+    }
+
+    /**
+     * Los artículos del excel entran al catálogo. Si el excel no se deja
+     * leer, la temporada ya está guardada y se avisa: el aviso dice lo que ha
+     * pasado y el catálogo se puede rellenar a mano o sustituyendo el excel.
+     */
+    private void incorporarAlCatalogo(TemporadaGuardada guardada, RedirectAttributes redirect) {
+        try {
+            ResumenAlta alta = catalogo.incorporarTemporada(guardada);
+            redirect.addFlashAttribute("altaCatalogo", alta);
+            redirect.addFlashAttribute("altaTemporada", guardada.getTemporada());
+            redirect.addFlashAttribute("altaTemporadaId", guardada.getId());
+            redirect.addFlashAttribute("altaCliente", guardada.getCliente());
+        } catch (IOException | RuntimeException e) {
+            redirect.addFlashAttribute("aviso", "Guardada la temporada, pero no se han podido extraer sus "
+                    + "artículos al catálogo: " + (e.getMessage() != null ? e.getMessage()
+                    : "el excel no tiene el formato esperado") + ".");
+        }
     }
 
     @PostMapping("/temporadas/borrar")
@@ -135,14 +169,20 @@ public class TemporadasController {
                 .body(temporada.getExcel());
     }
 
-    private Map<String, ClienteConfig> clientesConPedido() {
-        Map<String, ClienteConfig> conPedido = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> {
-            if (config.isPedidoCliente()) {
-                conPedido.put(clave, config);
-            }
-        });
-        return conPedido;
+    /** Clave de cliente → qué excel guarda su temporada, para que la pantalla rotule el fichero. */
+    private Map<String, TipoExcelTemporada> tiposPorCliente() {
+        Map<String, TipoExcelTemporada> tipos = new LinkedHashMap<>();
+        clientesProperties.getClientes().forEach((clave, config) -> tipos.put(clave, tipoDe(config)));
+        return tipos;
+    }
+
+    private static TipoExcelTemporada tipoDe(ClienteConfig config) {
+        return config.isPedidoCliente() ? TipoExcelTemporada.PEDIDO : TipoExcelTemporada.PRODUCCION;
+    }
+
+    private static String rotuloDe(TipoExcelTemporada tipo) {
+        return tipo == TipoExcelTemporada.PEDIDO ? "El excel de pedido del cliente"
+                : "El excel de producción de Puntotres";
     }
 
     private static boolean esExcel(String nombre) {

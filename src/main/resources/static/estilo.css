@@ -1357,3 +1357,18 @@ header.cabecera .interruptor-tema:focus-visible {
 @media (prefers-reduced-motion: reduce) {
     .interruptor-pista, .interruptor-pista::after { transition: none; }
 }
+
+/* --- Aviso emergente (temporada guardada → artículos en el catálogo) --- */
+/* Un <dialog> abierto desde el servidor: lo que ha pasado, a la vista, y un
+   enlace a la pantalla donde se puede seguir. Sin JavaScript para abrirlo. */
+dialog.emergente {
+    border: 1px solid var(--borde, #d6d3cd);
+    border-radius: 10px;
+    padding: 1.4rem 1.6rem;
+    max-width: 32rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+dialog.emergente::backdrop { background: rgba(0, 0, 0, 0.35); }
+dialog.emergente h3 { margin-top: 0; }
+dialog.emergente .acciones-emergente { display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.2rem; }
+dialog.emergente form { margin: 0; }

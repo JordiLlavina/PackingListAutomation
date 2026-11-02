@@ -28,6 +28,15 @@ public interface ClienteCorte {
     PedidoCorte leerPedido(byte[] excel) throws IOException;
 
     /**
+     * El pedido ENTERO, con lo que el corte deja fuera (los cinturones de
+     * AMI): es lo que entra al catálogo de modelos al guardar una temporada.
+     * Por defecto es el mismo que {@link #leerPedido}.
+     */
+    default PedidoCorte pedidoEntero(byte[] excel) throws IOException {
+        return leerPedido(excel);
+    }
+
+    /**
      * Parte una referencia en modelo y piel con la regla del cliente. La usa
      * también la lectura de las fotos: una carpeta "ULL027.AL103" es el modelo
      * ULL027.

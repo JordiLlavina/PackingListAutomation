@@ -152,7 +152,7 @@ public class PackingListTallerController {
                 : envioForm.getPedidoCliente().getOriginalFilename();
         if (excelPedido == null) {
             TemporadaGuardada guardada = archivoTemporadas
-                    .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                    .conPedidoParaElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
                     .orElse(null);
             if (guardada != null) {
                 excelPedido = guardada.getExcel();
@@ -222,7 +222,7 @@ public class PackingListTallerController {
         byte[] excelPedido = bytesDe(envioForm.getPedidoCliente());
         if (excelPedido == null) {
             excelPedido = archivoTemporadas
-                    .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                    .conPedidoParaElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
                     .map(TemporadaGuardada::getExcel)
                     .orElse(null);
         }

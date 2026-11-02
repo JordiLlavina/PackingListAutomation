@@ -317,7 +317,7 @@ public class PackingListController {
             return new PedidoDeTemporada(null, null, avisos);
         }
         TemporadaGuardada guardada = archivoTemporadas
-                .paraElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
+                .conPedidoParaElEnvio(envioForm.getTemporadaGuardadaId(), envioForm.getCliente())
                 .orElse(null);
         if (guardada == null) {
             avisos.add("La temporada guardada que se eligió ya no está disponible: "
