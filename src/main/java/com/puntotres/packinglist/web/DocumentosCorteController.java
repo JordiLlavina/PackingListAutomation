@@ -32,6 +32,7 @@ import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
 import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
 import com.puntotres.packinglist.service.corte.ClienteCorte;
 import com.puntotres.packinglist.service.corte.ColorCorte;
 import com.puntotres.packinglist.service.corte.ConversionFotos;
@@ -96,18 +97,21 @@ public class DocumentosCorteController {
     private final ArchivoTemporadas archivoTemporadas;
     private final MemoriaPieles memoria;
     private final TablaColores tablaColores;
+    private final FotosCatalogo fotosCatalogo;
     private final CorteEnCurso enCurso;
 
     public DocumentosCorteController(DocumentosCorteService servicio, ConversorFotos conversor,
                                      ClientesProperties clientesProperties,
                                      ArchivoTemporadas archivoTemporadas, MemoriaPieles memoria,
-                                     TablaColores tablaColores, CorteEnCurso enCurso) {
+                                     TablaColores tablaColores, FotosCatalogo fotosCatalogo,
+                                     CorteEnCurso enCurso) {
         this.servicio = servicio;
         this.conversor = conversor;
         this.clientesProperties = clientesProperties;
         this.archivoTemporadas = archivoTemporadas;
         this.memoria = memoria;
         this.tablaColores = tablaColores;
+        this.fotosCatalogo = fotosCatalogo;
         this.enCurso = enCurso;
     }
 
@@ -235,11 +239,16 @@ public class DocumentosCorteController {
 
         enCurso.reiniciar();
         Path directorio = null;
+        boolean fotosDelCatalogo = false;
         try {
             directorio = Files.createTempDirectory(CorteEnCurso.PREFIJO_DIRECTORIO);
             FotosTemporada leidas;
             if (sinFotos) {
-                leidas = FotosTemporada.vacia();
+                // Sin carpeta, las fotos que el catálogo ya tenga de estos modelos
+                // (de una temporada anterior o subidas en su pantalla) valen igual.
+                leidas = fotosCatalogo.comoFotosTemporada(clienteCorte.clave(), pedidoCorte.modelos(), directorio);
+                fotosDelCatalogo = leidas.total() > 0;
+                sinFotos = !fotosDelCatalogo;
             } else if (conZip) {
                 leidas = leerZip(fotos, pedidoCorte, clienteCorte, directorio);
             } else {
@@ -253,7 +262,7 @@ public class DocumentosCorteController {
             avisos.addAll(leidas.avisos());
             enCurso.cargar(clienteCorte.clave(), nombreDe(clienteCorte.clave()), nombreTemporada,
                     directorio, pedidoCorte, leidas, conversion, sinFotos, avisos,
-                    deProduccion ? OrigenCorte.PRODUCCION : OrigenCorte.PEDIDO);
+                    deProduccion ? OrigenCorte.PRODUCCION : OrigenCorte.PEDIDO, fotosDelCatalogo);
         } catch (IllegalArgumentException e) {
             CorteEnCurso.borrar(directorio);
             return error(redirect, "No se pudo usar la carpeta de fotos: " + e.getMessage());
@@ -264,13 +273,46 @@ public class DocumentosCorteController {
         }
 
         if (deLaProduccion != null) {
-            // El excel de producción ya dice la piel y su color: la memoria no se consulta.
+            // El excel de producción ya dice la piel y su color; lo que no trae
+            // (el forro, los colores del forro y de las combinaciones) sale del catálogo.
             deLaProduccion.rellenar(enCurso.getFilas());
+            completarDesdeCatalogo(clienteCorte.clave());
         } else {
             recordarPieles(clienteCorte.clave());
         }
         enCurso.ajustarColumnasALasFilas();
         return "redirect:/documentos-corte/pieles";
+    }
+
+    /**
+     * Con el excel de producción: rellena del catálogo SOLO lo que está vacío.
+     * Nunca el nombre de la piel ni el color de la piel principal, que el
+     * excel ya dice; el forro, las combinaciones (si el excel no trae ninguna)
+     * y los colores del forro y las combinaciones, si están en blanco.
+     */
+    private void completarDesdeCatalogo(String cliente) {
+        for (FilaCorte fila : enCurso.getFilas()) {
+            MemoriaPieles.Recordadas recordadas = memoria.buscar(cliente,
+                    fila.referencia().piel(), fila.referencia().referencia());
+            if (fila.getForro().isEmpty()) {
+                fila.setForro(recordadas.forro());
+            }
+            if (fila.getCombinaciones().isEmpty() && !recordadas.combinaciones().isEmpty()) {
+                fila.setCombinaciones(recordadas.combinaciones());
+            }
+            List<ColorCorte> colores = fila.colores();
+            for (int indice = 0; indice < colores.size(); indice++) {
+                MemoriaPieles.ColoresRecordados recordados = memoria.buscarColores(cliente,
+                        fila.referencia().referencia(), colores.get(indice).codigo());
+                if (fila.getColorForro(indice).isEmpty()) {
+                    fila.setColorForro(indice, recordados.colorForro());
+                }
+                if (fila.getColoresCombinacion(indice).stream().allMatch(String::isEmpty)
+                        && !recordados.coloresCombinacion().isEmpty()) {
+                    fila.setColoresCombinacion(indice, recordados.coloresCombinacion());
+                }
+            }
+        }
     }
 
     /** Lo que la memoria de pieles recuerda de cada fila, para no teclearlo cada temporada. */
@@ -369,11 +411,14 @@ public class DocumentosCorteController {
                     + "): el botón de generar se activa en cuanto acaben");
             return "redirect:/documentos-corte/pieles";
         }
-        if (!enCurso.isDeProduccion()) {
+        if (enCurso.isDeProduccion()) {
+            guardarPielesDeProduccion();
+        } else {
             guardarPieles();
         }
         try {
             enCurso.getConversion().esperar();
+            guardarFotosEnCatalogo();
             Path salida = enCurso.getDirectorio().resolve("documentos");
             CorteEnCurso.borrar(salida);
             ResultadoCorte resultado = servicio.generar(enCurso.getNombreCliente(),
@@ -393,8 +438,80 @@ public class DocumentosCorteController {
     }
 
     /**
-     * Lo tecleado pasa a la memoria de pieles. Solo con el excel de pedido:
-     * el de producción ya trae las pieles escritas y no la usa.
+     * Con el excel de producción: lo tecleado pasa al catálogo SIN tocar el
+     * nombre de la piel, que ahí es texto concatenado del excel ("SERRAJE
+     * ALABAMA") y no debe pisar el que alguien tecleó en su tabla. El forro,
+     * las combinaciones y los colores sí se guardan, como con el pedido.
+     */
+    private void guardarPielesDeProduccion() {
+        for (FilaCorte fila : enCurso.getFilas()) {
+            if (fila.getNombrePiel().isBlank()) {
+                continue;
+            }
+            memoria.recordarPielesDelArticulo(enCurso.getClaveCliente(), fila.referencia().referencia(),
+                    fila.getForro(), fila.getCombinaciones());
+            guardarColores(fila);
+        }
+    }
+
+    private void guardarColores(FilaCorte fila) {
+        List<ColorCorte> colores = fila.colores();
+        for (int indice = 0; indice < colores.size(); indice++) {
+            // Las de las combinaciones, emparejadas con las que tienen nombre:
+            // es como se guardan los nombres y como se vuelven a leer.
+            PielesArticulo pieles = fila.pieles(indice);
+            memoria.recordarColores(enCurso.getClaveCliente(), fila.referencia().referencia(),
+                    claveColor(colores.get(indice)), fila.getNombrePiel(), pieles.principal().color(),
+                    pieles.forro().color(),
+                    pieles.combinaciones().stream().map(PielCorte::color).toList());
+        }
+    }
+
+    /** La clave con la que el catálogo guarda un color del bolso: su código o, si no tiene, su descripción. */
+    private static String claveColor(ColorCorte color) {
+        return color.codigo().isEmpty() ? color.descripcion() : color.codigo();
+    }
+
+    /**
+     * Las fotos subidas con esta carga entran al catálogo, para que la
+     * siguiente temporada del mismo modelo no tenga que volver a subirlas:
+     * cada foto reducida con su nombre original, y la elegida en la tabla como
+     * principal. Un modelo se guarda una vez aunque tenga varias filas. Si las
+     * fotos ya salieron del catálogo, no hay nada que guardar.
+     */
+    private void guardarFotosEnCatalogo() throws IOException {
+        if (enCurso.isFotosDelCatalogo() || enCurso.isSinFotos()) {
+            return;
+        }
+        java.util.Set<String> hechos = new java.util.HashSet<>();
+        for (FilaCorte fila : enCurso.getFilas()) {
+            String modelo = fila.referencia().modelo();
+            if (!fila.isIncluida() || !hechos.add(modelo)) {
+                continue;
+            }
+            List<FotoModelo> fotos = enCurso.getFotos().de(modelo);
+            Long principal = null;
+            for (int indice = 0; indice < fotos.size(); indice++) {
+                FotoModelo foto = fotos.get(indice);
+                Optional<Path> reducida = enCurso.getConversion().reducida(foto);
+                if (reducida.isEmpty()) {
+                    continue;
+                }
+                Long id = fotosCatalogo.guardar(enCurso.getClaveCliente(), modelo, foto.nombreOriginal(),
+                        Files.readAllBytes(reducida.get())).id();
+                if (indice == fila.getFotoPrincipal()) {
+                    principal = id;
+                }
+            }
+            if (principal != null) {
+                fotosCatalogo.marcarPrincipal(enCurso.getClaveCliente(), modelo, principal);
+            }
+        }
+    }
+
+    /**
+     * Lo tecleado pasa a la memoria de pieles. Con el excel de pedido, nombre
+     * de piel incluido; ver {@link #guardarPielesDeProduccion} para el otro.
      */
     private void guardarPieles() {
         for (FilaCorte fila : enCurso.getFilas()) {

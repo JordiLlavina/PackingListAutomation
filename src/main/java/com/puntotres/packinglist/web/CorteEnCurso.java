@@ -50,6 +50,8 @@ public class CorteEnCurso {
      * avisa el lector diciendo qué carpeta no ha reconocido.
      */
     private boolean sinFotos;
+    /** Las fotos han salido del catálogo de modelos, no de una carpeta subida. */
+    private boolean fotosDelCatalogo;
     /** De dónde ha salido la carga: decide si se usa la memoria de pieles. */
     private OrigenCorte origen = OrigenCorte.PEDIDO;
     private final List<FilaCorte> filas = new ArrayList<>();
@@ -79,6 +81,18 @@ public class CorteEnCurso {
                                     Path directorio, PedidoCorte pedido, FotosTemporada fotos,
                                     ConversionFotos conversion, boolean sinFotos,
                                     List<String> avisos, OrigenCorte origen) {
+        cargar(claveCliente, nombreCliente, temporada, directorio, pedido, fotos, conversion, sinFotos,
+                avisos, origen, false);
+    }
+
+    /**
+     * {@code fotosDelCatalogo}: las fotos no las ha subido el usuario, han
+     * salido del catálogo de modelos. Al generar no se vuelven a guardar en él.
+     */
+    public synchronized void cargar(String claveCliente, String nombreCliente, String temporada,
+                                    Path directorio, PedidoCorte pedido, FotosTemporada fotos,
+                                    ConversionFotos conversion, boolean sinFotos,
+                                    List<String> avisos, OrigenCorte origen, boolean fotosDelCatalogo) {
         if (this.conversion != null && this.conversion != conversion) {
             this.conversion.cancelar();
         }
@@ -93,6 +107,7 @@ public class CorteEnCurso {
         this.conversion = conversion;
         this.sinFotos = sinFotos;
         this.origen = origen;
+        this.fotosDelCatalogo = fotosDelCatalogo;
         filas.clear();
         for (ArticuloCorte articulo : pedido.articulos()) {
             FilaCorte fila = new FilaCorte(articulo);
@@ -166,6 +181,7 @@ public class CorteEnCurso {
     public Path getDirectorio() { return directorio; }
     public FotosTemporada getFotos() { return fotos; }
     public boolean isSinFotos() { return sinFotos; }
+    public boolean isFotosDelCatalogo() { return fotosDelCatalogo; }
     public OrigenCorte getOrigen() { return origen; }
     public boolean isDeProduccion() { return origen == OrigenCorte.PRODUCCION; }
     public ConversionFotos getConversion() { return conversion; }

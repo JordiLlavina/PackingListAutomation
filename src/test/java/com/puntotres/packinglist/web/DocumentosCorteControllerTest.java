@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,6 +35,7 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
+import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
 import com.puntotres.packinglist.testutil.FotosDePrueba;
 import com.puntotres.packinglist.testutil.ExcelDePrueba;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
@@ -59,6 +61,9 @@ class DocumentosCorteControllerTest {
 
     @Autowired
     private MemoriaPieles memoria;
+
+    @Autowired
+    private FotosCatalogo fotosCatalogo;
 
     private final MockHttpSession sesion = new MockHttpSession();
 
@@ -744,5 +749,92 @@ class DocumentosCorteControllerTest {
             }
         }
         return salida.toByteArray();
+    }
+
+    // --- El catálogo de modelos en el camino del excel de producción ---
+
+    private MockMultipartHttpServletRequestBuilder cargarProduccion(String temporada, byte[] fotos) throws IOException {
+        MockMultipartHttpServletRequestBuilder peticion = multipart("/documentos-corte/cargar")
+                .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccionApc()));
+        if (fotos != null) {
+            peticion.file(new MockMultipartFile("fotos", temporada + ".zip", "application/zip", fotos));
+        }
+        return (MockMultipartHttpServletRequestBuilder) peticion
+                .param("origen", "PRODUCCION").param("cliente", "APC")
+                .param("temporada", temporada).session(sesion);
+    }
+
+    @Test
+    void conElExcelDeProduccionElForroSaleDelCatalogo() throws Exception {
+        // El excel de producción no trae el forro: se lee del catálogo, igual
+        // que con el excel de pedido. El nombre de la piel sigue siendo el del excel.
+        memoria.guardarPiel("APC", "PXCBC", "NOMBRE DE LA TABLA");
+        memoria.recordarPielesDelArticulo("APC", "PXCBC-F67008", "BADANA CAT", List.of());
+
+        mvc.perform(cargarProduccion("CAT-S27-FORRO", null)).andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(tabla.contains("value=\"BADANA CAT\""), "el forro recordado");
+        assertTrue(tabla.contains("value=\"ALPACA\""), "la piel es la del excel de producción");
+        assertTrue(!tabla.contains("value=\"NOMBRE DE LA TABLA\""), "no la de la tabla de pieles");
+    }
+
+    @Test
+    void generarConProduccionGuardaForroYColoresPeroNoElNombreDePiel() throws Exception {
+        memoria.guardarPiel("APC", "PXCBC", "NOMBRE MIO");
+        mvc.perform(cargarProduccion("CAT-S27-GUARDA", null)).andExpect(redirectedUrl("/documentos-corte/pieles"));
+        String tabla = mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        int fila = indiceDeFila(tabla, "PXCBC-F67008");
+
+        // La pantalla manda todos los campos de la fila; sin el nombre de la
+        // piel la fila cuenta como no rellenada y no toca el catálogo.
+        mvc.perform(post("/documentos-corte/generar").session(sesion)
+                        .param("filas[" + fila + "].nombrePiel", "ALPACA")
+                        .param("filas[" + fila + "].forro", "forro tecleado"))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        MemoriaPieles.Recordadas recordadas = memoria.buscar("APC", "PXCBC", "PXCBC-F67008");
+        assertEquals("FORRO TECLEADO", recordadas.forro());
+        assertEquals("NOMBRE MIO", recordadas.nombrePiel(), "producción no pisa el nombre de la piel");
+    }
+
+    @Test
+    void sinCarpetaDeFotosSeUsanLasDelCatalogo() throws Exception {
+        fotosCatalogo.guardar("APC", "F67008", "catalogo.jpg", FotosDePrueba.jpeg(30, 20, Color.GREEN));
+
+        mvc.perform(cargarProduccion("CAT-S27-FOTOS", null)).andExpect(redirectedUrl("/documentos-corte/pieles"));
+        esperarFotos();
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(model().attribute("sinFotos", false))
+                .andExpect(content().string(containsString("principal.jpg")));
+    }
+
+    @Test
+    void lasFotosSubidasSeGuardanEnElCatalogoAlGenerar() throws Exception {
+        mvc.perform(cargarProduccion("CAT-S27-SUBE", zipFotos("F67043"))).andExpect(redirectedUrl("/documentos-corte/pieles"));
+        esperarFotos();
+
+        mvc.perform(post("/documentos-corte/generar").session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/resultados"));
+
+        var guardadas = fotosCatalogo.de("APC", "F67043");
+        assertEquals(2, guardadas.size(), "las dos fotos del zip, no la de la carpeta ajena");
+        assertEquals(1, guardadas.stream().filter(foto -> foto.principal()).count());
+        assertEquals("a.jpg", guardadas.stream().filter(foto -> foto.principal()).findFirst().orElseThrow()
+                .nombreFichero(), "la principal es la elegida en la tabla: la primera por nombre");
+    }
+
+    /** El índice de la fila de esa referencia en la tabla de pieles (filas[i].*). */
+    private static int indiceDeFila(String tabla, String referencia) {
+        // La tabla pinta modelo y piel por separado; la referencia entera va en
+        // la etiqueta accesible de la casilla de incluir, que lleva su filas[i].
+        int posicion = tabla.indexOf("aria-label=\"Incluir " + referencia + "\"");
+        assertTrue(posicion > 0, "la referencia está en la tabla: " + referencia);
+        String antes = tabla.substring(0, posicion);
+        int ultimo = antes.lastIndexOf("name=\"filas[");
+        return Integer.parseInt(antes.substring(ultimo + 12, antes.indexOf(']', ultimo)));
     }
 }
