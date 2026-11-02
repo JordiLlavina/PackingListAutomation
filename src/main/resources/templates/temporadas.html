@@ -6,23 +6,40 @@
 <main>
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
-    <div class="alerta error" th:if="${aviso}" th:text="${aviso}"></div>
 
-    <!-- Lo que ha entrado al catálogo al guardar la temporada. Un <dialog>
-         abierto desde el servidor: se ve nada más volver, sin JavaScript. -->
-    <dialog class="emergente" id="altaCatalogo" open th:if="${altaCatalogo}">
+    <!-- Lo que ha entrado al catálogo al guardar la temporada: una línea por
+         excel subido y, si se subieron fotos, cómo va su guardado (en segundo
+         plano: el script pregunta hasta que acaba). Un <dialog> abierto desde
+         el servidor: se ve nada más volver. -->
+    <dialog class="emergente" id="altaCatalogo" open th:if="${altas != null}">
         <h3>Artículos guardados en el catálogo</h3>
-        <p>
-            Se han guardado los artículos de la temporada
-            <strong th:text="${altaTemporada}">H26</strong>:
-            <span th:text="${altaCatalogo.articulos}">38</span> artículos
-            (<span th:text="${altaCatalogo.articulosNuevos}">12</span> nuevos,
-            <span th:text="${altaCatalogo.modelosNuevos}">4</span> modelos nuevos)
-            y <span th:text="${altaCatalogo.colores}">13</span> colores
-            (<span th:text="${altaCatalogo.coloresNuevos}">2</span> nuevos en la tabla de colores).
+        <p th:if="${#lists.isEmpty(altas)}">
+            Guardada la temporada <strong th:text="${altaTemporada}">H26</strong>.
         </p>
-        <ul class="ayuda" th:if="${!#lists.isEmpty(altaCatalogo.avisos)}">
-            <li th:each="unAviso : ${altaCatalogo.avisos}" th:text="${unAviso}"></li>
+        <div class="alta-excel" th:each="unaAlta : ${altas}">
+            <p>
+                <strong th:text="${unaAlta.origen}">Excel de Pedido de Cliente</strong>
+                de la temporada <strong th:text="${altaTemporada}">H26</strong>:
+                <span th:text="${unaAlta.alta.articulos}">38</span> artículos
+                (<span th:text="${unaAlta.alta.articulosNuevos}">12</span> nuevos,
+                <span th:text="${unaAlta.alta.modelosNuevos}">4</span> modelos nuevos)
+                y <span th:text="${unaAlta.alta.colores}">13</span> colores
+                (<span th:text="${unaAlta.alta.coloresNuevos}">2</span> nuevos en la tabla de colores)<span
+                    th:if="${unaAlta.alta.pielesNombradas > 0}">; <span
+                    th:text="${unaAlta.alta.pielesNombradas}">5</span> pieles han cogido su nombre</span>.
+            </p>
+            <ul class="ayuda" th:if="${!#lists.isEmpty(unaAlta.alta.avisos)}">
+                <li th:each="unAviso : ${unaAlta.alta.avisos}" th:text="${unAviso}"></li>
+            </ul>
+        </div>
+        <div class="estado-fotos" id="estadoFotos" th:if="${fotosAlta != null}"
+             th:attr="data-url=@{/temporadas/{id}/fotos(id=${altaTemporadaId})}">
+            <p><strong>Fotos:</strong> <span class="texto-fotos"
+                    th:text="|Guardando en el catálogo (${fotosAlta.hechas} de ${fotosAlta.total} preparadas)…|">…</span></p>
+            <ul class="ayuda avisos-fotos"></ul>
+        </div>
+        <ul class="alerta aviso lista-avisos" th:if="${avisosAlta != null and !#lists.isEmpty(avisosAlta)}">
+            <li th:each="unAviso : ${avisosAlta}" th:text="${unAviso}"></li>
         </ul>
         <div class="acciones-emergente">
             <form method="dialog"><button type="submit" class="secundario">Cerrar</button></form>
@@ -32,12 +49,99 @@
         </div>
     </dialog>
 
-    <section class="tarjeta">
+    <!-- Alta y edición en el mismo formulario, arriba del todo: es lo que se
+         viene a hacer aquí. Con ?editar=id sale cargado con esa temporada y
+         un fichero sin elegir deja el que ya estaba guardado. -->
+    <section class="tarjeta" id="formulario">
+        <h3 class="titulo-seccion" th:text="${editando} ? |Editar la temporada ${editando.temporada}| : 'Añadir una temporada'">
+            Añadir una temporada
+        </h3>
         <p class="ayuda">
-            El excel de una temporada es el mismo documento durante toda ella: el de pedido del
-            cliente (AMI, A.P.C.) o, para los demás clientes, el excel de producción de Puntotres.
-            Guardándolo aquí una vez, luego se elige en un desplegable en el packing list, en los
-            documentos del corte y en el catálogo, y sus artículos entran solos al catálogo de modelos.
+            Los excels y las fotos de una temporada se guardan aquí una vez. Luego se elige la
+            temporada en un desplegable en el packing list, en los documentos del corte y en las
+            etiquetas, y todo lo que traen entra solo al catálogo de modelos.
+        </p>
+
+        <form th:action="@{/temporadas}" method="post" enctype="multipart/form-data" id="formTemporada"
+              th:attr="data-guardado-pedido=${editando != null and editando.conPedido()},
+                       data-guardado-produccion=${editando != null and editando.conProduccion()}">
+            <input type="hidden" name="id" th:if="${editando}" th:value="${editando.id}">
+            <div class="fila-cliente">
+                <div>
+                    <label for="clienteTemporada">Cliente</label>
+                    <select id="clienteTemporada" name="cliente">
+                        <option th:each="entrada : ${clientes}"
+                                th:value="${entrada.key}" th:text="${entrada.value.nombre}"
+                                th:selected="${editando != null and entrada.key == editando.cliente}"
+                                th:attr="data-pedido=${conPedido[entrada.key]}"></option>
+                    </select>
+                </div>
+                <div>
+                    <label for="nombreTemporada">Temporada</label>
+                    <input type="text" id="nombreTemporada" name="temporada" placeholder="H26" required
+                           th:value="${editando?.temporada}">
+                </div>
+            </div>
+
+            <div class="excels-temporada">
+                <div class="fila-excel" id="filaPedido">
+                    <span class="marca-campo obligatorio">Obligatorio</span>
+                    <label for="excelPedido">Excel de Pedido de Cliente</label>
+                    <input type="file" id="excelPedido" name="pedido" accept=".xlsx">
+                    <span class="ayuda excel-guardado" th:if="${editando != null and editando.conPedido()}">
+                        Guardado:
+                        <a th:href="@{/temporadas/descargar/{id}(id=${editando.id})}"
+                           th:text="${editando.nombreFicheroPedido}">pedido.xlsx</a>.
+                        Sin elegir otro, se queda este.
+                    </span>
+                </div>
+                <div class="fila-excel" id="filaProduccion">
+                    <span class="marca-campo" id="marcaProduccion">Opcional</span>
+                    <label for="excelProduccion">Excel de Producción de Puntotres</label>
+                    <input type="file" id="excelProduccion" name="produccion" accept=".xlsx">
+                    <span class="ayuda excel-guardado" th:if="${editando != null and editando.conProduccion()}">
+                        Guardado:
+                        <a th:href="@{/temporadas/descargar/{id}/produccion(id=${editando.id})}"
+                           th:text="${editando.nombreFicheroProduccion}">produccion.xlsx</a>.
+                        Sin elegir otro, se queda este.
+                    </span>
+                </div>
+                <!-- Lo que de verdad sale de cada excel, por cliente. Ningún
+                     pedido trae el nombre de la piel: solo el excel de producción. -->
+                <p class="ayuda texto-cliente" data-texto-cliente="AMI">
+                    Con el excel de pedido se importan los modelos (también los cinturones), sus pieles
+                    (solo la referencia, como AL0103) y los colores con su nombre. El pedido de AMI no trae
+                    el nombre del bolso ni el de la piel: los dos salen del excel de producción.
+                </p>
+                <p class="ayuda texto-cliente" data-texto-cliente="APC">
+                    Con el excel de pedido se importan los modelos con su nombre, sus pieles (solo la
+                    referencia, como PXCBC) y los códigos de color (LZZ), sin su nombre. El nombre de la
+                    piel y el de los colores que aún no lo tienen salen del excel de producción.
+                </p>
+                <p class="ayuda texto-cliente" data-texto-cliente="GENERICO">
+                    Este cliente no tiene excel de pedido: se trabaja con el excel de producción, del que
+                    se importan los modelos con su nombre y sus colores.
+                </p>
+            </div>
+
+            <h4 class="subtitulo-temporada">
+                <span class="marca-campo">Opcional</span> Fotos de la temporada
+            </h4>
+            <div th:replace="~{fragmentos :: campoFotos}"></div>
+            <p class="ayuda">
+                <strong>Estructura</strong>: una carpeta con el nombre de la temporada y dentro una
+                subcarpeta por modelo, con la referencia completa o parcial del modelo (ULL712 o
+                ULL712.AL0103, F67008 o PXCBC-F67008). Dentro de cada subcarpeta, las fotos del modelo; la
+                que se llame <em>principal</em> es la que sale primero. Las fotos se guardan en el catálogo
+                y los documentos del corte las usan sin volver a subirlas.
+            </p>
+
+            <button type="submit" id="botonGuardar"
+                    th:text="${editando} ? 'Guardar cambios' : 'Añadir temporada'">Añadir temporada</button>
+            <a class="boton secundario" th:if="${editando}" th:href="@{/temporadas}">Cancelar</a>
+        </form>
+        <p id="avisoSubiendo" class="aviso-procesando" hidden>
+            Subiendo… con muchas fotos tarda un rato; no cierres la página.
         </p>
     </section>
 
@@ -45,86 +149,127 @@
         <h3 class="titulo-seccion">Temporadas guardadas</h3>
 
         <p class="ayuda" th:if="${#lists.isEmpty(temporadas)}">
-            Todavía no hay ninguna. Añade la primera aquí abajo.
+            Todavía no hay ninguna. Añade la primera aquí arriba.
         </p>
 
-        <div class="temporada-guardada" th:each="temporada : ${temporadas}">
-            <form th:action="@{/temporadas}" method="post" enctype="multipart/form-data"
-                  class="form-temporada">
-                <input type="hidden" name="id" th:value="${temporada.id}">
-                <label>Cliente
-                    <select name="cliente">
-                        <option th:each="entrada : ${clientes}"
-                                th:value="${entrada.key}" th:text="${entrada.value.nombre}"
-                                th:selected="${entrada.key == temporada.cliente}"></option>
-                    </select>
-                </label>
-                <label>Temporada
-                    <input type="text" name="temporada" th:value="${temporada.temporada}" required>
-                </label>
-                <label>Sustituir
-                    <input type="file" name="pedido" accept=".xlsx">
-                </label>
-                <button type="submit" class="mini">Guardar</button>
-            </form>
+        <div class="temporada-guardada" th:each="temporada : ${temporadas}"
+             th:classappend="${editando != null and editando.id == temporada.id} ? 'editandose'">
+            <span class="temporada-nombre">
+                <strong th:text="${temporada.temporada}">H26</strong>
+                <span class="texto-suave"
+                      th:text="${clientes[temporada.cliente] != null} ? ${clientes[temporada.cliente].nombre} : ${temporada.cliente}">AMI</span>
+            </span>
+            <a class="boton secundario boton-fila" th:href="@{/temporadas(editar=${temporada.id})} + '#formulario'">Editar</a>
+            <a class="boton secundario boton-fila"
+               th:href="@{/catalogo(cliente=${temporada.cliente}, temporada=${temporada.id})}">Ver en el catálogo</a>
             <form th:action="@{/temporadas/borrar}" method="post" class="form-borrar">
                 <input type="hidden" name="id" th:value="${temporada.id}">
-                <button type="submit" class="mini"
-                        onclick="return confirm('¿Borrar esta temporada? Se borra también su excel. Los modelos del catálogo se quedan.')">Borrar</button>
+                <button type="submit" class="secundario boton-fila"
+                        onclick="return confirm('¿Borrar esta temporada? Se borran también sus excels. Los modelos del catálogo y sus fotos se quedan.')">Borrar</button>
             </form>
-            <!-- Pie de la fila, siempre debajo de los campos: el nombre del excel
-                 mide lo que mide y entre los campos descolocaba todo lo demás.
-                 Se puede descargar para comprobar cuál es el que hay dentro, que
-                 el nombre del fichero no siempre lo dice. -->
+            <!-- Pie de la fila, siempre debajo: el nombre de un excel mide lo
+                 que mide y entre los botones descolocaba todo lo demás. Se
+                 pueden descargar para comprobar cuál es el que hay dentro. -->
             <p class="ayuda pie-temporada">
                 <span>Última vez: <span th:text="${#temporals.format(temporada.fechaActualizacion, 'dd/MM/yyyy')}"></span></span>
-                <span th:text="${temporada.tipoExcel.name() == 'PEDIDO'} ? 'Excel de pedido del cliente:' : 'Excel de producción de Puntotres:'">Excel:</span>
-                <a class="fichero-guardado"
-                   th:href="@{/temporadas/descargar/{id}(id=${temporada.id})}"
-                   th:text="${temporada.nombreFichero}">pedido.xlsx</a>
+                <span th:if="${temporada.conPedido() or conPedido[temporada.cliente] == true}">Pedido:
+                    <a class="fichero-guardado" th:if="${temporada.conPedido()}"
+                       th:href="@{/temporadas/descargar/{id}(id=${temporada.id})}"
+                       th:text="${temporada.nombreFicheroPedido}">pedido.xlsx</a>
+                    <span th:unless="${temporada.conPedido()}">falta</span>
+                </span>
+                <span>Producción:
+                    <a class="fichero-guardado" th:if="${temporada.conProduccion()}"
+                       th:href="@{/temporadas/descargar/{id}/produccion(id=${temporada.id})}"
+                       th:text="${temporada.nombreFicheroProduccion}">produccion.xlsx</a>
+                    <span th:unless="${temporada.conProduccion()}">sin adjuntar</span>
+                </span>
             </p>
         </div>
-    </section>
-
-    <section class="tarjeta">
-        <h3 class="titulo-seccion">Añadir una temporada</h3>
-        <form th:action="@{/temporadas}" method="post" enctype="multipart/form-data"
-              class="form-temporada">
-            <label for="clienteNuevo">Cliente
-                <select id="clienteNuevo" name="cliente">
-                    <option th:each="entrada : ${clientes}"
-                            th:value="${entrada.key}" th:text="${entrada.value.nombre}"
-                            th:attr="data-tipo=${tiposExcel[entrada.key]}"></option>
-                </select>
-            </label>
-            <label for="temporadaNueva">Temporada
-                <input type="text" id="temporadaNueva" name="temporada" placeholder="H26" required>
-            </label>
-            <label for="pedidoNuevo"><span id="rotuloExcel">Excel de pedido del cliente</span>
-                <input type="file" id="pedidoNuevo" name="pedido" accept=".xlsx" required>
-            </label>
-            <button type="submit">Añadir</button>
-        </form>
     </section>
 
     <p class="menu-ajustes">
         <a class="boton secundario" th:href="@{/packing-list}">← Volver</a>
     </p>
 
+    <script th:src="@{/campo-fotos.js}"></script>
     <script>
-        // El rótulo del fichero sigue al cliente: un genérico guarda el excel de
-        // producción de Puntotres, no un pedido. El tipo lo decide el servidor
-        // por el cliente; esto solo lo dice.
+        // Qué excel es obligatorio y qué texto de ayuda sale lo dice el
+        // cliente: con excel de pedido (AMI, APC) el obligatorio es el pedido
+        // y el de producción es opcional; sin él (genéricos) el obligatorio es
+        // el de producción y el del pedido no se ofrece. El servidor lo vuelve
+        // a comprobar; esto solo lo enseña.
         (function () {
-            const cliente = document.getElementById('clienteNuevo');
-            const rotulo = document.getElementById('rotuloExcel');
+            const formulario = document.getElementById('formTemporada');
+            const cliente = document.getElementById('clienteTemporada');
+            const pedido = document.getElementById('excelPedido');
+            const produccion = document.getElementById('excelProduccion');
+            const marcaProduccion = document.getElementById('marcaProduccion');
+            const guardadoPedido = formulario.dataset.guardadoPedido === 'true';
+            const guardadoProduccion = formulario.dataset.guardadoProduccion === 'true';
+            const clienteInicial = cliente.value;
+
             function ajustar() {
                 const opcion = cliente.options[cliente.selectedIndex];
-                rotulo.textContent = opcion && opcion.dataset.tipo === 'PRODUCCION'
-                    ? 'Excel de producción de Puntotres' : 'Excel de pedido del cliente';
+                const conPedido = opcion && opcion.dataset.pedido === 'true';
+                // Lo guardado vale si sigue siendo del mismo cliente.
+                const mismoCliente = cliente.value === clienteInicial;
+                document.getElementById('filaPedido').hidden = !conPedido;
+                if (!conPedido) {
+                    pedido.value = '';
+                }
+                pedido.required = conPedido && !(guardadoPedido && mismoCliente);
+                produccion.required = !conPedido && !(guardadoProduccion && mismoCliente);
+                marcaProduccion.textContent = conPedido ? 'Opcional' : 'Obligatorio';
+                marcaProduccion.classList.toggle('obligatorio', !conPedido);
+                const texto = conPedido ? cliente.value : 'GENERICO';
+                document.querySelectorAll('.texto-cliente').forEach(function (parrafo) {
+                    parrafo.hidden = parrafo.dataset.textoCliente !== texto;
+                });
             }
+
             cliente.addEventListener('change', ajustar);
             ajustar();
+
+            formulario.addEventListener('submit', function () {
+                document.getElementById('avisoSubiendo').hidden = false;
+            });
+
+            // El emergente pregunta cómo van las fotos hasta que acaban.
+            const estado = document.getElementById('estadoFotos');
+            if (estado) {
+                const texto = estado.querySelector('.texto-fotos');
+                const avisos = estado.querySelector('.avisos-fotos');
+                (function preguntar() {
+                    fetch(estado.dataset.url).then(function (respuesta) {
+                        return respuesta.ok ? respuesta.json() : null;
+                    }).then(function (fotos) {
+                        if (!fotos) {
+                            texto.textContent = 'no se sabe cómo han ido: la aplicación se ha reiniciado. '
+                                + 'Míralo en el catálogo.';
+                            return;
+                        }
+                        if (!fotos.terminada) {
+                            texto.textContent = 'Guardando en el catálogo (' + fotos.hechas + ' de '
+                                + fotos.total + ' preparadas)…';
+                            setTimeout(preguntar, 1500);
+                            return;
+                        }
+                        texto.textContent = fotos.guardadas === 0
+                            ? 'no se ha guardado ninguna.'
+                            : fotos.guardadas + (fotos.guardadas === 1 ? ' foto guardada' : ' fotos guardadas')
+                                + ' en el catálogo.';
+                        avisos.innerHTML = '';
+                        fotos.avisos.forEach(function (aviso) {
+                            const linea = document.createElement('li');
+                            linea.textContent = aviso;
+                            avisos.appendChild(linea);
+                        });
+                    }).catch(function () {
+                        setTimeout(preguntar, 3000);
+                    });
+                })();
+            }
         })();
     </script>
 </main>

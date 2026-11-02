@@ -4,8 +4,6 @@ import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -14,19 +12,25 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 
 /**
- * Una temporada de un cliente y el excel de pedido con el que se trabaja
- * durante toda ella.
+ * Una temporada de un cliente y los excels con los que se trabaja durante
+ * toda ella: el de PEDIDO del cliente y el de PRODUCCIÓN de Puntotres.
  *
- * Existe para no volver a subir el mismo fichero en cada envío: el pedido de
- * una temporada es el mismo documento durante meses, y quien prepara un envío
- * lo tiene que ir a buscar al disco cada vez. Guardarlo aquí lo convierte en
- * elegir la temporada en un desplegable.
+ * Existe para no volver a subir los mismos ficheros en cada envío: son el
+ * mismo documento durante meses, y quien prepara un envío los tiene que ir a
+ * buscar al disco cada vez. Guardarlos aquí lo convierte en elegir la
+ * temporada en un desplegable.
  *
- * El fichero se guarda entero en la base de datos y no como ruta a un fichero
- * del disco: una ruta se rompe en cuanto alguien mueve o renombra la carpeta,
- * y el fallo aparecería a mitad de un envío. Con la copia dentro, la base de
- * datos de {@code ./datos} se lleva de un ordenador a otro y las temporadas
- * viajan con ella.
+ * Cuál es obligatorio lo decide el cliente, no esta clase: los de
+ * {@code pedido-cliente} (AMI, APC) necesitan el de pedido y el de producción
+ * es opcional; los genéricos no tienen pedido y necesitan el de producción.
+ * Por eso los dos son opcionales aquí, y quien lee uno pregunta antes si está
+ * ({@link #tienePedido()}, {@link #tieneProduccion()}).
+ *
+ * Los ficheros se guardan enteros en la base de datos y no como ruta a un
+ * fichero del disco: una ruta se rompe en cuanto alguien mueve o renombra la
+ * carpeta, y el fallo aparecería a mitad de un envío. Con la copia dentro, la
+ * base de datos de {@code ./datos} se lleva de un ordenador a otro y las
+ * temporadas viajan con ella.
  *
  * La clave es un id generado y no cliente+temporada: así se puede corregir el
  * nombre de una temporada mal tecleada sin borrarla y volver a subir el excel.
@@ -54,17 +58,19 @@ public class TemporadaGuardada {
     @Column(name = "temporada", length = 60, nullable = false)
     private String temporada;
 
-    @Column(name = "nombre_fichero", length = 255, nullable = false)
-    private String nombreFichero;
+    @Column(name = "nombre_fichero_pedido", length = 255)
+    private String nombreFicheroPedido;
 
     @Lob
-    @Column(name = "excel", nullable = false)
-    private byte[] excel;
+    @Column(name = "excel_pedido")
+    private byte[] excelPedido;
 
-    /** Qué excel es: el de pedido del cliente o el de producción de Puntotres (ver TipoExcelTemporada). */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "tipo_excel", length = 20, nullable = false)
-    private TipoExcelTemporada tipoExcel;
+    @Column(name = "nombre_fichero_produccion", length = 255)
+    private String nombreFicheroProduccion;
+
+    @Lob
+    @Column(name = "excel_produccion")
+    private byte[] excelProduccion;
 
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
@@ -73,18 +79,16 @@ public class TemporadaGuardada {
         // Constructor para JPA.
     }
 
-    public TemporadaGuardada(String cliente, String temporada, String nombreFichero, byte[] excel) {
-        this(cliente, temporada, nombreFichero, excel, TipoExcelTemporada.PEDIDO);
+    public TemporadaGuardada(String cliente, String temporada) {
+        this.cliente = cliente;
+        this.temporada = temporada;
+        this.fechaActualizacion = LocalDateTime.now();
     }
 
-    public TemporadaGuardada(String cliente, String temporada, String nombreFichero, byte[] excel,
-                             TipoExcelTemporada tipoExcel) {
-        this.cliente = cliente;
-        this.tipoExcel = tipoExcel;
-        this.temporada = temporada;
-        this.nombreFichero = nombreFichero;
-        this.excel = excel;
-        this.fechaActualizacion = LocalDateTime.now();
+    /** Con su excel de pedido: la forma de siempre de AMI y APC. */
+    public TemporadaGuardada(String cliente, String temporada, String nombreFichero, byte[] excel) {
+        this(cliente, temporada);
+        sustituirPedido(new FicheroExcel(nombreFichero, excel));
     }
 
     public Long getId() {
@@ -99,41 +103,67 @@ public class TemporadaGuardada {
         return temporada;
     }
 
-    public String getNombreFichero() {
-        return nombreFichero;
+    public String getNombreFicheroPedido() {
+        return nombreFicheroPedido;
     }
 
-    public byte[] getExcel() {
-        return excel;
+    public byte[] getExcelPedido() {
+        return excelPedido;
     }
 
-    public TipoExcelTemporada getTipoExcel() {
-        return tipoExcel;
+    public String getNombreFicheroProduccion() {
+        return nombreFicheroProduccion;
+    }
+
+    public byte[] getExcelProduccion() {
+        return excelProduccion;
+    }
+
+    public boolean tienePedido() {
+        return excelPedido != null;
+    }
+
+    public boolean tieneProduccion() {
+        return excelProduccion != null;
     }
 
     public LocalDateTime getFechaActualizacion() {
         return fechaActualizacion;
     }
 
-    /**
-     * Corrige la temporada. Un excel nulo significa "deja el que ya tenía": en
-     * la pantalla se edita el nombre sin volver a subir el fichero, y perderlo
-     * por no haberlo readjuntado sería justo el trabajo que esto ahorra.
-     */
-    public void actualizar(String cliente, String temporada, String nombreFichero, byte[] excel) {
-        actualizar(cliente, temporada, nombreFichero, excel, this.tipoExcel);
-    }
-
-    /** Con el tipo: sigue al cliente, que es quien lo decide (un genérico guarda el excel de producción). */
-    public void actualizar(String cliente, String temporada, String nombreFichero, byte[] excel,
-                           TipoExcelTemporada tipoExcel) {
+    /** Corrige el cliente o el nombre; los excels se quedan como estaban. */
+    public void renombrar(String cliente, String temporada) {
         this.cliente = cliente;
         this.temporada = temporada;
-        this.tipoExcel = tipoExcel;
-        if (excel != null) {
-            this.nombreFichero = nombreFichero;
-            this.excel = excel;
+        this.fechaActualizacion = LocalDateTime.now();
+    }
+
+    /** Un fichero nulo no toca nada: en la pantalla, no adjuntar es "deja el que había". */
+    public void sustituirPedido(FicheroExcel fichero) {
+        if (fichero != null) {
+            this.nombreFicheroPedido = fichero.nombre();
+            this.excelPedido = fichero.bytes();
+            this.fechaActualizacion = LocalDateTime.now();
         }
+    }
+
+    /** Como {@link #sustituirPedido}, con el excel de producción. */
+    public void sustituirProduccion(FicheroExcel fichero) {
+        if (fichero != null) {
+            this.nombreFicheroProduccion = fichero.nombre();
+            this.excelProduccion = fichero.bytes();
+            this.fechaActualizacion = LocalDateTime.now();
+        }
+    }
+
+    /**
+     * Quita el excel de pedido. Solo pasa al llevar la temporada a un cliente
+     * genérico, que no tiene pedido: guardado, el packing list de ese cliente
+     * lo leería como pedido.
+     */
+    public void quitarPedido() {
+        this.nombreFicheroPedido = null;
+        this.excelPedido = null;
         this.fechaActualizacion = LocalDateTime.now();
     }
 }

@@ -12,14 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * El archivo de temporadas: qué temporadas hay guardadas de cada cliente y con
- * qué excel, para no volver a subirlo en cada envío.
+ * qué excels, para no volver a subirlos en cada envío.
  *
- * Hay dos clases de excel ({@link TipoExcelTemporada}): el de PEDIDO del
- * cliente (AMI, APC), que el packing list, las etiquetas y /colores leen como
- * pedido; y el de PRODUCCION de Puntotres, el de los clientes genéricos, que
- * solo saben leer el corte y el catálogo de modelos. Por eso hay dos
- * desplegables y dos formas de pedir una temporada "para el envío": los
- * sitios que leen el excel como pedido no deben ver una de producción.
+ * Una temporada guarda hasta dos excels: el de PEDIDO del cliente (AMI, APC),
+ * que el packing list, las etiquetas y /colores leen como pedido, y el de
+ * PRODUCCION de Puntotres (obligatorio en los genéricos, opcional en AMI y
+ * APC), que leen el corte y el catálogo de modelos. Por eso hay dos
+ * desplegables y varias formas de pedir una temporada "para el envío": los
+ * sitios que leen el excel como pedido no deben ver una sin pedido.
  */
 @Service
 public class ArchivoTemporadas {
@@ -35,19 +35,19 @@ public class ArchivoTemporadas {
         return repositorio.resumenes();
     }
 
-    /** Todas las de un cliente, de los dos tipos. */
+    /** Todas las de un cliente, tengan los excels que tengan. */
     public List<ResumenTemporada> de(String cliente) {
         return cliente == null ? List.of() : repositorio.resumenesDe(cliente);
     }
 
-    /** Solo las de tipo PEDIDO de un cliente: las que /colores puede leer. */
+    /** Solo las que tienen excel de pedido: las que /colores puede leer. */
     public List<ResumenTemporada> dePedido(String cliente) {
-        return de(cliente).stream().filter(ArchivoTemporadas::esDePedido).toList();
+        return de(cliente).stream().filter(ResumenTemporada::conPedido).toList();
     }
 
-    /** Agrupadas por clave de cliente, para el desplegable de la entrada. */
+    /** Las que tienen excel de pedido, agrupadas por clave de cliente. */
     public Map<String, List<ResumenTemporada>> porCliente() {
-        return agrupar(ArchivoTemporadas::esDePedido);
+        return agrupar(ResumenTemporada::conPedido);
     }
 
     private Map<String, List<ResumenTemporada>> agrupar(Predicate<ResumenTemporada> filtro) {
@@ -63,21 +63,23 @@ public class ArchivoTemporadas {
 
     /**
      * Las temporadas de cada cliente tal como las necesita el desplegable de
-     * las pantallas que leen el excel como PEDIDO (packing list y etiquetas
-     * de artículo): id, nombre, fichero y tipo. Van al navegador como un mapa
-     * por cliente porque el desplegable se rehace al cambiar de cliente sin
-     * volver al servidor. Una sola copia para todas las pantallas: con una
-     * en cada controlador, un dato nuevo llega a unas y a otras no.
+     * las pantallas que leen el excel como PEDIDO (packing list, etiquetas de
+     * artículo, info de embalaje): solo las que lo tienen. Van al navegador
+     * como un mapa por cliente porque el desplegable se rehace al cambiar de
+     * cliente sin volver al servidor. Una sola copia para todas las
+     * pantallas: con una en cada controlador, un dato nuevo llega a unas y a
+     * otras no.
      */
     public Map<String, List<Map<String, String>>> paraElDesplegable() {
-        return paraElDesplegable(ArchivoTemporadas::esDePedido);
+        return paraElDesplegable(ResumenTemporada::conPedido);
     }
 
     /**
-     * Lo mismo con TODAS las temporadas, también las de producción: el corte
-     * sabe leer los dos excels (y con el de producción la temporada solo pone
-     * el nombre). Cada entrada lleva "tipo" para que la pantalla aparte las
-     * de producción cuando el origen elegido es el excel de pedido.
+     * Lo mismo con TODAS las temporadas, también las que no tienen pedido: el
+     * corte sabe leer los dos excels. Cada entrada lleva "pedido" y
+     * "produccion" ("true"/"false"), que dicen qué excels guarda, para que la
+     * pantalla aparte las que no sirven con el origen elegido y esconda el
+     * campo del fichero que ya está guardado.
      */
     public Map<String, List<Map<String, String>>> paraElDesplegableDelCorte() {
         return paraElDesplegable(temporada -> true);
@@ -91,8 +93,11 @@ public class ArchivoTemporadas {
                 Map<String, String> datos = new LinkedHashMap<>();
                 datos.put("id", String.valueOf(temporada.id()));
                 datos.put("temporada", temporada.temporada());
-                datos.put("fichero", temporada.nombreFichero());
-                datos.put("tipo", temporada.tipoExcel().name());
+                datos.put("fichero", temporada.conPedido() ? temporada.nombreFicheroPedido() : "");
+                datos.put("ficheroProduccion",
+                        temporada.conProduccion() ? temporada.nombreFicheroProduccion() : "");
+                datos.put("pedido", String.valueOf(temporada.conPedido()));
+                datos.put("produccion", String.valueOf(temporada.conProduccion()));
                 lista.add(datos);
             }
             porCliente.put(cliente, lista);
@@ -100,16 +105,16 @@ public class ArchivoTemporadas {
         return porCliente;
     }
 
-    /** La temporada con su excel, para descargarla o editarla. */
+    /** La temporada con sus excels, para descargarlos o editarla. */
     public Optional<TemporadaGuardada> conFichero(Long id) {
         return id == null ? Optional.empty() : repositorio.findById(id);
     }
 
     /**
      * La temporada elegida en la pantalla de entrada, solo si es de ese
-     * cliente, sea del tipo que sea. Vale para quien solo necesita su NOMBRE
-     * (el corte con el excel de producción); quien va a leer el excel como
-     * pedido usa {@link #conPedidoParaElEnvio}.
+     * cliente, tenga los excels que tenga. Vale para quien solo necesita su
+     * NOMBRE; quien va a leer un excel usa {@link #conPedidoParaElEnvio} o
+     * {@link #conProduccionParaElEnvio}.
      *
      * La comprobación del cliente no es paranoia: el desplegable se rellena en
      * el navegador y cambiar de cliente después de haber elegido temporada
@@ -123,13 +128,18 @@ public class ArchivoTemporadas {
     }
 
     /**
-     * Como {@link #paraElEnvio}, y además solo si su excel es el de PEDIDO del
-     * cliente: un excel de producción leído como pedido no daría error, daría
-     * un documento plausible y equivocado.
+     * Como {@link #paraElEnvio}, y además solo si guarda el excel de PEDIDO
+     * del cliente: una temporada de un genérico no lo tiene, y leer en su
+     * lugar el de producción como pedido no daría error, daría un documento
+     * plausible y equivocado.
      */
     public Optional<TemporadaGuardada> conPedidoParaElEnvio(Long id, String cliente) {
-        return paraElEnvio(id, cliente)
-                .filter(temporada -> temporada.getTipoExcel() == TipoExcelTemporada.PEDIDO);
+        return paraElEnvio(id, cliente).filter(TemporadaGuardada::tienePedido);
+    }
+
+    /** Como {@link #paraElEnvio}, y además solo si guarda el excel de producción de Puntotres. */
+    public Optional<TemporadaGuardada> conProduccionParaElEnvio(Long id, String cliente) {
+        return paraElEnvio(id, cliente).filter(TemporadaGuardada::tieneProduccion);
     }
 
     /**
@@ -143,28 +153,35 @@ public class ArchivoTemporadas {
                 .isPresent();
     }
 
-    /** Alta o corrección de una temporada de PEDIDO; ver la versión con tipo. */
+    /** Alta o corrección con solo el excel de pedido; ver la versión con los dos. */
     @Transactional
     public TemporadaGuardada guardar(Long id, String cliente, String temporada,
                                      String nombreFichero, byte[] excel) {
-        return guardar(id, cliente, temporada, nombreFichero, excel, TipoExcelTemporada.PEDIDO);
+        return guardar(id, cliente, temporada,
+                excel == null ? null : new FicheroExcel(nombreFichero, excel), null);
     }
 
     /**
-     * Alta o corrección. Un {@code id} nulo da de alta; un {@code excel} nulo
-     * conserva el que ya tuviera (se editó el nombre, no el fichero). El tipo
-     * lo fija el cliente (con pedido-cliente, PEDIDO; si no, PRODUCCION) y
-     * sigue al cliente también al editar.
+     * Alta o corrección. Un {@code id} nulo da de alta; un fichero nulo
+     * conserva el que ya tuviera (se editó el nombre, o solo se adjuntó el
+     * otro excel). Qué excel es obligatorio lo comprueba quien llama: depende
+     * del cliente.
      */
     @Transactional
     public TemporadaGuardada guardar(Long id, String cliente, String temporada,
-                                     String nombreFichero, byte[] excel, TipoExcelTemporada tipo) {
-        Optional<TemporadaGuardada> existente = conFichero(id);
-        if (existente.isPresent()) {
-            existente.get().actualizar(cliente, temporada, nombreFichero, excel, tipo);
-            return existente.get();
-        }
-        return repositorio.save(new TemporadaGuardada(cliente, temporada, nombreFichero, excel, tipo));
+                                     FicheroExcel pedido, FicheroExcel produccion) {
+        TemporadaGuardada guardada = conFichero(id)
+                .orElseGet(() -> new TemporadaGuardada(cliente, temporada));
+        guardada.renombrar(cliente, temporada);
+        guardada.sustituirPedido(pedido);
+        guardada.sustituirProduccion(produccion);
+        return repositorio.save(guardada);
+    }
+
+    /** Quita el excel de pedido: la temporada ha pasado a un cliente que no tiene. */
+    @Transactional
+    public void quitarPedido(Long id) {
+        conFichero(id).ifPresent(TemporadaGuardada::quitarPedido);
     }
 
     @Transactional
@@ -172,9 +189,5 @@ public class ArchivoTemporadas {
         if (id != null) {
             repositorio.deleteById(id);
         }
-    }
-
-    private static boolean esDePedido(ResumenTemporada temporada) {
-        return temporada.tipoExcel() == TipoExcelTemporada.PEDIDO;
     }
 }

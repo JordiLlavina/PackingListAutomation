@@ -324,7 +324,7 @@ public class PackingListController {
                     + "el envío va sin excel de pedido");
             return new PedidoDeTemporada(null, null, avisos);
         }
-        return new PedidoDeTemporada(guardada.getExcel(), guardada.getNombreFichero(), avisos);
+        return new PedidoDeTemporada(guardada.getExcelPedido(), guardada.getNombreFicheroPedido(), avisos);
     }
 
     // --- Paso 2: revisión ---

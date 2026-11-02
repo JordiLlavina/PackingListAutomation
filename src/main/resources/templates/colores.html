@@ -53,7 +53,7 @@
                         <option value="">-- otra temporada --</option>
                         <option th:each="temporada : ${temporadas}" th:value="${temporada.id}"
                                 th:text="${temporada.temporada}"
-                                th:attr="data-fichero=${temporada.nombreFichero}"></option>
+                                th:attr="data-fichero=${temporada.nombreFicheroPedido}"></option>
                     </select>
                     <p class="ayuda" id="ayudaTemporadaGuardada"></p>
                 </div>

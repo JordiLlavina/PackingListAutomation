@@ -154,7 +154,8 @@ public class DocumentosCorteController {
                 return error(redirect, "El cliente '" + cliente + "' no está en el catálogo");
             }
             clienteCorte = servicio.reglasDeProduccion(cliente);
-            // La temporada guardada solo pone el nombre: su excel de pedido no se usa.
+            // La temporada guardada pone el nombre y, si lo guarda, el excel de
+            // producción; su excel de pedido no se usa aquí.
             Optional<TemporadaGuardada> guardada =
                     archivoTemporadas.paraElEnvio(temporadaGuardadaId, clienteCorte.clave());
             if (temporadaGuardadaId != null && guardada.isEmpty()) {
@@ -166,11 +167,18 @@ public class DocumentosCorteController {
             if (nombreTemporada.isBlank()) {
                 return error(redirect, "Falta el nombre de la temporada");
             }
-            if (produccion == null || produccion.isEmpty()) {
-                return error(redirect, "Sube el excel de producción de Puntotres");
+            // Un excel subido a mano manda sobre el guardado, como en el pedido.
+            boolean conExcel = produccion != null && !produccion.isEmpty();
+            Optional<byte[]> guardadoEnLaTemporada = guardada
+                    .filter(TemporadaGuardada::tieneProduccion)
+                    .map(TemporadaGuardada::getExcelProduccion);
+            if (!conExcel && guardadoEnLaTemporada.isEmpty()) {
+                return error(redirect, "Sube el excel de producción de Puntotres (o adjúntalo a la "
+                        + "temporada en Temporadas y ficheros, y no hará falta volver a subirlo)");
             }
             try {
-                deLaProduccion = ProduccionPuntotresExcel.leer(produccion.getBytes(), clienteCorte);
+                byte[] excel = conExcel ? produccion.getBytes() : guardadoEnLaTemporada.get();
+                deLaProduccion = ProduccionPuntotresExcel.leer(excel, clienteCorte);
             } catch (IllegalArgumentException e) {
                 return error(redirect, "No se pudo leer el excel de producción: " + e.getMessage());
             } catch (IOException | RuntimeException e) {
@@ -207,7 +215,7 @@ public class DocumentosCorteController {
                 return error(redirect, "Falta el nombre de la temporada");
             }
             try {
-                byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
+                byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcelPedido();
                 pedidoCorte = clienteCorte.leerPedido(excel);
             } catch (IllegalArgumentException e) {
                 return error(redirect, "No se pudo leer el excel de pedido: "

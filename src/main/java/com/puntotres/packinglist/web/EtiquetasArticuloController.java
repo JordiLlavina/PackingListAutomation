@@ -128,7 +128,7 @@ public class EtiquetasArticuloController {
 
         ResultadoEtiquetasArticulo resultado;
         try {
-            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
+            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcelPedido();
             resultado = generador.generar(excel, nombreTemporada);
         } catch (IllegalArgumentException e) {
             // Un excel que no es el que toca (sin hoja EAN, sin columna

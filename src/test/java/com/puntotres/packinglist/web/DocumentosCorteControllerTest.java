@@ -104,7 +104,7 @@ class DocumentosCorteControllerTest {
     }
 
     @Test
-    void laEntradaVaEnDosIslasConElIconoDePielYLaCarpetaYElZipEnUnaFila() throws Exception {
+    void laEntradaVaEnDosIslasConElIconoDePielYUnSoloCampoParaLaCarpetaOElZip() throws Exception {
         String pagina = mvc.perform(get("/documentos-corte"))
                 .andReturn().getResponse().getContentAsString();
 
@@ -115,13 +115,13 @@ class DocumentosCorteControllerTest {
         String islaFotos = pagina.substring(fotos);
         assertTrue(!islaFotos.substring(0, islaFotos.indexOf("</div>")).contains("<h3"),
                 "la isla de las fotos no lleva título");
-        assertTrue(islaFotos.contains("class=\"fila-fotos\"") && islaFotos.contains("id=\"carpeta\"")
-                && islaFotos.contains("id=\"fotos\""), "carpeta y zip en la misma fila");
+        assertTrue(islaFotos.contains("data-campo-fotos") && islaFotos.contains("name=\"carpeta\"")
+                && islaFotos.contains("name=\"fotos\""), "un solo campo que manda la carpeta o el zip");
         assertTrue(islaFotos.contains("<strong>Estructura</strong>: Una carpeta con el nombre de la "
                 + "temporada"), islaFotos);
         // Las fotos son opcionales y la pantalla lo dice antes de subir nada.
         assertTrue(islaFotos.contains("Carpeta de fotos de la temporada (opcional)")
-                && islaFotos.contains("Sin fotos salen solo las órdenes de corte"), islaFotos);
+                && islaFotos.contains("salen solo las órdenes de corte"), islaFotos);
     }
 
     @Test
@@ -232,6 +232,22 @@ class DocumentosCorteControllerTest {
 
         mvc.perform(get("/documentos-corte/pieles").session(sesion))
                 .andExpect(content().string(containsString("SP27-GUARDADA")));
+    }
+
+    /** Si la temporada guarda su excel de producción, no hace falta volver a subirlo. */
+    @Test
+    void conElExcelDeProduccionLaTemporadaQueLoGuardaNoPideSubirlo() throws Exception {
+        Long id = archivoTemporadas.guardar(null, "APC", "SP27-CON-PROD", null,
+                new com.puntotres.packinglist.persistence.FicheroExcel("prod.xlsx", produccionApc())).getId();
+
+        mvc.perform(multipart("/documentos-corte/cargar")
+                        .param("origen", "PRODUCCION").param("cliente", "APC")
+                        .param("temporadaGuardadaId", String.valueOf(id)).session(sesion))
+                .andExpect(redirectedUrl("/documentos-corte/pieles"));
+
+        mvc.perform(get("/documentos-corte/pieles").session(sesion))
+                .andExpect(content().string(containsString("SP27-CON-PROD")))
+                .andExpect(content().string(containsString("PXCBC-F67008")));
     }
 
     @Test

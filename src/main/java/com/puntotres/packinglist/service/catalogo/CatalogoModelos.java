@@ -34,7 +34,7 @@ import com.puntotres.packinglist.persistence.PielRepository;
 import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.persistence.TipoArticulo;
-import com.puntotres.packinglist.persistence.TipoExcelTemporada;
+import com.puntotres.packinglist.service.corte.ProduccionCorte;
 import com.puntotres.packinglist.service.corte.ArticuloCorte;
 import com.puntotres.packinglist.service.corte.ClienteCorte;
 import com.puntotres.packinglist.service.corte.ColorCorte;
@@ -165,12 +165,24 @@ public class CatalogoModelos {
         }
     }
 
-    /** Lo que ha pasado al meter un excel de temporada en el catálogo: para el aviso emergente. */
+    /**
+     * Lo que ha pasado al meter un excel de temporada en el catálogo: para el
+     * aviso emergente. {@code pielesNombradas}: pieles que no tenían nombre y
+     * lo han cogido del excel (solo el de producción lo trae).
+     */
     public record ResumenAlta(int articulos, int articulosNuevos, int modelosNuevos, int colores,
-                              int coloresNuevos, List<String> avisos) {
+                              int coloresNuevos, int pielesNombradas, List<String> avisos) {
+
+        /** Lo que da una temporada sin ese excel. */
+        public static final ResumenAlta NADA = new ResumenAlta(0, 0, 0, 0, 0, 0, List.of());
 
         public ResumenAlta {
             avisos = List.copyOf(avisos);
+        }
+
+        public ResumenAlta conPielesNombradas(int nombradas) {
+            return new ResumenAlta(articulos, articulosNuevos, modelosNuevos, colores, coloresNuevos, nombradas,
+                    avisos);
         }
     }
 
@@ -197,24 +209,56 @@ public class CatalogoModelos {
     // --- Alta automática desde el excel de una temporada ---
 
     /**
-     * Lee el excel de la temporada con el lector de su tipo —el pedido del
-     * cliente (entero, cinturones incluidos) o el excel de producción de
-     * Puntotres— y mete lo que trae en el catálogo. Lanza
-     * IllegalArgumentException o IOException si el excel no se deja leer;
-     * quien llama decide qué hacer (la pantalla guarda la temporada y avisa).
+     * Lee el excel de PEDIDO del cliente que guarda la temporada (entero,
+     * cinturones incluidos) y mete lo que trae en el catálogo. Sin excel de
+     * pedido no hace nada. Lanza IllegalArgumentException o IOException si el
+     * excel no se deja leer; quien llama decide qué hacer (la pantalla guarda
+     * la temporada y avisa).
      */
     @Transactional
-    public ResumenAlta incorporarTemporada(TemporadaGuardada temporada) throws IOException {
-        String cliente = temporada.getCliente();
-        PedidoCorte pedido;
-        if (temporada.getTipoExcel() == TipoExcelTemporada.PRODUCCION) {
-            pedido = ProduccionPuntotresExcel.leer(temporada.getExcel(), reglas.reglasDeProduccion(cliente)).pedido();
-        } else {
-            ClienteCorte lector = reglas.clientePara(cliente).orElseThrow(() -> new IllegalArgumentException(
-                    "El pedido de " + cliente + " todavía no se sabe leer"));
-            pedido = lector.pedidoEntero(temporada.getExcel());
+    public ResumenAlta incorporarPedido(TemporadaGuardada temporada) throws IOException {
+        if (!temporada.tienePedido()) {
+            return ResumenAlta.NADA;
         }
-        return incorporar(cliente, pedido, temporada.getId());
+        String cliente = temporada.getCliente();
+        ClienteCorte lector = reglas.clientePara(cliente).orElseThrow(() -> new IllegalArgumentException(
+                "El pedido de " + cliente + " todavía no se sabe leer"));
+        return incorporar(cliente, lector.pedidoEntero(temporada.getExcelPedido()), temporada.getId());
+    }
+
+    /**
+     * Lee el excel de PRODUCCIÓN de Puntotres que guarda la temporada y mete
+     * lo que trae en el catálogo, como {@link #incorporarPedido}. Además pone
+     * nombre a las pieles que no lo tienen, con lo escrito en la columna PIEL:
+     * es el único sitio de donde sale, porque ningún pedido de cliente lo
+     * trae. Solo rellena huecos: un nombre tecleado en /colores o en el corte
+     * no se pisa.
+     */
+    @Transactional
+    public ResumenAlta incorporarProduccion(TemporadaGuardada temporada) throws IOException {
+        if (!temporada.tieneProduccion()) {
+            return ResumenAlta.NADA;
+        }
+        String cliente = clave(temporada.getCliente());
+        ProduccionCorte produccion = ProduccionPuntotresExcel.leer(temporada.getExcelProduccion(),
+                reglas.reglasDeProduccion(cliente));
+        ResumenAlta alta = incorporar(cliente, produccion.pedido(), temporada.getId());
+        int nombradas = 0;
+        for (Map.Entry<String, String> deLaReferencia : produccion.pielDe().entrySet()) {
+            String nombre = deLaReferencia.getValue() == null ? ""
+                    : deLaReferencia.getValue().trim().toUpperCase(Locale.ROOT);
+            Articulo articulo = articulos.findById(new ArticuloId(cliente, clave(deLaReferencia.getKey())))
+                    .orElse(null);
+            if (nombre.isEmpty() || articulo == null || !articulo.tienePiel()) {
+                continue;
+            }
+            Piel piel = pieles.findById(new PielId(cliente, articulo.getRefPiel())).orElse(null);
+            if (piel != null && piel.getNombre().isEmpty()) {
+                piel.actualizar(nombre);
+                nombradas++;
+            }
+        }
+        return alta.conPielesNombradas(nombradas);
     }
 
     /**
@@ -285,7 +329,7 @@ public class CatalogoModelos {
             }
         }
         return new ResumenAlta(pedido.articulos().size(), articulosNuevos, modelosNuevos, coloresVistos.size(),
-                enLaTabla.anadidos().size(), pedido.avisos());
+                enLaTabla.anadidos().size(), 0, pedido.avisos());
     }
 
     // --- Los colores de un artículo (la piel, el forro y las combinaciones en cada color del bolso) ---
@@ -577,6 +621,33 @@ public class CatalogoModelos {
     @Transactional
     public void borrarModelo(String cliente, String codigo) {
         modelo(cliente, codigo).ifPresent(modelos::delete);
+    }
+
+    /** Lo que ha hecho {@link #quitarModelosDeTemporada}: para el mensaje de la pantalla. */
+    public record ModelosQuitados(int borrados, int desvinculados) {
+    }
+
+    /**
+     * Quita del catálogo los modelos de una temporada. Un modelo que SOLO va
+     * en esta temporada se borra entero (artículos, colores y fotos, por las
+     * FK del esquema); uno que también va en otra se queda y solo pierde el
+     * vínculo con esta, porque borrarlo vaciaría las otras temporadas sin
+     * que nadie lo pidiera.
+     */
+    @Transactional
+    public ModelosQuitados quitarModelosDeTemporada(String cliente, Long temporadaId) {
+        int borrados = 0;
+        int desvinculados = 0;
+        for (String codigo : codigosDeModeloEn(cliente, temporadaId)) {
+            if (temporadasDe(cliente, codigo).stream().allMatch(temporadaId::equals)) {
+                borrarModelo(cliente, codigo);
+                borrados++;
+            } else {
+                temporadasDeModelo.deleteById(new ModeloTemporadaId(clave(cliente), codigo, temporadaId));
+                desvinculados++;
+            }
+        }
+        return new ModelosQuitados(borrados, desvinculados);
     }
 
     /** Borra el artículo; sus colores caen con él (FK del esquema). El modelo se queda aunque sea el último. */

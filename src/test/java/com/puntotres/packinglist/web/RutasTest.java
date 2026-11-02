@@ -102,6 +102,22 @@ class RutasTest {
     }
 
     @Test
+    void laTablaDelCatalogoTieneSuPropioScrollConLaCabeceraFija() throws Exception {
+        // Con un scroll solo horizontal (overflow-x) la cabecera sticky no se
+        // queda arriba y la barra horizontal sale al final de cientos de filas.
+        String css = new String(new org.springframework.core.io.ClassPathResource(
+                "static/estilo.css").getInputStream().readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8);
+
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.contains(".scroll-tabla { overflow: auto; max-height: calc(100vh"),
+                "la tabla hace scroll en su recuadro, con el alto de la ventana");
+        org.junit.jupiter.api.Assertions.assertTrue(
+                css.contains(".tabla-catalogo thead th { position: sticky; top: 0;"),
+                "la cabecera del catálogo se queda arriba");
+    }
+
+    @Test
     void elAmarilloDeLosPesosQueFaltanNoTineLaFilaEntera() throws Exception {
         // Si vuelve a ser "tr.pendiente td", tapa la banda de color del palet:
         // las dos reglas tienen la misma especificidad y esta va después. Y en

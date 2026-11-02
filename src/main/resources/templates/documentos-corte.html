@@ -104,16 +104,8 @@
       </div>
 
       <div class="tarjeta isla-fotos">
-        <div class="fila-fotos">
-            <div>
-                <label for="carpeta">Carpeta de fotos de la temporada (opcional)</label>
-                <input type="file" id="carpeta" name="carpeta" webkitdirectory multiple>
-            </div>
-            <div>
-                <label for="fotos">o la misma carpeta en zip</label>
-                <input type="file" id="fotos" name="fotos" accept=".zip">
-            </div>
-        </div>
+        <label class="rotulo-fotos">Carpeta de fotos de la temporada (opcional)</label>
+        <div th:replace="~{fragmentos :: campoFotos}"></div>
         <p class="ayuda">
             <strong>Estructura</strong>: Una carpeta con el nombre de la temporada, que contenga varias
             subcarpetas, una por modelo. Cada subcarpeta debe tener la referencia completa o parcial
@@ -121,7 +113,9 @@
             las fotos del modelo.
         </p>
         <p class="ayuda">
-            Sin fotos salen solo las órdenes de corte, con el hueco de la foto en blanco.
+            Sin subir fotos se usan las que el catálogo de modelos ya tenga de esos modelos (las que se
+            guardan con la temporada); si no tiene ninguna, salen solo las órdenes de corte, con el hueco
+            de la foto en blanco.
         </p>
       </div>
 
@@ -132,6 +126,7 @@
         Subiendo las fotos... con muchas tarda un rato; no cierres la página.
     </p>
 
+    <script th:src="@{/campo-fotos.js}"></script>
     <script th:inline="javascript">
         /*<![CDATA[*/
         const TEMPORADAS = /*[[${temporadasJs}]]*/ {};
@@ -154,13 +149,12 @@
             }
 
             // Con el excel de pedido solo valen las temporadas que guardan ese
-            // excel: una de producción leída como pedido daría un documento
-            // plausible y equivocado. Con el de producción la temporada solo
-            // pone el nombre, así que valen todas.
+            // excel: una sin él no tiene nada que leer como pedido. Con el de
+            // producción valen todas: ponen el nombre y, si lo guardan, el excel.
             function temporadasDelCliente() {
                 const todas = TEMPORADAS[cliente.value] || [];
                 return todas.filter(function (unaTemporada) {
-                    return !conPedido() || unaTemporada.tipo !== 'PRODUCCION';
+                    return !conPedido() || unaTemporada.pedido === 'true';
                 });
             }
 
@@ -207,14 +201,22 @@
                 const elegida = temporadasDelCliente().filter(function (unaTemporada) {
                     return String(unaTemporada.id) === guardada.value;
                 })[0];
+                // Con origen producción, una temporada que guarda su excel de
+                // producción ya lo trae: el campo del fichero sobra.
+                const conProduccionGuardada = !conPedido() && elegida && elegida.produccion === 'true';
                 document.getElementById('bloqueTemporada').style.display = elegida ? 'none' : '';
                 document.getElementById('bloquePedido').style.display = conPedido() && !elegida ? '' : 'none';
-                document.getElementById('bloqueProduccion').style.display = conPedido() ? 'none' : '';
-                ayuda.textContent = elegida && conPedido() ? 'Excel de pedido guardado: ' + elegida.fichero : '';
+                document.getElementById('bloqueProduccion').style.display =
+                    conPedido() || conProduccionGuardada ? 'none' : '';
+                ayuda.textContent = elegida && conPedido() ? 'Excel de pedido guardado: ' + elegida.fichero
+                    : conProduccionGuardada ? 'Excel de producción guardado: ' + elegida.ficheroProduccion : '';
                 // Lo escondido se enviaría igual y mandaría sin que se viera.
                 if (elegida) {
                     temporada.value = '';
                     pedido.value = '';
+                }
+                if (conProduccionGuardada) {
+                    produccion.value = '';
                 }
                 if (conPedido()) {
                     produccion.value = '';
@@ -236,19 +238,9 @@
                 rellenar();
             }
 
-            // Carpeta o zip, no los dos: elegir uno vacía el otro.
-            const carpeta = document.getElementById('carpeta');
-            const zip = document.getElementById('fotos');
-            carpeta.addEventListener('change', function () {
-                if (carpeta.files.length) {
-                    zip.value = '';
-                }
-            });
-            zip.addEventListener('change', function () {
-                if (zip.files.length) {
-                    carpeta.value = '';
-                }
-            });
+            // Carpeta o zip, uno u otro: lo resuelve el campo único (campo-fotos.js).
+            const carpeta = document.querySelector('#formCorte .cf-carpeta');
+            const zip = document.querySelector('#formCorte .cf-zip');
 
             document.querySelectorAll('#selectorOrigen .boton-formato').forEach(function (boton) {
                 boton.addEventListener('click', function () {

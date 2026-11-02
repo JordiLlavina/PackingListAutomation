@@ -1412,7 +1412,14 @@ main.catalogo { max-width: 100rem; }
 
 /* La tabla: un tbody por modelo, separado por un filete más fuerte; las
    celdas editables no tienen borde hasta que se entra en ellas. */
-.scroll-tabla { overflow-x: auto; }
+/* La tabla es su propio contenedor de scroll en los dos ejes y mide como
+   mucho el alto de la ventana: así la cabecera se queda fija arriba al bajar
+   (sticky dentro del contenedor) y la barra horizontal, que va al pie del
+   contenedor, está siempre a la vista en vez de al final de cientos de
+   filas. Con un scroll solo horizontal la cabecera sticky no funciona: el
+   contenedor no se mueve en vertical, se mueve la página. */
+.scroll-tabla { overflow: auto; max-height: calc(100vh - 1.5rem); }
+.tabla-catalogo thead th { position: sticky; top: 0; z-index: 3; }
 .tabla-catalogo { width: 100%; }
 .tabla-catalogo .oculta { display: none; }
 .tabla-catalogo tbody.modelo { border-top: 2px solid var(--borde-tarjeta-fuerte); }
@@ -1587,3 +1594,75 @@ main.catalogo { max-width: 100rem; }
 .comentario-form { align-items: flex-start; }
 .comentario-texto { flex: 1 1 24rem; }
 .comentario-form button { margin-top: 1.9rem; }
+
+/* --- Campo único de fotos de temporada (fragmento campoFotos) ---
+   Una zona punteada que acepta la carpeta o su zip soltados encima, y que al
+   pincharla abre el selector de carpeta; el zip tiene su enlace dentro. Se
+   ilumina al arrastrar encima y se queda con borde lleno cuando ya hay fotos
+   elegidas, para que se vea sin leer el texto. */
+.zona-fotos {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 1.2rem 1rem;
+    border: 2px dashed var(--borde-tarjeta-fuerte);
+    border-radius: 8px;
+    background: var(--superficie);
+    text-align: center;
+    cursor: pointer;
+}
+.zona-fotos:hover, .zona-fotos.encima { border-color: var(--acento); background: var(--acento-suave-fin); }
+.zona-fotos:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.campo-fotos.con-fotos .zona-fotos { border-style: solid; border-color: var(--ok-borde); }
+.zona-icono { width: 2rem; height: 2rem; color: var(--acento); }
+.zona-titulo { font-weight: 600; }
+.zona-detalle { font-size: 0.85rem; color: var(--texto-suave); }
+.zona-elegido { font-size: 0.9rem; color: var(--ok-borde); font-weight: 600; min-height: 1.2em; }
+button.enlace {
+    margin: 0; padding: 0; border: 0; background: none; color: var(--acento);
+    text-decoration: underline; font: inherit; cursor: pointer; box-shadow: none;
+}
+button.enlace:hover { background: none; color: var(--acento); }
+
+/* --- Pantalla de temporadas: formulario de alta y edición ---
+   Cada excel es una fila con su marca (Obligatorio en el color de acento,
+   Opcional en gris), su rótulo y su fichero; debajo, lo que se importa de
+   ellos según el cliente. Lo escondido con el atributo hidden tiene que
+   esconderse aunque la regla de la fila le dé display. */
+.excels-temporada [hidden], .temporada-guardada [hidden], #formTemporada [hidden] { display: none !important; }
+.excels-temporada { margin-top: 0.9rem; }
+.fila-excel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.8rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid var(--borde);
+}
+.fila-excel label { margin: 0; min-width: 16rem; }
+.fila-excel input[type="file"] { width: auto; flex: 0 1 22rem; margin: 0; }
+.fila-excel .excel-guardado { flex-basis: 100%; margin: 0 0 0 6.6rem; }
+.marca-campo {
+    display: inline-block;
+    min-width: 5.8rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--borde-tarjeta-fuerte);
+    color: var(--texto-suave);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+}
+.marca-campo.obligatorio { border-color: var(--acento); color: var(--acento); background: var(--acento-suave-ini); }
+.texto-cliente { margin-top: 0.7rem; }
+.subtitulo-temporada { display: flex; align-items: center; gap: 0.8rem; margin: 1.4rem 0 0.6rem; font-size: 1rem; }
+.temporada-guardada .boton-fila { margin: 0; padding: 0.35rem 0.8rem; font-size: 0.9rem; }
+.temporada-guardada .temporada-nombre { min-width: 14rem; display: flex; gap: 0.6rem; align-items: baseline; }
+.temporada-guardada .texto-suave { color: var(--texto-suave); }
+.temporada-guardada.editandose { background: var(--acento-suave-fin); }
+.alta-excel p { margin: 0.4rem 0; }
+.estado-fotos { margin-top: 0.6rem; }
+dialog.emergente .lista-avisos { margin-top: 0.8rem; padding: 0.6rem 0.8rem 0.6rem 1.8rem; }
+.quitar-temporada { margin: 0.6rem 0 0; }
+.quitar-temporada button { margin: 0; }

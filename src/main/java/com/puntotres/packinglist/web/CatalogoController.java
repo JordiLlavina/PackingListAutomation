@@ -33,6 +33,7 @@ import com.puntotres.packinglist.service.catalogo.CatalogoModelos.CampoArticulo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.CampoColor;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.CampoModelo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.Propagacion;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos.ModelosQuitados;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.TextosConocidos;
 import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
 import com.puntotres.packinglist.service.corte.DocumentosCorteService;
@@ -98,6 +99,8 @@ public class CatalogoController {
                 ? temporada : null;
         model.addAttribute("temporadas", delCliente);
         model.addAttribute("temporadaId", laTemporada);
+        model.addAttribute("nombreTemporada", delCliente.stream().filter(t -> t.id().equals(laTemporada))
+                .map(ResumenTemporada::temporada).findFirst().orElse(""));
         model.addAttribute("filas", elegido == null ? List.of() : filas(elegido, laTemporada));
         model.addAttribute("tamanos", taras.tamanosDeMayorAMenor());
         model.addAttribute("tipos", TipoArticulo.values());
@@ -219,6 +222,32 @@ public class CatalogoController {
         catalogo.borrarModelo(cliente, codigo);
         redirect.addFlashAttribute("mensaje", "Borrado el modelo " + codigo.trim().toUpperCase(Locale.ROOT)
                 + " con sus artículos, colores y fotos.");
+        return volver(cliente, temporada);
+    }
+
+    /**
+     * Quita del catálogo los modelos de una temporada: los que solo van en
+     * ella se borran enteros y los que también van en otra solo pierden el
+     * vínculo con esta (ver {@link CatalogoModelos#quitarModelosDeTemporada}).
+     */
+    @PostMapping("/catalogo/temporada/quitar-modelos")
+    public String quitarModelosDeTemporada(@RequestParam String cliente, @RequestParam Long temporada,
+                                           RedirectAttributes redirect) {
+        String nombre = temporadas.paraElEnvio(temporada, cliente.trim().toUpperCase(Locale.ROOT))
+                .map(guardada -> guardada.getTemporada()).orElse(null);
+        if (nombre == null) {
+            redirect.addFlashAttribute("mensajeError", "Esa temporada ya no existe o no es de este cliente.");
+            return volver(cliente, null);
+        }
+        ModelosQuitados quitados = catalogo.quitarModelosDeTemporada(cliente, temporada);
+        String mensaje = "Quitados los modelos de la temporada " + nombre + ": " + quitados.borrados()
+                + (quitados.borrados() == 1 ? " borrado" : " borrados") + " del catálogo";
+        if (quitados.desvinculados() > 0) {
+            mensaje += ", y " + quitados.desvinculados() + (quitados.desvinculados() == 1
+                    ? " que también va en otra temporada se queda en el catálogo, sin esta"
+                    : " que también van en otras temporadas se quedan en el catálogo, sin esta");
+        }
+        redirect.addFlashAttribute("mensaje", mensaje + ".");
         return volver(cliente, temporada);
     }
 

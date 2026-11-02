@@ -168,7 +168,7 @@ public class ColoresController {
         Map<String, String> colores = Map.of();
         Set<String> refsPiel = Set.of();
         try {
-            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcel();
+            byte[] excel = conExcel ? pedido.getBytes() : guardada.get().getExcelPedido();
             if (conColores) {
                 colores = lector.get().coloresDelPedido(excel);
             }

@@ -103,11 +103,37 @@ class CatalogoControllerTest {
     }
 
     @Test
+    void conUnaTemporadaElegidaSePuedenQuitarSusModelos() throws Exception {
+        TemporadaGuardada temporada = archivo.guardar(null, "AMI", "CAT-QUITAR-PANTALLA", "p.xlsx", new byte[] {1});
+        catalogo.incorporar("AMI", new PedidoCorte(List.of(new ArticuloCorte(
+                new ReferenciaCorte("ULL953.AL0001", "ULL953", "AL0001"),
+                List.of(new ColorCorte("001", "BLACK", 2)))), List.of()), temporada.getId());
+
+        mvc.perform(get("/catalogo").param("cliente", "AMI").param("temporada", String.valueOf(temporada.getId())))
+                .andExpect(content().string(containsString("Quitar los modelos de la temporada CAT-QUITAR-PANTALLA")));
+
+        mvc.perform(post("/catalogo/temporada/quitar-modelos")
+                        .param("cliente", "AMI").param("temporada", String.valueOf(temporada.getId())))
+                .andExpect(redirectedUrl("/catalogo?cliente=AMI&temporada=" + temporada.getId()))
+                .andExpect(flash().attribute("mensaje", containsString("1 borrado")));
+
+        assertTrue(catalogo.modelo("AMI", "ULL953").isEmpty());
+    }
+
+    @Test
+    void sinTemporadaElegidaNoSeOfreceQuitarModelos() throws Exception {
+        catalogo.asegurarArticulo("AMI", "ULL954.AL0001");
+
+        mvc.perform(get("/catalogo").param("cliente", "AMI"))
+                .andExpect(content().string(org.hamcrest.Matchers.not(containsString("quitar-modelos"))));
+    }
+
+    @Test
     void unaTemporadaDeOtroClienteNoFiltra() throws Exception {
         // El selector de cliente envía el formulario entero, con la temporada
         // del cliente anterior: esa no es de este y no puede dejar la tabla vacía.
-        TemporadaGuardada deOtro = archivo.guardar(null, "KAMI", "CAT-AJENA", "p.xlsx", new byte[] {1},
-                com.puntotres.packinglist.persistence.TipoExcelTemporada.PRODUCCION);
+        TemporadaGuardada deOtro = archivo.guardar(null, "KAMI", "CAT-AJENA", null,
+                new com.puntotres.packinglist.persistence.FicheroExcel("p.xlsx", new byte[] {1}));
         catalogo.asegurarArticulo("AMI", "ULL959.AL0001");
 
         MvcResult resultado = mvc.perform(get("/catalogo").param("cliente", "AMI")
