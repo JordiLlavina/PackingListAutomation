@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.service.embalaje;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,17 +10,23 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
 
+import org.apache.poi.openxml4j.opc.PackagePart;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFPicture;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
@@ -110,13 +117,27 @@ class InfoEmbalajeDocBuilderTest {
                 .findFirst().orElseThrow();
     }
 
-    /** La fila de la foto: la tabla de dos celdas cuya derecha empieza por el total. */
-    private static XWPFTableRow filaFotoYTotal(XWPFDocument doc) {
-        return doc.getTables().stream()
-                .map(t -> t.getRow(0))
-                .filter(f -> f.getTableCells().size() == 2
-                        && f.getCell(1).getText().startsWith("TOTAL "))
-                .findFirst().orElseThrow();
+    /** La fila de la cabecera: foto | artículo | QR, la primera tabla del documento. */
+    private static XWPFTableRow cabecera(XWPFDocument doc) {
+        return doc.getTables().get(0).getRow(0);
+    }
+
+    /** Las imágenes de una celda, también las de las tablas que lleva dentro (el marco del QR). */
+    private static List<XWPFPicture> imagenesEn(XWPFTableCell celda) {
+        List<XWPFPicture> imagenes = new ArrayList<>();
+        for (XWPFParagraph parrafo : celda.getParagraphs()) {
+            for (XWPFRun run : parrafo.getRuns()) {
+                imagenes.addAll(run.getEmbeddedPictures());
+            }
+        }
+        for (XWPFTable tabla : celda.getTables()) {
+            for (XWPFTableRow fila : tabla.getRows()) {
+                for (XWPFTableCell dentro : fila.getTableCells()) {
+                    imagenes.addAll(imagenesEn(dentro));
+                }
+            }
+        }
+        return imagenes;
     }
 
     private XWPFDocument abrir(DatosHojaEmbalaje datos, byte[] foto) throws Exception {
@@ -142,7 +163,7 @@ class InfoEmbalajeDocBuilderTest {
             String texto = texto(doc);
             for (String esperado : new String[] {
                     "A.P.C. · Spring 27 · TÁNGER",
-                    "Nº ENVÍO", "270", "NOTA ICSUITE", "12662", "FECHA", "02/11/2026",
+                    "Nº ENVÍO", "270", "NOTA ICSUITE", "12662",
                     "PXCBC-F67008", "LZZ NOIR", "SAC LE NEIGE ALPACA NOIR",
                     "60x40x40", "BOLSA DE TELA NEGRA", "GRABADO LOGO NIKEL",
                     "JAPAN", "4100132915", "DOUANES USA", "4100132811",
@@ -150,7 +171,7 @@ class InfoEmbalajeDocBuilderTest {
                     "TOTAL 520 UNIDADES",
                     "CAJA 1 A 12: 10 UDS", "CAJA 13: 8 UDS",
                     "CAJAS 14 A 20: 10 UDS", "CAJA 21: 3 UDS", "CAJA 22: 7 UDS",
-                    "COMENTARIOS", "SACAR LOS BOLSOS DEL SOBRE CON CUIDADO",
+                    "SACAR LOS BOLSOS DEL SOBRE CON CUIDADO",
                     "NO MEZCLAR COLORES"}) {
                 assertTrue(texto.contains(esperado), "falta en la hoja: " + esperado);
             }
@@ -212,14 +233,18 @@ class InfoEmbalajeDocBuilderTest {
     void lasSeccionesVaciasNoSalen() throws Exception {
         try (XWPFDocument doc = abrir(con(datosEjemplo(), "PARIS", "", "", "", ""), null)) {
             String texto = texto(doc);
-            assertFalse(texto.contains("COMENTARIOS"));
+            assertFalse(texto.contains("SACAR LOS BOLSOS"));
             assertFalse(texto.contains("Instrucción"));
             assertFalse(texto.contains("CAJA 1 A 12"));
+            assertEquals(3, doc.getTables().size(), "cabecera, embalaje y destinaciones; sin recuadro de comentarios");
+        }
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            assertEquals(4, doc.getTables().size(), "con comentarios, su recuadro es la cuarta tabla");
         }
     }
 
     @Test
-    void noLlevaTitulosDeSeccionSalvoComentarios() throws Exception {
+    void noLlevaTitulosDeSeccion() throws Exception {
         try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
             List<String> sueltos = parrafos(doc).stream().map(p -> p.getText().trim()).toList();
             String texto = texto(doc);
@@ -227,20 +252,38 @@ class InfoEmbalajeDocBuilderTest {
             assertFalse(sueltos.contains("EMBALAJE"), "sin título «EMBALAJE»");
             assertFalse(texto.contains("DESTINACIONES"));
             assertFalse(texto.contains("REPARTO EN CAJAS"));
-            assertTrue(sueltos.contains("COMENTARIOS"), "con comentarios, su título sí sale");
         }
     }
 
     @Test
-    void elTituloEsClienteTemporadaYTaller() throws Exception {
+    void noLlevaTituloDeComentarios() throws Exception {
         try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
-            XWPFTableCell izquierda = doc.getTables().get(0).getRow(0).getCell(0);
-            XWPFParagraph titulo = izquierda.getParagraphs().get(0);
+            List<String> sueltos = parrafos(doc).stream().map(p -> p.getText().trim()).toList();
+            assertFalse(sueltos.contains("COMENTARIOS"), "el recuadro de comentarios va sin título");
+            assertFalse(texto(doc).contains("COMENTARIOS"));
+            assertTrue(texto(doc).contains("SACAR LOS BOLSOS DEL SOBRE CON CUIDADO"), "el comentario sigue");
+        }
+    }
+
+    @Test
+    void noLlevaFecha() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), jpeg(40, 30))) {
+            String texto = texto(doc);
+            assertFalse(texto.contains("FECHA"));
+            assertFalse(Pattern.compile("\\d{2}/\\d{2}/\\d{4}").matcher(texto).find(), "ninguna fecha impresa");
+        }
+    }
+
+    @Test
+    void elTituloEsDeDoceSinNegrita() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            XWPFParagraph titulo = cabecera(doc).getCell(1).getParagraphs().get(0);
             assertEquals("A.P.C. · Spring 27 · TÁNGER", titulo.getText());
+            assertFalse(titulo.getRuns().isEmpty());
             for (XWPFRun run : titulo.getRuns()) {
-                assertEquals(22.0, run.getFontSizeAsDouble(), 0.01);
-                assertTrue(run.isBold());
-                assertEquals("000000", run.getColor());
+                assertEquals(12.0, run.getFontSizeAsDouble(), 0.01);
+                assertFalse(run.isBold());
+                assertEquals("404040", run.getColor());
             }
         }
     }
@@ -257,42 +300,107 @@ class InfoEmbalajeDocBuilderTest {
     }
 
     @Test
-    void laReferenciaYLasFichasVanJuntoAlQr() throws Exception {
-        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
-            XWPFTableRow cabecera = doc.getTables().get(0).getRow(0);
-            assertEquals(2, cabecera.getTableCells().size());
-            String izquierda = cabecera.getCell(0).getTextRecursively();
-            assertTrue(izquierda.contains("A.P.C. · Spring 27 · TÁNGER"));
-            assertTrue(izquierda.contains("PXCBC-F67008"));
-            assertTrue(izquierda.contains("LZZ NOIR"));
-            assertTrue(izquierda.contains("Nº ENVÍO"));
-            assertTrue(izquierda.contains("270"));
-            int imagenes = 0;
-            for (XWPFParagraph parrafo : cabecera.getCell(1).getParagraphs()) {
-                for (XWPFRun run : parrafo.getRuns()) {
-                    for (var imagen : run.getEmbeddedPictures()) {
-                        assertEquals("png", imagen.getPictureData().suggestFileExtension());
-                        imagenes++;
-                    }
-                }
+    void laCabeceraEsFotoInfoYQrEnUnaFila() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), jpeg(600, 800))) {
+            XWPFTableRow fila = cabecera(doc);
+            assertEquals(3, fila.getTableCells().size(), "foto | artículo | QR");
+
+            List<XWPFPicture> foto = imagenesEn(fila.getCell(0));
+            assertEquals(1, foto.size(), "la foto, arriba a la izquierda");
+            assertEquals("jpeg", foto.get(0).getPictureData().suggestFileExtension());
+
+            String articulo = fila.getCell(1).getTextRecursively();
+            for (String esperado : new String[] {"A.P.C. · Spring 27 · TÁNGER", "PXCBC-F67008", "LZZ NOIR",
+                    "SAC LE NEIGE ALPACA NOIR", "Nº ENVÍO", "270", "NOTA ICSUITE", "12662"}) {
+                assertTrue(articulo.contains(esperado), "falta en el artículo: " + esperado);
             }
-            assertEquals(1, imagenes, "el QR, a la derecha");
+
+            List<XWPFPicture> qr = imagenesEn(fila.getCell(2));
+            assertEquals(1, qr.size(), "el QR, a la derecha");
+            assertEquals("png", qr.get(0).getPictureData().suggestFileExtension());
+            // En versalitas: POI devuelve el texto en mayúsculas, aunque en el XML esté tal cual.
+            assertTrue(fila.getCell(2).getTextRecursively().toLowerCase().contains("guide d'emballage du sac"));
+        }
+    }
+
+    @Test
+    void sinEnlaceLaCabeceraNoTieneColumnaDelQr() throws Exception {
+        try (XWPFDocument doc = abrir(con(datosEjemplo(), "PARIS", "X", "R", "C", ""), jpeg(40, 30))) {
+            XWPFTableRow fila = cabecera(doc);
+            assertEquals(2, fila.getTableCells().size(), "foto | artículo");
+            assertEquals(18.0, (fila.getCell(0).getWidth() + fila.getCell(1).getWidth()) / 567.0, 0.01,
+                    "el artículo se queda con el ancho del QR");
         }
     }
 
     @Test
     void sinFotoElHuecoDeLaFotoSeConserva() throws Exception {
         try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
-            XWPFTableRow fila = filaFotoYTotal(doc);
-            assertEquals(2, fila.getTableCells().size());
+            XWPFTableRow fila = cabecera(doc);
+            assertEquals(3, fila.getTableCells().size());
             XWPFTableCell foto = fila.getCell(0);
             assertEquals("", foto.getTextRecursively().trim());
-            assertTrue(foto.getParagraphs().stream().allMatch(p -> p.getRuns().stream()
-                    .allMatch(r -> r.getEmbeddedPictures().isEmpty())), "sin imagen");
-            assertTrue(foto.getWidth() >= 5 * 567, "conserva al menos los 5 cm de la foto");
-            assertTrue(fila.getCell(1).getTextRecursively().contains("Bolsa de tela"),
-                    "el embalaje va al lado del total");
+            assertTrue(imagenesEn(foto).isEmpty(), "sin imagen");
+            assertEquals(4.5, foto.getWidth() / 567.0, 0.01, "conserva los 4,5 cm de la columna de la foto");
+            assertTrue(fila.getCell(1).getTextRecursively().contains("PXCBC-F67008"),
+                    "el artículo no se corre a la izquierda");
         }
+    }
+
+    @Test
+    void laFuenteEsGentiumBasicYVaIncrustada() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            for (XWPFParagraph parrafo : parrafos(doc)) {
+                for (XWPFRun run : parrafo.getRuns()) {
+                    if (!run.text().isEmpty()) {
+                        assertEquals("Gentium Basic", run.getFontFamily(), "run «" + run.text() + "»");
+                    }
+                }
+            }
+            String estilos = doc.getStyle().getDocDefaults().xmlText();
+            assertTrue(estilos.contains("w:ascii=\"Gentium Basic\""), "fuente por defecto del documento");
+            assertTrue(doc.getSettings().getCTSettings().isSetEmbedTrueTypeFonts());
+
+            List<PackagePart> fuentes = doc.getPackage()
+                    .getPartsByContentType("application/vnd.openxmlformats-officedocument.obfuscatedFont");
+            assertEquals(2, fuentes.size(), "normal y negrita");
+
+            // La tabla de fuentes dice qué parte es la normal y con qué clave está ofuscada.
+            PackagePart tablaFuentes = doc.getPackagePart().getRelatedPart(doc.getPackagePart()
+                    .getRelationshipsByType(
+                            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable")
+                    .getRelationship(0));
+            String xml = new String(tablaFuentes.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            assertTrue(xml.contains("w:name=\"Gentium Basic\""));
+            Matcher normal = Pattern.compile("<w:embedRegular r:id=\"([^\"]+)\" w:fontKey=\"([^\"]+)\"").matcher(xml);
+            assertTrue(normal.find(), xml);
+            assertTrue(xml.contains("<w:embedBold "));
+            PackagePart parteNormal = tablaFuentes.getRelatedPart(tablaFuentes.getRelationship(normal.group(1)));
+            byte[] ofuscada = parteNormal.getInputStream().readAllBytes();
+
+            byte[] desofuscada = desofuscar(ofuscada, normal.group(2));
+            assertArrayEquals(new byte[] {0, 1, 0, 0}, Arrays.copyOf(desofuscada, 4),
+                    "desofuscada con su clave vuelve a ser un TrueType");
+            assertFalse(Arrays.equals(new byte[] {0, 1, 0, 0}, Arrays.copyOf(ofuscada, 4)), "y dentro va ofuscada");
+        }
+    }
+
+    /**
+     * La desofuscación de ECMA-376 parte 2, escrita aquí aparte para no
+     * comprobar el builder consigo mismo: los 16 bytes del GUID en orden
+     * inverso, XOR con los 32 primeros bytes.
+     */
+    private static byte[] desofuscar(byte[] fuente, String guid) {
+        String hex = guid.replaceAll("[{}-]", "");
+        byte[] guidBytes = new byte[16];
+        for (int i = 0; i < 16; i++) {
+            guidBytes[i] = (byte) Integer.parseInt(hex.substring(2 * i, 2 * i + 2), 16);
+        }
+        byte[] salida = fuente.clone();
+        for (int i = 0; i < 32; i++) {
+            salida[i] ^= guidBytes[15 - (i % 16)];
+        }
+        return salida;
     }
 
     @Test
@@ -371,15 +479,15 @@ class InfoEmbalajeDocBuilderTest {
     }
 
     @Test
-    void laFotoConservaLaProporcionYNoPasaDeCuatroCentimetrosDeAlto() throws Exception {
+    void laFotoConservaLaProporcionYNoPasaDeCincoCentimetrosDeAlto() throws Exception {
         try (XWPFDocument apaisada = abrir(datosEjemplo(), jpeg(800, 600));
              XWPFDocument vertical = abrir(datosEjemplo(), jpeg(600, 800))) {
             double[] a = medidaDeLaFotoEnCm(apaisada);
-            assertEquals(5.0, a[0], 0.01, "ancho de 5 cm");
-            assertEquals(3.75, a[1], 0.01, "proporción 4:3");
+            assertEquals(3.9, a[0], 0.01, "el ancho de la columna menos el hueco con el artículo");
+            assertEquals(3.9 * 3 / 4, a[1], 0.01, "proporción 4:3");
             double[] v = medidaDeLaFotoEnCm(vertical);
-            assertEquals(4.0, v[1], 0.01, "tope de alto");
-            assertEquals(3.0, v[0], 0.01, "se encoge entera, sin deformarse");
+            assertEquals(5.0, v[1], 0.01, "tope de alto");
+            assertEquals(3.75, v[0], 0.01, "se encoge entera, sin deformarse");
         }
     }
 
@@ -438,13 +546,14 @@ class InfoEmbalajeDocBuilderTest {
 
     /**
      * Deja {@code target/Info embalaje ejemplo.docx} para abrirlo en Word y
-     * revisar la maquetación a ojo, con una foto de relleno apaisada de móvil
-     * (4:3; en el repo no entra ninguna foto real) y el QR.
+     * revisar la maquetación a ojo, con una foto de relleno vertical de móvil
+     * (3:4, la que topa con el alto máximo; en el repo no entra ninguna foto
+     * real) y el QR.
      */
     @Test
     void dejaElEjemploEnTarget() throws Exception {
         Path fichero = dejarEnTarget("Info embalaje ejemplo",
-                builder.generar(masCargado(datosEjemplo().enlaceVideo()), jpeg(800, 600)));
+                builder.generar(masCargado(datosEjemplo().enlaceVideo()), jpeg(600, 800)));
         try (XWPFDocument doc = new XWPFDocument(Files.newInputStream(fichero))) {
             assertEquals(2, doc.getAllPictures().size());
         }
