@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Catálogo de modelos')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Catálogo de modelos')}"></header>
+<main class="catalogo">
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+    <div class="alerta error" th:if="${aviso}" th:text="${aviso}"></div>
+
+    <!-- Cabecera fija: cliente, buscador, temporada y las vistas por tarea. Las
+         vistas son el filtro de columnas principal: quien viene a cambiar los
+         bolsos por caja pulsa Packaging y no ve nada más. Debajo, las columnas
+         activas como chips quitables y un chip para añadir cualquier otra. -->
+    <section class="tarjeta catalogo-cabecera">
+        <form th:action="@{/catalogo}" method="get" class="fila-filtros" id="formFiltros">
+            <label>Cliente
+                <select name="cliente" id="cliente" class="selector-cliente" onchange="this.form.submit()">
+                    <option value="" th:selected="${cliente == null}">-- elige --</option>
+                    <option th:each="entrada : ${clientes}" th:value="${entrada.key}" th:text="${entrada.value}"
+                            th:selected="${entrada.key == cliente}"></option>
+                </select>
+            </label>
+            <label>Buscar
+                <input type="search" id="buscar" placeholder="Referencia, modelo, nombre o piel" autocomplete="off">
+            </label>
+            <label>Temporada
+                <select name="temporada" id="temporada" onchange="this.form.submit()">
+                    <option value="" th:selected="${temporadaId == null}">Todas</option>
+                    <option th:each="t : ${temporadas}" th:value="${t.id}" th:text="${t.temporada}"
+                            th:selected="${t.id == temporadaId}"></option>
+                </select>
+            </label>
+            <div class="vistas" role="group" aria-label="Vistas">
+                <button type="button" data-vista="packaging">Packaging</button>
+                <button type="button" data-vista="corte">Corte</button>
+                <button type="button" data-vista="fotos">Fotos</button>
+                <button type="button" data-vista="todo">Todo</button>
+                <button type="button" data-vista="personalizada" hidden>Personalizada</button>
+            </div>
+        </form>
+        <div class="chips" id="columnasActivas">
+            <div class="desplegable-columnas" id="desplegableColumnas" hidden>
+                <input type="search" id="buscarColumna" placeholder="Buscar columna" autocomplete="off">
+                <div id="listaColumnas"></div>
+            </div>
+        </div>
+        <p class="ayuda enlaces-catalogo" th:if="${cliente != null}">
+            Colores y nombres de piel en <a th:href="@{/colores(cliente=${cliente})}">Colores y Pieles</a>;
+            temporadas en <a th:href="@{/temporadas}">Temporadas</a>.
+        </p>
+    </section>
+
+    <section class="tarjeta" th:if="${cliente == null}">
+        <p class="ayuda">Elige un cliente para ver su catálogo.</p>
+    </section>
+
+    <section class="tarjeta" th:if="${cliente != null and #lists.isEmpty(filas)}">
+        <p class="ayuda" th:if="${temporadaId == null}">
+            Este cliente no tiene modelos todavía. Guarda una temporada con su excel en
+            <a th:href="@{/temporadas}">Temporadas</a>, o añade un modelo aquí abajo.
+        </p>
+        <p class="ayuda" th:if="${temporadaId != null}">Ningún modelo ha ido en esa temporada.</p>
+    </section>
+
+    <section class="tarjeta tabla-catalogo-tarjeta" th:if="${cliente != null and !#lists.isEmpty(filas)}">
+        <datalist id="forros"><option th:each="f : ${forrosConocidos}" th:value="${f}"></option></datalist>
+        <datalist id="combinaciones"><option th:each="c : ${combinacionesConocidas}" th:value="${c}"></option></datalist>
+        <div class="scroll-tabla">
+        <table class="tabla-catalogo" id="tablaCatalogo">
+            <thead>
+            <tr>
+                <th data-col="foto">Foto</th>
+                <th data-col="modelo">Modelo</th>
+                <th data-col="nombre">Nombre</th>
+                <th data-col="tipo">Tipo</th>
+                <th data-col="temporadas">Temporadas</th>
+                <th data-col="nfotos">Fotos</th>
+                <th data-col="referencia">Referencia</th>
+                <th data-col="piel">Piel</th>
+                <th data-col="nombrePiel">Nombre piel</th>
+                <th data-col="forro">Forro</th>
+                <th data-col="comb1">Comb. 1</th>
+                <th data-col="comb2">Comb. 2</th>
+                <th data-col="comb3">Comb. 3</th>
+                <th data-col="comb4">Comb. 4</th>
+                <th data-col="carton">Cartón</th>
+                <th data-col="unidades">Uds/caja</th>
+                <th data-col="peso">Peso neto caja llena (kg)</th>
+                <th data-col="acciones"></th>
+            </tr>
+            </thead>
+            <tbody class="modelo" th:each="fila : ${filas}" th:attr="data-modelo=${fila.codigoModelo},
+                   data-buscar=${#strings.toUpperCase(fila.codigoModelo + ' ' + fila.nombre + ' '
+                       + #strings.listJoin(fila.articulos.![referencia + ' ' + nombrePiel], ' '))}">
+                <!-- El modelo no tiene artículos: una fila para poder verlo y darle el primero. -->
+                <tr th:if="${#lists.isEmpty(fila.articulos)}">
+                    <td data-col="foto" class="c-foto" th:insert="~{catalogo-fragmentos :: celdaFoto(${fila})}"></td>
+                    <td data-col="modelo" class="c-modelo" th:text="${fila.codigoModelo}"></td>
+                    <td data-col="nombre" th:insert="~{catalogo-fragmentos :: celdaNombre(${fila})}"></td>
+                    <td data-col="tipo" th:insert="~{catalogo-fragmentos :: celdaTipo(${fila}, ${tipos})}"></td>
+                    <td data-col="temporadas" th:insert="~{catalogo-fragmentos :: celdaTemporadas(${fila})}"></td>
+                    <td data-col="nfotos" th:text="${fila.numeroFotos}"></td>
+                    <td colspan="11" class="ayuda">Sin artículos todavía: añade uno al pie con su referencia entera.</td>
+                    <td data-col="acciones" class="c-acciones">
+                        <form th:action="@{/catalogo/modelo/borrar}" method="post" class="en-linea">
+                            <input type="hidden" name="cliente" th:value="${cliente}">
+                            <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
+                            <input type="hidden" name="temporada" th:value="${temporadaId}">
+                            <button type="submit" class="mini" title="Borrar el modelo"
+                                    onclick="return confirm('¿Borrar el modelo y sus fotos?')">Borrar modelo</button>
+                        </form>
+                    </td>
+                </tr>
+                <th:block th:each="articulo, estado : ${fila.articulos}">
+                <tr th:attr="data-referencia=${articulo.referencia}">
+                    <th:block th:if="${estado.first}">
+                        <td data-col="foto" class="c-foto" th:rowspan="${#lists.size(fila.articulos)}"
+                            th:insert="~{catalogo-fragmentos :: celdaFoto(${fila})}"></td>
+                        <td data-col="modelo" class="c-modelo" th:rowspan="${#lists.size(fila.articulos)}"
+                            th:text="${fila.codigoModelo}"></td>
+                        <td data-col="nombre" th:rowspan="${#lists.size(fila.articulos)}"
+                            th:insert="~{catalogo-fragmentos :: celdaNombre(${fila})}"></td>
+                        <td data-col="tipo" th:rowspan="${#lists.size(fila.articulos)}"
+                            th:insert="~{catalogo-fragmentos :: celdaTipo(${fila}, ${tipos})}"></td>
+                        <td data-col="temporadas" th:rowspan="${#lists.size(fila.articulos)}"
+                            th:insert="~{catalogo-fragmentos :: celdaTemporadas(${fila})}"></td>
+                        <td data-col="nfotos" th:rowspan="${#lists.size(fila.articulos)}" th:text="${fila.numeroFotos}"></td>
+                    </th:block>
+                    <td data-col="referencia" class="c-referencia" th:text="${articulo.referencia}"></td>
+                    <td data-col="piel" th:text="${articulo.refPiel}"></td>
+                    <td data-col="nombrePiel">
+                        <a th:href="@{/colores(cliente=${cliente})}" th:text="${articulo.nombrePiel}"
+                           th:title="'Se edita en Colores y Pieles'"></a>
+                    </td>
+                    <td data-col="forro">
+                        <input type="text" class="celda" list="forros" th:value="${articulo.forro}"
+                               data-url="/catalogo/articulo/celda" data-campo="FORRO"
+                               th:attr="data-referencia=${articulo.referencia}, aria-label=|Forro de ${articulo.referencia}|">
+                        <span class="estado-celda" aria-live="polite"></span>
+                    </td>
+                    <td th:each="comb, i : ${articulo.combinaciones}" th:attr="data-col=|comb${i.count}|">
+                        <input type="text" class="celda" list="combinaciones" th:value="${comb}"
+                               data-url="/catalogo/articulo/celda" th:attr="data-campo=|COMBINACION${i.count}|,
+                               data-referencia=${articulo.referencia}, aria-label=|Combinación ${i.count} de ${articulo.referencia}|">
+                        <span class="estado-celda" aria-live="polite"></span>
+                    </td>
+                    <td data-col="carton">
+                        <select class="celda" data-url="/catalogo/articulo/celda" data-campo="MEDIDA_CAJA"
+                                th:attr="data-referencia=${articulo.referencia}, aria-label=|Cartón de ${articulo.referencia}|">
+                            <option value="" th:selected="${articulo.medidaCaja == ''}">--</option>
+                            <option th:if="${!articulo.medidaConTara}" th:value="${articulo.medidaCaja}"
+                                    th:selected="${true}" th:text="|${articulo.medidaCaja} (sin tara)|"></option>
+                            <option th:each="tamano : ${tamanos}" th:value="${tamano}"
+                                    th:selected="${tamano == articulo.medidaCaja}" th:text="${tamano}"></option>
+                        </select>
+                        <span class="estado-celda" aria-live="polite"></span>
+                    </td>
+                    <td data-col="unidades">
+                        <input type="number" min="1" class="celda c-numero" th:value="${articulo.unidadesPorCaja}"
+                               data-url="/catalogo/articulo/celda" data-campo="UNIDADES_POR_CAJA"
+                               th:attr="data-referencia=${articulo.referencia}, aria-label=|Unidades por caja de ${articulo.referencia}|">
+                        <span class="estado-celda" aria-live="polite"></span>
+                    </td>
+                    <td data-col="peso">
+                        <input type="text" inputmode="decimal" class="celda c-numero" th:value="${articulo.pesoNetoKg}"
+                               data-url="/catalogo/articulo/celda" data-campo="PESO_NETO_KG"
+                               th:attr="data-referencia=${articulo.referencia}, aria-label=|Peso neto de ${articulo.referencia}|">
+                        <span class="estado-celda" aria-live="polite"></span>
+                    </td>
+                    <td data-col="acciones" class="c-acciones">
+                        <button type="button" class="mini alternar-colores" th:attr="aria-controls=|colores-${estado.index}-${fila.codigoModelo}|"
+                                title="Colores de la piel, el forro y las combinaciones en cada color del bolso">▸ colores</button>
+                        <form th:action="@{/catalogo/articulo/borrar}" method="post" class="en-linea">
+                            <input type="hidden" name="cliente" th:value="${cliente}">
+                            <input type="hidden" name="referencia" th:value="${articulo.referencia}">
+                            <input type="hidden" name="temporada" th:value="${temporadaId}">
+                            <button type="submit" class="mini" title="Borrar el artículo"
+                                    onclick="return confirm('¿Borrar el artículo y sus colores?')">✕</button>
+                        </form>
+                    </td>
+                </tr>
+                <!-- Los colores de piel por color del bolso: una matriz que no cabe como
+                     columnas. Se despliega bajo su artículo. -->
+                <tr class="detalle-colores" hidden th:id="|colores-${estado.index}-${fila.codigoModelo}|">
+                    <td colspan="18">
+                        <table class="tabla-colores-articulo">
+                            <thead>
+                            <tr>
+                                <th>Color del bolso</th><th>Color piel</th><th>Color forro</th>
+                                <th>Color comb. 1</th><th>Color comb. 2</th><th>Color comb. 3</th><th>Color comb. 4</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr th:each="color : ${articulo.colores}">
+                                <td class="codigo-color">
+                                    <span th:text="${color.codigoColor}"></span>
+                                    <span class="texto-suave" th:if="${color.descripcion != ''}" th:text="${color.descripcion}"></span>
+                                </td>
+                                <td><input type="text" class="celda" th:value="${color.colorPiel}" data-url="/catalogo/color/celda"
+                                           data-campo="COLOR_PIEL" th:attr="data-referencia=${articulo.referencia}, data-codigo-color=${color.codigoColor}">
+                                    <span class="estado-celda"></span></td>
+                                <td><input type="text" class="celda" th:value="${color.colorForro}" data-url="/catalogo/color/celda"
+                                           data-campo="COLOR_FORRO" th:attr="data-referencia=${articulo.referencia}, data-codigo-color=${color.codigoColor}">
+                                    <span class="estado-celda"></span></td>
+                                <td th:each="cc, j : ${color.coloresCombinacion}">
+                                    <input type="text" class="celda" th:value="${cc}" data-url="/catalogo/color/celda"
+                                           th:attr="data-campo=|COLOR_COMBINACION${j.count}|, data-referencia=${articulo.referencia}, data-codigo-color=${color.codigoColor}">
+                                    <span class="estado-celda"></span>
+                                </td>
+                            </tr>
+                            <tr th:if="${#lists.isEmpty(articulo.colores)}">
+                                <td colspan="7" class="ayuda">Este artículo no tiene colores todavía.</td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        <form th:action="@{/catalogo/color/nuevo}" method="post" class="form-tara nuevo-color">
+                            <input type="hidden" name="cliente" th:value="${cliente}">
+                            <input type="hidden" name="referencia" th:value="${articulo.referencia}">
+                            <input type="hidden" name="temporada" th:value="${temporadaId}">
+                            <label>+ color
+                                <input type="text" name="codigoColor" list="codigosColor" placeholder="Código, o descripción si no tiene" required>
+                            </label>
+                            <button type="submit" class="mini">Añadir</button>
+                        </form>
+                    </td>
+                </tr>
+                </th:block>
+            </tbody>
+        </table>
+        </div>
+        <datalist id="codigosColor">
+            <option th:each="c : ${coloresCliente}" th:value="${c.codigo}" th:text="${c.descripcion}"></option>
+        </datalist>
+    </section>
+
+    <section class="tarjeta" th:if="${cliente != null}">
+        <details class="alta-catalogo">
+            <summary>+ modelo</summary>
+            <form th:action="@{/catalogo/modelo/nuevo}" method="post" class="form-tara">
+                <input type="hidden" name="cliente" th:value="${cliente}">
+                <input type="hidden" name="temporada" th:value="${temporadaId}">
+                <label>Código <input type="text" name="codigo" placeholder="ULL027" required></label>
+                <label>Nombre <input type="text" name="nombre" placeholder="Nombre del bolso"></label>
+                <label>Tipo
+                    <select name="tipo"><option th:each="t : ${tipos}" th:value="${t}" th:text="${t}"></option></select>
+                </label>
+                <button type="submit" class="mini">Añadir modelo</button>
+            </form>
+        </details>
+        <details class="alta-catalogo">
+            <summary>+ artículo</summary>
+            <form th:action="@{/catalogo/articulo/nuevo}" method="post" class="form-tara">
+                <input type="hidden" name="cliente" th:value="${cliente}">
+                <input type="hidden" name="temporada" th:value="${temporadaId}">
+                <label>Referencia entera <input type="text" name="referencia" placeholder="ULL027.AL0103" required></label>
+                <button type="submit" class="mini">Añadir artículo</button>
+            </form>
+            <p class="ayuda">El modelo y la piel salen de partir la referencia con la regla del cliente; si no existen, se crean.</p>
+        </details>
+    </section>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const CLIENTE = /*[[${cliente}]]*/ '';
+        const BASE = /*[[@{/}]]*/ '/';
+        /*]]>*/
+        (function () {
+            if (!CLIENTE) { return; }
+            // --- Columnas: vistas por tarea, chips y el desplegable para añadir ---
+            const TODAS = ['foto', 'modelo', 'nombre', 'tipo', 'temporadas', 'nfotos', 'referencia', 'piel',
+                'nombrePiel', 'forro', 'comb1', 'comb2', 'comb3', 'comb4', 'carton', 'unidades', 'peso'];
+            const TITULOS = {foto: 'Foto', modelo: 'Modelo', nombre: 'Nombre', tipo: 'Tipo', temporadas: 'Temporadas',
+                nfotos: 'Fotos', referencia: 'Referencia', piel: 'Piel', nombrePiel: 'Nombre piel', forro: 'Forro',
+                comb1: 'Comb. 1', comb2: 'Comb. 2', comb3: 'Comb. 3', comb4: 'Comb. 4', carton: 'Cartón',
+                unidades: 'Uds/caja', peso: 'Peso neto'};
+            const VISTAS = {
+                packaging: ['foto', 'referencia', 'nombre', 'tipo', 'carton', 'unidades', 'peso'],
+                corte: ['foto', 'referencia', 'modelo', 'nombre', 'nombrePiel', 'forro', 'comb1', 'comb2', 'comb3', 'comb4'],
+                fotos: ['foto', 'modelo', 'nombre', 'nfotos', 'temporadas'],
+                todo: TODAS
+            };
+            const CLAVE_VISTA = 'catalogo.vista.' + CLIENTE;
+            const CLAVE_COLUMNAS = 'catalogo.columnas.' + CLIENTE;
+            let vista = 'packaging';
+            let columnas = VISTAS.packaging.slice();
+            try {
+                vista = localStorage.getItem(CLAVE_VISTA) || vista;
+                const guardadas = JSON.parse(localStorage.getItem(CLAVE_COLUMNAS) || 'null');
+                columnas = Array.isArray(guardadas) ? guardadas : (VISTAS[vista] || VISTAS.packaging).slice();
+            } catch (e) { /* sin almacenamiento: la vista de partida */ }
+
+            const chips = document.getElementById('columnasActivas');
+            const desplegable = document.getElementById('desplegableColumnas');
+            const lista = document.getElementById('listaColumnas');
+            const buscarColumna = document.getElementById('buscarColumna');
+
+            function recordar() {
+                try {
+                    localStorage.setItem(CLAVE_VISTA, vista);
+                    localStorage.setItem(CLAVE_COLUMNAS, JSON.stringify(columnas));
+                } catch (e) { /* da igual */ }
+            }
+            function aplicar() {
+                document.querySelectorAll('#tablaCatalogo [data-col]').forEach(function (celda) {
+                    const col = celda.dataset.col;
+                    celda.classList.toggle('oculta', col !== 'acciones' && columnas.indexOf(col) < 0);
+                });
+                document.querySelectorAll('.vistas button').forEach(function (boton) {
+                    boton.classList.toggle('activo', boton.dataset.vista === vista);
+                    if (boton.dataset.vista === 'personalizada') { boton.hidden = vista !== 'personalizada'; }
+                });
+                pintarChips();
+                recordar();
+            }
+            function pintarChips() {
+                chips.querySelectorAll('.chip').forEach(function (chip) { chip.remove(); });
+                const anadir = document.createElement('button');
+                anadir.type = 'button';
+                anadir.className = 'chip chip-anadir';
+                anadir.textContent = '+ columna';
+                anadir.addEventListener('click', function () {
+                    desplegable.hidden = !desplegable.hidden;
+                    if (!desplegable.hidden) { pintarLista(); buscarColumna.value = ''; buscarColumna.focus(); }
+                });
+                TODAS.filter(function (col) { return columnas.indexOf(col) >= 0; }).forEach(function (col) {
+                    const chip = document.createElement('button');
+                    chip.type = 'button';
+                    chip.className = 'chip';
+                    chip.dataset.col = col;
+                    chip.innerHTML = '<span></span><b aria-hidden="true">×</b>';
+                    chip.querySelector('span').textContent = TITULOS[col];
+                    chip.title = 'Quitar la columna ' + TITULOS[col];
+                    chip.addEventListener('click', function () {
+                        columnas = columnas.filter(function (c) { return c !== col; });
+                        vista = 'personalizada';
+                        aplicar();
+                    });
+                    chips.insertBefore(chip, desplegable);
+                });
+                chips.insertBefore(anadir, desplegable);
+            }
+            function pintarLista() {
+                lista.innerHTML = '';
+                const texto = (buscarColumna.value || '').toLowerCase();
+                TODAS.forEach(function (col) {
+                    if (texto && TITULOS[col].toLowerCase().indexOf(texto) < 0) { return; }
+                    const etiqueta = document.createElement('label');
+                    const casilla = document.createElement('input');
+                    casilla.type = 'checkbox';
+                    casilla.checked = columnas.indexOf(col) >= 0;
+                    casilla.addEventListener('change', function () {
+                        if (casilla.checked) { columnas.push(col); } else { columnas = columnas.filter(function (c) { return c !== col; }); }
+                        vista = 'personalizada';
+                        aplicar();
+                    });
+                    etiqueta.appendChild(casilla);
+                    etiqueta.appendChild(document.createTextNode(' ' + TITULOS[col]));
+                    lista.appendChild(etiqueta);
+                });
+            }
+            buscarColumna.addEventListener('input', pintarLista);
+            document.addEventListener('click', function (evento) {
+                if (!desplegable.hidden && !chips.contains(evento.target)) { desplegable.hidden = true; }
+            });
+            document.querySelectorAll('.vistas button').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    if (boton.dataset.vista === 'personalizada') { return; }
+                    vista = boton.dataset.vista;
+                    columnas = VISTAS[vista].slice();
+                    aplicar();
+                });
+            });
+            aplicar();
+
+            // --- Buscador: oculta los modelos que no casan ---
+            const buscar = document.getElementById('buscar');
+            if (buscar) {
+                buscar.addEventListener('input', function () {
+                    const texto = buscar.value.trim().toUpperCase();
+                    document.querySelectorAll('tbody.modelo').forEach(function (cuerpo) {
+                        cuerpo.hidden = texto !== '' && (cuerpo.dataset.buscar || '').indexOf(texto) < 0;
+                    });
+                });
+            }
+
+            // --- Colores de cada artículo, plegados bajo su fila ---
+            document.querySelectorAll('.alternar-colores').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    const detalle = document.getElementById(boton.getAttribute('aria-controls'));
+                    detalle.hidden = !detalle.hidden;
+                    boton.textContent = (detalle.hidden ? '▸' : '▾') + ' colores';
+                });
+            });
+
+            // --- Edición en celda: cada cambio se guarda por fetch y se dice al lado ---
+            function estadoDe(celda) { return celda.parentElement.querySelector('.estado-celda'); }
+            function decir(celda, texto, clase) {
+                const estado = estadoDe(celda);
+                if (!estado) { return; }
+                estado.textContent = texto;
+                estado.className = 'estado-celda' + (clase ? ' ' + clase : '');
+                if (clase === 'guardado') {
+                    setTimeout(function () { if (estado.textContent === texto) { estado.textContent = ''; } }, 2000);
+                }
+            }
+            function enviar(url, datos) {
+                const cuerpo = new URLSearchParams(datos);
+                cuerpo.set('cliente', CLIENTE);
+                return fetch(url, {method: 'POST', body: cuerpo}).then(function (respuesta) {
+                    return respuesta.json().then(function (json) {
+                        if (!respuesta.ok || !json.ok) { throw new Error(json.mensaje || 'No se ha podido guardar'); }
+                        return json;
+                    });
+                });
+            }
+            function datosDe(celda, valor) {
+                const datos = {campo: celda.dataset.campo, valor: valor};
+                if (celda.dataset.referencia) { datos.referencia = celda.dataset.referencia; }
+                if (celda.dataset.codigo) { datos.codigo = celda.dataset.codigo; }
+                if (celda.dataset.codigoColor) { datos.codigoColor = celda.dataset.codigoColor; }
+                return datos;
+            }
+            function celdaHermana(referencia, campo) {
+                const fila = document.querySelector('tr[data-referencia="' + referencia + '"]');
+                return fila ? fila.querySelector('.celda[data-campo="' + campo + '"]') : null;
+            }
+            function guardar(celda) {
+                decir(celda, 'Guardando…');
+                const valor = celda.value;
+                enviar(BASE + celda.dataset.url.replace(/^\//, ''), datosDe(celda, valor)).then(function (json) {
+                    celda.defaultValue = valor;
+                    const propagadas = json.propagadas || [];
+                    if (propagadas.length === 0) { decir(celda, 'Guardado', 'guardado'); return; }
+                    propagadas.forEach(function (p) {
+                        const hermana = celdaHermana(p.referencia, celda.dataset.campo);
+                        if (hermana) { hermana.value = valor; hermana.defaultValue = valor; }
+                    });
+                    const estado = estadoDe(celda);
+                    estado.className = 'estado-celda propagado';
+                    estado.textContent = 'aplicado también a ' + propagadas.length
+                        + (propagadas.length === 1 ? ' piel ' : ' pieles ');
+                    const deshacer = document.createElement('button');
+                    deshacer.type = 'button';
+                    deshacer.className = 'mini enlace';
+                    deshacer.textContent = 'deshacer';
+                    deshacer.addEventListener('click', function () {
+                        Promise.all(propagadas.map(function (p) {
+                            const datos = {campo: celda.dataset.campo, valor: p.anterior, referencia: p.referencia, propagar: 'false'};
+                            return enviar(BASE + 'catalogo/articulo/celda', datos).then(function () {
+                                const hermana = celdaHermana(p.referencia, celda.dataset.campo);
+                                if (hermana) { hermana.value = p.anterior; hermana.defaultValue = p.anterior; }
+                            });
+                        })).then(function () { decir(celda, 'Deshecho en las demás', 'guardado'); })
+                          .catch(function (error) { decir(celda, error.message, 'error'); });
+                    });
+                    estado.appendChild(deshacer);
+                }).catch(function (error) { decir(celda, error.message, 'error'); });
+            }
+            document.querySelectorAll('.celda').forEach(function (celda) {
+                celda.addEventListener('change', function () { guardar(celda); });
+                celda.addEventListener('keydown', function (evento) {
+                    if (evento.key === 'Enter') { evento.preventDefault(); celda.blur(); }
+                    if (evento.key === 'Escape') { celda.value = celda.defaultValue; celda.blur(); }
+                });
+            });
+        })();
+    </script>
+</main>
+</body>
+</html>

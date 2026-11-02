@@ -792,7 +792,7 @@ header.cabecera .enlace-menu:hover {
    el que `.tarjeta` le da a las de al lado, para arrancar a la misma altura. */
 .menu-paneles {
     display: grid;
-    grid-template-rows: repeat(3, 1fr);
+    grid-template-rows: repeat(4, 1fr);
     gap: 1rem;
     align-self: stretch;
     margin-top: 1rem;
@@ -1372,3 +1372,82 @@ dialog.emergente::backdrop { background: rgba(0, 0, 0, 0.35); }
 dialog.emergente h3 { margin-top: 0; }
 dialog.emergente .acciones-emergente { display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.2rem; }
 dialog.emergente form { margin: 0; }
+
+/* --- Catálogo de modelos --- */
+/* La cabecera de filtros va en una fila: cliente, buscador, temporada y las
+   vistas por tarea. Las vistas son botones segmentados (borde compartido, el
+   activo relleno): es el filtro de columnas principal. */
+main.catalogo { max-width: 100rem; }
+.catalogo-cabecera .fila-filtros { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; align-items: flex-end; }
+.catalogo-cabecera .fila-filtros label { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.9rem; }
+.catalogo-cabecera #buscar { min-width: 18rem; }
+.vistas { display: inline-flex; border: 1px solid var(--borde-tarjeta-fuerte); border-radius: 6px; overflow: hidden; }
+.vistas button {
+    margin: 0; border: 0; border-radius: 0; background: var(--superficie); color: var(--tinta);
+    padding: 0.5rem 0.9rem; font: inherit; cursor: pointer;
+}
+.vistas button + button { border-left: 1px solid var(--borde-tarjeta-fuerte); }
+.vistas button.activo { background: var(--acento); color: #fff; }
+.vistas button:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; }
+
+/* Las columnas activas, como píldoras quitables; la última añade. El
+   desplegable de columnas cuelga del chip y se cierra al pinchar fuera. */
+.chips { position: relative; display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.9rem; }
+.chip {
+    margin: 0; border: 1px solid var(--borde-tarjeta-fuerte); border-radius: 999px; background: var(--entrada);
+    color: var(--tinta); padding: 0.2rem 0.7rem; font-size: 0.85rem; cursor: pointer; display: inline-flex; gap: 0.4rem;
+}
+.chip b { font-weight: 400; color: var(--texto-tenue); }
+.chip:hover b { color: var(--error-borde); }
+.chip-anadir { border-style: dashed; background: var(--superficie); color: var(--acento); }
+.desplegable-columnas {
+    position: absolute; top: 100%; left: 0; z-index: 5; margin-top: 0.3rem; padding: 0.6rem;
+    background: var(--superficie); border: 1px solid var(--borde-tarjeta-fuerte); border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(var(--sombra-rgb), 0.15); min-width: 14rem;
+}
+.desplegable-columnas input[type="search"] { width: 100%; margin-bottom: 0.4rem; }
+.desplegable-columnas #listaColumnas { max-height: 16rem; overflow: auto; display: flex; flex-direction: column; gap: 0.2rem; }
+.desplegable-columnas label { font-size: 0.9rem; display: flex; gap: 0.4rem; align-items: center; }
+.enlaces-catalogo { margin: 0.8rem 0 0; }
+
+/* La tabla: un tbody por modelo, separado por un filete más fuerte; las
+   celdas editables no tienen borde hasta que se entra en ellas. */
+.scroll-tabla { overflow-x: auto; }
+.tabla-catalogo { width: 100%; }
+.tabla-catalogo .oculta { display: none; }
+.tabla-catalogo tbody.modelo { border-top: 2px solid var(--borde-tarjeta-fuerte); }
+.tabla-catalogo td { vertical-align: top; }
+.tabla-catalogo td.c-modelo, .tabla-catalogo td.c-referencia { font-weight: 600; white-space: nowrap; }
+.tabla-catalogo td.c-foto { width: 5.5rem; text-align: center; }
+.tabla-catalogo .miniatura { max-width: 5rem; max-height: 5rem; border-radius: 4px; display: block; margin: 0 auto; }
+.tabla-catalogo .sin-foto { color: var(--texto-tenue); }
+.tabla-catalogo input.celda, .tabla-catalogo select.celda {
+    width: 100%; min-width: 5rem; border: 1px solid transparent; background: transparent; padding: 0.25rem 0.3rem;
+    border-radius: 4px; font: inherit;
+}
+.tabla-catalogo input.celda:hover, .tabla-catalogo select.celda:hover { border-color: var(--borde); }
+.tabla-catalogo input.celda:focus, .tabla-catalogo select.celda:focus { border-color: var(--acento); background: var(--campo); outline: 0; }
+.tabla-catalogo input.c-numero { max-width: 6rem; }
+.tabla-catalogo .estado-celda { display: block; font-size: 0.75rem; color: var(--texto-tenue); min-height: 1em; }
+.tabla-catalogo .estado-celda.guardado { color: var(--ok-borde); }
+.tabla-catalogo .estado-celda.error { color: var(--error-borde); }
+.tabla-catalogo .estado-celda.propagado { color: var(--acento); }
+.tabla-catalogo .estado-celda button.enlace {
+    margin: 0 0 0 0.3rem; padding: 0; border: 0; background: none; color: var(--acento); text-decoration: underline;
+    font-size: inherit; cursor: pointer;
+}
+.tabla-catalogo .etiqueta {
+    display: inline-block; padding: 0.05rem 0.5rem; margin: 0 0.2rem 0.2rem 0; border-radius: 999px;
+    background: var(--acento-suave-ini); color: var(--acento); font-size: 0.8rem;
+}
+.tabla-catalogo td.c-acciones { white-space: nowrap; }
+.tabla-catalogo .en-linea { display: inline; }
+.tabla-catalogo .en-linea button, .tabla-catalogo .alternar-colores { margin: 0 0.2rem 0 0; }
+.tabla-catalogo tr.detalle-colores > td { background: var(--fondo-suave); padding: 0.6rem 1rem 0.8rem; }
+.tabla-colores-articulo { width: auto; min-width: 50%; }
+.tabla-colores-articulo .codigo-color { font-weight: 600; white-space: nowrap; }
+.tabla-colores-articulo .codigo-color .texto-suave { font-weight: 400; color: var(--texto-suave); margin-left: 0.4rem; }
+.tabla-colores-articulo input.celda { min-width: 7rem; }
+.nuevo-color { margin-top: 0.5rem; }
+.alta-catalogo summary { cursor: pointer; font-weight: 600; }
+.alta-catalogo + .alta-catalogo { margin-top: 0.8rem; }

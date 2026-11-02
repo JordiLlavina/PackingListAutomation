@@ -68,6 +68,19 @@ public class ArticuloColor {
         actualizar(colorPiel, colorForro, coloresCombinacion);
     }
 
+    public String getCliente() {
+        return cliente;
+    }
+
+    public String getReferencia() {
+        return referencia;
+    }
+
+    /** El código del color del bolso o, si no tiene, su descripción entera. */
+    public String getCodigoColor() {
+        return codigoColor;
+    }
+
     public String getColorPiel() {
         return colorPiel == null ? "" : colorPiel;
     }

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<!-- Las celdas del modelo de la tabla del catálogo, que van una vez por
+     modelo con rowspan sobre sus artículos (y también en la fila de un modelo
+     sin artículos). Van en su fichero porque un fragmento definido en la
+     misma plantilla se renderiza además en su sitio, sin parámetros. -->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<th:block th:fragment="celdaFoto(fila)">
+    <img th:if="${fila.fotoPrincipalId != null}" class="miniatura"
+         th:src="@{/catalogo/foto/{id}(id=${fila.fotoPrincipalId})}" th:alt="|Foto de ${fila.codigoModelo}|">
+    <span th:if="${fila.fotoPrincipalId == null}" class="sin-foto" title="Sin foto">—</span>
+</th:block>
+
+<th:block th:fragment="celdaNombre(fila)">
+    <input type="text" class="celda" th:value="${fila.nombre}" data-url="/catalogo/modelo/celda" data-campo="NOMBRE"
+           th:attr="data-codigo=${fila.codigoModelo}, aria-label=|Nombre de ${fila.codigoModelo}|">
+    <span class="estado-celda" aria-live="polite"></span>
+</th:block>
+
+<th:block th:fragment="celdaTipo(fila, tipos)">
+    <select class="celda" data-url="/catalogo/modelo/celda" data-campo="TIPO"
+            th:attr="data-codigo=${fila.codigoModelo}, aria-label=|Tipo de ${fila.codigoModelo}|"
+            title="Informativo: el packing y el corte siguen la regla del prefijo UBL">
+        <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}" th:selected="${t.name() == fila.tipo}"></option>
+    </select>
+    <span class="estado-celda" aria-live="polite"></span>
+</th:block>
+
+<th:block th:fragment="celdaTemporadas(fila)">
+    <span class="etiqueta" th:each="t : ${fila.temporadas}" th:text="${t}"></span>
+</th:block>
+
+</body>
+</html>

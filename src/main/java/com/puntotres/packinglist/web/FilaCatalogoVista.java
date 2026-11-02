@@ -1,0 +1,37 @@
+package com.puntotres.packinglist.web;
+
+import java.util.List;
+
+/**
+ * Un modelo del catálogo tal como lo pinta la pantalla: sus datos propios una
+ * vez (van con rowspan sobre sus artículos) y una fila por artículo, cada una
+ * con sus colores. Las cuatro casillas de combinación y de color de
+ * combinación van siempre, vacías incluidas, para que la tabla tenga las
+ * mismas columnas en todas las filas.
+ */
+public record FilaCatalogoVista(String codigoModelo, String nombre, String tipo, List<String> temporadas,
+                                int numeroFotos, Long fotoPrincipalId, List<ArticuloVista> articulos) {
+
+    public FilaCatalogoVista {
+        temporadas = List.copyOf(temporadas);
+        articulos = List.copyOf(articulos);
+    }
+
+    public record ArticuloVista(String referencia, String refPiel, String nombrePiel, String forro,
+                                List<String> combinaciones, String medidaCaja, boolean medidaConTara,
+                                Integer unidadesPorCaja, Double pesoNetoKg, List<ColorVista> colores) {
+
+        public ArticuloVista {
+            combinaciones = List.copyOf(combinaciones);
+            colores = List.copyOf(colores);
+        }
+    }
+
+    public record ColorVista(String codigoColor, String descripcion, String colorPiel, String colorForro,
+                             List<String> coloresCombinacion) {
+
+        public ColorVista {
+            coloresCombinacion = List.copyOf(coloresCombinacion);
+        }
+    }
+}

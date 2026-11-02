@@ -285,6 +285,68 @@ public class CatalogoModelos {
                 enLaTabla.anadidos().size(), pedido.avisos());
     }
 
+    // --- Los colores de un artículo (la piel, el forro y las combinaciones en cada color del bolso) ---
+
+    /** Los campos del color de un artículo que se editan celda a celda. */
+    public enum CampoColor {
+        COLOR_PIEL, COLOR_FORRO, COLOR_COMBINACION1, COLOR_COMBINACION2, COLOR_COMBINACION3, COLOR_COMBINACION4
+    }
+
+    public List<ArticuloColor> coloresDe(String cliente, String referencia) {
+        if (vacio(cliente) || vacio(referencia)) {
+            return List.of();
+        }
+        return coloresDeArticulo.findByClienteAndReferenciaOrderByCodigoColor(clave(cliente), clave(referencia));
+    }
+
+    /** El artículo en ese color del bolso, creándolo vacío (y el artículo) si falta. */
+    @Transactional
+    public ArticuloColor asegurarColor(String cliente, String referencia, String codigoColor) {
+        if (vacio(codigoColor)) {
+            throw new IllegalArgumentException("El color necesita su código, o su descripción si no tiene");
+        }
+        Articulo articulo = asegurarArticulo(cliente, referencia);
+        ArticuloColorId id = new ArticuloColorId(articulo.getCliente(), articulo.getReferencia(), clave(codigoColor));
+        return coloresDeArticulo.findById(id).orElseGet(() -> coloresDeArticulo.save(
+                new ArticuloColor(id.cliente(), id.referencia(), id.codigoColor(), "", "", List.of())));
+    }
+
+    /** Escribe un color de piel del artículo en ese color del bolso; vacío borra. En mayúsculas, como todo texto. */
+    @Transactional
+    public void guardarCampoColor(String cliente, String referencia, String codigoColor, CampoColor campo,
+                                  String valor) {
+        ArticuloColor color = asegurarColor(cliente, referencia, codigoColor);
+        String limpio = valor == null ? "" : valor.trim().toUpperCase(Locale.ROOT);
+        List<String> combinaciones = new ArrayList<>(color.getColoresCombinacion());
+        while (combinaciones.size() < MAXIMO_COMBINACIONES) {
+            combinaciones.add("");
+        }
+        String piel = color.getColorPiel();
+        String forro = color.getColorForro();
+        switch (campo) {
+            case COLOR_PIEL -> piel = limpio;
+            case COLOR_FORRO -> forro = limpio;
+            default -> combinaciones.set(campo.ordinal() - CampoColor.COLOR_COMBINACION1.ordinal(), limpio);
+        }
+        color.actualizar(piel, forro, combinaciones);
+    }
+
+    /** Los forros y las combinaciones distintos ya guardados de un cliente, para autocompletar. */
+    public record TextosConocidos(List<String> forros, List<String> combinaciones) {
+    }
+
+    public TextosConocidos textosConocidos(String cliente) {
+        Set<String> forros = new java.util.TreeSet<>();
+        Set<String> combinaciones = new java.util.TreeSet<>();
+        for (Articulo articulo : articulosDe(cliente)) {
+            if (!articulo.getForro().isEmpty()) {
+                forros.add(articulo.getForro());
+            }
+            combinaciones.addAll(articulo.getCombinaciones());
+        }
+        return new TextosConocidos(List.copyOf(forros), List.copyOf(combinaciones));
+    }
+
     /** Los códigos de modelo que fueron en una temporada, en orden. */
     public Set<String> codigosDeModeloEn(String cliente, Long temporadaId) {
         if (vacio(cliente) || temporadaId == null) {

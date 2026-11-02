@@ -74,8 +74,8 @@
 
         <!-- Los ajustes no son un flujo con pantallas, sino un dato que se
              guarda una vez y vale para todos los envíos, así que van en paneles
-             pequeños y no en una tarjeta. En la columna caben tres, y ya están
-             los tres: un cuarto necesita repartir la rejilla de .menu-paneles. -->
+             pequeños y no en una tarjeta. En la columna caben cuatro (la
+             rejilla de .menu-paneles tiene cuatro filas); un quinto la reparte. -->
         <div class="menu-paneles">
             <a class="menu-panel" th:href="@{/taras}">
                 <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -104,6 +104,15 @@
                     <circle cx="15" cy="7.5" r="1.2"/>
                 </svg>
                 <span class="menu-panel-titulo">Colores y Pieles de Cliente</span>
+            </a>
+
+            <a class="menu-panel" th:href="@{/catalogo}">
+                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5z"/>
+                    <path d="M4 7.5 12 12l8-4.5M12 12v9"/>
+                </svg>
+                <span class="menu-panel-titulo">Catálogo de modelos</span>
             </a>
         </div>
     </div>
