@@ -62,10 +62,12 @@ public class CatalogoController {
     private final TablaColores tablaColores;
     private final DocumentosCorteService reglas;
     private final com.puntotres.packinglist.persistence.MemoriaPieles pieles;
+    private final com.puntotres.packinglist.service.corte.ConversorFotos conversor;
 
     public CatalogoController(CatalogoModelos catalogo, FotosCatalogo fotos, ArchivoTemporadas temporadas,
                               ClientesProperties clientesProperties, CatalogoTaras taras, TablaColores tablaColores,
-                              DocumentosCorteService reglas, com.puntotres.packinglist.persistence.MemoriaPieles pieles) {
+                              DocumentosCorteService reglas, com.puntotres.packinglist.persistence.MemoriaPieles pieles,
+                              com.puntotres.packinglist.service.corte.ConversorFotos conversor) {
         this.catalogo = catalogo;
         this.fotos = fotos;
         this.temporadas = temporadas;
@@ -74,6 +76,7 @@ public class CatalogoController {
         this.tablaColores = tablaColores;
         this.reglas = reglas;
         this.pieles = pieles;
+        this.conversor = conversor;
     }
 
     @GetMapping("/catalogo")
@@ -223,6 +226,89 @@ public class CatalogoController {
         return volver(cliente, temporada);
     }
 
+    // --- Fotos ---
+
+    @GetMapping("/catalogo/foto/{id}")
+    public ResponseEntity<byte[]> foto(@org.springframework.web.bind.annotation.PathVariable Long id) {
+        return fotos.conBytes(id)
+                .map(foto -> ResponseEntity.ok()
+                        .contentType(org.springframework.http.MediaType.IMAGE_JPEG)
+                        .cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofDays(1))
+                                .cachePrivate())
+                        .body(foto.getJpeg()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Varias fotos a la vez, HEIC incluido: pasan por el conversor del corte
+     * (reduce a 1.600 px y endereza por el EXIF) en un directorio temporal
+     * que se borra al acabar, y entran con su nombre original. La primera de
+     * un modelo sin fotos queda como principal.
+     */
+    @PostMapping("/catalogo/foto/subir")
+    public String subir(@RequestParam String cliente, @RequestParam String codigo,
+                        @RequestParam("fotos") List<org.springframework.web.multipart.MultipartFile> subidas,
+                        @RequestParam(required = false) Long temporada, RedirectAttributes redirect) {
+        List<org.springframework.web.multipart.MultipartFile> conContenido = subidas.stream()
+                .filter(fichero -> !fichero.isEmpty() && fichero.getOriginalFilename() != null).toList();
+        if (conContenido.isEmpty()) {
+            redirect.addFlashAttribute("mensajeError", "Elige al menos una foto.");
+            return volver(cliente, temporada);
+        }
+        java.nio.file.Path directorio = null;
+        try {
+            directorio = java.nio.file.Files.createTempDirectory("catalogo-fotos-");
+            List<com.puntotres.packinglist.service.corte.FotoModelo> originales = new ArrayList<>();
+            int numero = 0;
+            for (org.springframework.web.multipart.MultipartFile fichero : conContenido) {
+                String nombre = java.nio.file.Paths.get(fichero.getOriginalFilename()).getFileName().toString();
+                String extension = nombre.contains(".") ? nombre.substring(nombre.lastIndexOf('.')) : ".jpg";
+                java.nio.file.Path copia = directorio.resolve(String.format("%05d%s", ++numero, extension));
+                fichero.transferTo(copia);
+                originales.add(new com.puntotres.packinglist.service.corte.FotoModelo(codigo, nombre, copia));
+            }
+            com.puntotres.packinglist.service.corte.ConversionFotos conversion = conversor.convertir(originales, directorio);
+            conversion.esperar();
+            int guardadas = 0;
+            for (com.puntotres.packinglist.service.corte.FotoModelo foto : originales) {
+                java.util.Optional<java.nio.file.Path> reducida = conversion.reducida(foto);
+                if (reducida.isPresent()) {
+                    fotos.guardar(cliente, codigo, foto.nombreOriginal(), java.nio.file.Files.readAllBytes(reducida.get()));
+                    guardadas++;
+                }
+            }
+            redirect.addFlashAttribute("mensaje", guardadas + (guardadas == 1 ? " foto guardada" : " fotos guardadas")
+                    + " en " + codigo.trim().toUpperCase(Locale.ROOT) + ".");
+            List<String> avisos = conversion.avisos();
+            if (!avisos.isEmpty()) {
+                redirect.addFlashAttribute("aviso", String.join(" ", avisos));
+            }
+        } catch (java.io.IOException | RuntimeException e) {
+            redirect.addFlashAttribute("mensajeError", "No se pudieron guardar las fotos: "
+                    + (e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            redirect.addFlashAttribute("mensajeError", "Se ha interrumpido la conversión de las fotos.");
+        } finally {
+            CorteEnCurso.borrar(directorio);
+        }
+        return volver(cliente, temporada);
+    }
+
+    @PostMapping("/catalogo/foto/principal")
+    public String principal(@RequestParam String cliente, @RequestParam String codigo, @RequestParam Long id,
+                            @RequestParam(required = false) Long temporada) {
+        fotos.marcarPrincipal(cliente, codigo, id);
+        return volver(cliente, temporada);
+    }
+
+    @PostMapping("/catalogo/foto/borrar")
+    public String borrarFoto(@RequestParam String cliente, @RequestParam Long id,
+                             @RequestParam(required = false) Long temporada) {
+        fotos.borrar(id);
+        return volver(cliente, temporada);
+    }
+
     // --- Internos ---
 
     private List<FilaCatalogoVista> filas(String cliente, Long temporadaId) {
@@ -262,7 +348,7 @@ public class CatalogoController {
                 articulos.add(vistaDe(cliente, articulo, nombreDePiel, descripcionDeColor, conTara));
             }
             filas.add(new FilaCatalogoVista(modelo.getCodigo(), modelo.getNombre(), modelo.getTipo().name(),
-                    nombresTemporada, delModelo.size(), principal, articulos));
+                    nombresTemporada, delModelo, principal, articulos));
         }
         return filas;
     }

@@ -1451,3 +1451,24 @@ main.catalogo { max-width: 100rem; }
 .nuevo-color { margin-top: 0.5rem; }
 .alta-catalogo summary { cursor: pointer; font-weight: 600; }
 .alta-catalogo + .alta-catalogo { margin-top: 0.8rem; }
+
+/* La galería de fotos de un modelo, plegada en la celda de la foto: la
+   principal lleva el borde de acento; cada foto tiene sus dos botones. */
+.galeria summary { list-style: none; cursor: pointer; }
+.galeria summary::-webkit-details-marker { display: none; }
+.galeria[open] summary .miniatura { outline: 2px solid var(--acento); }
+.galeria-cuerpo {
+    position: absolute; z-index: 4; margin-top: 0.4rem; padding: 0.8rem; min-width: 22rem;
+    background: var(--superficie); border: 1px solid var(--borde-tarjeta-fuerte); border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(var(--sombra-rgb), 0.15); text-align: left;
+}
+.galeria-fotos { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.6rem; }
+.galeria-foto { width: 6.5rem; display: flex; flex-direction: column; gap: 0.2rem; align-items: center; }
+.galeria-foto img { width: 6rem; height: 6rem; object-fit: cover; border-radius: 4px; border: 2px solid transparent; }
+.galeria-foto.principal img { border-color: var(--acento); }
+.galeria-foto .nombre-foto { font-size: 0.7rem; color: var(--texto-suave); max-width: 6rem; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+.galeria-foto form { display: inline; }
+.galeria-foto button.mini { padding: 0.1rem 0.4rem; font-size: 0.75rem; margin: 0; }
+.galeria-subir { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.tabla-catalogo td.c-foto { position: relative; }

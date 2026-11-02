@@ -6,10 +6,49 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 
-<th:block th:fragment="celdaFoto(fila)">
-    <img th:if="${fila.fotoPrincipalId != null}" class="miniatura"
-         th:src="@{/catalogo/foto/{id}(id=${fila.fotoPrincipalId})}" th:alt="|Foto de ${fila.codigoModelo}|">
-    <span th:if="${fila.fotoPrincipalId == null}" class="sin-foto" title="Sin foto">—</span>
+<!-- La celda de la foto es la galería del modelo plegada: la miniatura de la
+     principal (o un guion) abre las demás, con marcar principal, borrar y
+     subir. Son formularios normales porque cambian la forma de la celda. -->
+<th:block th:fragment="celdaFoto(fila, cliente, temporadaId)">
+    <details class="galeria">
+        <summary th:title="|Fotos de ${fila.codigoModelo} (${fila.numeroFotos})|">
+            <img th:if="${fila.fotoPrincipalId != null}" class="miniatura"
+                 th:src="@{/catalogo/foto/{id}(id=${fila.fotoPrincipalId})}" th:alt="|Foto de ${fila.codigoModelo}|">
+            <span th:if="${fila.fotoPrincipalId == null}" class="sin-foto">sin foto</span>
+        </summary>
+        <div class="galeria-cuerpo">
+            <div class="galeria-fotos">
+                <div class="galeria-foto" th:each="foto : ${fila.fotos}" th:classappend="${foto.principal} ? 'principal'">
+                    <img th:src="@{/catalogo/foto/{id}(id=${foto.id})}" th:alt="${foto.nombreFichero}">
+                    <span class="nombre-foto" th:text="${foto.nombreFichero}" th:title="${foto.nombreFichero}"></span>
+                    <span>
+                        <form th:action="@{/catalogo/foto/principal}" method="post" th:unless="${foto.principal}">
+                            <input type="hidden" name="cliente" th:value="${cliente}">
+                            <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
+                            <input type="hidden" name="id" th:value="${foto.id}">
+                            <input type="hidden" name="temporada" th:value="${temporadaId}">
+                            <button type="submit" class="mini" title="Hacerla principal">Principal</button>
+                        </form>
+                        <form th:action="@{/catalogo/foto/borrar}" method="post">
+                            <input type="hidden" name="cliente" th:value="${cliente}">
+                            <input type="hidden" name="id" th:value="${foto.id}">
+                            <input type="hidden" name="temporada" th:value="${temporadaId}">
+                            <button type="submit" class="mini" title="Borrar la foto"
+                                    onclick="return confirm('¿Borrar esta foto?')">Borrar</button>
+                        </form>
+                    </span>
+                </div>
+                <p class="ayuda" th:if="${#lists.isEmpty(fila.fotos)}">Este modelo no tiene fotos.</p>
+            </div>
+            <form th:action="@{/catalogo/foto/subir}" method="post" enctype="multipart/form-data" class="galeria-subir">
+                <input type="hidden" name="cliente" th:value="${cliente}">
+                <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
+                <input type="hidden" name="temporada" th:value="${temporadaId}">
+                <input type="file" name="fotos" multiple accept="image/*,.heic" required>
+                <button type="submit" class="mini">Subir fotos</button>
+            </form>
+        </div>
+    </details>
 </th:block>
 
 <th:block th:fragment="celdaNombre(fila)">

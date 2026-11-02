@@ -2,6 +2,8 @@ package com.puntotres.packinglist.web;
 
 import java.util.List;
 
+import com.puntotres.packinglist.persistence.ResumenFoto;
+
 /**
  * Un modelo del catálogo tal como lo pinta la pantalla: sus datos propios una
  * vez (van con rowspan sobre sus artículos) y una fila por artículo, cada una
@@ -10,11 +12,16 @@ import java.util.List;
  * mismas columnas en todas las filas.
  */
 public record FilaCatalogoVista(String codigoModelo, String nombre, String tipo, List<String> temporadas,
-                                int numeroFotos, Long fotoPrincipalId, List<ArticuloVista> articulos) {
+                                List<ResumenFoto> fotos, Long fotoPrincipalId, List<ArticuloVista> articulos) {
 
     public FilaCatalogoVista {
         temporadas = List.copyOf(temporadas);
+        fotos = List.copyOf(fotos);
         articulos = List.copyOf(articulos);
+    }
+
+    public int numeroFotos() {
+        return fotos.size();
     }
 
     public record ArticuloVista(String referencia, String refPiel, String nombrePiel, String forro,

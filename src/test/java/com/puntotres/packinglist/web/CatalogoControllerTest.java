@@ -50,6 +50,9 @@ class CatalogoControllerTest {
     @Autowired
     private ArchivoTemporadas archivo;
 
+    @Autowired
+    private com.puntotres.packinglist.service.catalogo.FotosCatalogo fotosCatalogo;
+
     @SuppressWarnings("unchecked")
     private List<FilaCatalogoVista> filas(MvcResult resultado) {
         return (List<FilaCatalogoVista>) resultado.getModelAndView().getModel().get("filas");
@@ -182,6 +185,64 @@ class CatalogoControllerTest {
         mvc.perform(get("/catalogo"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Elige un cliente")));
+    }
+
+    // --- Fotos ---
+
+    @Test
+    void laFotoSeSirveComoJpeg() throws Exception {
+        catalogo.asegurarModelo("AMI", "ULL960", "");
+        byte[] jpeg = com.puntotres.packinglist.testutil.FotosDePrueba.jpeg(20, 20, java.awt.Color.RED);
+        Long id = fotosCatalogo.guardar("AMI", "ULL960", "a.jpg", jpeg).id();
+
+        byte[] servida = mvc.perform(get("/catalogo/foto/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(org.springframework.http.MediaType.IMAGE_JPEG))
+                .andReturn().getResponse().getContentAsByteArray();
+        org.junit.jupiter.api.Assertions.assertArrayEquals(jpeg, servida);
+        mvc.perform(get("/catalogo/foto/{id}", 999999L)).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void subirUnaFotoLaGuardaReducidaYComoPrincipal() throws Exception {
+        catalogo.asegurarModelo("AMI", "ULL961", "");
+        byte[] grande = com.puntotres.packinglist.testutil.FotosDePrueba.jpeg(2000, 1000, java.awt.Color.BLUE);
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/catalogo/foto/subir")
+                        .file(new org.springframework.mock.web.MockMultipartFile("fotos", "grande.jpg", "image/jpeg", grande))
+                        .param("cliente", "AMI").param("codigo", "ULL961"))
+                .andExpect(redirectedUrl("/catalogo?cliente=AMI"))
+                .andExpect(flash().attribute("mensaje", containsString("1 foto")));
+
+        var guardadas = fotosCatalogo.de("AMI", "ULL961");
+        assertEquals(1, guardadas.size());
+        assertTrue(guardadas.get(0).principal());
+        java.awt.image.BufferedImage leida = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(
+                fotosCatalogo.conBytes(guardadas.get(0).id()).orElseThrow().getJpeg()));
+        assertTrue(Math.max(leida.getWidth(), leida.getHeight())
+                <= com.puntotres.packinglist.service.corte.ReductorImagen.LADO_MAXIMO, "reducida como en el corte");
+        assertEquals(1, filaDe(filas(mvc.perform(get("/catalogo").param("cliente", "AMI")).andReturn()), "ULL961")
+                .fotos().size());
+    }
+
+    @Test
+    void borrarLaPrincipalPasaElTestigoYMarcarCambiaLaPrincipal() throws Exception {
+        catalogo.asegurarModelo("AMI", "ULL962", "");
+        Long a = fotosCatalogo.guardar("AMI", "ULL962", "a.jpg",
+                com.puntotres.packinglist.testutil.FotosDePrueba.jpeg(20, 20, java.awt.Color.RED)).id();
+        Long b = fotosCatalogo.guardar("AMI", "ULL962", "b.jpg",
+                com.puntotres.packinglist.testutil.FotosDePrueba.jpeg(20, 20, java.awt.Color.BLUE)).id();
+
+        mvc.perform(post("/catalogo/foto/principal").param("cliente", "AMI").param("codigo", "ULL962")
+                        .param("id", String.valueOf(b)))
+                .andExpect(redirectedUrl("/catalogo?cliente=AMI"));
+        assertEquals(b, filaDe(filas(mvc.perform(get("/catalogo").param("cliente", "AMI")).andReturn()), "ULL962")
+                .fotoPrincipalId());
+
+        mvc.perform(post("/catalogo/foto/borrar").param("cliente", "AMI").param("id", String.valueOf(b)))
+                .andExpect(redirectedUrl("/catalogo?cliente=AMI"));
+        assertEquals(a, filaDe(filas(mvc.perform(get("/catalogo").param("cliente", "AMI")).andReturn()), "ULL962")
+                .fotoPrincipalId());
     }
 
     @Test

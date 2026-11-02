@@ -95,7 +95,7 @@
                        + #strings.listJoin(fila.articulos.![referencia + ' ' + nombrePiel], ' '))}">
                 <!-- El modelo no tiene artículos: una fila para poder verlo y darle el primero. -->
                 <tr th:if="${#lists.isEmpty(fila.articulos)}">
-                    <td data-col="foto" class="c-foto" th:insert="~{catalogo-fragmentos :: celdaFoto(${fila})}"></td>
+                    <td data-col="foto" class="c-foto" th:insert="~{catalogo-fragmentos :: celdaFoto(${fila}, ${cliente}, ${temporadaId})}"></td>
                     <td data-col="modelo" class="c-modelo" th:text="${fila.codigoModelo}"></td>
                     <td data-col="nombre" th:insert="~{catalogo-fragmentos :: celdaNombre(${fila})}"></td>
                     <td data-col="tipo" th:insert="~{catalogo-fragmentos :: celdaTipo(${fila}, ${tipos})}"></td>
@@ -116,7 +116,7 @@
                 <tr th:attr="data-referencia=${articulo.referencia}">
                     <th:block th:if="${estado.first}">
                         <td data-col="foto" class="c-foto" th:rowspan="${#lists.size(fila.articulos)}"
-                            th:insert="~{catalogo-fragmentos :: celdaFoto(${fila})}"></td>
+                            th:insert="~{catalogo-fragmentos :: celdaFoto(${fila}, ${cliente}, ${temporadaId})}"></td>
                         <td data-col="modelo" class="c-modelo" th:rowspan="${#lists.size(fila.articulos)}"
                             th:text="${fila.codigoModelo}"></td>
                         <td data-col="nombre" th:rowspan="${#lists.size(fila.articulos)}"
