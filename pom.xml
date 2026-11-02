@@ -88,6 +88,19 @@
             <version>2.1</version>
         </dependency>
 
+        <!-- ZXing: el código QR de la etiqueta de información de embalaje
+             (barcode4j no sabe hacer QR). core codifica; javase lo pasa a PNG. -->
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>core</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.zxing</groupId>
+            <artifactId>javase</artifactId>
+            <version>3.5.3</version>
+        </dependency>
+
         <!-- Documentos del corte: las fotos del iPhone llegan en HEIC y ni
              ImageIO ni POI saben leerlo. Java puro para que funcione igual en
              el PC del almacén y en el servidor Linux; en Windows se prueba
