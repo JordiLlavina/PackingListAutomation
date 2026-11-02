@@ -127,7 +127,7 @@ java -jar packing-list-ami-1.0.0-SNAPSHOT.jar
 pause
 ```
 
-No necesita permisos de escritura en disco: los excels generados se sirven al navegador y se descargan a la carpeta de descargas del usuario.
+Los excels generados se sirven al navegador y se descargan a la carpeta de descargas del usuario. Lo único que la aplicación escribe en disco es su base de datos, en la carpeta `datos/` junto al jar: las taras, las temporadas con sus excels y el catálogo de modelos (cartones, unidades por caja, pieles, colores y fotos). Copiar esa carpeta es llevarse todo lo aprendido a otro ordenador. El esquema lo crea Flyway al arrancar; una base de una versión anterior a Flyway no arranca y hay que apartarla.
 
 ### 4. Cambiar taras o clientes sin recompilar
 
@@ -258,5 +258,6 @@ Las plantillas de packing list viven en `src/main/resources/client-packinglist/`
 - [CLAUDE.md](CLAUDE.md) — **la referencia más completa y al día** del proyecto: arquitectura, decisiones y trampas conocidas.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — recorrido interno del pipeline de dominio. ⚠️ Parcialmente desactualizado (no cuenta la web, la extracción ni los builders nuevos; lo que cuenta del pipeline sigue siendo válido).
 - [ESTADO_ANTES_VACACIONES.md](ESTADO_ANTES_VACACIONES.md) — foto del estado del proyecto a 2026-08-08.
+- [docs/superpowers/specs/2026-11-01-catalogo-modelos-design.md](docs/superpowers/specs/2026-11-01-catalogo-modelos-design.md) — el catálogo de modelos (pantalla `/catalogo`), la memoria única de la que leen el taller y el corte.
 - [TODO](TODO) — pendientes (lo mantiene Jordi).
 - [docs/](docs/) — ejemplos de plantillas por cliente, análisis de las hojas manuscritas y prompts de extracción.

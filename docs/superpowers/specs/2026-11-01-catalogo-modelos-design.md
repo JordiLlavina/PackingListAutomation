@@ -7,8 +7,11 @@ todas las features. Relacionado con
 [2026-09-29-documentos-del-corte-design.md](2026-09-29-documentos-del-corte-design.md)
 y [2026-10-08-colores-corte-design.md](2026-10-08-colores-corte-design.md).
 
-Estado: **diseño aprobado en conversación, pendiente de implementar.** El
-usuario va a resolver otros fallos antes; esta implementación viene después.
+Estado: **implementado** (2026-11-02, rama `catalogo-modelos`, plan en
+`docs/superpowers/plans/2026-11-02-catalogo-modelos.md`). Un desvío respecto de
+lo escrito abajo: un excel de temporada que **no se deja leer guarda la temporada
+y avisa**, en vez de rechazarla, por la regla del proyecto de no bloquear por
+datos que un humano puede resolver.
 
 ## Qué pidió el usuario
 
