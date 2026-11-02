@@ -7,6 +7,7 @@ Alrededor de ese flujo central hay tres salidas más:
 - **Volcado de albarán para el ERP** (un excel con las líneas del envío).
 - **Etiquetas de caja y de palet** (AMI y APC), con códigos de barras EAN-13 y Code 128.
 - Dos flujos independientes del envío: **etiquetas de artículo** (desde el excel de pedido del cliente) y **procesado de escandallos ICSUITE** (excels del ERP → un libro con una hoja por escandallo).
+- **Hoja de info de embalaje para el taller** (`/info-embalaje`): un A4 en Word por artículo, con caja, destinaciones y pedidos sacados del excel de pedido, reparto y comentarios tecleados y un QR al vídeo de embalaje; se guarda para volver a descargarla o importarla (`/info-embalaje/antiguos`), y los comentarios tipo se mantienen en `/comentarios-embalaje`.
 
 Todo se maneja desde un asistente web (Spring Boot + Thymeleaf). Código y documentación en **español** (nombres de clases en inglés; javadoc, comentarios y UI en español).
 
