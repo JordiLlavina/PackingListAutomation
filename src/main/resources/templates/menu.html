@@ -91,8 +91,10 @@
 
         <!-- Los ajustes no son un flujo con pantallas, sino un dato que se
              guarda una vez y vale para todos los envíos, así que van en paneles
-             pequeños y no en una tarjeta. En la columna caben cinco (la
-             rejilla de .menu-paneles tiene cinco filas); un sexto la reparte. -->
+             pequeños y no en una tarjeta. En la columna caben cuatro (la
+             rejilla de .menu-paneles tiene cuatro filas); un quinto la reparte.
+             Los comentarios de embalaje no tienen panel: se editan desde
+             /info-embalaje, que es donde se usan. -->
         <div class="menu-paneles">
             <a class="menu-panel" th:href="@{/temporadas}">
                 <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -121,15 +123,6 @@
                     <circle cx="15" cy="7.5" r="1.2"/>
                 </svg>
                 <span class="menu-panel-titulo">Colores y Pieles de Cliente</span>
-            </a>
-
-            <a class="menu-panel" th:href="@{/comentarios-embalaje}">
-                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M4 5h16v11H9l-5 4z"/>
-                    <path d="M8 9.5h8M8 12.5h5"/>
-                </svg>
-                <span class="menu-panel-titulo">Comentarios de embalaje</span>
             </a>
 
             <a class="menu-panel" th:href="@{/taras}">

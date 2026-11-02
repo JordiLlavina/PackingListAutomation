@@ -792,7 +792,7 @@ header.cabecera .enlace-menu:hover {
    el que `.tarjeta` le da a las de al lado, para arrancar a la misma altura. */
 .menu-paneles {
     display: grid;
-    grid-template-rows: repeat(5, 1fr);
+    grid-template-rows: repeat(4, 1fr);
     gap: 1rem;
     align-self: stretch;
     margin-top: 1rem;

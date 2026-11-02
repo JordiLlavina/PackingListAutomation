@@ -148,7 +148,13 @@ class InfoEmbalajeControllerTest {
         assertTrue(html.contains("en desarrollo"), "algún cliente sin lector de pedido");
         assertTrue(html.matches("(?s).*<option[^>]*value=\"AMI\"(?![^>]*disabled)[^>]*>.*"), "AMI encendido");
         assertTrue(html.matches("(?s).*<option[^>]*value=\"APC\"(?![^>]*disabled)[^>]*>.*"), "APC encendido");
-        assertTrue(html.contains("href=\"/info-embalaje/antiguos\""), "botón Importar antiguos");
+        assertTrue(html.contains("href=\"/info-embalaje/antiguos\">Importar Antiguos Envios<"),
+                "botón Importar Antiguos Envios");
+        // Los comentarios tipo se mantienen desde aquí, no desde un panel del menú.
+        assertTrue(html.contains("href=\"/comentarios-embalaje\">Editar Comentarios de Embalaje<"),
+                "botón Editar Comentarios de Embalaje");
+        assertTrue(html.indexOf("Importar Antiguos Envios") < html.indexOf("Editar Comentarios de Embalaje"),
+                "el de comentarios va a la derecha del de importar");
         assertTrue(html.contains("href=\"/temporadas\""), "lápiz a las temporadas");
     }
 
