@@ -102,8 +102,13 @@ class InfoEmbalajeControllerTest {
 
     private static MockHttpServletRequestBuilder generar(MockHttpSession sesion, String nota,
                                                          String numeroEnvio, String referencia) {
+        return generar(sesion, nota, numeroEnvio, referencia, "TÁNGER");
+    }
+
+    private static MockHttpServletRequestBuilder generar(MockHttpSession sesion, String nota,
+                                                         String numeroEnvio, String referencia, String taller) {
         return post("/info-embalaje/generar").session(sesion)
-                .param("taller", "TÁNGER")
+                .param("taller", taller)
                 .param("numeroEnvio", numeroEnvio)
                 .param("nota", nota)
                 .param("referencia", referencia)
@@ -311,16 +316,30 @@ class InfoEmbalajeControllerTest {
         MockHttpSession sesion = cargarApc();
         mvc.perform(generar(sesion, "contador")).andExpect(status().isOk());
 
-        assertTrue(archivo.siguienteNumeroEnvio() >= 271);
+        // El contador es del taller de la hoja generada (TÁNGER), y la
+        // pantalla recibe el de cada taller para proponerlo al teclearlo.
+        int siguiente = archivo.siguienteNumeroEnvio("TÁNGER");
+        assertTrue(siguiente >= 271);
         mvc.perform(get("/info-embalaje/formulario").session(sesion))
-                .andExpect(content().string(containsString(
-                        "value=\"" + archivo.siguienteNumeroEnvio() + "\"")));
+                // Thymeleaf escapa en el JavaScript lo que no es ASCII: la Á va como escape unicode.
+                .andExpect(content().string(containsString("\"T" + "\\" + "u00C1NGER\":" + siguiente)));
+    }
+
+    @Test
+    void generarSinNumeroUsaElSiguienteDeSuTaller() throws Exception {
+        MockHttpSession sesion = cargarApc();
+        int esperado = archivo.siguienteNumeroEnvio("EMBT Ubrique ctrl");
+
+        mvc.perform(generar(sesion, "sin número", "", "PXCBC-F67008", "EMBT Ubrique ctrl"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("X-Numero-Envio", String.valueOf(esperado)))
+                .andExpect(header().string("X-Siguiente-Numero", String.valueOf(esperado + 1)));
     }
 
     @Test
     void elSiguienteNumeroLoDiceElContadorYNoElEnvioMasUno() throws Exception {
         // Un envío alto guardado antes y luego se repite el 270 (importado):
-        // el siguiente libre no es el 271 sino el del contador.
+        // el siguiente libre no es el 271 sino el del contador de su taller.
         MockHttpSession sesion = cargarApc();
         mvc.perform(generar(sesion, "alto", "5000", "PXCBC-F67008")).andExpect(status().isOk());
 
@@ -330,7 +349,7 @@ class InfoEmbalajeControllerTest {
                 .andReturn().getResponse();
 
         int siguiente = Integer.parseInt(respuesta.getHeader("X-Siguiente-Numero"));
-        assertEquals(archivo.siguienteNumeroEnvio(), siguiente);
+        assertEquals(archivo.siguienteNumeroEnvio("TÁNGER"), siguiente);
         assertTrue(siguiente >= 5001, "el 271 podría estar ya usado: manda el contador");
     }
 

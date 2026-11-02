@@ -151,7 +151,6 @@ public class InfoEmbalajeController {
         if (enCurso.estaVacio()) {
             return "redirect:/info-embalaje";
         }
-        int siguiente = archivo.siguienteNumeroEnvio();
         DatosHojaEmbalaje partida = enCurso.getPartida();
         HojaEmbalajeForm formulario;
         if (partida != null) {
@@ -159,7 +158,8 @@ public class InfoEmbalajeController {
             elegido(partida).ifPresent(a -> formulario.setFotoId(a.fotoId()));
         } else {
             formulario = new HojaEmbalajeForm();
-            formulario.setNumeroEnvio(siguiente);
+            // Sin taller no hay contador del que seguir: el número lo propone la
+            // pantalla en cuanto se teclea el taller (siguientesPorTaller).
         }
         model.addAttribute("enCurso", enCurso);
         model.addAttribute("articulosJs", enCurso.getArticulos());
@@ -167,7 +167,9 @@ public class InfoEmbalajeController {
                 : enCurso.getArticulos().indexOf(elegido(partida).orElse(null)));
         model.addAttribute("partida", partida);
         model.addAttribute("formulario", formulario);
-        model.addAttribute("siguienteNumero", siguiente);
+        model.addAttribute("siguientesPorTaller", archivo.siguientesPorTaller());
+        model.addAttribute("siguienteNumero", partida == null ? null
+                : archivo.siguienteNumeroEnvio(partida.taller()));
         model.addAttribute("talleres", archivo.talleres());
         model.addAttribute("comentariosGuardados", comentarios.todos());
         model.addAttribute("hoy", LocalDate.now());
@@ -179,7 +181,7 @@ public class InfoEmbalajeController {
      * y descarga el blob en vez de enviar el formulario: así no se recarga,
      * lo tecleado sigue ahí para la hoja del siguiente artículo, y puede
      * enseñar con qué número se ha guardado (cabecera {@code X-Numero-Envio})
-     * y cuál es el siguiente libre ({@code X-Siguiente-Numero}). El siguiente
+     * y cuál es el siguiente libre de su taller ({@code X-Siguiente-Numero}). El siguiente
      * lo dice el contador y no la pantalla: tras repetir el envío 270 de una
      * hoja importada, el 271 puede estar ya usado.
      * Sin JavaScript, el envío normal del formulario descarga igual el Word.
@@ -206,7 +208,7 @@ public class InfoEmbalajeController {
         return word(datos, contenido)
                 .header("X-Hoja-Id", String.valueOf(guardada.getId()))
                 .header("X-Numero-Envio", String.valueOf(guardada.getNumeroEnvio()))
-                .header("X-Siguiente-Numero", String.valueOf(archivo.siguienteNumeroEnvio()))
+                .header("X-Siguiente-Numero", String.valueOf(archivo.siguienteNumeroEnvio(datos.taller())))
                 .body(contenido);
     }
 

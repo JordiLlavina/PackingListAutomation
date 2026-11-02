@@ -3,7 +3,7 @@ package com.puntotres.packinglist.web;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.IntSupplier;
+import java.util.function.ToIntFunction;
 
 import com.puntotres.packinglist.model.DatosHojaEmbalaje;
 import com.puntotres.packinglist.model.DatosHojaEmbalaje.DestinacionHoja;
@@ -105,10 +105,10 @@ public class HojaEmbalajeForm {
      * son un error: es la fila que se añadió y no se usó), una cantidad vacía
      * cuenta como cero y el enlace se recorta, porque un espacio pegado al
      * copiarlo haría un QR que no abre. Un número de envío vacío se resuelve
-     * con {@code siguienteNumero}, el contador del archivo: solo se consulta
-     * si hace falta.
+     * con {@code siguienteNumero}, el contador del archivo para el taller de
+     * la hoja (cada taller lleva el suyo): solo se consulta si hace falta.
      */
-    public DatosHojaEmbalaje aDatos(EmbalajeEnCurso enCurso, LocalDate hoy, IntSupplier siguienteNumero) {
+    public DatosHojaEmbalaje aDatos(EmbalajeEnCurso enCurso, LocalDate hoy, ToIntFunction<String> siguienteNumero) {
         List<DestinacionHoja> destinaciones = new ArrayList<>();
         if (destinos != null) {
             for (Destino d : destinos) {
@@ -120,7 +120,7 @@ public class HojaEmbalajeForm {
             }
         }
         return new DatosHojaEmbalaje(enCurso.getCliente(), enCurso.getNombreCliente(), enCurso.getTemporada(),
-                recortar(taller), numeroEnvio != null ? numeroEnvio : siguienteNumero.getAsInt(),
+                recortar(taller), numeroEnvio != null ? numeroEnvio : siguienteNumero.applyAsInt(recortar(taller)),
                 recortar(nota), hoy, recortar(referencia), recortar(codigoColor), recortar(descripcionColor),
                 recortar(nombreBolso), recortar(codigoModelo), recortar(medidaCaja), unidadesPorCaja,
                 recortar(bolsaTela), recortar(etiquetaInterior), recortar(instruccionEspecial),

@@ -77,9 +77,12 @@
                         <div>
                             <label for="numeroEnvio">Nº de envío</label>
                             <input type="number" th:field="*{numeroEnvio}" min="1" step="1">
-                            <p class="ayuda" id="ayudaNumeroEnvio" th:if="${partida == null}">El siguiente del contador de Puntotres.</p>
-                            <p class="ayuda" id="ayudaNumeroEnvio" th:if="${partida != null}"
-                               th:text="|El de la hoja importada. El siguiente libre es el ${siguienteNumero}.|"></p>
+                            <p class="ayuda" id="ayudaNumeroEnvio" th:if="${partida == null}">Escribe el taller para proponer el número.</p>
+                            <p class="ayuda" id="ayudaNumeroEnvio"
+                               th:if="${partida != null and #strings.isEmpty(#strings.trim(partida.taller))}">El de la hoja importada.</p>
+                            <p class="ayuda" id="ayudaNumeroEnvio"
+                               th:if="${partida != null and !#strings.isEmpty(#strings.trim(partida.taller))}"
+                               th:text="|El de la hoja importada. El siguiente libre del taller ${#strings.trim(partida.taller)} es el ${siguienteNumero}.|"></p>
                         </div>
                         <div>
                             <label for="nota">Nota ICSUITE</label>
@@ -195,6 +198,9 @@
     /*<![CDATA[*/
     const ARTICULOS = /*[[${articulosJs}]]*/ [];
     const URL_FOTO = /*[[@{/catalogo/foto/}]]*/ '/catalogo/foto/';
+    // El siguiente nº de envío de cada taller, por taller recortado y en mayúsculas.
+    const SIGUIENTES_POR_TALLER = /*[[${siguientesPorTaller}]]*/ {};
+    const CON_PARTIDA = /*[[${partida != null}]]*/ false;
     /*]]>*/
     (function () {
         const form = document.getElementById('formEmbalaje');
@@ -307,6 +313,33 @@
         const boton = document.getElementById('botonGenerar');
         const resultado = document.getElementById('resultadoGenerar');
         const numeroEnvio = document.getElementById('numeroEnvio');
+        const taller = document.getElementById('taller');
+        const ayudaNumero = document.getElementById('ayudaNumeroEnvio');
+
+        // --- Nº de envío: cada taller lleva su propia numeración ---
+        // Se compara como en el servidor: recortado y en mayúsculas, sin quitar acentos.
+        function claveTaller(texto) {
+            return (texto || '').trim().toUpperCase();
+        }
+
+        function proponerNumero() {
+            const clave = claveTaller(taller.value);
+            if (!clave) {
+                numeroEnvio.value = '';
+                ayudaNumero.textContent = 'Escribe el taller para proponer el número.';
+                return;
+            }
+            numeroEnvio.value = SIGUIENTES_POR_TALLER[clave] || 1;
+            ayudaNumero.textContent = 'El siguiente del taller ' + taller.value.trim() + '.';
+        }
+
+        taller.addEventListener('input', proponerNumero);
+        taller.addEventListener('change', proponerNumero);
+        // Una hoja importada conserva su número al abrirse; sin ella, el taller
+        // que ya traiga el campo (el navegador lo puede recordar) propone el suyo.
+        if (!CON_PARTIDA && taller.value.trim()) {
+            proponerNumero();
+        }
 
         function nombreDeFichero(cabecera) {
             if (cabecera) {
@@ -339,6 +372,8 @@
             evento.preventDefault();
             boton.disabled = true;
             boton.textContent = 'Generando…';
+            // El taller con el que se genera: el que se teclee mientras tanto es otro.
+            const tallerEnviado = taller.value.trim();
             fetch(form.action, {method: 'POST', body: new FormData(form)})
                 .then(function (respuesta) {
                     if (!respuesta.ok) {
@@ -368,14 +403,15 @@
                     setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 10000);
                     avisar('ok', 'Guardada como envío ' + hoja.numero + '. Se ha descargado «'
                             + hoja.nombre + '».');
-                    // El siguiente lo dice el contador del servidor, no «este + 1»:
-                    // tras repetir un envío importado, ese número puede estar usado.
+                    // El siguiente lo dice el contador del servidor para ese taller,
+                    // no «este + 1»: tras repetir un envío importado, ese número
+                    // puede estar usado.
                     const siguiente = parseInt(hoja.siguiente, 10);
-                    if (!isNaN(siguiente)) {
-                        numeroEnvio.value = siguiente;
-                        document.getElementById('ayudaNumeroEnvio').textContent =
-                                'El siguiente libre del contador de Puntotres es el ' + siguiente + '.';
+                    if (!isNaN(siguiente) && tallerEnviado) {
+                        SIGUIENTES_POR_TALLER[claveTaller(tallerEnviado)] = siguiente;
                     }
+                    // Lo propone para el taller que haya ahora en el campo.
+                    proponerNumero();
                 })
                 .catch(function (error) {
                     avisar('error', error.message || 'No se ha podido hablar con el servidor');

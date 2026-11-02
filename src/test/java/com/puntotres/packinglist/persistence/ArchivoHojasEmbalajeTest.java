@@ -6,11 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -24,7 +22,6 @@ import com.puntotres.packinglist.model.DatosHojaEmbalaje.DestinacionHoja;
  * guardan hojas: nada aquí asume que la tabla está vacía.
  */
 @SpringBootTest
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class ArchivoHojasEmbalajeTest {
 
     private static final String CLIENTE = "EMB-TEST";
@@ -33,23 +30,34 @@ class ArchivoHojasEmbalajeTest {
     private ArchivoHojasEmbalaje archivo;
 
     @Test
-    @Order(1)
-    void sinHojasElSiguienteNumeroEsUno() {
-        boolean vacia = archivo.todas().isEmpty();
-        int siguiente = archivo.siguienteNumeroEnvio();
-        if (vacia) {
-            assertEquals(1, siguiente);
-        } else {
-            assertTrue(siguiente >= 1);
-        }
+    void unTallerSinHojasEmpiezaEnUnoYUnTallerVacioTambien() {
+        assertEquals(1, archivo.siguienteNumeroEnvio("EMBT Taller sin hojas"));
+        assertEquals(1, archivo.siguienteNumeroEnvio("  "));
+        assertEquals(1, archivo.siguienteNumeroEnvio(null));
     }
 
     @Test
     void elSiguienteNumeroEsElMaximoMasUnoAunqueSeGuardeUnoMenor() {
-        archivo.guardar(datos(500, "ULL027"), null);
-        archivo.guardar(datos(7, "ULL027"), null);
+        archivo.guardar(conTaller(datos(500, "ULL027"), "EMBT Máximo"), null);
+        archivo.guardar(conTaller(datos(7, "ULL027"), "EMBT Máximo"), null);
 
-        assertEquals(501, archivo.siguienteNumeroEnvio());
+        assertEquals(501, archivo.siguienteNumeroEnvio("EMBT Máximo"));
+    }
+
+    @Test
+    void cadaTallerLlevaSuPropioContador() {
+        archivo.guardar(conTaller(datos(270, "ULL027"), "EMBT Tánger"), null);
+        archivo.guardar(conTaller(datos(145, "ULL027"), "EMBT Fez"), null);
+
+        assertEquals(271, archivo.siguienteNumeroEnvio("EMBT Tánger"));
+        assertEquals(146, archivo.siguienteNumeroEnvio("EMBT Fez"));
+        assertEquals(271, archivo.siguienteNumeroEnvio("embt tánger "), "sin mayúsculas ni espacios de más");
+        assertEquals(1, archivo.siguienteNumeroEnvio("EMBT Ubrique"));
+
+        Map<String, Integer> siguientes = archivo.siguientesPorTaller();
+        assertEquals(271, siguientes.get("EMBT TÁNGER"));
+        assertEquals(146, siguientes.get("EMBT FEZ"));
+        assertFalse(siguientes.containsKey("EMBT UBRIQUE"));
     }
 
     @Test

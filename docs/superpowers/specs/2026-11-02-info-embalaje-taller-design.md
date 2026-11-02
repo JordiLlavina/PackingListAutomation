@@ -34,7 +34,7 @@ Grupo | Campo | De dónde sale | Editable
 ---|---|---|---
 Cabecera | Cliente, temporada | entrada | no (vienen de la carga)
 Cabecera | Taller | texto; `<datalist>` con los talleres usados antes | sí
-Envío | Nº envío | **max(número de envío guardado) + 1**, 1 si no hay ninguno; contador único de Puntotres **(decisión de Claude)** | sí
+Envío | Nº envío | **max(número de envío guardado de ese taller) + 1**, 1 si el taller no tiene ninguna; **un contador por taller** (Tánger, Fez, Ubrique…), comparando el taller recortado y sin mayúsculas. **Decisión del usuario** (noviembre de 2026), que sustituye al contador único que se había propuesto. Lo propone la pantalla al teclear el taller | sí
 Envío | Nota ERP | texto, lo teclea el usuario | sí
 Envío | Fecha | hoy | no
 Artículo | Referencia, código y descripción de color | pedido (AMI: `COLORIS` + `Libellé coloris`; APC: color del `sku`/`Couleurs` + descripción de `color_cliente`) | elección en el desplegable

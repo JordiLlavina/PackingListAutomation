@@ -1,7 +1,10 @@
 package com.puntotres.packinglist.persistence;
 
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +16,7 @@ import com.puntotres.packinglist.model.DatosHojaEmbalaje;
 /**
  * El archivo de hojas de «Info de embalaje»: guarda cada hoja generada y
  * responde a lo que la pantalla necesita saber de las anteriores (siguiente
- * número de envío, talleres usados, última hoja de un modelo).
+ * número de envío de cada taller, talleres usados, última hoja de un modelo).
  *
  * Se guarda el snapshot entero en JSON y no solo las columnas sueltas porque
  * una hoja antigua tiene que enseñar lo que de verdad se imprimió, aunque el
@@ -61,11 +64,44 @@ public class ArchivoHojasEmbalaje {
         return id == null ? Optional.empty() : repositorio.findById(id);
     }
 
-    /** El contador único de Puntotres: el mayor número guardado más uno, o 1 si no hay ninguno. */
+    /**
+     * El siguiente número de envío de un taller: su mayor número guardado más
+     * uno, o 1 si no tiene ninguno. Cada taller (Tánger, Fez, Ubrique…) lleva
+     * su propia numeración, por decisión del usuario. El taller se compara
+     * recortado y sin mayúsculas ({@link #claveTaller}); un taller vacío
+     * empieza en 1, porque no hay numeración de la que seguir.
+     */
     @Transactional(readOnly = true)
-    public int siguienteNumeroEnvio() {
-        Integer maximo = repositorio.maximoNumeroEnvio();
+    public int siguienteNumeroEnvio(String taller) {
+        String clave = claveTaller(taller);
+        if (clave.isEmpty()) {
+            return 1;
+        }
+        Integer maximo = repositorio.maximoNumeroEnvioDe(clave);
         return maximo == null ? 1 : maximo + 1;
+    }
+
+    /**
+     * El siguiente número de cada taller con hojas, por su {@link #claveTaller}.
+     * Va entero a la pantalla porque el número propuesto depende de lo que se
+     * teclee en el campo del taller, y así se cambia sin volver al servidor.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Integer> siguientesPorTaller() {
+        Map<String, Integer> siguientes = new TreeMap<>();
+        for (Object[] fila : repositorio.maximosPorTaller()) {
+            if (fila[1] != null) {
+                // Se vuelve a normalizar en Java para que la clave sea la misma
+                // que la del navegador aunque la base pase a mayúsculas distinto.
+                siguientes.merge(claveTaller((String) fila[0]), ((Number) fila[1]).intValue() + 1, Math::max);
+            }
+        }
+        return siguientes;
+    }
+
+    /** El taller tal como se compara: recortado y en mayúsculas, sin quitar acentos. */
+    public static String claveTaller(String taller) {
+        return taller == null ? "" : taller.trim().toUpperCase(Locale.ROOT);
     }
 
     /** La última hoja del mismo cliente y modelo, de la que se prerrellenan bolsa, etiqueta e instrucción. */
