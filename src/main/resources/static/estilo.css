@@ -1472,3 +1472,112 @@ main.catalogo { max-width: 100rem; }
 .galeria-foto button.mini { padding: 0.1rem 0.4rem; font-size: 0.75rem; margin: 0; }
 .galeria-subir { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 .tabla-catalogo td.c-foto { position: relative; }
+
+/* --- Info de embalaje para taller -----------------------------------------
+   Formulario en dos columnas (artículo y envío a la izquierda, embalaje y
+   destinaciones a la derecha) que se apilan en pantallas estrechas; los
+   textos largos van debajo a todo el ancho. */
+.embalaje-cabecera {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+}
+.embalaje-cabecera p { margin: 0; }
+.embalaje-cabecera .boton { margin: 0; }
+
+.embalaje-columnas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(24rem, 1fr));
+    gap: 0 1rem;
+    align-items: start;
+}
+
+/* Números y desplegables al ancho de su columna, como los campos de texto. */
+.embalaje-formulario input[type="number"],
+.embalaje-formulario select {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+    background: var(--campo);
+}
+
+.embalaje-pareja {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1rem;
+}
+
+.embalaje-articulo {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0 1rem;
+    align-items: start;
+}
+
+.embalaje-foto {
+    margin-top: 0.8rem;
+    width: 7.5rem;
+    height: 7.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--borde);
+    border-radius: 6px;
+    background: var(--fondo-suave);
+    color: var(--texto-suave);
+    font-size: 0.8rem;
+    text-align: center;
+    overflow: hidden;
+}
+.embalaje-foto img { width: 100%; height: 100%; object-fit: contain; }
+.embalaje-foto [hidden] { display: none; }
+
+.embalaje-rotulo { display: block; font-weight: 600; margin: 0.8rem 0 0.25rem; }
+.embalaje-dato { margin: 0; padding: 0.45rem 0; }
+
+.embalaje-destinos td input[type="text"],
+.embalaje-destinos td input[type="number"] { width: 100%; }
+.embalaje-destinos th:last-child, .embalaje-destinos td:last-child { width: 2.5rem; text-align: center; }
+.embalaje-destinos tfoot th { border-top: 0; }
+.embalaje-anadir { margin-top: 0.6rem; }
+
+.embalaje-comentario-guardado { margin-bottom: 0.4rem; }
+
+/* Hojas guardadas: la lista a la izquierda y la elegida a la derecha. */
+.embalaje-antiguos {
+    display: grid;
+    grid-template-columns: minmax(16rem, 1fr) 2fr;
+    gap: 1rem;
+    align-items: start;
+}
+@media (max-width: 52rem) {
+    .embalaje-antiguos { grid-template-columns: 1fr; }
+}
+
+.embalaje-lista { padding: 0.5rem; }
+.embalaje-lista ul { list-style: none; margin: 0; padding: 0; max-height: 75vh; overflow-y: auto; }
+.embalaje-lista a {
+    display: block;
+    padding: 0.5rem 0.6rem;
+    border-radius: 4px;
+    color: inherit;
+    text-decoration: none;
+}
+.embalaje-lista a:hover { background: var(--fondo-suave); }
+.embalaje-lista a.elegida {
+    background: var(--acento-suave-ini);
+    box-shadow: inset 3px 0 0 var(--acento);
+}
+.embalaje-lista-fecha { display: block; font-size: 0.85rem; color: var(--texto-suave); }
+.embalaje-lista-articulo { display: block; font-weight: 600; }
+.embalaje-lista .ayuda { display: block; margin: 0; }
+
+.embalaje-resumen th { width: 14rem; font-weight: 600; }
+.embalaje-panel h4 { margin: 1.2rem 0 0.4rem; }
+.embalaje-texto { white-space: pre-line; margin: 0; }
+.embalaje-acciones { display: flex; flex-wrap: wrap; align-items: center; }
+.embalaje-acciones form { display: inline; }

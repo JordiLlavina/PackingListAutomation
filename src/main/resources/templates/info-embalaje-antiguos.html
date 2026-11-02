@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Hojas de embalaje guardadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Etiqueta Info de Embalaje · Hojas guardadas')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="tarjeta" th:if="${#lists.isEmpty(hojas)}">
+        <p>Todavía no hay ninguna hoja guardada.</p>
+    </div>
+
+    <div class="embalaje-antiguos" th:unless="${#lists.isEmpty(hojas)}">
+        <nav class="tarjeta embalaje-lista" aria-label="Hojas guardadas">
+            <ul>
+                <li th:each="hoja : ${hojas}">
+                    <a th:href="@{/info-embalaje/antiguos(id=${hoja.id()})}"
+                       th:classappend="${hoja.id() == elegidaId} ? 'elegida'"
+                       th:attr="aria-current=${hoja.id() == elegidaId} ? 'true' : null">
+                        <span class="embalaje-lista-fecha"
+                              th:text="|${#temporals.format(hoja.fecha(), 'dd/MM/yyyy')} · ${hoja.temporada()} · envío ${hoja.numeroEnvio()}|">
+                            02/11/2026 · Spring 27 · envío 270</span>
+                        <span class="embalaje-lista-articulo"
+                              th:text="|${hoja.referencia()} ${hoja.codigoColor()}|">PXCBC-F67008 LZZ</span>
+                        <span class="ayuda" th:if="${hoja.taller() != null}"
+                              th:text="|${hoja.cliente()} · ${hoja.taller()}|">APC · TÁNGER</span>
+                        <span class="ayuda" th:if="${hoja.taller() == null}" th:text="${hoja.cliente()}">APC</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <section class="tarjeta embalaje-panel">
+            <p th:if="${elegida == null}">La hoja elegida ya no existe: elige otra de la lista.</p>
+            <th:block th:if="${elegida != null}">
+                <h3 class="titulo-seccion"
+                    th:text="|Envío ${elegida.numeroEnvio()} · ${elegida.referencia()} ${elegida.codigoColor()} ${elegida.descripcionColor()}|">
+                    Envío 270 · PXCBC-F67008 LZZ NOIR</h3>
+                <table class="embalaje-resumen">
+                    <tbody>
+                    <tr><th>Cliente</th><td th:text="${elegida.nombreCliente()}"></td></tr>
+                    <tr><th>Temporada</th><td th:text="${elegida.temporada()}"></td></tr>
+                    <tr><th>Taller</th><td th:text="${elegida.taller()}"></td></tr>
+                    <tr><th>Nº de envío</th><td th:text="${elegida.numeroEnvio()}"></td></tr>
+                    <tr><th>Nota ICSUITE</th><td th:text="${elegida.nota()}"></td></tr>
+                    <tr><th>Fecha</th>
+                        <td th:text="${elegida.fecha() != null} ? ${#temporals.format(elegida.fecha(), 'dd/MM/yyyy')} : ''"></td></tr>
+                    <tr><th>Referencia</th><td th:text="${elegida.referencia()}"></td></tr>
+                    <tr><th>Color</th><td th:text="|${elegida.codigoColor()} ${elegida.descripcionColor()}|"></td></tr>
+                    <tr><th>Nombre del bolso</th><td th:text="${elegida.nombreBolso()}"></td></tr>
+                    <tr><th>Caja</th><td th:text="${elegida.medidaCaja()}"></td></tr>
+                    <tr><th>Unidades por caja</th><td th:text="${elegida.unidadesPorCaja()}"></td></tr>
+                    <tr><th>Bolsa de tela</th><td th:text="${elegida.bolsaTela()}"></td></tr>
+                    <tr><th>Etiqueta de cartón interior</th>
+                        <td th:text="${#strings.isEmpty(elegida.etiquetaInterior())} ? 'No lleva' : ${elegida.etiquetaInterior()}"></td></tr>
+                    <tr><th>Instrucción especial</th><td th:text="${elegida.instruccionEspecial()}"></td></tr>
+                    <tr><th>Enlace al vídeo</th><td th:text="${elegida.enlaceVideo()}"></td></tr>
+                    </tbody>
+                </table>
+
+                <h4>Destinaciones</h4>
+                <table class="embalaje-destinos">
+                    <thead><tr><th>Destino</th><th>Nº pedido</th><th>Cantidad</th></tr></thead>
+                    <tbody>
+                    <tr th:each="destino : ${elegida.destinaciones()}">
+                        <td th:text="${destino.destino()}"></td>
+                        <td th:text="${destino.pedido()}"></td>
+                        <td th:text="${destino.cantidad()}"></td>
+                    </tr>
+                    </tbody>
+                    <tfoot>
+                    <tr><th colspan="2">Total unidades</th><th th:text="${elegida.totalUnidades()}">0</th></tr>
+                    </tfoot>
+                </table>
+
+                <th:block th:if="${!#strings.isEmpty(elegida.repartoCajas())}">
+                    <h4>Reparto en cajas</h4>
+                    <p class="embalaje-texto" th:text="${elegida.repartoCajas()}"></p>
+                </th:block>
+                <th:block th:if="${!#strings.isEmpty(elegida.comentarios())}">
+                    <h4>Comentarios</h4>
+                    <p class="embalaje-texto" th:text="${elegida.comentarios()}"></p>
+                </th:block>
+
+                <div class="embalaje-acciones">
+                    <a class="boton" th:href="@{/info-embalaje/antiguos/{id}/docx(id=${elegidaId})}">Descargar Word</a>
+                    <form th:action="@{/info-embalaje/importar}" method="post">
+                        <input type="hidden" name="id" th:value="${elegidaId}">
+                        <button type="submit" class="secundario">Importar al formulario</button>
+                    </form>
+                </div>
+            </th:block>
+        </section>
+    </div>
+
+    <a class="boton neutro" th:href="@{/info-embalaje}">Volver</a>
+</main>
+</body>
+</html>

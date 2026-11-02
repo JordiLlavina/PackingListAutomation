@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Info de embalaje para taller')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Etiqueta Info de Embalaje para Taller')}"></header>
+<main>
+    <div class="embalaje-cabecera">
+        <p>
+            <strong th:text="${enCurso.nombreCliente}">A.P.C.</strong>
+            <span th:if="${!#strings.isEmpty(enCurso.temporada)}" th:text="|· Temporada ${enCurso.temporada}|">· Temporada Spring 27</span>
+            <span class="ayuda" th:if="${partida != null}"
+                  th:text="|· importada del envío ${partida.numeroEnvio()}|">· importada del envío 270</span>
+        </p>
+        <a class="boton neutro" th:href="@{/info-embalaje}">Empezar de nuevo</a>
+    </div>
+
+    <div class="alerta" th:each="aviso : ${enCurso.avisos}" th:text="${aviso}"></div>
+
+    <form id="formEmbalaje" class="embalaje-formulario" th:action="@{/info-embalaje/generar}" method="post"
+          th:object="${formulario}">
+        <div class="tarjeta">
+            <label for="articulo">Artículo del pedido</label>
+            <select id="articulo">
+                <option value="">-- elige un artículo --</option>
+                <option th:each="articulo, estado : ${articulosJs}"
+                        th:value="${estado.index}"
+                        th:text="${articulo.etiqueta()}"
+                        th:selected="${estado.index == articuloElegido}"></option>
+            </select>
+            <p class="ayuda">
+                Rellena todo lo de abajo con lo que ya se sabe del pedido y del catálogo.
+                Cualquier campo se puede cambiar después.
+            </p>
+        </div>
+
+        <div class="embalaje-columnas">
+            <div>
+                <div class="tarjeta">
+                    <h3 class="titulo-seccion">Artículo</h3>
+                    <div class="embalaje-articulo">
+                        <div class="embalaje-foto">
+                            <img id="foto" alt="Foto del modelo"
+                                 th:src="${formulario.fotoId != null} ? @{/catalogo/foto/{id}(id=${formulario.fotoId})} : null"
+                                 th:hidden="${formulario.fotoId == null}">
+                            <span id="sinFoto" th:hidden="${formulario.fotoId != null}">Sin foto en el catálogo</span>
+                        </div>
+                        <div>
+                            <label for="referencia">Referencia</label>
+                            <input type="text" th:field="*{referencia}" maxlength="80">
+                            <div class="embalaje-pareja">
+                                <div>
+                                    <label for="codigoColor">Código de color</label>
+                                    <input type="text" th:field="*{codigoColor}" maxlength="200">
+                                </div>
+                                <div>
+                                    <label for="descripcionColor">Color</label>
+                                    <input type="text" th:field="*{descripcionColor}" maxlength="200">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <label for="nombreBolso">Nombre del bolso</label>
+                    <input type="text" th:field="*{nombreBolso}" maxlength="200">
+                    <input type="hidden" th:field="*{codigoModelo}">
+                    <input type="hidden" th:field="*{fotoId}">
+                </div>
+
+                <div class="tarjeta">
+                    <h3 class="titulo-seccion">Envío</h3>
+                    <label for="taller">Taller</label>
+                    <input type="text" th:field="*{taller}" list="talleres" maxlength="60"
+                           placeholder="TÁNGER, FEZ…">
+                    <datalist id="talleres">
+                        <option th:each="taller : ${talleres}" th:value="${taller}"></option>
+                    </datalist>
+                    <div class="embalaje-pareja">
+                        <div>
+                            <label for="numeroEnvio">Nº de envío</label>
+                            <input type="number" th:field="*{numeroEnvio}" min="1" step="1">
+                            <p class="ayuda" th:if="${partida == null}">El siguiente del contador de Puntotres.</p>
+                            <p class="ayuda" th:if="${partida != null}"
+                               th:text="|El de la hoja importada. El siguiente libre es el ${siguienteNumero}.|"></p>
+                        </div>
+                        <div>
+                            <label for="nota">Nota ICSUITE</label>
+                            <input type="text" th:field="*{nota}" maxlength="60">
+                        </div>
+                    </div>
+                    <span class="embalaje-rotulo">Fecha</span>
+                    <p class="embalaje-dato" th:text="${#temporals.format(hoy, 'dd/MM/yyyy')}">02/11/2026</p>
+                </div>
+            </div>
+
+            <div>
+                <div class="tarjeta">
+                    <h3 class="titulo-seccion">Embalaje</h3>
+                    <div class="embalaje-pareja">
+                        <div>
+                            <label for="medidaCaja">Caja</label>
+                            <input type="text" th:field="*{medidaCaja}" maxlength="40" placeholder="60x40x40">
+                        </div>
+                        <div>
+                            <label for="unidadesPorCaja">Unidades por caja</label>
+                            <input type="number" th:field="*{unidadesPorCaja}" min="1" step="1">
+                        </div>
+                    </div>
+                    <label for="bolsaTela">Bolsa de tela</label>
+                    <input type="text" th:field="*{bolsaTela}" maxlength="200">
+                    <label for="etiquetaInterior">Etiqueta de cartón interior</label>
+                    <input type="text" th:field="*{etiquetaInterior}" maxlength="200" placeholder="PARIS">
+                    <p class="ayuda">
+                        Vacío: «NO LLEVA ETIQUETA DE CARTÓN INTERIOR». Con texto: «LLEVA ETIQUETA DE
+                        CARTÓN INTERIOR» seguido de lo escrito.
+                    </p>
+                    <label for="instruccionEspecial">Instrucción especial</label>
+                    <input type="text" th:field="*{instruccionEspecial}" maxlength="200"
+                           placeholder="GRABADO LOGO NIKEL">
+                    <p class="ayuda">Sale destacada en la hoja.</p>
+                </div>
+
+                <div class="tarjeta">
+                    <h3 class="titulo-seccion">Destinaciones</h3>
+                    <table class="embalaje-destinos">
+                        <thead>
+                        <tr><th>Destino</th><th>Nº pedido</th><th>Cantidad</th><th></th></tr>
+                        </thead>
+                        <tbody id="filasDestino">
+                        <tr th:each="destino, estado : *{destinos}">
+                            <td><input type="text" class="d-destino" maxlength="100" aria-label="Destino"
+                                       th:name="|destinos[${estado.index}].destino|" th:value="${destino.destino}"></td>
+                            <td><input type="text" class="d-pedido" maxlength="100" aria-label="Nº de pedido"
+                                       th:name="|destinos[${estado.index}].pedido|" th:value="${destino.pedido}"></td>
+                            <td><input type="number" class="d-cantidad" min="0" step="1" aria-label="Cantidad"
+                                       th:name="|destinos[${estado.index}].cantidad|" th:value="${destino.cantidad}"></td>
+                            <td><button type="button" class="mini quitar" title="Quitar esta destinación"
+                                        aria-label="Quitar esta destinación">&times;</button></td>
+                        </tr>
+                        </tbody>
+                        <tfoot>
+                        <tr>
+                            <th colspan="2">Total unidades</th>
+                            <th id="totalUnidades" th:text="${partida != null ? partida.totalUnidades() : 0}">0</th>
+                            <th></th>
+                        </tr>
+                        </tfoot>
+                    </table>
+                    <button type="button" class="mini embalaje-anadir" id="anadirDestino">+ destinación</button>
+                    <template id="plantillaDestino">
+                        <tr>
+                            <td><input type="text" class="d-destino" maxlength="100" aria-label="Destino"></td>
+                            <td><input type="text" class="d-pedido" maxlength="100" aria-label="Nº de pedido"></td>
+                            <td><input type="number" class="d-cantidad" min="0" step="1" aria-label="Cantidad"></td>
+                            <td><button type="button" class="mini quitar" title="Quitar esta destinación"
+                                        aria-label="Quitar esta destinación">&times;</button></td>
+                        </tr>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <div class="tarjeta">
+            <label for="repartoCajas">Reparto en cajas</label>
+            <textarea th:field="*{repartoCajas}" rows="5" maxlength="4000"
+                      placeholder="12 cajas de 10 a JAPAN&#10;8 cajas de 10 a KOREA"></textarea>
+
+            <label for="comentarios" class="etiqueta-con-accion">
+                <span>Comentarios</span>
+                <a class="lapiz" th:href="@{/comentarios-embalaje}"
+                   title="Añadir, editar o borrar comentarios guardados"
+                   aria-label="Editar los comentarios guardados">&#9998;</a>
+            </label>
+            <select id="comentarioGuardado" class="embalaje-comentario-guardado"
+                    aria-label="Añadir un comentario guardado">
+                <option value="">-- comentario guardado --</option>
+                <option th:each="comentario : ${comentariosGuardados}"
+                        th:value="${comentario.id}" th:text="${comentario.nombre}"
+                        th:attr="data-texto=${comentario.texto}"></option>
+            </select>
+            <textarea th:field="*{comentarios}" rows="4" maxlength="4000"></textarea>
+            <p class="ayuda">Elegir un comentario guardado lo añade al final; se pueden combinar varios.</p>
+
+            <label for="enlaceVideo">Enlace al vídeo de embalaje</label>
+            <input type="text" th:field="*{enlaceVideo}" maxlength="500" placeholder="https://youtu.be/…">
+            <p class="ayuda">
+                Opcional. Con enlace, la hoja lleva un QR que lo abre: YouTube «no listado» o Google
+                Drive con «cualquier persona con el enlace».
+            </p>
+        </div>
+
+        <button type="submit" id="botonGenerar">Generar hoja</button>
+        <div id="resultadoGenerar" role="status"></div>
+    </form>
+</main>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const ARTICULOS = /*[[${articulosJs}]]*/ [];
+    const URL_FOTO = /*[[@{/catalogo/foto/}]]*/ '/catalogo/foto/';
+    /*]]>*/
+    (function () {
+        const form = document.getElementById('formEmbalaje');
+        const articulo = document.getElementById('articulo');
+        const filas = document.getElementById('filasDestino');
+        const plantilla = document.getElementById('plantillaDestino');
+        const total = document.getElementById('totalUnidades');
+        const foto = document.getElementById('foto');
+        const sinFoto = document.getElementById('sinFoto');
+        const fotoId = document.getElementById('fotoId');
+        const CAMPOS = ['referencia', 'codigoColor', 'descripcionColor', 'nombreBolso', 'codigoModelo',
+            'medidaCaja', 'unidadesPorCaja', 'bolsaTela', 'etiquetaInterior', 'instruccionEspecial'];
+
+        // Los nombres se rehacen tras cada alta o baja: Spring une destinos[i]
+        // por índice, y un hueco en la numeración llegaría como fila vacía.
+        function renumerar() {
+            Array.prototype.forEach.call(filas.rows, function (fila, i) {
+                fila.querySelector('.d-destino').name = 'destinos[' + i + '].destino';
+                fila.querySelector('.d-pedido').name = 'destinos[' + i + '].pedido';
+                fila.querySelector('.d-cantidad').name = 'destinos[' + i + '].cantidad';
+            });
+        }
+
+        function sumar() {
+            let suma = 0;
+            filas.querySelectorAll('.d-cantidad').forEach(function (campo) {
+                const valor = parseInt(campo.value, 10);
+                if (!isNaN(valor)) suma += valor;
+            });
+            total.textContent = suma;
+        }
+
+        function anadirFila(destinacion) {
+            const fila = plantilla.content.firstElementChild.cloneNode(true);
+            if (destinacion) {
+                fila.querySelector('.d-destino').value = destinacion.destino || '';
+                fila.querySelector('.d-pedido').value = destinacion.pedido || '';
+                fila.querySelector('.d-cantidad').value = destinacion.cantidad;
+            }
+            filas.appendChild(fila);
+            return fila;
+        }
+
+        function pintarFoto(id) {
+            if (id === null || id === undefined) {
+                foto.hidden = true;
+                foto.removeAttribute('src');
+                sinFoto.hidden = false;
+            } else {
+                foto.src = URL_FOTO + id;
+                foto.hidden = false;
+                sinFoto.hidden = true;
+            }
+        }
+
+        // Elegir un artículo pisa todo lo suyo, también lo ya tecleado: es
+        // otro sobre, y mezclar campos de dos artículos daría una hoja falsa.
+        articulo.addEventListener('change', function () {
+            const elegido = ARTICULOS[articulo.value];
+            if (!elegido) return;
+            CAMPOS.forEach(function (campo) {
+                const valor = elegido[campo];
+                document.getElementById(campo).value = valor === null || valor === undefined ? '' : valor;
+            });
+            fotoId.value = elegido.fotoId === null || elegido.fotoId === undefined ? '' : elegido.fotoId;
+            pintarFoto(elegido.fotoId);
+            filas.innerHTML = '';
+            (elegido.destinaciones || []).forEach(anadirFila);
+            renumerar();
+            sumar();
+        });
+
+        document.getElementById('anadirDestino').addEventListener('click', function () {
+            anadirFila(null).querySelector('.d-destino').focus();
+            renumerar();
+        });
+
+        filas.addEventListener('click', function (evento) {
+            const quitar = evento.target.closest('.quitar');
+            if (!quitar) return;
+            quitar.closest('tr').remove();
+            renumerar();
+            sumar();
+        });
+        filas.addEventListener('input', sumar);
+
+        // El comentario guardado se AÑADE al texto, no lo sustituye, y el
+        // desplegable vuelve a la opción vacía para poder añadir otro.
+        const guardado = document.getElementById('comentarioGuardado');
+        const comentarios = document.getElementById('comentarios');
+        guardado.addEventListener('change', function () {
+            const opcion = guardado.options[guardado.selectedIndex];
+            const texto = opcion && opcion.dataset.texto;
+            if (texto) {
+                comentarios.value = comentarios.value.trim() === ''
+                        ? texto : comentarios.value.replace(/\s+$/, '') + '\n' + texto;
+            }
+            guardado.value = '';
+        });
+
+        // --- Generar: guarda y descarga sin recargar la pantalla ---
+        const boton = document.getElementById('botonGenerar');
+        const resultado = document.getElementById('resultadoGenerar');
+        const numeroEnvio = document.getElementById('numeroEnvio');
+
+        function nombreDeFichero(cabecera) {
+            if (cabecera) {
+                const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(cabecera);
+                if (utf8) return decodeURIComponent(utf8[1]);
+                const simple = /filename="([^"]+)"/i.exec(cabecera);
+                if (simple) return simple[1];
+            }
+            return 'Info embalaje.docx';
+        }
+
+        function avisar(clase, texto) {
+            resultado.innerHTML = '';
+            const caja = document.createElement('div');
+            caja.className = 'alerta ' + clase;
+            caja.textContent = texto;
+            resultado.appendChild(caja);
+        }
+
+        form.addEventListener('submit', function (evento) {
+            evento.preventDefault();
+            boton.disabled = true;
+            boton.textContent = 'Generando…';
+            fetch(form.action, {method: 'POST', body: new FormData(form)})
+                .then(function (respuesta) {
+                    if (!respuesta.ok) {
+                        const tipo = respuesta.headers.get('Content-Type') || '';
+                        return (tipo.indexOf('text/plain') === 0 ? respuesta.text() : Promise.resolve(''))
+                            .then(function (texto) {
+                                throw new Error(texto || 'No se ha podido generar la hoja (código '
+                                        + respuesta.status + ')');
+                            });
+                    }
+                    return respuesta.blob().then(function (blob) {
+                        return {
+                            blob: blob,
+                            nombre: nombreDeFichero(respuesta.headers.get('Content-Disposition')),
+                            numero: respuesta.headers.get('X-Numero-Envio')
+                        };
+                    });
+                })
+                .then(function (hoja) {
+                    const enlace = document.createElement('a');
+                    enlace.href = URL.createObjectURL(hoja.blob);
+                    enlace.download = hoja.nombre;
+                    document.body.appendChild(enlace);
+                    enlace.click();
+                    enlace.remove();
+                    setTimeout(function () { URL.revokeObjectURL(enlace.href); }, 10000);
+                    avisar('ok', 'Guardada como envío ' + hoja.numero + '. Se ha descargado «'
+                            + hoja.nombre + '».');
+                    const numero = parseInt(hoja.numero, 10);
+                    if (!isNaN(numero)) numeroEnvio.value = numero + 1;
+                })
+                .catch(function (error) {
+                    avisar('error', error.message || 'No se ha podido hablar con el servidor');
+                })
+                .then(function () {
+                    boton.disabled = false;
+                    boton.textContent = 'Generar hoja';
+                });
+        });
+
+        sumar();
+    })();
+</script>
+</body>
+</html>
