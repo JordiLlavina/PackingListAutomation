@@ -44,7 +44,7 @@ public class ArchivoHojasEmbalaje {
     /** Todas las hojas, la más reciente primero, sin el snapshot. */
     @Transactional(readOnly = true)
     public List<ResumenHojaEmbalaje> todas() {
-        return repositorio.findAllByOrderByFechaDesc().stream()
+        return repositorio.findAllByOrderByFechaDescIdDesc().stream()
                 .map(h -> new ResumenHojaEmbalaje(h.getId(), h.getFecha(), h.getCliente(), h.getTemporada(),
                         h.getNumeroEnvio(), h.getReferencia(), h.getCodigoColor(), h.getTaller()))
                 .toList();
@@ -74,7 +74,7 @@ public class ArchivoHojasEmbalaje {
         if (cliente == null || codigoModelo == null || codigoModelo.isBlank()) {
             return Optional.empty();
         }
-        return repositorio.findFirstByClienteAndCodigoModeloOrderByFechaDesc(cliente, codigoModelo)
+        return repositorio.findFirstByClienteAndCodigoModeloOrderByFechaDescIdDesc(cliente, codigoModelo)
                 .map(h -> deserializar(h.getDatos()));
     }
 

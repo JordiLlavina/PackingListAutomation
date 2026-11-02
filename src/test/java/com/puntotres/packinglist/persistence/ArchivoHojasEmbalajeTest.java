@@ -66,11 +66,9 @@ class ArchivoHojasEmbalajeTest {
     }
 
     @Test
-    void laUltimaDelModeloEsLaMasRecienteDelMismoClienteYModelo() throws InterruptedException {
+    void laUltimaDelModeloEsLaMasRecienteDelMismoClienteYModelo() {
         archivo.guardar(conBolsa(datos(21, "ULL027"), "A"), null);
-        Thread.sleep(5);
         archivo.guardar(conBolsa(datos(22, "ULL027"), "B"), null);
-        Thread.sleep(5);
         archivo.guardar(conBolsa(datos(23, "ULL999"), "C"), null);
 
         assertEquals("B", archivo.ultimaDe(CLIENTE, "ULL027").orElseThrow().bolsaTela());
