@@ -30,15 +30,33 @@ public record ArticuloEmbalaje(
         destinaciones = destinaciones == null ? List.of() : List.copyOf(destinaciones);
     }
 
-    /** El texto del desplegable: «PXCBC-F67008 · LZZ NOIR — SAC LE NEIGE». */
+    /**
+     * El artículo en una línea: «PXCBC-F67008 · LZZ NOIR — SAC LE NEIGE». El
+     * desplegable del formulario no la usa tal cual: alinea el nombre del
+     * bolso en columna ({@code OpcionesArticuloEmbalaje} en la capa web).
+     */
     public String etiqueta() {
+        StringBuilder texto = new StringBuilder(referenciaYColor());
+        if (tieneNombre()) {
+            texto.append(SEPARADOR_NOMBRE).append(nombreBolso);
+        }
+        return texto.toString();
+    }
+
+    /** Lo que identifica al artículo, sin el nombre del bolso: «PXCBC-F67008 · LZZ NOIR». */
+    public String referenciaYColor() {
         StringBuilder texto = new StringBuilder(referencia).append(" · ").append(codigoColor);
         if (descripcionColor != null && !descripcionColor.isBlank()) {
             texto.append(' ').append(descripcionColor);
         }
-        if (nombreBolso != null && !nombreBolso.isBlank()) {
-            texto.append(" — ").append(nombreBolso);
-        }
         return texto.toString();
     }
+
+    /** Si hay nombre del bolso que poner detrás de {@link #referenciaYColor()}. */
+    public boolean tieneNombre() {
+        return nombreBolso != null && !nombreBolso.isBlank();
+    }
+
+    /** Lo que separa el nombre del bolso del resto en {@link #etiqueta()}. */
+    public static final String SEPARADOR_NOMBRE = " — ";
 }

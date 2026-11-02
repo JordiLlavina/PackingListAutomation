@@ -163,6 +163,7 @@ public class InfoEmbalajeController {
         }
         model.addAttribute("enCurso", enCurso);
         model.addAttribute("articulosJs", enCurso.getArticulos());
+        model.addAttribute("textosArticulos", OpcionesArticuloEmbalaje.textos(enCurso.getArticulos()));
         model.addAttribute("articuloElegido", partida == null ? -1
                 : enCurso.getArticulos().indexOf(elegido(partida).orElse(null)));
         model.addAttribute("partida", partida);

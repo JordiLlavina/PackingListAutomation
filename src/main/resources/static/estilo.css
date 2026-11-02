@@ -1554,6 +1554,36 @@ main.catalogo { max-width: 100rem; }
 
 .embalaje-comentario-guardado { margin-bottom: 0.4rem; }
 
+/* El desplegable de artículos en letra de ancho fijo: con los espacios duros
+   que pone OpcionesArticuloEmbalaje, el nombre del bolso cae en columna
+   (un <option> no pinta tabuladores). */
+.embalaje-formulario select.embalaje-articulo-select {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9rem;
+}
+
+/* Reparto en cajas: calculado con la tabla hasta que se edita a mano. En
+   manual, un aviso discreto al lado del rótulo y el campo con el mismo borde
+   de aviso, para que se vea que ya no sigue a la tabla. */
+.embalaje-reparto-cabecera { align-items: center; margin: 0.8rem 0 0.25rem; }
+.embalaje-reparto-cabecera label { margin: 0; }
+.embalaje-reparto-manual {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.15rem 0.3rem 0.15rem 0.6rem;
+    border: 1px solid var(--aviso-borde);
+    border-radius: 4px;
+    background: var(--aviso-fondo);
+    color: var(--tinta);
+    font-size: 0.85rem;
+}
+.embalaje-reparto-manual[hidden] { display: none; }
+.embalaje-formulario textarea.a-mano {
+    border-color: var(--aviso-borde);
+    box-shadow: inset 3px 0 0 var(--aviso-borde);
+}
+
 /* Hojas guardadas: la lista a la izquierda y la elegida a la derecha. */
 .embalaje-antiguos {
     display: grid;

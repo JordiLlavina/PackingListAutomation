@@ -20,11 +20,13 @@
           th:object="${formulario}">
         <div class="tarjeta">
             <label for="articulo">Artículo del pedido</label>
-            <select id="articulo">
+            <!-- Letra de ancho fijo y espacios duros (OpcionesArticuloEmbalaje):
+                 el nombre del bolso sale en columna, un <option> no pinta tabuladores. -->
+            <select id="articulo" class="embalaje-articulo-select">
                 <option value="">-- elige un artículo --</option>
                 <option th:each="articulo, estado : ${articulosJs}"
                         th:value="${estado.index}"
-                        th:text="${articulo.etiqueta()}"
+                        th:text="${textosArticulos[estado.index]}"
                         th:selected="${estado.index == articuloElegido}"></option>
             </select>
             <p class="ayuda">
@@ -162,9 +164,20 @@
         </div>
 
         <div class="tarjeta">
-            <label for="repartoCajas">Reparto en cajas</label>
+            <!-- El reparto se calcula con la tabla y las unidades por caja
+                 (reparto-cajas.js) hasta que se edita a mano; entonces se deja
+                 de tocar y se avisa, con un botón para volver al cálculo. -->
+            <div class="etiqueta-con-accion embalaje-reparto-cabecera">
+                <label for="repartoCajas">Reparto en cajas</label>
+                <span id="repartoManual" class="embalaje-reparto-manual" role="status" hidden>
+                    Editado a mano: ya no sigue a la tabla
+                    <button type="button" class="mini" id="volverACalcular"
+                            title="Descarta lo escrito a mano y vuelve a calcularlo con la tabla">Volver a calcular</button>
+                </span>
+            </div>
             <textarea th:field="*{repartoCajas}" rows="5" maxlength="4000"
-                      placeholder="12 cajas de 10 a JAPAN&#10;8 cajas de 10 a KOREA"></textarea>
+                      placeholder="4 CAJAS X 10 BOLSOS: 40 - JAPAN&#10;1 CAJA X 5 BOLSOS: 5 - KOREA"></textarea>
+            <p class="ayuda" id="repartoAyuda">Se calcula con la tabla y las unidades por caja.</p>
 
             <label for="comentarios" class="etiqueta-con-accion">
                 <span>Comentarios</span>
@@ -194,6 +207,7 @@
         <div id="resultadoGenerar" role="status"></div>
     </form>
 </main>
+<script th:src="@{/reparto-cajas.js}"></script>
 <script th:inline="javascript">
     /*<![CDATA[*/
     const ARTICULOS = /*[[${articulosJs}]]*/ [];
@@ -214,7 +228,8 @@
         const CAMPOS = ['referencia', 'codigoColor', 'descripcionColor', 'nombreBolso', 'codigoModelo',
             'medidaCaja', 'unidadesPorCaja', 'bolsaTela', 'etiquetaInterior', 'instruccionEspecial'];
         // Campos que son de CADA artículo y no del sobre: el reparto en cajas es
-        // el de ese bolso y el enlace es la guía de ese bolso. Se vacían al cambiar.
+        // el de ese bolso y el enlace es la guía de ese bolso. Se vacían al
+        // cambiar (y el reparto se vuelve a calcular con el artículo nuevo).
         const POR_ARTICULO = ['repartoCajas', 'enlaceVideo'];
 
         // Los nombres se rehacen tras cada alta o baja: Spring une destinos[i]
@@ -279,11 +294,14 @@
             (elegido.destinaciones || []).forEach(anadirFila);
             renumerar();
             sumar();
+            // Otro bolso: lo escrito a mano era del anterior, se vuelve al cálculo.
+            volverAlCalculo();
         });
 
         document.getElementById('anadirDestino').addEventListener('click', function () {
             anadirFila(null).querySelector('.d-destino').focus();
             renumerar();
+            seguirLaTabla();
         });
 
         filas.addEventListener('click', function (evento) {
@@ -292,8 +310,82 @@
             quitar.closest('tr').remove();
             renumerar();
             sumar();
+            seguirLaTabla();
         });
-        filas.addEventListener('input', sumar);
+        filas.addEventListener('input', function () {
+            sumar();
+            seguirLaTabla();
+        });
+
+        // --- Reparto en cajas: calculado hasta que se edita a mano ---
+        // El cálculo es textoReparto (reparto-cajas.js). En modo automático el
+        // texto sigue a la tabla y a las unidades por caja; en cuanto alguien
+        // escribe en el campo pasa a manual, se deja de tocar y se avisa, porque
+        // si no un cambio en la tabla se comería en silencio lo corregido a mano.
+        // Asignar .value desde aquí no dispara «input»: solo lo tecleado cuenta.
+        const reparto = document.getElementById('repartoCajas');
+        const unidadesPorCaja = document.getElementById('unidadesPorCaja');
+        const avisoManual = document.getElementById('repartoManual');
+        const ayudaReparto = document.getElementById('repartoAyuda');
+        let repartoAMano = false;
+
+        function filasDeLaTabla() {
+            return Array.prototype.map.call(filas.rows, function (fila) {
+                return {
+                    destino: fila.querySelector('.d-destino').value,
+                    cantidad: fila.querySelector('.d-cantidad').value
+                };
+            });
+        }
+
+        function repartoCalculado() {
+            return textoReparto(filasDeLaTabla(), unidadesPorCaja.value);
+        }
+
+        function pintarModoReparto() {
+            avisoManual.hidden = !repartoAMano;
+            ayudaReparto.hidden = repartoAMano;
+            reparto.classList.toggle('a-mano', repartoAMano);
+        }
+
+        // Un cambio en la tabla o en las unidades: solo en modo automático, y
+        // sin unidades por caja no hay cálculo y el texto se deja como está.
+        function seguirLaTabla() {
+            if (repartoAMano || !(parseInt(unidadesPorCaja.value, 10) > 0)) return;
+            reparto.value = repartoCalculado();
+        }
+
+        // «Volver a calcular» y el cambio de artículo: se descarta lo escrito y
+        // el campo vuelve a seguir a la tabla (vacío si aún no hay cálculo).
+        function volverAlCalculo() {
+            repartoAMano = false;
+            reparto.value = repartoCalculado();
+            pintarModoReparto();
+        }
+
+        reparto.addEventListener('input', function () {
+            if (!repartoAMano) {
+                repartoAMano = true;
+                pintarModoReparto();
+            }
+        });
+        unidadesPorCaja.addEventListener('input', seguirLaTabla);
+        document.getElementById('volverACalcular').addEventListener('click', function () {
+            volverAlCalculo();
+            reparto.focus();
+        });
+
+        // Al abrir: un reparto vacío o igual al cálculo es automático; otro
+        // texto (el de una hoja importada, que es lo que se imprimió) es manual
+        // y no se pisa.
+        (function modoInicialDelReparto() {
+            const guardado = reparto.value.replace(/\r\n/g, '\n').trim();
+            repartoAMano = guardado !== '' && guardado !== repartoCalculado();
+            if (!repartoAMano) {
+                seguirLaTabla();
+            }
+            pintarModoReparto();
+        })();
 
         // El comentario guardado se AÑADE al texto, no lo sustituye, y el
         // desplegable vuelve a la opción vacía para poder añadir otro.

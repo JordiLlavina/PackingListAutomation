@@ -175,6 +175,52 @@ class InfoEmbalajeControllerTest {
     }
 
     @Test
+    void elFormularioCalculaElRepartoYAvisaCuandoSeEditaAMano() throws Exception {
+        String html = mvc.perform(get("/info-embalaje/formulario").session(cargarApc()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // El cálculo vive en su propio estático (con el hash del contenido en el nombre).
+        assertTrue(html.matches("(?s).*<script src=\"/reparto-cajas[^\"]*\\.js\"></script>.*"),
+                "carga reparto-cajas.js");
+        assertTrue(html.contains("textoReparto(filasDeLaTabla(), unidadesPorCaja.value)"),
+                "el formulario usa la función del cálculo");
+        assertTrue(html.contains("id=\"repartoManual\""), "el aviso de modo manual");
+        assertTrue(html.contains("Editado a mano: ya no sigue a la tabla"), "su texto");
+        assertTrue(html.matches("(?s).*<button[^>]*id=\"volverACalcular\"[^>]*>Volver a calcular</button>.*"),
+                "el botón para volver al cálculo");
+        assertTrue(html.contains("Se calcula con la tabla y las unidades por caja"), "la ayuda del modo automático");
+    }
+
+    @Test
+    void elDesplegableDeArticulosAlineaElNombreDelBolso() throws Exception {
+        String html = mvc.perform(get("/info-embalaje/formulario").session(cargarApc()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertTrue(html.contains("<select id=\"articulo\" class=\"embalaje-articulo-select\">"),
+                "el desplegable lleva la clase de letra de ancho fijo");
+        // Cada opción con nombre: «referencia · color» rellenado con espacios duros
+        // hasta la más larga y luego «— nombre», así que el «—» cae en la misma columna.
+        java.util.regex.Matcher opcion = java.util.regex.Pattern
+                .compile("<option value=\"\\d+\"[^>]*>([^<]*)</option>").matcher(html);
+        java.util.Set<Integer> columnas = new java.util.HashSet<>();
+        int conNombre = 0;
+        while (opcion.find()) {
+            String texto = opcion.group(1);
+            int raya = texto.indexOf("\u00A0—\u00A0");
+            if (raya >= 0) {
+                conNombre++;
+                columnas.add(raya);
+            }
+        }
+        assertTrue(conNombre > 1, "hay opciones con nombre de bolso");
+        assertEquals(1, columnas.size(), "el nombre empieza en la misma columna en todas: " + columnas);
+        assertTrue(html.matches("(?s).*<option value=\"\\d+\"[^>]*>[^<]*\u00A0\u00A0[^<]*</option>.*"),
+                "alguna opción va rellenada con espacios duros");
+    }
+
+    @Test
     void elFormularioSinPedidoCargadoVuelveALaEntrada() throws Exception {
         mvc.perform(get("/info-embalaje/formulario").session(new MockHttpSession()))
                 .andExpect(redirectedUrl("/info-embalaje"));
