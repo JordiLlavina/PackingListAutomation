@@ -1684,8 +1684,17 @@ main.catalogo { max-width: 100rem; }
 
 /* Zona de cualquier otro campo de fichero (campo-fichero.js): el input va
    encima, transparente y a toda la zona, que es lo que recoge el clic y lo
-   soltado. Un poco más baja que la de fotos: lleva una sola línea. */
-.zona-subida { position: relative; padding: 0.9rem 1rem; }
+   soltado. Del alto del campo de fichero de antes (el padding de los campos
+   del campo, ajustado a lo que medía el botón nativo), con el icono y el
+   texto en línea a la izquierda: la zona grande es solo la de fotos. */
+.zona-subida {
+    position: relative;
+    flex-direction: row;
+    gap: 0.5rem;
+    padding: calc(0.45rem + 0.5px) 0.6rem;
+    text-align: left;
+}
+.zona-subida .zona-icono { width: 1.25rem; height: 1.25rem; flex: none; }
 .zona-subida input[type="file"] {
     position: absolute;
     inset: 0;
