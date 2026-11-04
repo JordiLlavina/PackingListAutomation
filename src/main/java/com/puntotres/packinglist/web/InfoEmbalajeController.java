@@ -38,6 +38,7 @@ import com.puntotres.packinglist.service.embalaje.ArticuloEmbalaje;
 import com.puntotres.packinglist.service.embalaje.ArticulosEmbalaje;
 import com.puntotres.packinglist.service.embalaje.InfoEmbalajeDocBuilder;
 import com.puntotres.packinglist.service.embalaje.PedidoEmbalajeService;
+import com.puntotres.packinglist.service.embalaje.RepartoCajas;
 
 /**
  * «Etiqueta Info de Embalaje para Taller»: la hoja A4 que va pegada en el
@@ -201,6 +202,16 @@ public class InfoEmbalajeController {
                     + "ha guardado nada.");
         }
         DatosHojaEmbalaje datos = form.aDatos(enCurso, LocalDate.now(), archivo::siguienteNumeroEnvio);
+        // El reparto va en la tabla de destinaciones y solo admite su formato:
+        // una línea que no lo cumple no se puede colocar y no se imprime una
+        // hoja que diga otra cosa que lo tecleado. La pantalla ya lo avisa al
+        // escribir; esto es lo que vale sin JavaScript. Los avisos (cajas que
+        // no suman la cantidad) no bloquean.
+        RepartoCajas.Resultado reparto = RepartoCajas.de(datos);
+        if (reparto.tieneErrores()) {
+            return rechazo(HttpStatus.BAD_REQUEST, "Corrige el reparto en cajas, no se ha guardado nada:\n"
+                    + String.join("\n", reparto.errores()));
+        }
         byte[] foto = fotos.conBytes(form.getFotoId()).map(FotoCatalogo::getJpeg).orElse(null);
         // Primero el Word y luego guardar: una hoja que no se ha podido
         // escribir no debe gastar un número de envío ni salir en los antiguos.

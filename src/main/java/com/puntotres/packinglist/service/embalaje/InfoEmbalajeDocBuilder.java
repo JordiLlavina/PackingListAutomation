@@ -34,12 +34,14 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcBorders;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STLineSpacingRule;
+import org.openxmlformats.schemas.wordprocessingml.x2006.main.STMerge;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblLayoutType;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STTblWidth;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.model.DatosHojaEmbalaje;
 import com.puntotres.packinglist.model.DatosHojaEmbalaje.DestinacionHoja;
+import com.puntotres.packinglist.service.embalaje.RepartoCajas.LineaReparto;
 
 /**
  * Escribe la <b>hoja de instrucciones de embalaje</b>: un A4 en Word que se
@@ -56,7 +58,8 @@ import com.puntotres.packinglist.model.DatosHojaEmbalaje.DestinacionHoja;
  * Arriba, la cabecera en una fila de tres columnas: la foto, el artículo
  * (cliente · temporada · taller, referencia, color, nombre del bolso y las
  * fichas del envío) y el QR, sin marco. Debajo, a todo el ancho, el
- * embalaje; luego las destinaciones, el reparto y los comentarios. Ningún
+ * embalaje; luego las destinaciones, con el reparto en cajas como su cuarta
+ * columna (ver {@link RepartoCajas}), y los comentarios. Ningún
  * bloque lleva título de sección: se separan con aire, sin filetes
  * (decisión del usuario sobre la hoja impresa).
  *
@@ -114,7 +117,11 @@ public class InfoEmbalajeDocBuilder {
     /** La tabla de destinaciones, cabecera y filas; solo la fila Total es mayor. */
     private static final int TAMANO_TABLA = 12;
     private static final int TAMANO_TOTAL_TABLA = 14;
-    /** El reparto en cajas: el taller lo lee caja a caja, así que va al tamaño de la fila Total. */
+    /**
+     * El reparto en texto libre de las hojas guardadas antes de que tuviera
+     * formato, que se sigue imprimiendo debajo de la tabla: el taller lo lee
+     * caja a caja, así que va al tamaño de la fila Total.
+     */
     private static final int TAMANO_REPARTO = 14;
     private static final int TAMANO_COMENTARIOS = 14;
 
@@ -145,7 +152,7 @@ public class InfoEmbalajeDocBuilder {
     private static final int ESPACIO_TRAS_TITULO = 80;
     private static final int ESPACIO_ANTES_NOMBRE = 40;
     private static final int ESPACIO_ANTES_FICHAS = 200;
-    /** Alto de línea del reparto: la letra de 14 pt con dos puntos de aire, menos que el automático. */
+    /** Alto de línea del reparto antiguo: la letra de 14 pt con dos puntos de aire, menos que el automático. */
     private static final double ALTO_LINEA_REPARTO_PT = 16;
     private static final int MARGEN_CELDA_FICHA = 50;
     private static final int MARGEN_LATERAL_FICHA = 160;
@@ -192,8 +199,35 @@ public class InfoEmbalajeDocBuilder {
     private static final int[] PROPORCIONES_DESTINACIONES = {4400, 3400, 2506};
     private static final int[] ANCHOS_DESTINACIONES = repartir(
             (int) Math.round(ANCHO_UTIL * FRACCION_ANCHO_DESTINACIONES), PROPORCIONES_DESTINACIONES);
+    /**
+     * Con la columna CAJAS la tabla crece hasta el 90 % del ancho útil, también
+     * pegada a la izquierda: las tres primeras columnas conservan entre sí sus
+     * proporciones y CAJAS se queda con un ancho fijo.
+     */
+    static final double FRACCION_ANCHO_CON_CAJAS = 0.90;
+    /**
+     * Ancho de la columna CAJAS: 5 cm. «100 CAJAS X 10 BOLSOS» mide 4 cm a
+     * 12 pt en Gentium Basic (medido con sus métricas), más los márgenes de
+     * celda; así una línea de reparto nunca parte en dos renglones.
+     */
+    static final int ANCHO_COLUMNA_CAJAS = 5 * TWIPS_POR_CM;
+    private static final int[] ANCHOS_DESTINACIONES_CON_CAJAS = conCajas(repartir(
+            (int) Math.round(ANCHO_UTIL * FRACCION_ANCHO_CON_CAJAS) - ANCHO_COLUMNA_CAJAS,
+            PROPORCIONES_DESTINACIONES));
 
-    private static final String[] CABECERAS_DESTINACIONES = {"Destinación", "Nº pedido", "Cantidad"};
+    private static final String[] CABECERAS_DESTINACIONES = {"Destinación", "Nº pedido", "Cantidad", "Cajas"};
+    /** La columna de la cantidad, la única alineada a la derecha. */
+    private static final int COLUMNA_CANTIDAD = 2;
+    /** Las columnas que son de la destinación y se combinan en vertical cuando lleva varias líneas de cajas. */
+    private static final int COLUMNAS_DE_LA_DESTINACION = 3;
+    /** La columna CAJAS, la que va detrás de las de la destinación. */
+    private static final int COLUMNA_CAJAS = COLUMNAS_DE_LA_DESTINACION;
+    /**
+     * Sangría de la columna CAJAS, en veinteavos (0,4 cm): la cantidad va
+     * pegada a la derecha de su columna y, sin ella, «40» y «4 CAJAS» se leían
+     * como una sola cifra. Con «100 CAJAS X 10 BOLSOS» aún cabe en una línea.
+     */
+    private static final int SANGRIA_CAJAS = 227;
     private static final String TITULO_QR = "Guide d'emballage du sac";
     /** Los textos se pasan a mayúsculas con las reglas del castellano; los acentos se conservan. */
     private static final Locale CASTELLANO = Locale.forLanguageTag("es");
@@ -242,8 +276,9 @@ public class InfoEmbalajeDocBuilder {
             espacio(doc, ESPACIO_BLOQUES_PT);
             escribirEmbalaje(doc, datos);
             espacio(doc, ESPACIO_BLOQUES_PT);
-            escribirDestinaciones(doc, datos);
-            escribirReparto(doc, datos);
+            RepartoCajas.Resultado reparto = RepartoCajas.de(datos);
+            escribirDestinaciones(doc, datos, reparto);
+            escribirRepartoSinColocar(doc, reparto);
             escribirComentarios(doc, datos);
             // Una tabla al final del cuerpo la deja Word sin párrafo detrás y
             // abre el documento "reparado" en algunas versiones: este lo cierra.
@@ -396,30 +431,70 @@ public class InfoEmbalajeDocBuilder {
     }
 
     /**
-     * Cabecera gris, un filete fino entre filas, la cantidad a la derecha y el
-     * total más grande, con un filete negro encima: es la cifra que el taller
-     * tiene que cuadrar con las cajas.
+     * Cabecera gris, un filete fino entre destinaciones, la cantidad a la
+     * derecha y el total más grande, con un filete negro encima: es la cifra
+     * que el taller tiene que cuadrar con las cajas.
+     *
+     * Con reparto, una cuarta columna CAJAS a la derecha («12 CAJAS X 10
+     * BOLSOS»: la destinación y el total ya están en la fila). Una destinación
+     * con varias líneas de cajas ocupa varias filas, con destinación, pedido y
+     * cantidad combinados en vertical y sin filete entre ellas; la fila Total
+     * lleva las cajas de todas. Sin ninguna línea de reparto la columna no sale.
      */
-    private void escribirDestinaciones(XWPFDocument doc, DatosHojaEmbalaje datos) {
+    private void escribirDestinaciones(XWPFDocument doc, DatosHojaEmbalaje datos, RepartoCajas.Resultado reparto) {
         List<DestinacionHoja> destinaciones = datos.destinaciones();
-        XWPFTable tabla = nuevaTabla(doc, destinaciones.size() + 2, ANCHOS_DESTINACIONES);
+        boolean conCajas = reparto.hayLineas();
+        int columnas = conCajas ? CABECERAS_DESTINACIONES.length : COLUMNAS_DE_LA_DESTINACION;
+        int filasDeDatos = 0;
+        for (int i = 0; i < destinaciones.size(); i++) {
+            filasDeDatos += Math.max(1, reparto.lineasDe(i).size());
+        }
+        XWPFTable tabla = nuevaTabla(doc, filasDeDatos + 2,
+                conCajas ? ANCHOS_DESTINACIONES_CON_CAJAS : ANCHOS_DESTINACIONES);
         tabla.setTableAlignment(TableRowAlign.LEFT);
         tabla.setInsideHBorder(XWPFTable.XWPFBorderType.SINGLE, FILETE_FINO, 0, GRIS_FILETE);
         tabla.setCellMargins(MARGEN_VERTICAL_TABLA, MARGEN_LATERAL_TABLA, MARGEN_VERTICAL_TABLA, MARGEN_LATERAL_TABLA);
 
-        for (int i = 0; i < CABECERAS_DESTINACIONES.length; i++) {
+        for (int i = 0; i < columnas; i++) {
             XWPFTableCell celda = tabla.getRow(0).getCell(i);
             celda.setColor(GRIS_FONDO);
-            texto(parrafo(celda, alineacionDeColumna(i)), CABECERAS_DESTINACIONES[i],
+            texto(parrafoDeColumna(celda, i), CABECERAS_DESTINACIONES[i],
                     TAMANO_TABLA, true, GRIS_ROTULO);
         }
+        int fila = 1;
         for (int i = 0; i < destinaciones.size(); i++) {
             DestinacionHoja destinacion = destinaciones.get(i);
-            filaDestinacion(tabla.getRow(i + 1), TAMANO_TABLA, false, destinacion.destino(), destinacion.pedido(),
+            List<LineaReparto> lineas = reparto.lineasDe(i);
+            XWPFTableRow primera = tabla.getRow(fila);
+            filaDestinacion(primera, TAMANO_TABLA, false, destinacion.destino(), destinacion.pedido(),
                     String.valueOf(destinacion.cantidad()));
+            for (int j = 0; j < lineas.size(); j++) {
+                XWPFTableCell cajas = tabla.getRow(fila + j).getCell(COLUMNA_CAJAS);
+                texto(parrafoDeColumna(cajas, COLUMNA_CAJAS), lineas.get(j).cajasTexto(), TAMANO_TABLA, false, NEGRO);
+                if (j > 0) {
+                    // Sin filete entre las cajas de una misma destinación, ni
+                    // por arriba de esta celda ni por debajo de la anterior.
+                    sinBorde(cajas, true);
+                    sinBorde(tabla.getRow(fila + j - 1).getCell(COLUMNA_CAJAS), false);
+                }
+            }
+            if (lineas.size() > 1) {
+                for (int c = 0; c < COLUMNAS_DE_LA_DESTINACION; c++) {
+                    combinarEnVertical(primera.getCell(c), STMerge.RESTART);
+                    for (int j = 1; j < lineas.size(); j++) {
+                        combinarEnVertical(tabla.getRow(fila + j).getCell(c), STMerge.CONTINUE);
+                    }
+                }
+            }
+            fila += Math.max(1, lineas.size());
         }
-        XWPFTableRow total = tabla.getRow(destinaciones.size() + 1);
-        filaDestinacion(total, TAMANO_TOTAL_TABLA, true, "Total", "", String.valueOf(datos.totalUnidades()));
+        XWPFTableRow total = tabla.getRow(fila);
+        if (conCajas) {
+            filaDestinacion(total, TAMANO_TOTAL_TABLA, true, "Total", "", String.valueOf(datos.totalUnidades()),
+                    RepartoCajas.cajas(reparto.totalCajas()));
+        } else {
+            filaDestinacion(total, TAMANO_TOTAL_TABLA, true, "Total", "", String.valueOf(datos.totalUnidades()));
+        }
         for (XWPFTableCell celda : total.getTableCells()) {
             borde(celda, true, FILETE_TOTAL, NEGRO);
         }
@@ -427,8 +502,13 @@ public class InfoEmbalajeDocBuilder {
 
     private void filaDestinacion(XWPFTableRow fila, int tamano, boolean negrita, String... valores) {
         for (int i = 0; i < valores.length; i++) {
-            texto(parrafo(fila.getCell(i), alineacionDeColumna(i)), valores[i], tamano, negrita, NEGRO);
+            texto(parrafoDeColumna(fila.getCell(i), i), valores[i], tamano, negrita, NEGRO);
         }
+    }
+
+    /** La rejilla de cuatro columnas: las tres de la destinación y, detrás, la de cajas. */
+    private static int[] conCajas(int[] tres) {
+        return new int[] {tres[0], tres[1], tres[2], ANCHO_COLUMNA_CAJAS};
     }
 
     /**
@@ -450,18 +530,33 @@ public class InfoEmbalajeDocBuilder {
         return anchos;
     }
 
-    /** La cantidad (última columna) a la derecha para que las cifras se sumen a ojo. */
-    private static ParagraphAlignment alineacionDeColumna(int columna) {
-        return columna == CABECERAS_DESTINACIONES.length - 1 ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT;
+    /**
+     * Un párrafo de la tabla de destinaciones: la cantidad a la derecha para
+     * que las cifras se sumen a ojo; lo demás, a la izquierda, y las cajas
+     * con su sangría para separarse de la cantidad.
+     */
+    private static XWPFParagraph parrafoDeColumna(XWPFTableCell celda, int columna) {
+        XWPFParagraph parrafo = parrafo(celda,
+                columna == COLUMNA_CANTIDAD ? ParagraphAlignment.RIGHT : ParagraphAlignment.LEFT);
+        if (columna == COLUMNA_CAJAS) {
+            parrafo.setIndentationLeft(SANGRIA_CAJAS);
+        }
+        return parrafo;
     }
 
-    /** El texto libre del reparto, una línea por párrafo, sin título. Sin texto no sale nada. */
-    private void escribirReparto(XWPFDocument doc, DatosHojaEmbalaje datos) {
-        if (datos.repartoCajas().isBlank()) {
+    /**
+     * Las líneas del reparto que no van en la columna CAJAS, debajo de la
+     * tabla como se imprimía antes: solo pasa con las hojas guardadas cuando
+     * el reparto era texto libre («CAJA 1 A 12: 10 UDS»), que se regeneran
+     * desde «antiguos» y no pueden fallar ni perder lo que dijeron. Una hoja
+     * nueva no llega aquí: con una línea así el servidor no la genera.
+     */
+    private void escribirRepartoSinColocar(XWPFDocument doc, RepartoCajas.Resultado reparto) {
+        if (reparto.sinColocar().isEmpty()) {
             return;
         }
         espacio(doc, ESPACIO_BLOQUES_PT);
-        for (String linea : lineas(datos.repartoCajas())) {
+        for (String linea : reparto.sinColocar()) {
             XWPFParagraph parrafo = parrafo(doc.createParagraph(), ParagraphAlignment.LEFT);
             altoExacto(parrafo, ALTO_LINEA_REPARTO_PT);
             texto(parrafo, linea, TAMANO_REPARTO, false, NEGRO);
@@ -688,6 +783,20 @@ public class InfoEmbalajeDocBuilder {
         for (CTBorder lado : new CTBorder[] {bordes.addNewLeft(), bordes.addNewRight()}) {
             ajustar(lado, grosor, color);
         }
+    }
+
+    /** Quita el filete de una celda, arriba o abajo, aunque la tabla lo pinte entre filas. */
+    private static void sinBorde(XWPFTableCell celda, boolean arriba) {
+        CTTcBorders bordes = bordesDe(celda);
+        CTBorder lado = arriba ? (bordes.isSetTop() ? bordes.getTop() : bordes.addNewTop())
+                : (bordes.isSetBottom() ? bordes.getBottom() : bordes.addNewBottom());
+        lado.setVal(STBorder.NIL);
+    }
+
+    /** Combina una celda con las de arriba o abajo: {@code RESTART} la primera, {@code CONTINUE} las demás. */
+    private static void combinarEnVertical(XWPFTableCell celda, STMerge.Enum tipo) {
+        CTTcPr propiedades = celda.getCTTc().isSetTcPr() ? celda.getCTTc().getTcPr() : celda.getCTTc().addNewTcPr();
+        (propiedades.isSetVMerge() ? propiedades.getVMerge() : propiedades.addNewVMerge()).setVal(tipo);
     }
 
     /** Filete de una celda, arriba o abajo. */

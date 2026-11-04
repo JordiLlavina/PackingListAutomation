@@ -105,8 +105,23 @@ class InfoEmbalajeControllerTest {
         return generar(sesion, nota, numeroEnvio, referencia, "TÁNGER");
     }
 
+    /** El reparto que cuadra con las dos destinaciones de {@link #generar}. */
+    private static final String REPARTO = "12 CAJAS X 10 BOLSOS: 120 - JAPAN\n8 CAJAS X 10 BOLSOS: 80 - KOREA";
+
     private static MockHttpServletRequestBuilder generar(MockHttpSession sesion, String nota,
                                                          String numeroEnvio, String referencia, String taller) {
+        return generarConReparto(sesion, nota, numeroEnvio, referencia, taller, REPARTO);
+    }
+
+    /** Con otro reparto: {@code param} de MockMvc añade un valor más en vez de sustituirlo. */
+    private static MockHttpServletRequestBuilder generarConReparto(MockHttpSession sesion, String nota,
+                                                                   String reparto) {
+        return generarConReparto(sesion, nota, "270", "PXCBC-F67008", "TÁNGER", reparto);
+    }
+
+    private static MockHttpServletRequestBuilder generarConReparto(MockHttpSession sesion, String nota,
+                                                                   String numeroEnvio, String referencia,
+                                                                   String taller, String reparto) {
         return post("/info-embalaje/generar").session(sesion)
                 .param("taller", taller)
                 .param("numeroEnvio", numeroEnvio)
@@ -127,7 +142,7 @@ class InfoEmbalajeControllerTest {
                 .param("destinos[1].destino", "KOREA")
                 .param("destinos[1].pedido", "4100132916")
                 .param("destinos[1].cantidad", "80")
-                .param("repartoCajas", "12 cajas de 10\n8 cajas de 10")
+                .param("repartoCajas", reparto)
                 .param("comentarios", "Cuidado con las asas")
                 .param("enlaceVideo", "  https://youtu.be/guia  ");
     }
@@ -419,6 +434,57 @@ class InfoEmbalajeControllerTest {
         assertTrue(html.matches("(?s).*<input[^>]*\\brequired\\b[^>]*name=\"referencia\"[^>]*>.*")
                 || html.matches("(?s).*<input[^>]*name=\"referencia\"[^>]*\\brequired\\b[^>]*>.*"),
                 "la referencia es obligatoria también en el navegador");
+    }
+
+    @Test
+    void generarConUnRepartoMalEscritoContesta400YNoGuarda() throws Exception {
+        MockHttpSession sesion = cargarApc();
+        int antes = archivo.todas().size();
+        String motivo = mvc.perform(generarConReparto(sesion, "reparto mal",
+                        "12 CAJAS X 10 BOLSOS: 120 - JAPAN\nRevisar costuras\n1 CAJA X 5 BOLSOS: 5 - CHINA"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith("text/plain"))
+                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(motivo.contains("Corrige el reparto en cajas"), motivo);
+        assertTrue(motivo.contains("Línea 2: «Revisar costuras» no tiene el formato"), motivo);
+        assertTrue(motivo.contains("Línea 3: CHINA no está en la tabla de destinaciones"), motivo);
+        assertEquals(antes, archivo.todas().size(), "no se ha guardado nada");
+    }
+
+    @Test
+    void unRepartoBienEscritoQueNoSumaLaCantidadGeneraIgual() throws Exception {
+        MockHttpSession sesion = cargarApc();
+        MockHttpServletResponse respuesta = mvc.perform(generarConReparto(sesion, "reparto corto",
+                        "10 CAJAS X 10 BOLSOS: 100 - JAPAN\n1 CAJA X 7 BOLSOS: 7 - korea"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(TIPO_DOCX))
+                .andReturn().getResponse();
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(respuesta.getContentAsByteArray()))) {
+            var tabla = doc.getTables().stream()
+                    .filter(t -> t.getRow(0).getCell(0).getText().trim().equals("DESTINACIÓN"))
+                    .findFirst().orElseThrow();
+            assertEquals("CAJAS", tabla.getRow(0).getCell(3).getText().trim());
+            assertEquals("10 CAJAS X 10 BOLSOS", tabla.getRow(1).getCell(3).getText().trim());
+            assertEquals("1 CAJA X 7 BOLSOS", tabla.getRow(2).getCell(3).getText().trim());
+        }
+        assertEquals("10 CAJAS X 10 BOLSOS: 100 - JAPAN\n1 CAJA X 7 BOLSOS: 7 - korea",
+                archivo.datosDe(idGenerado(respuesta)).orElseThrow().repartoCajas(), "se guarda tal cual");
+    }
+
+    @Test
+    void elFormularioCompruebaElRepartoMientrasSeTeclea() throws Exception {
+        String html = mvc.perform(get("/info-embalaje/formulario").session(cargarApc()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(html.contains("comprobarReparto(reparto.value, filasDeLaTabla())"), "usa la comprobación");
+        assertTrue(html.contains("id=\"repartoComprobacion\""), "el sitio de los errores y avisos");
+        assertTrue(html.contains("4 CAJAS X 10 BOLSOS: 40 - JAPAN</code>"), "la ayuda dice el formato");
+        assertTrue(html.contains("Corrige el reparto en cajas: "), "no envía con errores");
+
+        String js = mvc.perform(get("/reparto-cajas.js")).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(js.contains("global.comprobarReparto = comprobarReparto"), "la función está publicada");
+        assertTrue(js.contains("no tiene el formato "), "los mismos mensajes que RepartoCajas.java");
     }
 
     @Test

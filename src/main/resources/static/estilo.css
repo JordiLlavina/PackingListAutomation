@@ -1611,6 +1611,17 @@ main.catalogo { max-width: 100rem; }
     border-color: var(--aviso-borde);
     box-shadow: inset 3px 0 0 var(--aviso-borde);
 }
+/* Un reparto con errores no deja generar: el campo en rojo, aunque esté en
+   modo manual (va detrás para ganarle al amarillo). Debajo, una línea por
+   error o aviso, con su número de línea. */
+.embalaje-formulario textarea.con-errores {
+    border-color: var(--error-borde);
+    box-shadow: inset 3px 0 0 var(--error-borde);
+}
+.embalaje-reparto-comprobacion:empty { display: none; }
+.embalaje-reparto-comprobacion { margin: 0.3rem 0 0.6rem; font-size: 0.9rem; }
+/* El rechazo del servidor trae un error por renglón. */
+#resultadoGenerar .alerta { white-space: pre-line; }
 
 /* Hojas guardadas: la lista a la izquierda y la elegida a la derecha. */
 .embalaje-antiguos {

@@ -166,7 +166,10 @@
         <div class="tarjeta">
             <!-- El reparto se calcula con la tabla y las unidades por caja
                  (reparto-cajas.js) hasta que se edita a mano; entonces se deja
-                 de tocar y se avisa, con un botón para volver al cálculo. -->
+                 de tocar y se avisa, con un botón para volver al cálculo.
+                 Solo admite un formato (va en la columna CAJAS de la tabla de
+                 destinaciones de la hoja): comprobarReparto lo revisa mientras
+                 se teclea y RepartoCajas.java lo vuelve a revisar al generar. -->
             <div class="etiqueta-con-accion embalaje-reparto-cabecera">
                 <label for="repartoCajas">Reparto en cajas</label>
                 <span id="repartoManual" class="embalaje-reparto-manual" role="status" hidden>
@@ -177,7 +180,13 @@
             </div>
             <textarea th:field="*{repartoCajas}" rows="5" maxlength="4000"
                       placeholder="4 CAJAS X 10 BOLSOS: 40 - JAPAN&#10;1 CAJA X 5 BOLSOS: 5 - KOREA"></textarea>
+            <p class="ayuda" id="repartoFormato">
+                Una línea por grupo de cajas: <code>4 CAJAS X 10 BOLSOS: 40 - JAPAN</code>. Sale en la
+                tabla de destinaciones de la hoja, en la columna CAJAS; cualquier otro texto no se acepta.
+            </p>
             <p class="ayuda" id="repartoAyuda">Se calcula con la tabla y las unidades por caja.</p>
+            <!-- Errores (no deja generar) y avisos (sí) del reparto, con su nº de línea. -->
+            <div id="repartoComprobacion" class="embalaje-reparto-comprobacion" aria-live="polite"></div>
 
             <label for="comentarios" class="etiqueta-con-accion">
                 <span>Comentarios</span>
@@ -348,11 +357,34 @@
             reparto.classList.toggle('a-mano', repartoAMano);
         }
 
+        // Comprueba el reparto contra la tabla (comprobarReparto, en
+        // reparto-cajas.js) y pinta debajo del campo los errores en rojo y los
+        // avisos en amarillo; nada si todo cuadra. Devuelve los errores.
+        const comprobacion = document.getElementById('repartoComprobacion');
+        function comprobar() {
+            const resultado = comprobarReparto(reparto.value, filasDeLaTabla());
+            comprobacion.innerHTML = '';
+            resultado.errores.forEach(function (texto) { pintarComprobacion('error', texto); });
+            resultado.avisos.forEach(function (texto) { pintarComprobacion('', texto); });
+            reparto.classList.toggle('con-errores', resultado.errores.length > 0);
+            return resultado.errores;
+        }
+
+        function pintarComprobacion(clase, texto) {
+            const linea = document.createElement('div');
+            linea.className = ('alerta ' + clase).trim();
+            linea.textContent = texto;
+            comprobacion.appendChild(linea);
+        }
+
         // Un cambio en la tabla o en las unidades: solo en modo automático, y
         // sin unidades por caja no hay cálculo y el texto se deja como está.
+        // La comprobación sí va siempre: la tabla decide qué destinaciones valen.
         function seguirLaTabla() {
-            if (repartoAMano || !(parseInt(unidadesPorCaja.value, 10) > 0)) return;
-            reparto.value = repartoCalculado();
+            if (!repartoAMano && parseInt(unidadesPorCaja.value, 10) > 0) {
+                reparto.value = repartoCalculado();
+            }
+            comprobar();
         }
 
         // «Volver a calcular» y el cambio de artículo: se descarta lo escrito y
@@ -361,6 +393,7 @@
             repartoAMano = false;
             reparto.value = repartoCalculado();
             pintarModoReparto();
+            comprobar();
         }
 
         reparto.addEventListener('input', function () {
@@ -368,6 +401,7 @@
                 repartoAMano = true;
                 pintarModoReparto();
             }
+            comprobar();
         });
         unidadesPorCaja.addEventListener('input', seguirLaTabla);
         document.getElementById('volverACalcular').addEventListener('click', function () {
@@ -385,6 +419,7 @@
                 seguirLaTabla();
             }
             pintarModoReparto();
+            comprobar();
         })();
 
         // El comentario guardado se AÑADE al texto, no lo sustituye, y el
@@ -462,6 +497,15 @@
 
         form.addEventListener('submit', function (evento) {
             evento.preventDefault();
+            // Con el reparto mal escrito no se envía nada: se dice al lado del
+            // botón y se vuelve al campo, sin tocar lo tecleado. El servidor
+            // lo rechazaría igual (400), esto solo ahorra el viaje.
+            const errores = comprobar();
+            if (errores.length > 0) {
+                avisar('error', 'Corrige el reparto en cajas: ' + errores.join(' · '));
+                reparto.focus();
+                return;
+            }
             boton.disabled = true;
             boton.textContent = 'Generando…';
             // El taller con el que se genera: el que se teclee mientras tanto es otro.

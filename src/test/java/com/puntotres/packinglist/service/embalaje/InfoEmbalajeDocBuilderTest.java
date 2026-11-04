@@ -52,6 +52,19 @@ class InfoEmbalajeDocBuilderTest {
 
     private final InfoEmbalajeDocBuilder builder = new InfoEmbalajeDocBuilder();
 
+    /**
+     * El reparto del ejemplo, en el único formato admitido: cuadra con las
+     * cantidades de la tabla, y RETAIL y DOUANES USA llevan dos líneas cada
+     * una. 53 cajas en total.
+     */
+    private static final String REPARTO_EJEMPLO = """
+            4 CAJAS X 10 BOLSOS: 40 - JAPAN
+            24 CAJAS X 10 BOLSOS: 240 - DOUANES USA
+            1 CAJA X 3 BOLSOS: 3 - DOUANES USA
+            11 CAJAS X 10 BOLSOS: 110 - WHOLESALE
+            12 CAJAS X 10 BOLSOS: 120 - RETAIL
+            1 CAJA X 7 BOLSOS: 7 - RETAIL""";
+
     /** Los valores de la hoja de Tánger que el usuario nos pasó en foto. */
     private static DatosHojaEmbalaje datosEjemplo() {
         return new DatosHojaEmbalaje("APC", "A.P.C.", "Spring 27", "TÁNGER", 270, "12662",
@@ -62,7 +75,7 @@ class InfoEmbalajeDocBuilderTest {
                         new DestinacionHoja("DOUANES USA", "4100132811", 243),
                         new DestinacionHoja("WHOLESALE", "4100132847", 110),
                         new DestinacionHoja("RETAIL", "4100132835", 127)),
-                "CAJA 1 A 12: 10 UDS\nCAJA 13: 8 UDS\nCAJAS 14 A 20: 10 UDS\nCAJA 21: 3 UDS\nCAJA 22: 7 UDS",
+                REPARTO_EJEMPLO,
                 "SACAR LOS BOLSOS DEL SOBRE CON CUIDADO\nNO MEZCLAR COLORES",
                 "https://youtu.be/guia");
     }
@@ -120,7 +133,7 @@ class InfoEmbalajeDocBuilderTest {
     /** La tabla de destinaciones: la de tres columnas que empieza por «Destinación». */
     private static XWPFTable tablaDestinaciones(XWPFDocument doc) {
         return doc.getTables().stream()
-                .filter(t -> t.getRow(0).getTableCells().size() == 3
+                .filter(t -> t.getRow(0).getTableCells().size() >= 3
                         && t.getRow(0).getCell(0).getText().trim().equals("DESTINACIÓN"))
                 .findFirst().orElseThrow();
     }
@@ -176,8 +189,8 @@ class InfoEmbalajeDocBuilderTest {
                     "60X40X40", "BOLSA DE TELA NEGRA", "GRABADO LOGO NIKEL",
                     "JAPAN", "4100132915", "DOUANES USA", "4100132811",
                     "WHOLESALE", "4100132847", "RETAIL", "4100132835",
-                    "CAJA 1 A 12: 10 UDS", "CAJA 13: 8 UDS",
-                    "CAJAS 14 A 20: 10 UDS", "CAJA 21: 3 UDS", "CAJA 22: 7 UDS",
+                    "4 CAJAS X 10 BOLSOS", "24 CAJAS X 10 BOLSOS", "1 CAJA X 3 BOLSOS",
+                    "11 CAJAS X 10 BOLSOS", "12 CAJAS X 10 BOLSOS", "1 CAJA X 7 BOLSOS",
                     "SACAR LOS BOLSOS DEL SOBRE CON CUIDADO",
                     "NO MEZCLAR COLORES"}) {
                 assertTrue(texto.contains(esperado), "falta en la hoja: " + esperado);
@@ -189,12 +202,12 @@ class InfoEmbalajeDocBuilderTest {
     void laTablaDeDestinacionesLlevaCabeceraFilasYTotal() throws Exception {
         try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
             XWPFTable tabla = tablaDestinaciones(doc);
-            assertEquals(6, tabla.getRows().size(), "cabecera + 4 destinaciones + total");
+            assertEquals(8, tabla.getRows().size(), "cabecera + 4 destinaciones (dos de ellas en dos filas) + total");
             assertEquals("Nº PEDIDO", tabla.getRow(0).getCell(1).getText().trim());
             assertEquals("CANTIDAD", tabla.getRow(0).getCell(2).getText().trim());
             assertEquals("243", tabla.getRow(2).getCell(2).getText().trim());
-            assertEquals("TOTAL", tabla.getRow(5).getCell(0).getText().trim());
-            assertEquals("520", tabla.getRow(5).getCell(2).getText().trim());
+            assertEquals("TOTAL", tabla.getRow(7).getCell(0).getText().trim());
+            assertEquals("520", tabla.getRow(7).getCell(2).getText().trim());
         }
     }
 
@@ -240,7 +253,7 @@ class InfoEmbalajeDocBuilderTest {
             String texto = texto(doc);
             assertFalse(texto.contains("SACAR LOS BOLSOS"));
             assertFalse(texto.contains("INSTRUCCIÓN"));
-            assertFalse(texto.contains("CAJA 1 A 12"));
+            assertFalse(texto.contains("CAJAS X"));
             assertEquals(3, doc.getTables().size(), "cabecera, embalaje y destinaciones; sin recuadro de comentarios");
         }
         try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
@@ -580,43 +593,159 @@ class InfoEmbalajeDocBuilderTest {
         }
     }
 
+    /** La combinación vertical de una celda («restart», «continue») o null si no está combinada. */
+    private static String vMerge(XWPFTableCell celda) {
+        CTTcPr propiedades = celda.getCTTc().getTcPr();
+        if (propiedades == null || !propiedades.isSetVMerge()) {
+            return null;
+        }
+        return propiedades.getVMerge().getVal() == null ? "continue" : propiedades.getVMerge().getVal().toString();
+    }
+
     @Test
-    void elRepartoVaATamano14() throws Exception {
+    void elRepartoVaEnLaTablaComoCuartaColumna() throws Exception {
         try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
-            List<XWPFParagraph> reparto = doc.getParagraphs().stream()
-                    .filter(p -> p.getText().startsWith("CAJA"))
-                    .toList();
-            assertEquals(5, reparto.size(), "una línea de reparto por párrafo");
-            for (XWPFParagraph parrafo : reparto) {
-                for (XWPFRun run : parrafo.getRuns()) {
-                    assertEquals(14.0, run.getFontSizeAsDouble(), 0.01, "«" + run.text() + "»");
-                }
+            XWPFTable tabla = tablaDestinaciones(doc);
+            assertEquals(4, tabla.getRow(0).getTableCells().size());
+            assertEquals("CAJAS", tabla.getRow(0).getCell(3).getText().trim());
+
+            assertEquals("JAPAN", tabla.getRow(1).getCell(0).getText().trim());
+            assertEquals("4 CAJAS X 10 BOLSOS", tabla.getRow(1).getCell(3).getText().trim());
+            assertEquals(null, vMerge(tabla.getRow(1).getCell(0)), "una sola línea: sin combinar");
+
+            // RETAIL ocupa dos filas: destinación, pedido y cantidad combinados.
+            XWPFTableRow retail = tabla.getRow(5);
+            XWPFTableRow resto = tabla.getRow(6);
+            assertEquals("RETAIL", retail.getCell(0).getText().trim());
+            assertEquals("127", retail.getCell(2).getText().trim());
+            for (int c = 0; c < 3; c++) {
+                assertEquals("restart", vMerge(retail.getCell(c)), "columna " + c);
+                assertEquals("continue", vMerge(resto.getCell(c)), "columna " + c);
+                assertEquals("", resto.getCell(c).getText().trim());
+            }
+            assertEquals("12 CAJAS X 10 BOLSOS", retail.getCell(3).getText().trim());
+            assertEquals("1 CAJA X 7 BOLSOS", resto.getCell(3).getText().trim());
+            assertEquals(null, vMerge(retail.getCell(3)), "la columna de cajas no se combina");
+            // Sin filete entre las dos filas de cajas de RETAIL.
+            assertEquals(STBorder.NIL, retail.getCell(3).getCTTc().getTcPr().getTcBorders().getBottom().getVal());
+            assertEquals(STBorder.NIL, resto.getCell(3).getCTTc().getTcPr().getTcBorders().getTop().getVal());
+
+            XWPFTableRow total = tabla.getRow(7);
+            assertEquals("TOTAL", total.getCell(0).getText().trim());
+            assertEquals("53 CAJAS", total.getCell(3).getText().trim());
+            XWPFRun cajasTotal = total.getCell(3).getParagraphs().get(0).getRuns().get(0);
+            assertEquals(14.0, cajasTotal.getFontSizeAsDouble(), 0.01);
+            assertTrue(cajasTotal.isBold());
+        }
+    }
+
+    @Test
+    void unaSolaCajaEnTotalVaEnSingular() throws Exception {
+        DatosHojaEmbalaje d = datosEjemplo();
+        DatosHojaEmbalaje una = new DatosHojaEmbalaje(d.cliente(), d.nombreCliente(), d.temporada(),
+                d.taller(), d.numeroEnvio(), d.nota(), d.fecha(), d.referencia(), d.codigoColor(),
+                d.descripcionColor(), d.nombreBolso(), d.codigoModelo(), d.medidaCaja(),
+                d.unidadesPorCaja(), d.bolsaTela(), d.etiquetaInterior(), d.instruccionEspecial(),
+                List.of(new DestinacionHoja("KOREA", "4100132901", 7)), "1 CAJA X 7 BOLSOS: 7 - KOREA",
+                d.comentarios(), d.enlaceVideo());
+        try (XWPFDocument doc = abrir(una, null)) {
+            XWPFTable tabla = tablaDestinaciones(doc);
+            assertEquals("1 CAJA", tabla.getRow(tabla.getRows().size() - 1).getCell(3).getText().trim());
+        }
+    }
+
+    @Test
+    void sinRepartoLaTablaTieneTresColumnas() throws Exception {
+        try (XWPFDocument doc = abrir(con(datosEjemplo(), "PARIS", "X", "", "C", ""), null)) {
+            XWPFTable tabla = tablaDestinaciones(doc);
+            assertEquals(6, tabla.getRows().size(), "una fila por destinación");
+            for (XWPFTableRow fila : tabla.getRows()) {
+                assertEquals(3, fila.getTableCells().size());
+            }
+            assertEquals(3, tabla.getCTTbl().getTblGrid().sizeOfGridColArray());
+        }
+    }
+
+    @Test
+    void noHayBloqueDeRepartoDebajoDeLaTabla() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            for (XWPFParagraph parrafo : doc.getParagraphs()) {
+                assertFalse(parrafo.getText().contains("CAJA"), "párrafo suelto: «" + parrafo.getText() + "»");
             }
         }
     }
 
     @Test
-    void laTablaDeDestinacionesOcupaElSetentaPorCiento() throws Exception {
-        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
-            var seccion = doc.getDocument().getBody().getSectPr();
-            long anchoUtil = ((BigInteger) seccion.getPgSz().getW()).longValue()
-                    - ((BigInteger) seccion.getPgMar().getLeft()).longValue()
-                    - ((BigInteger) seccion.getPgMar().getRight()).longValue();
-            long esperado = Math.round(anchoUtil * 0.70);
-
-            XWPFTable tabla = tablaDestinaciones(doc);
-            var propiedades = tabla.getCTTbl().getTblPr();
-            assertEquals(esperado, ((BigInteger) propiedades.getTblW().getW()).longValue(), "tblW");
-            long rejilla = 0;
-            List<Long> columnas = new ArrayList<>();
-            for (var columna : tabla.getCTTbl().getTblGrid().getGridColList()) {
-                columnas.add(((BigInteger) columna.getW()).longValue());
-                rejilla += columnas.get(columnas.size() - 1);
+    void unRepartoAntiguoEnTextoLibreSigueSaliendoDebajo() throws Exception {
+        // Una hoja guardada antes de que el reparto tuviera formato: se regenera
+        // desde «antiguos» sin fallar y sin perder nada. Lo que sí se entiende
+        // va a la tabla; lo demás, debajo y como antes, a 14 pt.
+        String antiguo = "CAJA 1 A 12: 10 UDS\nCAJA 13: 8 UDS\n4 CAJAS X 10 BOLSOS: 40 - JAPAN\nCAJA 21: 3 UDS";
+        try (XWPFDocument doc = abrir(con(datosEjemplo(), "PARIS", "X", antiguo, "C", ""), null)) {
+            List<XWPFParagraph> debajo = doc.getParagraphs().stream()
+                    .filter(p -> p.getText().startsWith("CAJA"))
+                    .toList();
+            assertEquals(List.of("CAJA 1 A 12: 10 UDS", "CAJA 13: 8 UDS", "CAJA 21: 3 UDS"),
+                    debajo.stream().map(XWPFParagraph::getText).toList());
+            for (XWPFParagraph parrafo : debajo) {
+                for (XWPFRun run : parrafo.getRuns()) {
+                    assertEquals(14.0, run.getFontSizeAsDouble(), 0.01, "«" + run.text() + "»");
+                }
             }
-            assertEquals(esperado, rejilla, "la rejilla suma lo mismo que la tabla");
+            XWPFTable tabla = tablaDestinaciones(doc);
+            assertEquals("4 CAJAS X 10 BOLSOS", tabla.getRow(1).getCell(3).getText().trim());
+        }
+        try (XWPFDocument doc = abrir(con(datosEjemplo(), "PARIS", "X", "CAJA 1 A 12: 10 UDS", "C", ""), null)) {
+            assertEquals(3, tablaDestinaciones(doc).getRow(0).getTableCells().size(),
+                    "sin ninguna línea en formato, la tabla sigue con tres columnas");
+            assertTrue(texto(doc).contains("CAJA 1 A 12: 10 UDS"));
+        }
+    }
+
+    /** Ancho útil de la página, en veinteavos de punto. */
+    private static long anchoUtil(XWPFDocument doc) {
+        var seccion = doc.getDocument().getBody().getSectPr();
+        return ((BigInteger) seccion.getPgSz().getW()).longValue()
+                - ((BigInteger) seccion.getPgMar().getLeft()).longValue()
+                - ((BigInteger) seccion.getPgMar().getRight()).longValue();
+    }
+
+    /** Los anchos de la rejilla de una tabla, comprobando que suman su ancho declarado. */
+    private static List<Long> columnas(XWPFTable tabla, long esperado) {
+        assertEquals(esperado, ((BigInteger) tabla.getCTTbl().getTblPr().getTblW().getW()).longValue(), "tblW");
+        List<Long> columnas = new ArrayList<>();
+        for (var columna : tabla.getCTTbl().getTblGrid().getGridColList()) {
+            columnas.add(((BigInteger) columna.getW()).longValue());
+        }
+        assertEquals(esperado, columnas.stream().mapToLong(Long::longValue).sum(),
+                "la rejilla suma lo mismo que la tabla");
+        return columnas;
+    }
+
+    @Test
+    void sinRepartoLaTablaDeDestinacionesOcupaElSetentaPorCiento() throws Exception {
+        try (XWPFDocument doc = abrir(con(datosEjemplo(), "PARIS", "X", "", "C", ""), null)) {
+            long esperado = Math.round(anchoUtil(doc) * 0.70);
+            XWPFTable tabla = tablaDestinaciones(doc);
+            List<Long> columnas = columnas(tabla, esperado);
             // Las proporciones de siempre: destinación > pedido > cantidad.
             assertTrue(columnas.get(0) > columnas.get(1) && columnas.get(1) > columnas.get(2), columnas.toString());
             assertEquals(4400.0 / 10306, columnas.get(0) / (double) esperado, 0.001);
+            assertEquals(TableRowAlign.LEFT, tabla.getTableAlignment(), "pegada a la izquierda");
+        }
+    }
+
+    @Test
+    void conRepartoLaTablaOcupaElNoventaPorCientoYCajasMideCincoCentimetros() throws Exception {
+        try (XWPFDocument doc = abrir(datosEjemplo(), null)) {
+            long esperado = Math.round(anchoUtil(doc) * 0.90);
+            XWPFTable tabla = tablaDestinaciones(doc);
+            List<Long> columnas = columnas(tabla, esperado);
+            assertEquals(4, columnas.size());
+            assertEquals(5 * 567, columnas.get(3), "la columna CAJAS");
+            long tres = esperado - columnas.get(3);
+            assertEquals(4400.0 / 10306, columnas.get(0) / (double) tres, 0.001, "proporciones de las otras tres");
+            assertEquals(3400.0 / 10306, columnas.get(1) / (double) tres, 0.001);
             assertEquals(TableRowAlign.LEFT, tabla.getTableAlignment(), "pegada a la izquierda");
         }
     }
@@ -701,10 +830,15 @@ class InfoEmbalajeDocBuilderTest {
                 InfoEmbalajeDocBuilder.nombreFichero(conBarra));
     }
 
-    /** El caso más cargado que la hoja tiene que caber en un A4: 6 destinaciones, 8 líneas de reparto y 4 de comentarios. */
+    /**
+     * El caso más cargado que la hoja tiene que caber en un A4: 6
+     * destinaciones, 10 líneas de reparto (cuatro destinaciones en dos filas)
+     * y 4 de comentarios.
+     */
     private static DatosHojaEmbalaje masCargado(String enlace) {
         DatosHojaEmbalaje base = con(datosEjemplo(), "PARIS", "GRABADO LOGO NIKEL",
-                datosEjemplo().repartoCajas() + "\nCAJA 23: 5 UDS\nCAJA 24: 6 UDS\nCAJA 25: 2 UDS",
+                datosEjemplo().repartoCajas() + "\n2 CAJAS X 10 BOLSOS: 20 - KOREA\n1 CAJA X 5 BOLSOS: 5 - KOREA"
+                        + "\n1 CAJA X 10 BOLSOS: 10 - AUSTRALIA\n1 CAJA X 8 BOLSOS: 8 - AUSTRALIA",
                 datosEjemplo().comentarios() + "\nREVISAR LAS COSTURAS\nCOLOCAR PAPEL DE SEDA", enlace);
         List<DestinacionHoja> seis = new ArrayList<>(base.destinaciones());
         seis.add(new DestinacionHoja("KOREA", "4100132901", 25));
