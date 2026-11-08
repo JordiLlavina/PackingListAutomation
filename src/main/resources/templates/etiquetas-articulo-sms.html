@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Etiquetas de artículo · SMS')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Etiquetas de artículo · SMS')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <form id="formEtiquetasSms" th:action="@{/etiquetas-articulo-sms/generar}" method="post"
+          enctype="multipart/form-data">
+      <div class="tarjeta isla-pedido">
+        <h3 class="titulo-seccion">🏷️ Etiquetas de SMS</h3>
+        <p class="ayuda">
+            Del excel de pedido de SMS sale un Word con una etiqueta pequeña por muestra («Commande SMS»),
+            65 por A4: PUNTOTRES, la temporada, SMS, la referencia, el nombre del modelo, la piel y su
+            color. No se guarda nada: la temporada solo va impresa en las etiquetas y en el nombre del
+            documento.
+        </p>
+
+        <!-- Solo los clientes cuyo excel de SMS se sabe leer; los demás, apagados. -->
+        <div class="fila-cliente">
+            <div>
+                <label for="cliente">Cliente</label>
+                <select id="cliente" name="cliente" required>
+                    <option th:each="entrada : ${clientes}"
+                            th:value="${entrada.key}"
+                            th:text="${entrada.value.disponible} ? ${entrada.value.nombre}
+                                     : |${entrada.value.nombre} — en desarrollo|"
+                            th:disabled="${!entrada.value.disponible}"
+                            th:selected="${entrada.key == clienteElegido}"></option>
+                </select>
+            </div>
+            <div>
+                <label for="temporada">Temporada</label>
+                <input type="text" id="temporada" name="temporada" placeholder="FALL 27" required
+                       th:value="${temporada}">
+            </div>
+        </div>
+
+        <label for="excel">Excel de pedido de SMS</label>
+        <input type="file" id="excel" name="excel" accept=".xlsx" required>
+      </div>
+
+        <button type="submit">Generar etiquetas</button>
+        <a class="boton secundario" th:href="@{/etiquetas-articulo}">Volver</a>
+    </form>
+</main>
+</body>
+</html>

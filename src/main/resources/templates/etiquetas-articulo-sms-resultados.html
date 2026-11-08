@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Etiquetas de SMS generadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Etiquetas de artículo · SMS')}"></header>
+<main>
+    <ul class="ficha-envio">
+        <li><span class="rotulo">Cliente</span>
+            <strong th:text="${cliente}"></strong></li>
+        <li><span class="rotulo">Temporada</span>
+            <strong th:text="${temporada}"></strong></li>
+        <li><span class="rotulo">Etiquetas</span>
+            <strong th:text="${resultado.etiquetas}"></strong></li>
+        <li><span class="rotulo">Hojas A4</span>
+            <strong th:text="${resultado.hojas()}"></strong></li>
+    </ul>
+
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(resultado.avisos)}">
+        <summary th:text="|${#lists.size(resultado.avisos)} aviso(s)|"></summary>
+        <div class="alerta" th:each="aviso : ${resultado.avisos}" th:text="${aviso}"></div>
+    </details>
+
+    <section class="tarjeta seccion-salida">
+        <h3 class="titulo-seccion">🏷️ Etiquetas de SMS</h3>
+        <table>
+            <thead>
+            <tr>
+                <th>Fichero</th>
+                <th>Contenido</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td th:text="${resultado.nombreFichero}"></td>
+                <td th:text="|${resultado.etiquetas} etiquetas de ${resultado.referencias} ${resultado.referencias == 1 ? 'fila' : 'filas'} del pedido|"></td>
+            </tr>
+            </tbody>
+        </table>
+        <a class="boton" th:href="@{/etiquetas-articulo-sms/descargar}">Descargar</a>
+    </section>
+
+    <div class="salidas-pantalla">
+        <a class="boton neutro" th:href="@{/menu}">Volver al menú</a>
+        <a class="boton neutro" th:href="@{/etiquetas-articulo-sms}">Otro excel de SMS</a>
+    </div>
+</main>
+</body>
+</html>

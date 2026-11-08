@@ -25,7 +25,8 @@ public class MenuController {
 
     /**
      * Menú de la sección de etiquetas de artículo: producción (el flujo de
-     * EtiquetasArticuloController) y, todavía sin hacer, SMS y prototipos.
+     * EtiquetasArticuloController), SMS (EtiquetasSmsController) y, todavía
+     * sin hacer, prototipos.
      * Vive aquí y no en EtiquetasArticuloController porque es una portada, no
      * un paso de ese flujo.
      */

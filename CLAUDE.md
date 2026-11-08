@@ -226,8 +226,8 @@ afecta a los dos**.
 **Etiquetas de artículo** (`service/etiquetasarticulo/`): flujo **independiente
 del envío** (`/etiquetas-articulo-produccion`), su única entrada es el excel de
 pedido del cliente. `/etiquetas-articulo` es el **menú de la sección** (en
-`MenuController`, que es una portada y no un paso del flujo): producción y, sin
-implementar todavía, SMS y prototipos. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
+`MenuController`, que es una portada y no un paso del flujo): producción, SMS
+(ver más abajo) y, sin implementar todavía, prototipos. `GeneradorEtiquetasArticuloCliente` es la interfaz, despachada por
 clave de cliente; implementado AMI. Una hoja por fila del pedido (= por EAN13),
 40 etiquetas idénticas por hoja en una rejilla 4×10 que cabe en un A4, y un
 fichero por (tipo, Made in): bolsos MOROCCO, bolsos SPAIN, cinturones
@@ -237,6 +237,36 @@ fichero por (tipo, Made in): bolsos MOROCCO, bolsos SPAIN, cinturones
 al fichero real del cliente por `EtiquetasArticuloMaquetacionTest` — POI no
 copia el `pageSetup` al clonar hojas, así que heredarla de una plantilla no
 servía.
+
+**Etiquetas de artículo de SMS** (`/etiquetas-articulo-sms`, `EtiquetasSmsController`,
+`EtiquetasSmsService`, `EtiquetasSmsDocBuilder`): de momento **solo APC**, los
+demás clientes salen «en desarrollo». Entrada: cliente, temporada escrita a
+mano (no se guarda nada) y el **excel de pedido de SMS** (`COMMANDE
+SMS_FALL27_PUNTOTRES.xlsx`), leído con el mismo `ApcSmsExcel` que las hojas de
+corte de SMS, así que lo que cuenta como muestra es lo mismo en los dos
+documentos. Sale **un Word** (no un Excel) con **una etiqueta por muestra** de
+«Commande SMS», seguidas en el orden del excel, y siete líneas por etiqueta,
+decididas por el usuario: `PUNTOTRES`, la temporada, `SMS`, la referencia
+entera, el nombre del modelo (`MODELE`), la piel (`ARTICLE`) y su color
+(`COLORIS FOURNISSEURS`), todo en mayúsculas. La plantilla del usuario es
+`docs/Etiquetas Artículos/ETIQUETAS PEQUEÑAS Template.doc` (en las de
+prototipos la tercera línea será `TEST`). Lo que no se deduce del código:
+
+- **La maquetación está copiada de esa plantilla, sin usarla**: hojas
+  adhesivas de 65 etiquetas (5 × 13) por A4, casillas de 2160 × 1202 twips
+  sin hueco entre ellas, Calibri 7 pt, líneas de alto fijo. El `.doc` es
+  antiguo y mide el sangrado de la tabla **hasta el texto** de la primera
+  casilla y no hasta su borde: la tabla empieza 96 twips (el margen de la
+  casilla) antes de los 660 que dice la plantilla. Se comprobó exportando los
+  dos documentos con Word a PDF y comparando dónde cae el texto.
+- Una línea que no cabe **baja de letra** de medio en medio punto, hasta 4 pt
+  (un bolso de dos pieles escribe las dos, `BOMBARDIER … + NOBILE`), y nunca
+  se corta; si ni así cabe, se avisa. Un dato que falta deja **su línea en
+  blanco** (no se corre la de debajo) y también se avisa. Ninguna de las dos
+  cosas bloquea.
+- `EtiquetasSmsServiceTest` deja `target/Etiquetas SMS APC FALL 27.docx`, el
+  del pedido real (93 etiquetas, 2 hojas), y `EtiquetasSmsDocBuilderTest`,
+  `target/Etiquetas SMS ejemplo.docx`.
 
 **Procesado de escandallos ICSUITE** (`service/escandallos/`): flujo
 **totalmente independiente** del resto (`/clickup`, pantalla «Escandallos para

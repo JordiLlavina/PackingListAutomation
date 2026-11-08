@@ -28,6 +28,9 @@ datos-antes-flyway/
 # Excel lock files (created while a workbook is open)
 .~lock.*#
 ~$*.xlsx
+# Y los de Word
+~$*.doc
+~$*.docx
 docs/Envios DHL/address-book-*.csv
 
 # Fotos reales de temporada para probar los Documentos del Corte: no entran en el repo
