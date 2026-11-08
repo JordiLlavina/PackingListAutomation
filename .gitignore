@@ -36,3 +36,6 @@ docs/Envios DHL/address-book-*.csv
 # Fotos reales de temporada para probar los Documentos del Corte: no entran en el repo
 docs/Documentos de Corte/APC SPRING 27/
 docs/Documentos de Corte/AMI SS27/
+
+# Espacio de trabajo de los planes ejecutados con subagentes (ledger, briefs, informes): borrador local
+.superpowers/
