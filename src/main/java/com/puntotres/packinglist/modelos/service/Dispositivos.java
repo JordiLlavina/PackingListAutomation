@@ -42,6 +42,13 @@ public class Dispositivos {
     /** Lo que dura la cookie del dispositivo en el navegador. */
     public static final Duration VIGENCIA_COOKIE = Duration.ofDays(365);
 
+    /**
+     * Cada cuánto se vuelve a apuntar el último uso de un dispositivo: el
+     * taller entra con la cookie en cada petición, y apuntarlo en todas sería
+     * una escritura en la base de datos por cada clic.
+     */
+    public static final Duration CADA_CUANTO_SE_APUNTA_EL_USO = Duration.ofHours(1);
+
     private static final String NO_VALE = "El código no vale o ha caducado";
     private static final int BYTES_TOKEN = 32;
     private static final int LARGO_NOMBRE = 120;
@@ -113,6 +120,19 @@ public class Dispositivos {
             return Optional.empty();
         }
         return dispositivos.findByTokenHash(hashDe(tokenEnClaro)).filter(dispositivo -> !dispositivo.revocado());
+    }
+
+    /**
+     * Apunta que el dispositivo se acaba de usar, salvo que ya se apuntara
+     * hace menos de {@link #CADA_CUANTO_SE_APUNTA_EL_USO}.
+     */
+    @Transactional
+    public void apuntarUso(Dispositivo dispositivo) {
+        LocalDateTime ultimo = dispositivo.getUltimoUso();
+        if (ultimo == null || ultimo.isBefore(LocalDateTime.now().minus(CADA_CUANTO_SE_APUNTA_EL_USO))) {
+            dispositivo.tocar();
+            dispositivos.save(dispositivo);
+        }
     }
 
     /** Todos, también los revocados, del más reciente al más antiguo. */
