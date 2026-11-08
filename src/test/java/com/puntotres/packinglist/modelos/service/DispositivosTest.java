@@ -3,6 +3,7 @@ package com.puntotres.packinglist.modelos.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -95,5 +96,30 @@ class DispositivosTest {
         assertFalse(dispositivos.porToken(token.tokenEnClaro()).isPresent());
         assertTrue(repositorioDispositivos.findById(token.dispositivo().getId()).orElseThrow().revocado(),
                 "revocar no lo borra: queda la traza");
+    }
+
+    @Test
+    void apuntarElUsoNoDeshaceUnaRevocacionHechaEntreMedias() {
+        Long taller = usuarios.crear(new Usuarios.Alta("Taller Carrera T6", "t6-carrera", "", Rol.TALLER)).getId();
+        Dispositivos.TokenDispositivo token = dispositivos.canjear(dispositivos.generarCodigoAlta(taller), "Móvil");
+        // Lo que ha leído el filtro de la cookie antes de que el admin lo revocara.
+        Dispositivo leidoPorElFiltro = dispositivos.porToken(token.tokenEnClaro()).orElseThrow();
+
+        dispositivos.revocar(token.dispositivo().getId());
+        dispositivos.apuntarUso(leidoPorElFiltro);
+
+        Dispositivo guardado = repositorioDispositivos.findById(token.dispositivo().getId()).orElseThrow();
+        assertTrue(guardado.revocado(), "apuntar el uso no puede deshacer la revocación");
+        assertFalse(dispositivos.porToken(token.tokenEnClaro()).isPresent());
+    }
+
+    @Test
+    void apuntarElUsoEscribeElUltimoUsoDeUnDispositivoVivo() {
+        Long taller = usuarios.crear(new Usuarios.Alta("Taller Uso T6", "t6-uso-vivo", "", Rol.TALLER)).getId();
+        Dispositivos.TokenDispositivo token = dispositivos.canjear(dispositivos.generarCodigoAlta(taller), "Móvil");
+
+        dispositivos.apuntarUso(dispositivos.porToken(token.tokenEnClaro()).orElseThrow());
+
+        assertNotNull(repositorioDispositivos.findById(token.dispositivo().getId()).orElseThrow().getUltimoUso());
     }
 }

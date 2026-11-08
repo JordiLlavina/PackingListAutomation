@@ -112,15 +112,24 @@ public class SesionController {
     }
 
     /**
-     * Salir: cierra la sesión y, si se entró con un dispositivo, le borra la
-     * cookie. El dispositivo no se revoca (eso lo hace el admin); el aparato
-     * tendrá que darse de alta con un código nuevo.
+     * Salir: quita de la sesión quién ha entrado y, si se entró con un
+     * dispositivo, le borra la cookie. El dispositivo no se revoca (eso lo hace
+     * el admin); el aparato tendrá que darse de alta con un código nuevo.
+     *
+     * La sesión NO se invalida, a propósito: la app de modelos y las pantallas
+     * viejas se sirven desde el mismo origen y comparten la misma sesión HTTP,
+     * y en ella viven el envío en curso del packing list, el corte en curso o
+     * las filas desplegadas de la revisión. Invalidarla al salir de /app haría
+     * perder lo tecleado en otra pestaña. Solo se quita el contexto de
+     * seguridad y se cambia el id de la sesión, para que el id que llevaba la
+     * sesión entrada no sirva después.
      */
     @DeleteMapping
     public ResponseEntity<Void> salir(HttpServletRequest request) {
         HttpSession sesion = request.getSession(false);
         if (sesion != null) {
-            sesion.invalidate();
+            sesion.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+            request.changeSessionId();
         }
         estrategia.clearContext();
         ResponseEntity.HeadersBuilder<?> respuesta = ResponseEntity.noContent();

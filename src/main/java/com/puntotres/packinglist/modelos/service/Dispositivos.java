@@ -124,14 +124,18 @@ public class Dispositivos {
 
     /**
      * Apunta que el dispositivo se acaba de usar, salvo que ya se apuntara
-     * hace menos de {@link #CADA_CUANTO_SE_APUNTA_EL_USO}.
+     * hace menos de {@link #CADA_CUANTO_SE_APUNTA_EL_USO}. Nunca deshace una
+     * revocación: el dispositivo que llega es el que leyó el filtro de la
+     * cookie, quizá ya viejo, así que no se guarda entero; se escribe solo el
+     * último uso y solo si sigue sin revocar
+     * ({@link DispositivoRepository#apuntarUso}).
      */
     @Transactional
     public void apuntarUso(Dispositivo dispositivo) {
+        LocalDateTime ahora = LocalDateTime.now();
         LocalDateTime ultimo = dispositivo.getUltimoUso();
-        if (ultimo == null || ultimo.isBefore(LocalDateTime.now().minus(CADA_CUANTO_SE_APUNTA_EL_USO))) {
-            dispositivo.tocar();
-            dispositivos.save(dispositivo);
+        if (ultimo == null || ultimo.isBefore(ahora.minus(CADA_CUANTO_SE_APUNTA_EL_USO))) {
+            dispositivos.apuntarUso(dispositivo.getId(), ahora);
         }
     }
 

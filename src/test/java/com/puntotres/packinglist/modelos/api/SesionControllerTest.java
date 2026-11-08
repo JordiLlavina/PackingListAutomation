@@ -2,6 +2,7 @@ package com.puntotres.packinglist.modelos.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -127,20 +128,26 @@ class SesionControllerTest {
     }
 
     @Test
-    void salirInvalidaLaSesionYBorraLaCookieDelDispositivo() throws Exception {
+    void salirQuitaLaEntradaSinInvalidarLaSesionYBorraLaCookieDelDispositivo() throws Exception {
         usuarios.crear(new Usuarios.Alta("Despacho T6 salir", "t6-salir", "secreto", Rol.DESPACHO));
         MockHttpSession sesion = (MockHttpSession) mvc.perform(login("t6-salir", "secreto"))
                 .andReturn().getRequest().getSession(false);
+
+        // Lo de la app vieja vive en la misma sesión (envío en curso, corte en curso...).
+        sesion.setAttribute("t6-envioEnCurso", "lo tecleado en el packing list");
+        String idAntes = sesion.getId();
 
         MvcResult salida = mvc.perform(delete("/api/sesion").session(sesion).with(csrf())
                         .cookie(new Cookie(FiltroDispositivo.COOKIE, "lo-que-sea")))
                 .andExpect(status().isNoContent())
                 .andReturn();
 
-        assertTrue(sesion.isInvalid());
+        assertFalse(sesion.isInvalid(), "salir de /app no puede tirar la sesión de las pantallas viejas");
+        assertEquals("lo tecleado en el packing list", sesion.getAttribute("t6-envioEnCurso"));
+        assertNotEquals(idAntes, sesion.getId(), "el id de la sesión cambia al salir");
         String borrado = setCookieDe(salida, FiltroDispositivo.COOKIE);
         assertTrue(borrado.contains("Max-Age=0"), borrado);
-        mvc.perform(get("/api/sesion").session(new MockHttpSession()))
+        mvc.perform(get("/api/sesion").session(sesion))
                 .andExpect(status().isUnauthorized());
     }
 
