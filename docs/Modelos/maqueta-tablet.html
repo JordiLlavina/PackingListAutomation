@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Maqueta clicable de la cara de taller de la app de modelos (ver el spec
+     docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md).
+     Sin servidor: abrir este fichero en Chrome (mejor en la tablet) y recorrerlo. -->
+</head>
+<body>
+<title>Maqueta Modelos Taller</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Maqueta clicable de la cara de taller. Layout: cabecera fija con saludo,
+   contenido que hace scroll, barra inferior fija de cuatro destinos. Una
+   tarea por pantalla, objetivos táctiles de 64 px, letra grande. */
+:root {
+  --bg: #f1f3f6;          /* gris frío, con el azul de la tinta */
+  --surface: #ffffff;
+  --fg: #16213a;          /* tinta azul oscuro */
+  --muted: #5d6779;
+  --line: #d5dbe4;
+  --accent: #a8731f;      /* latón de los herrajes: marca y acciones secundarias */
+  --accent-ink: #ffffff;
+  --ok: #1d8a4c;          /* hecho / enviar */
+  --ok-ink: #ffffff;
+  --new: #2456d1;         /* nuevo, sin leer */
+  --alta: #c4372b;        /* prioridad alta */
+  --normal: #d29a1c;
+  --baja: #7c8699;
+  --shadow: 0 1px 2px rgba(22,33,58,.08), 0 6px 18px rgba(22,33,58,.06);
+  --font: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161f; --surface: #1a2130; --fg: #e9edf3; --muted: #9ca7b9; --line: #2a3447;
+    --accent: #d7a24a; --accent-ink: #1a1408; --ok: #35b26c; --ok-ink: #06200f;
+    --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161f; --surface: #1a2130; --fg: #e9edf3; --muted: #9ca7b9; --line: #2a3447;
+  --accent: #d7a24a; --accent-ink: #1a1408; --ok: #35b26c; --ok-ink: #06200f;
+  --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 19px; line-height: 1.35; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible, label:focus-within { outline: 3px solid var(--new); outline-offset: 2px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.15; }
+.cabecera { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 12px; min-height: 64px;
+  padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.cabecera h1 { font-size: 1.15rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cabecera .maqueta { font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 2px 8px; }
+.atras { width: 56px; height: 56px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; }
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px calc(96px + env(safe-area-inset-bottom, 0px)); max-width: 1100px; margin: 0 auto; }
+.saludo { font-size: 1.9rem; margin-bottom: 4px; }
+.sub { color: var(--muted); margin: 0 0 18px; }
+.losas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.losa { position: relative; min-height: 150px; border-radius: 20px; border: 0; background: var(--surface); box-shadow: var(--shadow); text-align: left; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
+.losa .t { font-size: 1.5rem; font-weight: 700; }
+.losa svg { width: 44px; height: 44px; }
+.losa.primaria { background: var(--accent); color: var(--accent-ink); }
+.losa.primaria .m { color: inherit; opacity: .85; }
+.losa .m { color: var(--muted); font-size: 1rem; }
+.badge { position: absolute; top: 14px; right: 14px; min-width: 40px; height: 40px; padding: 0 10px; border-radius: 999px; background: var(--alta); color: #fff; font-weight: 700; display: grid; place-items: center; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.badge.cero { display: none; }
+.fila-titulo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 12px; }
+.fila-titulo h2 { font-size: 1.25rem; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip { height: 48px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 1rem; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.tarjeta-modelo { border: 0; padding: 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; text-align: left; display: flex; flex-direction: column; }
+.tarjeta-modelo .foto { aspect-ratio: 1; width: 100%; display: block; }
+.tarjeta-modelo .pie { padding: 10px 12px 12px; display: grid; gap: 2px; }
+.tarjeta-modelo .ref { font-weight: 700; font-size: 1.05rem; }
+.tarjeta-modelo .nom { color: var(--muted); font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etapa { display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.etapa::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--baja); }
+.etapa[data-e="PRODUCCION"]::before { background: var(--ok); }
+.etapa[data-e="SMS"]::before { background: var(--normal); }
+.etapa[data-e="PROTOTIPO"]::before { background: var(--new); }
+.nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: repeat(4, 1fr); padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); }
+.nav button { position: relative; border: 0; background: none; min-height: 68px; display: grid; justify-items: center; align-content: center; gap: 4px; font-size: .9rem; color: var(--muted); border-radius: 12px; }
+.nav button[aria-current="page"] { color: var(--fg); font-weight: 700; }
+.nav button svg { width: 28px; height: 28px; }
+.nav .pepita { position: absolute; top: 6px; left: calc(50% + 8px); min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; background: var(--alta); color: #fff; font-size: .85rem; font-weight: 700; display: grid; place-items: center; }
+.fab { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 6; width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--fg); color: var(--bg); box-shadow: var(--shadow); display: grid; place-items: center; }
+.fab svg { width: 34px; height: 34px; }
+.pasos { display: flex; gap: 6px; margin-bottom: 14px; }
+.pasos span { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.pasos span.hecho { background: var(--accent); }
+.pregunta { font-size: 1.6rem; margin-bottom: 16px; }
+.opciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+.opcion { min-height: 120px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); display: grid; justify-items: center; align-content: center; gap: 10px; font-size: 1.15rem; font-weight: 700; }
+.opcion svg { width: 44px; height: 44px; }
+.opcion[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, var(--surface)); }
+.acciones { display: grid; gap: 12px; margin-top: 22px; }
+@media (min-width: 640px) { .acciones { grid-template-columns: 1fr 1fr; } .acciones .ancho { grid-column: 1 / -1; } }
+.boton { min-height: 68px; border-radius: 18px; border: 2px solid var(--line); background: var(--surface); font-size: 1.2rem; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 12px; padding: 0 20px; }
+.boton svg { width: 30px; height: 30px; }
+.boton.ok { background: var(--ok); color: var(--ok-ink); border-color: var(--ok); }
+.boton.marca { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.boton.peligro { border-color: var(--alta); color: var(--alta); }
+.boton[disabled] { opacity: .45; cursor: not-allowed; }
+.ayuda { color: var(--muted); font-size: 1rem; margin: 10px 0 0; }
+.miniaturas { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.miniaturas img, .miniaturas .mini { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 14px; background: var(--line); display: block; }
+.miniaturas .mini { display: grid; place-items: center; color: var(--muted); font-size: .9rem; }
+.camara { min-height: 140px; border: 2px dashed var(--accent); border-radius: 18px; display: grid; place-items: center; gap: 8px; cursor: pointer; background: var(--surface); text-align: center; padding: 16px; }
+.camara svg { width: 44px; height: 44px; color: var(--accent); }
+.camara input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.grabador { display: grid; justify-items: center; gap: 18px; padding: 24px 0; }
+.mic { width: 160px; height: 160px; border-radius: 50%; border: 0; background: var(--alta); color: #fff; display: grid; place-items: center; box-shadow: var(--shadow); transition: transform .15s; }
+.mic svg { width: 72px; height: 72px; }
+.mic.grabando { animation: late 1.2s ease-in-out infinite; }
+@keyframes late { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+.mic.listo { background: var(--ok); }
+.tiempo { font-size: 2.4rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+.onda { display: flex; gap: 4px; align-items: center; height: 56px; }
+.onda i { width: 6px; border-radius: 3px; background: var(--accent); height: 10px; }
+.onda.viva i { animation: barra .9s ease-in-out infinite; }
+.onda i:nth-child(2n) { animation-delay: .15s; } .onda i:nth-child(3n) { animation-delay: .3s; } .onda i:nth-child(5n) { animation-delay: .45s; }
+@keyframes barra { 0%,100% { height: 10px; } 50% { height: 52px; } }
+@media (prefers-reduced-motion: reduce) { .mic.grabando, .onda.viva i { animation: none; } }
+.resumen { display: grid; gap: 14px; }
+.ficha { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 16px; display: flex; gap: 16px; align-items: center; }
+.ficha .foto { width: 96px; height: 96px; border-radius: 14px; flex: none; }
+.ficha .texto { display: grid; gap: 4px; min-width: 0; }
+.ficha .texto b { font-size: 1.25rem; }
+.lista { display: grid; gap: 14px; }
+.orden { border: 0; text-align: left; padding: 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); display: grid; grid-template-columns: 8px 110px 1fr; overflow: hidden; min-height: 110px; }
+.orden .franja { background: var(--baja); }
+.orden[data-p="ALTA"] .franja { background: var(--alta); }
+.orden[data-p="NORMAL"] .franja { background: var(--normal); }
+.orden .foto { width: 110px; height: 100%; min-height: 110px; }
+.orden .cuerpo { padding: 12px 14px; display: grid; gap: 4px; align-content: center; min-width: 0; }
+.orden .tit { font-weight: 700; font-size: 1.15rem; }
+.orden .meta { color: var(--muted); font-size: .95rem; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.pill { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 999px; font-size: .85rem; font-weight: 700; }
+.pill.nueva { background: var(--new); color: #fff; }
+.pill.vista { background: var(--line); color: var(--fg); }
+.pill.hecha { background: var(--ok); color: var(--ok-ink); }
+.pill.enviado { background: var(--line); color: var(--fg); }
+.orden.hecha { opacity: .7; }
+.detalle { display: grid; gap: 18px; }
+.detalle .texto-grande { font-size: 1.35rem; line-height: 1.45; background: var(--surface); border-radius: 18px; padding: 18px; box-shadow: var(--shadow); }
+.audio { display: flex; align-items: center; gap: 14px; background: var(--surface); border-radius: 18px; padding: 14px; box-shadow: var(--shadow); }
+.audio .play { width: 72px; height: 72px; border-radius: 50%; border: 0; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; flex: none; }
+.audio .play svg { width: 34px; height: 34px; }
+.audio .barra { flex: 1; height: 10px; border-radius: 5px; background: var(--line); overflow: hidden; }
+.audio .barra i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s linear; }
+.audio .dur { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 3.2em; text-align: right; }
+.docs { display: grid; gap: 10px; }
+.doc { min-height: 72px; border-radius: 16px; border: 2px solid var(--line); background: var(--surface); display: flex; align-items: center; gap: 14px; padding: 0 16px; font-size: 1.1rem; text-align: left; }
+.doc svg { width: 34px; height: 34px; color: var(--alta); flex: none; }
+.doc small { color: var(--muted); display: block; font-size: .9rem; }
+.linea { display: grid; gap: 0; }
+.evento { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.evento .punto { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); margin: 6px auto 0; }
+.evento .punto.etapa-p { background: var(--new); }
+.evento .cuando { color: var(--muted); font-size: .9rem; }
+.evento .que { font-weight: 700; }
+.evento .quien { color: var(--muted); font-size: .95rem; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); z-index: 7; background: var(--fg); color: var(--bg); padding: 14px 20px; border-radius: 14px; box-shadow: var(--shadow); font-weight: 700; max-width: min(92vw, 520px); text-align: center; }
+.vacio { text-align: center; color: var(--muted); padding: 48px 16px; display: grid; gap: 12px; justify-items: center; }
+.vacio svg { width: 72px; height: 72px; color: var(--ok); }
+.enviado { display: grid; justify-items: center; gap: 18px; padding: 40px 0; text-align: center; }
+.enviado .tick { width: 140px; height: 140px; border-radius: 50%; background: var(--ok); color: var(--ok-ink); display: grid; place-items: center; }
+.enviado .tick svg { width: 80px; height: 80px; }
+.escaner { position: relative; aspect-ratio: 4 / 3; max-height: 60vh; border-radius: 20px; overflow: hidden; background: linear-gradient(160deg, #2a3140, #0d1118); display: grid; place-items: center; color: #cbd3df; text-align: center; padding: 16px; }
+.escaner .marco { position: absolute; inset: 14% 22%; border: 4px solid var(--accent); border-radius: 18px; }
+@media (max-width: 480px) { .escaner .marco { inset: 20% 12%; } }
+.nota-maqueta { margin-top: 24px; padding: 12px 14px; border-left: 4px solid var(--accent); color: var(--muted); font-size: .95rem; background: var(--surface); border-radius: 0 12px 12px 0; }
+.teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 360px; margin: 0 auto; }
+.teclado button { min-height: 72px; font-size: 1.6rem; border-radius: 16px; border: 2px solid var(--line); background: var(--surface); font-weight: 700; }
+.codigo { font-size: 2.2rem; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; min-height: 1.4em; margin: 10px 0 18px; }
+</style>
+
+<header class="cabecera" id="cabecera"></header>
+<main id="vista"></main>
+<button class="fab" id="fab" aria-label="Escanear etiqueta" title="Escanear etiqueta"></button>
+<nav class="nav" id="nav" aria-label="Secciones"></nav>
+
+<script>
+/* ---------- iconos (trazo sencillo, 24×24) ---------- */
+const I = {
+  casa: '<path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>',
+  bandeja: '<path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6z"/>',
+  lista: '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/>',
+  rejilla: '<rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM19 14h2M14 19h2M19 19h2v2"/>',
+  mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>',
+  cam: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  play: '<path d="M7 4v16l13-8z" fill="currentColor" stroke="none"/>',
+  pausa: '<path d="M7 4h4v16H7zM13 4h4v16h-4z" fill="currentColor" stroke="none"/>',
+  check: '<path d="M4 12.5 10 18.5 20 6.5"/>',
+  atras: '<path d="M15 5l-7 7 7 7"/>',
+  mas: '<path d="M12 5v14M5 12h14"/>',
+  duda: '<path d="M9 9a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4"/><circle cx="12" cy="18" r=".8" fill="currentColor"/><circle cx="12" cy="12" r="9.5"/>',
+  pdf: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 17v-5h2a1.5 1.5 0 0 1 0 3H9"/>',
+  piel: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 12c3-3 5 3 8 0s5 3 10 0"/>',
+  forro: '<rect x="4" y="8" width="13" height="12" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1"/>',
+  herraje: '<rect x="3" y="8" width="18" height="8" rx="4"/><path d="M9 8v8M15 8v8"/>',
+  costura: '<path d="M3 18 21 6" stroke-dasharray="3 3"/><path d="m16 4 4 4-2 2-4-4z"/>',
+  medidas: '<rect x="2" y="8" width="20" height="8" rx="1"/><path d="M6 8v3M10 8v4M14 8v3M18 8v4"/>',
+  patron: '<circle cx="6" cy="18" r="3"/><circle cx="18" cy="18" r="3"/><path d="M8.5 16 20 4M15.5 16 4 4"/>',
+  otro: '<circle cx="6" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="18" cy="12" r="1.5" fill="currentColor"/>',
+  campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  ok: '<circle cx="12" cy="12" r="9.5"/><path d="m8 12.5 3 3 5-6"/>',
+  salir: '<path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/>',
+};
+const ic = (n, cls = '') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]}</svg>`;
+
+/* ---------- foto de relleno: silueta del artículo con el color del modelo ---------- */
+function foto(m, cls = 'foto') {
+  const h = m.hue, s = m.sat ?? 45;
+  const fondo = `hsl(${h} ${Math.round(s * .35)}% 92%)`, piel = `hsl(${h} ${s}% 38%)`, oscuro = `hsl(${h} ${s}% 26%)`;
+  const bolso = `<rect x="18" y="38" width="64" height="48" rx="10" fill="${piel}"/><path d="M34 40c0-14 32-14 32 0" fill="none" stroke="${oscuro}" stroke-width="6" stroke-linecap="round"/><rect x="18" y="52" width="64" height="6" fill="${oscuro}" opacity=".5"/><circle cx="50" cy="66" r="4" fill="${oscuro}"/>`;
+  const cinturon = `<rect x="6" y="42" width="88" height="16" rx="6" fill="${piel}"/><rect x="62" y="36" width="22" height="28" rx="5" fill="none" stroke="${oscuro}" stroke-width="5"/><rect x="72" y="36" width="4" height="28" fill="${oscuro}"/><circle cx="24" cy="50" r="2.5" fill="${oscuro}"/><circle cx="38" cy="50" r="2.5" fill="${oscuro}"/>`;
+  const cartera = `<rect x="22" y="30" width="56" height="42" rx="6" fill="${piel}"/><path d="M22 46h56" stroke="${oscuro}" stroke-width="4"/><rect x="60" y="50" width="14" height="12" rx="3" fill="${oscuro}"/>`;
+  const forma = m.tipo === 'cinturon' ? cinturon : m.tipo === 'cartera' ? cartera : bolso;
+  return `<svg class="${cls}" viewBox="0 0 100 100" role="img" aria-label="Foto de ${m.ref}" style="background:${fondo}">${forma}</svg>`;
+}
+
+/* ---------- datos de ejemplo (inventados para la maqueta) ---------- */
+const modelos = [
+  { id: 1, cliente: 'AMI', ref: 'ULL770', nombre: 'CANDY POUCH BAG', etapa: 'PRODUCCION', hue: 22, sat: 55, tipo: 'bolso' },
+  { id: 2, cliente: 'AMI', ref: 'PROTO B', nombre: 'MINI SATCHEL', etapa: 'PROTOTIPO', hue: 205, tipo: 'bolso' },
+  { id: 3, cliente: 'APC', ref: 'F67008', nombre: 'LE NEIGE', etapa: 'PRODUCCION', hue: 220, sat: 10, tipo: 'bolso' },
+  { id: 4, cliente: 'APC', ref: 'F63023', nombre: 'POCHETTE NEIGE CLOU', etapa: 'SMS', hue: 340, tipo: 'cartera' },
+  { id: 5, cliente: 'AMI', ref: 'UBL029', nombre: 'CINTURÓN FINO', etapa: 'PRODUCCION', hue: 30, sat: 60, tipo: 'cinturon' },
+  { id: 6, cliente: 'APC', ref: 'PROTO MINI CLOU', nombre: 'MINI CLOU', etapa: 'PROTOTIPO', hue: 120, sat: 30, tipo: 'bolso' },
+  { id: 7, cliente: 'AMI', ref: 'ULL027', nombre: 'AMI DE COEUR', etapa: 'INACTIVO', hue: 265, sat: 35, tipo: 'bolso' },
+  { id: 8, cliente: 'APC', ref: 'F65101', nombre: 'GRACE', etapa: 'PRODUCCION', hue: 42, sat: 65, tipo: 'cartera' },
+];
+const etapaTxt = { PRODUCCION: 'Producción', SMS: 'Muestras', PROTOTIPO: 'Prototipo', INACTIVO: 'Inactivo' };
+const tipos = [
+  { k: 'PIEL', t: 'Piel / material', i: 'piel' }, { k: 'FORRO', t: 'Forro', i: 'forro' }, { k: 'HERRAJES', t: 'Herrajes', i: 'herraje' },
+  { k: 'COSTURA', t: 'Costura', i: 'costura' }, { k: 'MEDIDAS', t: 'Medidas', i: 'medidas' }, { k: 'PATRON', t: 'Patrón', i: 'patron' }, { k: 'OTRO', t: 'Otro', i: 'otro' },
+];
+const ordenes = [
+  { id: 1, modelo: 1, p: 'ALTA', estado: 'nueva', tit: 'Cambiar el forro a badana negra', texto: 'A partir de la muestra 3, el forro de la ULL770 pasa a badana negra en todos los colores. Mira la ficha adjunta, página 2.', audio: 42, fotos: 1, docs: ['ULL770 ficha forro.pdf'], hace: 'hace 2 horas', de: 'Carme' },
+  { id: 2, modelo: 4, p: 'NORMAL', estado: 'nueva', tit: 'Correa 2 cm más larga', texto: 'El cliente pide la correa de la pochette 2 cm más larga: pasa de 120 a 122 cm. Vale para las muestras.', audio: 0, fotos: 2, docs: [], hace: 'hace 1 día', de: 'Pol' },
+  { id: 3, modelo: 5, p: 'BAJA', estado: 'vista', tit: 'Hebilla nueva en el UBL029', texto: 'Probar la hebilla de latón mate de la foto en la próxima muestra.', audio: 18, fotos: 1, docs: [], hace: 'hace 4 días', de: 'Susana' },
+  { id: 4, modelo: 3, p: 'NORMAL', estado: 'hecha', tit: 'Refuerzo en la base', texto: 'Añadir el refuerzo de la base como en la F65101.', audio: 0, fotos: 0, docs: [], hace: 'hace 6 días', de: 'Carme' },
+];
+const avisos = [
+  { id: 1, modelo: 3, tipo: 'COSTURA', hace: 'hace 3 horas', estado: 'Visto', audio: 35, fotos: 2, respuesta: null },
+  { id: 2, modelo: 8, tipo: 'HERRAJES', hace: 'hace 2 días', estado: 'Hecho', audio: 51, fotos: 1, respuesta: { de: 'Carme', texto: 'Gracias, cambiado en el escandallo.', audio: 9 } },
+  { id: 3, modelo: 2, tipo: 'MEDIDAS', hace: 'hace 5 días', estado: 'Hecho', audio: 20, fotos: 3, respuesta: null },
+];
+const lineaTiempo = {
+  1: [
+    { cuando: 'Hoy', que: 'Orden: cambiar el forro a badana negra', quien: 'Carme (despacho)', audio: true },
+    { cuando: 'Hace 3 semanas', que: 'Aviso: costura del asa reforzada', quien: 'Bachir (taller)', audio: true },
+    { cuando: 'Hace 2 meses', que: 'Pasa a Producción', quien: 'Pol (despacho)', etapa: true },
+    { cuando: 'Hace 5 meses', que: 'Pasa a Muestras · era PROTO C', quien: 'Pol (despacho)', etapa: true },
+  ],
+};
+
+/* ---------- estado ---------- */
+const S = { nombre: 'Bachir', filtro: 'TODOS', borrador: { modelo: null, tipo: null, fotos: [], audio: 0 }, grabando: false, seg: 0, timer: null, hechoPendiente: null, codigo: '' };
+try { if (localStorage.getItem('maqueta-alta') !== 'si') S.sinAlta = true; } catch (e) { S.sinAlta = false; }
+const M = id => modelos.find(m => m.id === Number(id));
+const nuevas = () => ordenes.filter(o => o.estado === 'nueva').length;
+
+/* ---------- enrutado por hash ---------- */
+const vistas = {};
+function ir(h) { location.hash = h; }
+function pintar() {
+  const h = (location.hash || '#inicio').slice(1);
+  const [nombre, arg] = h.split('-');
+  S.vista = S.sinAlta ? 'alta' : (vistas[nombre] ? nombre : 'inicio');
+  if (S.sinAlta && nombre !== 'alta') { return vistas.alta(); }
+  (vistas[nombre] || vistas.inicio)(arg);
+  window.scrollTo(0, 0);
+}
+window.addEventListener('hashchange', pintar);
+
+function cabecera(titulo, atras) {
+  document.getElementById('cabecera').innerHTML =
+    (atras ? `<button class="atras" aria-label="Volver" onclick="history.length > 1 ? history.back() : ir('${atras}')">${ic('atras')}</button>` : '') +
+    `<h1>${titulo}</h1><span class="maqueta">Maqueta</span>`;
+}
+function nav(actual) {
+  const n = nuevas();
+  document.getElementById('nav').innerHTML = [
+    ['inicio', 'Inicio', 'casa'], ['ordenes', 'Tengo que hacer', 'bandeja', n], ['avisos', 'Mis avisos', 'lista'], ['modelos', 'Modelos', 'rejilla'],
+  ].map(([k, t, i, b]) => `<button onclick="ir('#${k}')" ${actual === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${t}</span>${b ? `<span class="pepita">${b}</span>` : ''}</button>`).join('');
+  document.getElementById('fab').innerHTML = ic('qr');
+  document.getElementById('fab').onclick = () => ir('#escanear');
+  // El escáner flotante solo en las pantallas de consulta: dentro de un aviso o
+  // de una orden taparía el botón de abajo y no hace falta cambiar de modelo.
+  document.getElementById('fab').hidden = !['inicio', 'ordenes', 'avisos', 'modelos', 'modelo'].includes(S.vista);
+  document.getElementById('nav').hidden = actual === 'alta';
+}
+function toast(txt) {
+  const t = document.createElement('div'); t.className = 'toast'; t.textContent = txt; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2600);
+}
+function tarjetaModelo(m, destino) {
+  return `<button class="tarjeta-modelo" onclick="${destino}(${m.id})">${foto(m)}<div class="pie"><span class="ref">${m.ref}</span><span class="nom">${m.nombre}</span><span class="etapa" data-e="${m.etapa}">${etapaTxt[m.etapa]} · ${m.cliente}</span></div></button>`;
+}
+function rejillaModelos(destino) {
+  const lista = modelos.filter(m => S.filtro === 'TODOS' || m.cliente === S.filtro || m.etapa === S.filtro);
+  const chips = [['TODOS', 'Todos'], ['AMI', 'AMI'], ['APC', 'APC'], ['PROTOTIPO', 'Prototipos'], ['SMS', 'Muestras'], ['PRODUCCION', 'Producción']];
+  return `<div class="chips">${chips.map(([k, t]) => `<button class="chip" aria-pressed="${S.filtro === k}" onclick="S.filtro='${k}';pintar()">${t}</button>`).join('')}</div>
+    <div class="rejilla">${lista.map(m => tarjetaModelo(m, destino)).join('')}</div>`;
+}
+
+/* ---------- vistas ---------- */
+vistas.alta = () => {
+  cabecera('Modelos · Puntotres');
+  nav('alta');
+  const teclas = ['1','2','3','4','5','6','7','8','9','←','0','OK'];
+  document.getElementById('vista').innerHTML = `
+    <h2 class="saludo">Soy del taller</h2>
+    <p class="sub">Pide a despacho el código de 6 cifras y tecléalo aquí. Solo hace falta la primera vez.</p>
+    <div class="codigo" aria-live="polite">${S.codigo.padEnd(6, '·')}</div>
+    <div class="teclado">${teclas.map(t => `<button onclick="tecla('${t}')">${t}</button>`).join('')}</div>
+    <p class="nota-maqueta">Maqueta: cualquier código de 6 cifras vale. En la app real lo genera despacho y caduca a los 10 minutos.</p>`;
+};
+window.tecla = t => {
+  if (t === '←') S.codigo = S.codigo.slice(0, -1);
+  else if (t === 'OK') { if (S.codigo.length === 6) { S.sinAlta = false; try { localStorage.setItem('maqueta-alta', 'si'); } catch (e) {} toast('Tablet registrada'); ir('#inicio'); return; } else { toast('Faltan cifras'); return; } }
+  else if (S.codigo.length < 6) S.codigo += t;
+  pintar();
+};
+
+vistas.inicio = () => {
+  cabecera('Modelos · Puntotres');
+  nav('inicio');
+  const n = nuevas();
+  document.getElementById('vista').innerHTML = `
+    <h2 class="saludo">Hola, ${S.nombre}</h2>
+    <p class="sub">${n ? `Tienes ${n} ${n === 1 ? 'orden nueva' : 'órdenes nuevas'} de despacho.` : 'No tienes nada pendiente.'}</p>
+    <div class="losas">
+      <button class="losa" onclick="ir('#ordenes')"><span class="badge ${n ? '' : 'cero'}">${n}</span>${ic('bandeja')}<span><span class="t">Tengo que hacer</span><br><span class="m">Órdenes de despacho</span></span></button>
+      <button class="losa primaria" onclick="empezarCambio()">${ic('mic')}<span><span class="t">He cambiado algo</span><br><span class="m">Avisar con fotos y voz</span></span></button>
+    </div>
+    <div class="fila-titulo"><h2>Modelos</h2><button class="chip" onclick="ir('#escanear')">${ic('qr')} Escanear</button></div>
+    ${rejillaModelos('abrirModelo')}
+    <p class="nota-maqueta">Maqueta clicable: los modelos, las órdenes y los nombres son inventados. Las fotos reales se hacen con la cámara; el audio aquí no se graba de verdad.</p>`;
+};
+window.abrirModelo = id => ir('#modelo-' + id);
+window.empezarCambio = (modeloId) => { S.borrador = { modelo: modeloId ? M(modeloId) : null, tipo: null, fotos: [], audio: 0 }; ir(modeloId ? '#cambio' : '#elegir'); };
+
+vistas.modelos = () => {
+  cabecera('Modelos');
+  nav('modelos');
+  document.getElementById('vista').innerHTML = `<h2 class="saludo">Modelos</h2><p class="sub">Toca un modelo para ver su ficha, o escanea la etiqueta del patrón.</p>${rejillaModelos('abrirModelo')}`;
+};
+
+vistas.elegir = () => {
+  cabecera('¿Qué modelo?', '#inicio');
+  nav('inicio');
+  document.getElementById('vista').innerHTML = `
+    <div class="pasos"><span class="hecho"></span><span></span><span></span><span></span></div>
+    <h2 class="pregunta">¿Qué modelo has cambiado?</h2>
+    <div class="acciones" style="margin:0 0 18px"><button class="boton marca ancho" onclick="ir('#escanear')">${ic('qr')} Escanear la etiqueta del patrón</button></div>
+    ${rejillaModelos('elegirModelo')}`;
+};
+window.elegirModelo = id => { S.borrador.modelo = M(id); ir('#cambio'); };
+
+vistas.cambio = () => {
+  const m = S.borrador.modelo; if (!m) return ir('#elegir');
+  cabecera(m.ref + ' · ' + m.nombre, '#elegir');
+  nav('inicio');
+  document.getElementById('vista').innerHTML = `
+    <div class="pasos"><span class="hecho"></span><span class="hecho"></span><span></span><span></span></div>
+    <h2 class="pregunta">¿Qué has cambiado?</h2>
+    <div class="opciones">${tipos.map(t => `<button class="opcion" aria-pressed="${S.borrador.tipo === t.k}" onclick="S.borrador.tipo='${t.k}';ir('#fotos')">${ic(t.i)}<span>${t.t}</span></button>`).join('')}</div>`;
+};
+
+vistas.fotos = () => {
+  const b = S.borrador; if (!b.modelo) return ir('#elegir');
+  cabecera('Fotos del cambio', '#cambio');
+  nav('inicio');
+  document.getElementById('vista').innerHTML = `
+    <div class="pasos"><span class="hecho"></span><span class="hecho"></span><span class="hecho"></span><span></span></div>
+    <h2 class="pregunta">Haz fotos del cambio</h2>
+    <label class="camara">${ic('cam')}<span><b>Hacer foto</b><br><span class="ayuda" style="margin:0">Puedes hacer varias</span></span>
+      <input type="file" id="entrada-fotos" accept="image/*" capture="environment" multiple onchange="anadirFotos(this.files)"></label>
+    <div class="miniaturas" id="minis" style="margin-top:14px">${b.fotos.map(src => `<img src="${src}" alt="Foto del cambio">`).join('')}</div>
+    <div class="acciones">
+      <button class="boton" onclick="ir('#grabar')">Sin foto, solo voz</button>
+      <button class="boton ok" ${b.fotos.length ? '' : 'disabled'} onclick="ir('#grabar')">${ic('check')} Siguiente (${b.fotos.length})</button>
+    </div>`;
+};
+window.anadirFotos = files => {
+  [...files].forEach(f => { const r = new FileReader(); r.onload = e => { S.borrador.fotos.push(e.target.result); pintar(); }; r.readAsDataURL(f); });
+};
+
+vistas.grabar = () => {
+  const b = S.borrador; if (!b.modelo) return ir('#elegir');
+  cabecera('Nota de voz', '#fotos');
+  nav('inicio');
+  const listo = !S.grabando && S.seg > 0;
+  document.getElementById('vista').innerHTML = `
+    <div class="pasos"><span class="hecho"></span><span class="hecho"></span><span class="hecho"></span><span class="hecho"></span></div>
+    <h2 class="pregunta">${S.grabando ? 'Te escucho… toca para parar' : listo ? 'Grabado. ¿Lo mandamos?' : 'Toca y explica qué has cambiado'}</h2>
+    <div class="grabador">
+      <button class="mic ${S.grabando ? 'grabando' : ''} ${listo ? 'listo' : ''}" onclick="alternarGrabacion()" aria-label="${S.grabando ? 'Parar' : 'Grabar'}">${ic(S.grabando ? 'pausa' : listo ? 'check' : 'mic')}</button>
+      <div class="tiempo" aria-live="off">${mmss(S.seg)}</div>
+      <div class="onda ${S.grabando ? 'viva' : ''}" aria-hidden="true">${'<i></i>'.repeat(18)}</div>
+    </div>
+    <div class="acciones">
+      <button class="boton" ${listo ? '' : 'disabled'} onclick="S.seg=0;S.borrador.audio=0;pintar()">Repetir</button>
+      <button class="boton ok" ${listo || b.fotos.length ? '' : 'disabled'} onclick="S.borrador.audio=S.seg;ir('#revisar')">${ic('check')} Siguiente</button>
+    </div>
+    <p class="ayuda">${b.fotos.length ? `Llevas ${b.fotos.length} ${b.fotos.length === 1 ? 'foto' : 'fotos'}. Si no quieres grabar, pulsa Siguiente.` : 'Hace falta una nota de voz o una foto.'}</p>
+    <p class="nota-maqueta">Maqueta: la grabación es simulada. En la app real se graba con el micrófono y despacho recibe el audio y su texto.</p>`;
+};
+const mmss = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+window.alternarGrabacion = () => {
+  if (S.grabando) { clearInterval(S.timer); S.grabando = false; }
+  else { S.seg = 0; S.grabando = true; S.timer = setInterval(() => { S.seg++; if (S.seg >= 180) alternarGrabacion(); else document.querySelector('.tiempo').textContent = mmss(S.seg); }, 1000); }
+  pintar();
+};
+
+vistas.revisar = () => {
+  const b = S.borrador; if (!b.modelo) return ir('#elegir');
+  const t = tipos.find(x => x.k === b.tipo);
+  cabecera('Revisar y enviar', '#grabar');
+  nav('inicio');
+  document.getElementById('vista').innerHTML = `
+    <h2 class="pregunta">¿Está bien?</h2>
+    <div class="resumen">
+      <div class="ficha">${foto(b.modelo)}<div class="texto"><b>${b.modelo.ref}</b><span>${b.modelo.nombre} · ${b.modelo.cliente}</span><span class="etapa" data-e="${b.modelo.etapa}">${etapaTxt[b.modelo.etapa]}</span></div></div>
+      <div class="ficha">${ic(t ? t.i : 'otro', 'foto')}<div class="texto"><b>${t ? t.t : 'Otro'}</b><span>Tipo de cambio</span></div></div>
+      ${b.audio ? `<div class="audio"><button class="play" onclick="reproducir(this, ${b.audio})" aria-label="Escuchar">${ic('play')}</button><div class="barra"><i></i></div><span class="dur">${mmss(b.audio)}</span></div>` : ''}
+      ${b.fotos.length ? `<div class="miniaturas">${b.fotos.map(src => `<img src="${src}" alt="Foto del cambio">`).join('')}</div>` : ''}
+    </div>
+    <div class="acciones">
+      <button class="boton" onclick="ir('#cambio')">Cambiar algo</button>
+      <button class="boton ok" onclick="enviar()">${ic('check')} Enviar a despacho</button>
+    </div>`;
+};
+window.enviar = () => {
+  const b = S.borrador, t = tipos.find(x => x.k === b.tipo);
+  avisos.unshift({ id: Date.now(), modelo: b.modelo.id, tipo: b.tipo, hace: 'ahora mismo', estado: 'Enviado', audio: b.audio, fotos: b.fotos.length, respuesta: null });
+  S.seg = 0; ir('#enviado');
+};
+vistas.enviado = () => {
+  cabecera('Enviado');
+  nav('inicio');
+  document.getElementById('vista').innerHTML = `
+    <div class="enviado"><div class="tick">${ic('check')}</div><h2 class="pregunta" style="margin:0">Enviado a despacho</h2><p class="sub">Lo verás en «Mis avisos» cuando lo lean y cuando esté hecho.</p>
+    <div class="acciones" style="width:100%;max-width:520px"><button class="boton marca ancho" onclick="ir('#inicio')">Volver al inicio</button></div></div>`;
+};
+
+vistas.ordenes = () => {
+  cabecera('Tengo que hacer');
+  nav('ordenes');
+  const pendientes = ordenes.filter(o => o.estado !== 'hecha'), hechas = ordenes.filter(o => o.estado === 'hecha');
+  const tarjeta = o => { const m = M(o.modelo); return `<button class="orden ${o.estado}" data-p="${o.p}" onclick="ir('#orden-${o.id}')"><span class="franja"></span>${foto(m)}<span class="cuerpo"><span class="tit">${o.tit}</span><span class="meta"><b>${m.ref}</b> · ${m.nombre}</span><span class="meta"><span class="pill ${o.estado}">${o.estado === 'nueva' ? 'Nueva' : o.estado === 'vista' ? 'Vista' : 'Hecha'}</span>${o.hace} · de ${o.de}</span></span></button>`; };
+  document.getElementById('vista').innerHTML = `
+    <h2 class="saludo">Tengo que hacer</h2>
+    <p class="sub">Las nuevas primero, luego por prioridad. La franja roja es prioridad alta.</p>
+    ${pendientes.length ? `<div class="lista">${pendientes.map(tarjeta).join('')}</div>` : `<div class="vacio">${ic('ok')}<b>No tienes nada pendiente</b><span>Cuando despacho mande una orden, sonará y vibrará.</span></div>`}
+    ${hechas.length ? `<div class="fila-titulo"><h2>Hechas</h2></div><div class="lista">${hechas.map(tarjeta).join('')}</div>` : ''}`;
+};
+
+vistas.orden = id => {
+  const o = ordenes.find(x => x.id === Number(id)); if (!o) return ir('#ordenes');
+  const m = M(o.modelo);
+  if (o.estado === 'nueva') o.estado = 'vista';
+  cabecera(o.tit, '#ordenes');
+  nav('ordenes');
+  const confirmando = S.hechoPendiente === o.id;
+  document.getElementById('vista').innerHTML = `
+    <div class="detalle">
+      <div class="ficha">${foto(m)}<div class="texto"><b>${m.ref}</b><span>${m.nombre} · ${m.cliente}</span><span class="meta" style="color:var(--muted)">${o.hace} · de ${o.de} · prioridad ${o.p.toLowerCase()}</span></div></div>
+      ${o.audio ? `<div class="audio"><button class="play" onclick="reproducir(this, ${o.audio})" aria-label="Escuchar la nota de ${o.de}">${ic('play')}</button><div class="barra"><i></i></div><span class="dur">${mmss(o.audio)}</span></div>` : ''}
+      <div class="texto-grande">${o.texto}</div>
+      ${o.fotos ? `<div class="miniaturas">${Array.from({ length: o.fotos }, (_, i) => `<div class="mini" role="img" aria-label="Foto ${i + 1}">${foto(m, 'foto')}</div>`).join('')}</div>` : ''}
+      ${o.docs.length ? `<div class="docs">${o.docs.map(d => `<button class="doc" onclick="toast('Se abriría en el visor de PDF de la tablet')">${ic('pdf')}<span>${d}<small>Toca para abrir · vuelve con «atrás»</small></span></button>`).join('')}</div>` : ''}
+      ${o.estado === 'hecha' ? `<div class="vacio" style="padding:20px">${ic('ok')}<b>Hecha</b></div>` : `
+      <div class="acciones">
+        <button class="boton" onclick="ir('#duda-${o.id}')">${ic('duda')} Tengo una duda</button>
+        <button class="boton ${confirmando ? 'ok' : ''}" onclick="hecho(${o.id})">${ic('check')} ${confirmando ? 'Confirmar: está hecho' : 'Hecho'}</button>
+      </div>
+      <p class="ayuda">${confirmando ? 'Toca otra vez para confirmar. Si no, espera y se queda como estaba.' : '«Hecho» pide dos toques para que no se marque sin querer.'}</p>`}
+    </div>`;
+};
+window.hecho = id => {
+  if (S.hechoPendiente === id) { const o = ordenes.find(x => x.id === id); o.estado = 'hecha'; S.hechoPendiente = null; toast('Marcada como hecha'); ir('#ordenes'); return; }
+  S.hechoPendiente = id; pintar();
+  setTimeout(() => { if (S.hechoPendiente === id) { S.hechoPendiente = null; if ((location.hash || '') === '#orden-' + id) pintar(); } }, 6000);
+};
+
+vistas.duda = id => {
+  const o = ordenes.find(x => x.id === Number(id)); if (!o) return ir('#ordenes');
+  cabecera('Tengo una duda', '#orden-' + id);
+  nav('ordenes');
+  const listo = !S.grabando && S.seg > 0;
+  document.getElementById('vista').innerHTML = `
+    <h2 class="pregunta">${S.grabando ? 'Te escucho… toca para parar' : listo ? '¿Mandamos la duda a despacho?' : 'Graba tu duda sobre «' + o.tit + '»'}</h2>
+    <div class="grabador">
+      <button class="mic ${S.grabando ? 'grabando' : ''} ${listo ? 'listo' : ''}" onclick="alternarGrabacion()" aria-label="${S.grabando ? 'Parar' : 'Grabar'}">${ic(S.grabando ? 'pausa' : listo ? 'check' : 'mic')}</button>
+      <div class="tiempo">${mmss(S.seg)}</div>
+      <div class="onda ${S.grabando ? 'viva' : ''}" aria-hidden="true">${'<i></i>'.repeat(18)}</div>
+    </div>
+    <div class="acciones">
+      <button class="boton" ${listo ? '' : 'disabled'} onclick="S.seg=0;pintar()">Repetir</button>
+      <button class="boton ok" ${listo ? '' : 'disabled'} onclick="S.seg=0;toast('Duda enviada a ${o.de}');ir('#orden-${o.id}')">${ic('check')} Enviar la duda</button>
+    </div>`;
+};
+
+vistas.avisos = () => {
+  cabecera('Mis avisos');
+  nav('avisos');
+  document.getElementById('vista').innerHTML = `
+    <h2 class="saludo">Mis avisos</h2>
+    <p class="sub">Lo que has mandado a despacho y en qué punto está.</p>
+    <div class="lista">${avisos.map(a => { const m = M(a.modelo), t = tipos.find(x => x.k === a.tipo); const est = a.estado.toLowerCase();
+      return `<div class="orden" data-p="${a.estado === 'Hecho' ? 'BAJA' : 'NORMAL'}" style="min-height:auto"><span class="franja" style="background:${a.estado === 'Hecho' ? 'var(--ok)' : a.estado === 'Visto' ? 'var(--normal)' : 'var(--new)'}"></span>${foto(m)}<span class="cuerpo">
+        <span class="tit">${t ? t.t : 'Cambio'} · ${m.ref}</span>
+        <span class="meta">${m.nombre} · ${a.hace} · ${a.audio ? mmss(a.audio) + ' de voz' : 'sin voz'} · ${a.fotos} ${a.fotos === 1 ? 'foto' : 'fotos'}</span>
+        <span class="meta"><span class="pill ${est === 'hecho' ? 'hecha' : est === 'visto' ? 'vista' : 'enviado'}">${a.estado}</span></span>
+        ${a.respuesta ? `<span class="audio" style="padding:10px;margin-top:6px"><button class="play" style="width:56px;height:56px" onclick="reproducir(this, ${a.respuesta.audio})" aria-label="Escuchar la respuesta">${ic('play')}</button><span style="flex:1;min-width:0"><b>${a.respuesta.de}:</b> ${a.respuesta.texto}<span class="barra" style="margin-top:6px"><i></i></span></span></span>` : ''}
+      </span></div>`; }).join('')}</div>`;
+};
+
+vistas.modelo = id => {
+  const m = M(id); if (!m) return ir('#modelos');
+  cabecera(m.ref, '#modelos');
+  nav('modelos');
+  const eventos = lineaTiempo[m.id] || [{ cuando: 'Hace 1 mes', que: 'Pasa a ' + etapaTxt[m.etapa], quien: 'Pol (despacho)', etapa: true }];
+  document.getElementById('vista').innerHTML = `
+    <div class="detalle">
+      <div class="ficha" style="align-items:flex-start">${foto(m, 'foto')}<div class="texto"><b style="font-size:1.6rem">${m.ref}</b><span style="font-size:1.15rem">${m.nombre}</span><span>${m.cliente}</span><span class="etapa" data-e="${m.etapa}">${etapaTxt[m.etapa]}</span></div></div>
+      <div class="acciones" style="margin:0"><button class="boton marca ancho" onclick="empezarCambio(${m.id})">${ic('mic')} He cambiado algo en este modelo</button></div>
+      <div class="fila-titulo"><h2>Historial</h2></div>
+      <div class="linea">${eventos.map(e => `<div class="evento"><span class="punto ${e.etapa ? 'etapa-p' : ''}"></span><div><div class="cuando">${e.cuando}</div><div class="que">${e.que}</div><div class="quien">${e.quien}</div>${e.audio ? `<div class="audio" style="padding:8px;margin-top:8px;box-shadow:none;border:1px solid var(--line)"><button class="play" style="width:52px;height:52px" onclick="reproducir(this, 30)" aria-label="Escuchar">${ic('play')}</button><div class="barra"><i></i></div><span class="dur">00:30</span></div>` : ''}</div></div>`).join('')}</div>
+    </div>`;
+};
+
+vistas.escanear = () => {
+  cabecera('Escanear etiqueta', '#inicio');
+  nav('escanear');
+  document.getElementById('vista').innerHTML = `
+    <h2 class="pregunta">Apunta al QR de la etiqueta del patrón</h2>
+    <div class="escaner"><div class="marco"></div><span>Vista de la cámara<br><small>En la app real se abre la cámara trasera y la ficha salta sola al leer el QR.</small></span></div>
+    <div class="acciones">
+      <button class="boton marca ancho" onclick="toast('Leído: ULL770');${S.borrador.modelo === null && location.hash === '#escanear' ? "ir('#modelo-1')" : "elegirModelo(1)"}">${ic('qr')} Simular lectura (ULL770)</button>
+      <button class="boton ancho" onclick="ir('#modelos')">No puedo escanear: elegir en la lista</button>
+    </div>`;
+};
+
+/* reproducción simulada: la barra avanza durante la duración */
+window.reproducir = (btn, seg) => {
+  const barra = btn.parentElement.querySelector('.barra i'); if (!barra) return;
+  if (btn.dataset.activo) { clearInterval(Number(btn.dataset.activo)); delete btn.dataset.activo; btn.innerHTML = ic('play'); barra.style.width = '0'; return; }
+  let t = 0; btn.innerHTML = ic('pausa');
+  const paso = Math.max(80, (seg * 1000) / 60);
+  const id = setInterval(() => { t++; barra.style.width = Math.min(100, (t / 60) * 100) + '%'; if (t >= 60) { clearInterval(id); delete btn.dataset.activo; btn.innerHTML = ic('play'); setTimeout(() => barra.style.width = '0', 600); } }, paso);
+  btn.dataset.activo = String(id);
+};
+
+pintar();
+</script>
+
+</body>
+</html>
