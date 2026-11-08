@@ -51,6 +51,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Spring Security: usuarios de la app de modelos (contraseñas con
+             BCrypt) y, más adelante, la cadena de filtros que la protege. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
         <!-- Lo que el programa tiene que recordar entre ejecuciones: qué cartón
              y cuántas unidades por caja lleva cada referencia, y la tabla de
              taras. H2 en fichero para que sobreviva al reinicio sin instalar

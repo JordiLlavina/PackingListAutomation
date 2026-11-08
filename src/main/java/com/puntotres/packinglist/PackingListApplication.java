@@ -2,6 +2,7 @@ package com.puntotres.packinglist;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
@@ -9,7 +10,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  * levantar el contexto de beans, cargar application.yml y validar el cableado.
  * La prueba manual del builder sigue en {@link Main}.
  */
-@SpringBootApplication
+// Sin el usuario por defecto de Spring Security (y su contraseña en el log): los usuarios son los de la app de modelos.
+@SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 @ConfigurationPropertiesScan
 public class PackingListApplication {
 
