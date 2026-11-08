@@ -30,11 +30,8 @@ public class FotoCatalogo {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "cliente", length = 60, nullable = false)
-    private String cliente;
-
-    @Column(name = "codigo_modelo", length = 80, nullable = false)
-    private String codigoModelo;
+    @Column(name = "modelo_id", nullable = false)
+    private Long modeloId;
 
     @Column(name = "nombre_fichero", length = 255, nullable = false)
     private String nombreFichero;
@@ -56,9 +53,8 @@ public class FotoCatalogo {
         // Constructor para JPA.
     }
 
-    public FotoCatalogo(String cliente, String codigoModelo, String nombreFichero, int orden, byte[] jpeg) {
-        this.cliente = cliente;
-        this.codigoModelo = codigoModelo;
+    public FotoCatalogo(Long modeloId, String nombreFichero, int orden, byte[] jpeg) {
+        this.modeloId = modeloId;
         this.nombreFichero = nombreFichero;
         this.orden = orden;
         this.jpeg = jpeg;
@@ -70,12 +66,8 @@ public class FotoCatalogo {
         return id;
     }
 
-    public String getCliente() {
-        return cliente;
-    }
-
-    public String getCodigoModelo() {
-        return codigoModelo;
+    public Long getModeloId() {
+        return modeloId;
     }
 
     public String getNombreFichero() {
@@ -100,6 +92,6 @@ public class FotoCatalogo {
     }
 
     public ResumenFoto resumen() {
-        return new ResumenFoto(id, codigoModelo, nombreFichero, principal, orden);
+        return new ResumenFoto(id, modeloId, nombreFichero, principal, orden);
     }
 }

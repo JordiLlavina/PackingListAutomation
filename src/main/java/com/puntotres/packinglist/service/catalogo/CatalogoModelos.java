@@ -23,7 +23,6 @@ import com.puntotres.packinglist.persistence.ArticuloId;
 import com.puntotres.packinglist.persistence.ArticuloRepository;
 import com.puntotres.packinglist.persistence.Incorporacion;
 import com.puntotres.packinglist.persistence.Modelo;
-import com.puntotres.packinglist.persistence.ModeloId;
 import com.puntotres.packinglist.persistence.ModeloRepository;
 import com.puntotres.packinglist.persistence.ModeloTemporada;
 import com.puntotres.packinglist.persistence.ModeloTemporadaId;
@@ -67,6 +66,13 @@ import com.puntotres.packinglist.service.corte.ReferenciaCorte;
  * hermanos que decían lo mismo o estaban vacíos y respeta a los que no. Es
  * la regla que ya usaba el nombre de piel en la tabla del corte. El taller
  * NO propaga: {@code MemoriaReferencias.recordar} escribe solo su artículo.
+ *
+ * El modelo tiene un id interno y los artículos, fotos y temporadas cuelgan
+ * de él, porque un prototipo puede no tener código todavía. La API por
+ * (cliente, código) se conserva, resolviendo el id con el código; las
+ * versiones por id son para lo que también tiene que ver a los prototipos.
+ * El alta automática ({@link #incorporar}) nunca cambia la etapa de un
+ * modelo que ya existía, y uno que crea nace en PRODUCCION.
  */
 @Service
 public class CatalogoModelos {
@@ -280,7 +286,7 @@ public class CatalogoModelos {
         int modelosNuevos = 0;
         Set<String> coloresVistos = new LinkedHashSet<>();
         Map<String, String> codigosDeColor = new LinkedHashMap<>();
-        Set<String> modelosDelPedido = new LinkedHashSet<>();
+        Set<Long> modelosDelPedido = new LinkedHashSet<>();
         for (ArticuloCorte entrada : pedido.articulos()) {
             String referencia = clave(entrada.referencia().referencia());
             if (referencia.isEmpty()) {
@@ -290,16 +296,20 @@ public class CatalogoModelos {
             // El modelo se mira ANTES de asegurar el artículo, que ya lo crea.
             ReferenciaCorte partida = reglas.reglasDeProduccion(elCliente).partir(referencia);
             String codigoModelo = partida.tienePiel() ? partida.modelo() : referencia;
-            boolean habiaModelo = modelos.existsById(new ModeloId(elCliente, codigoModelo));
+            boolean habiaModelo = modelos.findByClienteAndCodigo(elCliente, codigoModelo).isPresent();
             Articulo articulo = asegurarArticulo(elCliente, referencia);
             if (!habiaArticulo) {
                 articulosNuevos++;
             }
-            asegurarModelo(elCliente, articulo.getCodigoModelo(), entrada.nombreModelo());
+            // El modelo del artículo, ya exista o lo acabe de crear asegurarArticulo
+            // (nace en PRODUCCION). Solo se le rellena el nombre: la etapa de un
+            // modelo que ya existía la cambia una persona, no un pedido.
+            Modelo modelo = modelos.findById(articulo.getModeloId()).orElseThrow();
+            rellenarNombre(modelo, entrada.nombreModelo());
             if (!habiaModelo) {
                 modelosNuevos++;
             }
-            modelosDelPedido.add(articulo.getCodigoModelo());
+            modelosDelPedido.add(modelo.getId());
             for (ColorCorte color : entrada.colores()) {
                 String codigo = clave(color.codigo());
                 String descripcion = color.descripcion() == null ? "" : color.descripcion().trim();
@@ -321,10 +331,10 @@ public class CatalogoModelos {
         }
         Incorporacion enLaTabla = tablaColores.incorporar(elCliente, codigosDeColor);
         if (temporadaId != null) {
-            for (String modelo : modelosDelPedido) {
-                ModeloTemporadaId id = new ModeloTemporadaId(elCliente, modelo, temporadaId);
+            for (Long modeloId : modelosDelPedido) {
+                ModeloTemporadaId id = new ModeloTemporadaId(modeloId, temporadaId);
                 if (!temporadasDeModelo.existsById(id)) {
-                    temporadasDeModelo.save(new ModeloTemporada(elCliente, modelo, temporadaId));
+                    temporadasDeModelo.save(new ModeloTemporada(modeloId, temporadaId));
                 }
             }
         }
@@ -402,23 +412,48 @@ public class CatalogoModelos {
         }
     }
 
-    /** Los códigos de modelo que fueron en una temporada, en orden. */
+    /**
+     * Los códigos de modelo que fueron en una temporada, en orden. Un
+     * prototipo sin código no sale: aquí solo hay códigos.
+     */
     public Set<String> codigosDeModeloEn(String cliente, Long temporadaId) {
-        if (vacio(cliente) || temporadaId == null) {
-            return Set.of();
-        }
         Set<String> codigos = new LinkedHashSet<>();
-        temporadasDeModelo.findByClienteAndTemporadaId(clave(cliente), temporadaId)
-                .forEach(vinculo -> codigos.add(vinculo.getCodigoModelo()));
+        for (Modelo modelo : modelosEn(cliente, temporadaId)) {
+            if (modelo.getCodigo() != null) {
+                codigos.add(modelo.getCodigo());
+            }
+        }
         return codigos;
+    }
+
+    /** Los modelos del cliente que fueron en una temporada, en el orden de sus vínculos. */
+    private List<Modelo> modelosEn(String cliente, Long temporadaId) {
+        if (vacio(cliente) || temporadaId == null) {
+            return List.of();
+        }
+        String elCliente = clave(cliente);
+        List<Long> ids = temporadasDeModelo.findByTemporadaId(temporadaId).stream()
+                .map(ModeloTemporada::getModeloId)
+                .toList();
+        Map<Long, Modelo> porId = new LinkedHashMap<>();
+        modelos.findAllById(ids).forEach(modelo -> porId.put(modelo.getId(), modelo));
+        return ids.stream()
+                .map(porId::get)
+                .filter(modelo -> modelo != null && elCliente.equals(modelo.getCliente()))
+                .toList();
     }
 
     /** Los ids de las temporadas en que ha ido un modelo. */
     public List<Long> temporadasDe(String cliente, String codigoModelo) {
-        if (vacio(cliente) || vacio(codigoModelo)) {
+        return modelo(cliente, codigoModelo).map(modelo -> temporadasDeModelo(modelo.getId())).orElse(List.of());
+    }
+
+    /** Los ids de las temporadas en que ha ido un modelo, por su id. */
+    public List<Long> temporadasDeModelo(Long modeloId) {
+        if (modeloId == null) {
             return List.of();
         }
-        return temporadasDeModelo.findByClienteAndCodigoModelo(clave(cliente), clave(codigoModelo)).stream()
+        return temporadasDeModelo.findByModeloId(modeloId).stream()
                 .map(ModeloTemporada::getTemporadaId)
                 .toList();
     }
@@ -427,7 +462,11 @@ public class CatalogoModelos {
         if (vacio(cliente) || vacio(codigo)) {
             return Optional.empty();
         }
-        return modelos.findById(new ModeloId(clave(cliente), clave(codigo)));
+        return modelos.findByClienteAndCodigo(clave(cliente), clave(codigo));
+    }
+
+    public Optional<Modelo> modelo(Long id) {
+        return id == null ? Optional.empty() : modelos.findById(id);
     }
 
     public Optional<Articulo> articulo(String cliente, String referencia) {
@@ -438,24 +477,33 @@ public class CatalogoModelos {
     }
 
     public List<Modelo> modelosDe(String cliente) {
-        return vacio(cliente) ? List.of() : modelos.findByClienteOrderByCodigo(clave(cliente));
+        return vacio(cliente) ? List.of() : modelos.findByClienteOrderByCodigoAscNombrePrototipoAsc(clave(cliente));
     }
 
     public List<Articulo> articulosDe(String cliente) {
         return vacio(cliente) ? List.of() : articulos.findByClienteOrderByReferencia(clave(cliente));
     }
 
+    /** Todos los artículos de un modelo (con piel o sin ella), por referencia. */
+    public List<Articulo> articulosDelModelo(Long modeloId) {
+        return modeloId == null ? List.of() : articulos.findByModeloIdOrderByReferencia(modeloId);
+    }
+
     /** Los artículos del modelo que tienen piel, por referencia: los que heredan y propagan entre sí. */
     public List<Articulo> hermanos(String cliente, String codigoModelo) {
-        if (vacio(cliente) || vacio(codigoModelo)) {
-            return List.of();
-        }
-        return articulos.findByClienteAndCodigoModeloOrderByReferencia(clave(cliente), clave(codigoModelo)).stream()
+        return modelo(cliente, codigoModelo).map(modelo -> hermanos(modelo.getId())).orElse(List.of());
+    }
+
+    private List<Articulo> hermanos(Long modeloId) {
+        return articulosDelModelo(modeloId).stream()
                 .filter(Articulo::tienePiel)
                 .toList();
     }
 
-    /** Devuelve el modelo, creándolo si falta. Un nombre que llega solo rellena el hueco: lo tecleado no se pisa. */
+    /**
+     * Devuelve el modelo, creándolo si falta (nace en PRODUCCION). Un nombre
+     * que llega solo rellena el hueco: lo tecleado no se pisa.
+     */
     @Transactional
     public Modelo asegurarModelo(String cliente, String codigo, String nombre) {
         return asegurarModelo(clave(cliente), clave(codigo), nombre, TipoArticulo.porReferencia(codigo));
@@ -463,14 +511,20 @@ public class CatalogoModelos {
 
     private Modelo asegurarModelo(String elCliente, String elCodigo, String nombre, TipoArticulo tipo) {
         String elNombre = nombre == null ? "" : nombre.trim();
-        Modelo modelo = modelos.findById(new ModeloId(elCliente, elCodigo)).orElse(null);
+        Modelo modelo = modelos.findByClienteAndCodigo(elCliente, elCodigo).orElse(null);
         if (modelo == null) {
             return modelos.save(new Modelo(elCliente, elCodigo, elNombre.isEmpty() ? null : elNombre, tipo));
         }
+        rellenarNombre(modelo, elNombre);
+        return modelo;
+    }
+
+    /** El nombre del bolso que llega solo rellena el hueco. Ni el nombre tecleado ni la etapa se tocan. */
+    private static void rellenarNombre(Modelo modelo, String nombre) {
+        String elNombre = nombre == null ? "" : nombre.trim();
         if (modelo.getNombre().isEmpty() && !elNombre.isEmpty()) {
             modelo.setNombre(elNombre);
         }
-        return modelo;
     }
 
     /**
@@ -495,10 +549,10 @@ public class CatalogoModelos {
         if (refPiel != null && pieles.findById(new PielId(elCliente, refPiel)).isEmpty()) {
             pieles.save(new Piel(elCliente, refPiel, ""));
         }
-        asegurarModelo(elCliente, codigoModelo, "", TipoArticulo.porReferencia(laReferencia));
-        Articulo nuevo = new Articulo(elCliente, laReferencia, codigoModelo, refPiel);
+        Modelo modelo = asegurarModelo(elCliente, codigoModelo, "", TipoArticulo.porReferencia(laReferencia));
+        Articulo nuevo = new Articulo(elCliente, laReferencia, modelo.getId(), refPiel);
         if (refPiel != null) {
-            heredar(nuevo, hermanos(elCliente, codigoModelo));
+            heredar(nuevo, hermanos(modelo.getId()));
         }
         return articulos.save(nuevo);
     }
@@ -551,7 +605,7 @@ public class CatalogoModelos {
         campo.escribir(articulo, validado);
         List<Propagada> propagadas = new ArrayList<>();
         if (propagar && campo.sePropaga() && articulo.tienePiel()) {
-            for (Articulo hermano : hermanos(articulo.getCliente(), articulo.getCodigoModelo())) {
+            for (Articulo hermano : hermanos(articulo.getModeloId())) {
                 if (hermano.getReferencia().equals(articulo.getReferencia())) {
                     continue;
                 }
@@ -638,12 +692,12 @@ public class CatalogoModelos {
     public ModelosQuitados quitarModelosDeTemporada(String cliente, Long temporadaId) {
         int borrados = 0;
         int desvinculados = 0;
-        for (String codigo : codigosDeModeloEn(cliente, temporadaId)) {
-            if (temporadasDe(cliente, codigo).stream().allMatch(temporadaId::equals)) {
-                borrarModelo(cliente, codigo);
+        for (Modelo modelo : modelosEn(cliente, temporadaId)) {
+            if (temporadasDeModelo(modelo.getId()).stream().allMatch(temporadaId::equals)) {
+                modelos.delete(modelo);
                 borrados++;
             } else {
-                temporadasDeModelo.deleteById(new ModeloTemporadaId(clave(cliente), codigo, temporadaId));
+                temporadasDeModelo.deleteById(new ModeloTemporadaId(modelo.getId(), temporadaId));
                 desvinculados++;
             }
         }

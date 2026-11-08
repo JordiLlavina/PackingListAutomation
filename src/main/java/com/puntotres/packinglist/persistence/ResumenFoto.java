@@ -6,5 +6,5 @@ package com.puntotres.packinglist.persistence;
  * entidad por el mismo motivo que {@link ResumenTemporada}: listar un cliente
  * no puede traerse del disco todas sus fotos.
  */
-public record ResumenFoto(Long id, String codigoModelo, String nombreFichero, boolean principal, int orden) {
+public record ResumenFoto(Long id, Long modeloId, String nombreFichero, boolean principal, int orden) {
 }

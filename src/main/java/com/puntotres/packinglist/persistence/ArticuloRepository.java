@@ -9,7 +9,7 @@ public interface ArticuloRepository extends JpaRepository<Articulo, ArticuloId> 
 
     List<Articulo> findByClienteOrderByReferencia(String cliente);
 
-    List<Articulo> findByClienteAndCodigoModeloOrderByReferencia(String cliente, String codigoModelo);
+    List<Articulo> findByModeloIdOrderByReferencia(Long modeloId);
 
-    void deleteByClienteAndCodigoModelo(String cliente, String codigoModelo);
+    void deleteByModeloId(Long modeloId);
 }

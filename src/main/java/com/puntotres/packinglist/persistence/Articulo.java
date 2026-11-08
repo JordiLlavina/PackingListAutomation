@@ -38,8 +38,8 @@ public class Articulo {
     @Column(name = "referencia", length = 80)
     private String referencia;
 
-    @Column(name = "codigo_modelo", length = 80, nullable = false)
-    private String codigoModelo;
+    @Column(name = "modelo_id", nullable = false)
+    private Long modeloId;
 
     @Column(name = "ref_piel", length = 80)
     private String refPiel;
@@ -81,10 +81,10 @@ public class Articulo {
         // Constructor para JPA.
     }
 
-    public Articulo(String cliente, String referencia, String codigoModelo, String refPiel) {
+    public Articulo(String cliente, String referencia, Long modeloId, String refPiel) {
         this.cliente = cliente;
         this.referencia = referencia;
-        this.codigoModelo = codigoModelo;
+        this.modeloId = modeloId;
         this.refPiel = vacioANulo(refPiel);
         this.fechaActualizacion = LocalDateTime.now();
     }
@@ -97,8 +97,9 @@ public class Articulo {
         return referencia;
     }
 
-    public String getCodigoModelo() {
-        return codigoModelo;
+    /** El id del modelo del que es el artículo (no su código: un prototipo puede no tenerlo). */
+    public Long getModeloId() {
+        return modeloId;
     }
 
     /** La referencia de la piel, o "" si la regla del cliente no la separó. */

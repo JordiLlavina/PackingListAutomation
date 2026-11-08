@@ -129,7 +129,7 @@ class MemoriaReferenciasTest {
         memoria.recordar("AMI", "ULL910.AL0100", "60x40x40", 6, 2.0);
 
         Articulo articulo = catalogo.articulo("AMI", "ULL910.AL0100").orElseThrow();
-        assertEquals("ULL910", articulo.getCodigoModelo());
+        assertEquals("ULL910", catalogo.modelo(articulo.getModeloId()).orElseThrow().getCodigo());
         assertEquals(6, articulo.getUnidadesPorCaja());
         assertEquals(2.0, articulo.getPesoNetoKg());
     }

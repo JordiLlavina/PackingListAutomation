@@ -18,12 +18,16 @@ import com.puntotres.packinglist.persistence.Articulo;
 import com.puntotres.packinglist.persistence.ArticuloColorId;
 import com.puntotres.packinglist.persistence.ArticuloColorRepository;
 import com.puntotres.packinglist.persistence.ColorCliente;
+import com.puntotres.packinglist.persistence.Etapa;
+import com.puntotres.packinglist.persistence.Modelo;
+import com.puntotres.packinglist.persistence.ModeloRepository;
 import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.persistence.FicheroExcel;
 import com.puntotres.packinglist.persistence.Piel;
 import com.puntotres.packinglist.persistence.PielId;
 import com.puntotres.packinglist.persistence.PielRepository;
+import com.puntotres.packinglist.persistence.TipoArticulo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.CampoModelo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos.ResumenAlta;
 import com.puntotres.packinglist.service.corte.ArticuloCorte;
@@ -50,6 +54,13 @@ class CatalogoModelosIncorporarTest {
     private TablaColores tablaColores;
     @Autowired
     private PielRepository pieles;
+    @Autowired
+    private ModeloRepository modelos;
+
+    /** El código del modelo de un artículo: el artículo cuelga del id del modelo, no de su código. */
+    private String codigoDe(Articulo articulo) {
+        return catalogo.modelo(articulo.getModeloId()).map(Modelo::getCodigo).orElse(null);
+    }
 
     private static byte[] recurso(String ruta) throws IOException {
         try (InputStream entrada = CatalogoModelosIncorporarTest.class.getResourceAsStream(ruta)) {
@@ -75,7 +86,7 @@ class CatalogoModelosIncorporarTest {
         assertTrue(modelos.stream().anyMatch(modelo -> modelo.startsWith("UBL")),
                 "los cinturones entran al catálogo aunque el corte los deje fuera");
         Articulo alguno = catalogo.articulosDe("AMI").stream()
-                .filter(articulo -> modelos.contains(articulo.getCodigoModelo()))
+                .filter(articulo -> modelos.contains(codigoDe(articulo)))
                 .findFirst().orElseThrow();
         assertTrue(alguno.tienePiel(), "AMI parte la referencia por el punto");
     }
@@ -106,7 +117,7 @@ class CatalogoModelosIncorporarTest {
         List<Articulo> articulos = catalogo.articulosDe("KAMI");
         assertFalse(articulos.isEmpty());
         assertTrue(articulos.stream().noneMatch(Articulo::tienePiel), "un genérico no parte la referencia");
-        assertTrue(articulos.stream().allMatch(a -> a.getCodigoModelo().equals(a.getReferencia())));
+        assertTrue(articulos.stream().allMatch(a -> a.getReferencia().equals(codigoDe(a))));
     }
 
     @Test
@@ -121,7 +132,7 @@ class CatalogoModelosIncorporarTest {
 
         Set<String> modelos = catalogo.codigosDeModeloEn("APC", temporada.getId());
         List<Articulo> suyos = catalogo.articulosDe("APC").stream()
-                .filter(articulo -> modelos.contains(articulo.getCodigoModelo()) && articulo.tienePiel())
+                .filter(articulo -> modelos.contains(codigoDe(articulo)) && articulo.tienePiel())
                 .toList();
         assertFalse(suyos.isEmpty());
         assertTrue(alta.pielesNombradas() > 0, "el emergente dice cuántas pieles han cogido nombre: " + alta);
@@ -145,6 +156,37 @@ class CatalogoModelosIncorporarTest {
         ResumenAlta alta = catalogo.incorporarProduccion(temporada);
 
         assertEquals(0, alta.articulos());
+    }
+
+    @Test
+    void incorporarNoTocaLaEtapaDeUnModeloQueYaExistia() {
+        // Un prototipo que ya tiene código y que aparece en un pedido: la
+        // etapa la cambia una persona, no el alta automática.
+        Modelo prototipo = modelos.save(new Modelo("AMI", "ULL970", "", "", TipoArticulo.BOLSO,
+                Etapa.PROTOTIPO, null));
+        PedidoCorte pedido = new PedidoCorte(List.of(new ArticuloCorte(
+                new ReferenciaCorte("ULL970.AL0103", "ULL970", "AL0103"),
+                List.of(new ColorCorte("001", "BLACK", 3)))), List.of());
+
+        ResumenAlta alta = catalogo.incorporar("AMI", pedido, null);
+
+        assertEquals(0, alta.modelosNuevos(), "el modelo ya existía");
+        Modelo despues = catalogo.modelo("AMI", "ULL970").orElseThrow();
+        assertEquals(prototipo.getId(), despues.getId());
+        assertEquals(Etapa.PROTOTIPO, despues.getEtapa());
+        Articulo articulo = catalogo.articulo("AMI", "ULL970.AL0103").orElseThrow();
+        assertEquals(prototipo.getId(), articulo.getModeloId(), "el artículo cuelga del modelo que ya había");
+    }
+
+    @Test
+    void unModeloNuevoPorIncorporarNaceEnProduccion() {
+        PedidoCorte pedido = new PedidoCorte(List.of(new ArticuloCorte(
+                new ReferenciaCorte("ULL971.AL0103", "ULL971", "AL0103"),
+                List.of(new ColorCorte("001", "BLACK", 3)))), List.of());
+
+        catalogo.incorporar("AMI", pedido, null);
+
+        assertEquals(Etapa.PRODUCCION, catalogo.modelo("AMI", "ULL971").orElseThrow().getEtapa());
     }
 
     @Test

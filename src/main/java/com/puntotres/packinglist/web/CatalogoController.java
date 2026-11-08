@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.springframework.http.ResponseEntity;
@@ -359,26 +360,27 @@ public class CatalogoController {
         tablaColores.de(cliente).forEach(color -> descripcionDeColor.put(color.getCodigo(), color.getDescripcion()));
         Set<String> conTara = Set.copyOf(taras.tamanosDeMayorAMenor());
 
-        Map<String, List<Articulo>> porModelo = new LinkedHashMap<>();
+        Map<Long, List<Articulo>> porModelo = new LinkedHashMap<>();
         for (Articulo articulo : catalogo.articulosDe(cliente)) {
-            porModelo.computeIfAbsent(articulo.getCodigoModelo(), modelo -> new ArrayList<>()).add(articulo);
+            porModelo.computeIfAbsent(articulo.getModeloId(), modelo -> new ArrayList<>()).add(articulo);
         }
         List<FilaCatalogoVista> filas = new ArrayList<>();
         List<Modelo> modelos = catalogo.modelosDe(cliente);
         Map<String, List<ResumenFoto>> fotosDe = fotos.de(cliente,
-                modelos.stream().map(Modelo::getCodigo).toList());
+                modelos.stream().map(Modelo::getCodigo).filter(Objects::nonNull).toList());
         for (Modelo modelo : modelos) {
             if (enLaTemporada != null && !enLaTemporada.contains(modelo.getCodigo())) {
                 continue;
             }
-            List<String> nombresTemporada = catalogo.temporadasDe(cliente, modelo.getCodigo()).stream()
+            List<String> nombresTemporada = catalogo.temporadasDeModelo(modelo.getId()).stream()
                     .map(id -> nombreDeTemporada.getOrDefault(String.valueOf(id), "?"))
                     .toList();
-            List<ResumenFoto> delModelo = fotosDe.getOrDefault(modelo.getCodigo(), List.of());
+            List<ResumenFoto> delModelo = modelo.getCodigo() == null ? fotos.de(modelo.getId())
+                    : fotosDe.getOrDefault(modelo.getCodigo(), List.of());
             Long principal = delModelo.stream().filter(ResumenFoto::principal).map(ResumenFoto::id)
                     .findFirst().orElse(delModelo.isEmpty() ? null : delModelo.get(0).id());
             List<FilaCatalogoVista.ArticuloVista> articulos = new ArrayList<>();
-            for (Articulo articulo : porModelo.getOrDefault(modelo.getCodigo(), List.of())) {
+            for (Articulo articulo : porModelo.getOrDefault(modelo.getId(), List.of())) {
                 articulos.add(vistaDe(cliente, articulo, nombreDePiel, descripcionDeColor, conTara));
             }
             filas.add(new FilaCatalogoVista(modelo.getCodigo(), modelo.getNombre(), modelo.getTipo().name(),

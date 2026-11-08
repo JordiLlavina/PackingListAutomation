@@ -51,7 +51,7 @@ class CatalogoModelosTest {
         catalogo.asegurarArticulo("AMI", "ull900.al0100");
 
         Articulo articulo = catalogo.articulo("AMI", "ULL900.AL0100").orElseThrow();
-        assertEquals("ULL900", articulo.getCodigoModelo());
+        assertEquals("ULL900", catalogo.modelo(articulo.getModeloId()).orElseThrow().getCodigo());
         assertEquals("AL0100", articulo.getRefPiel());
         Modelo modelo = catalogo.modelo("AMI", "ULL900").orElseThrow();
         assertEquals(TipoArticulo.BOLSO, modelo.getTipo());
@@ -121,7 +121,7 @@ class CatalogoModelosTest {
 
         Articulo parcial = catalogo.asegurarArticulo("APC", "F63023");
         assertFalse(parcial.tienePiel());
-        assertEquals("F63023", parcial.getCodigoModelo());
+        assertEquals("F63023", catalogo.modelo(parcial.getModeloId()).orElseThrow().getCodigo());
         assertNull(parcial.getUnidadesPorCaja(), "una referencia parcial no es hermana de nadie");
 
         catalogo.guardarCampo("APC", "PXCBC-F63023", CampoArticulo.UNIDADES_POR_CAJA, "5", true);

@@ -5,17 +5,22 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.puntotres.packinglist.persistence.FotoCatalogo;
 import com.puntotres.packinglist.persistence.FotoCatalogoRepository;
+import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.service.corte.FotoModelo;
 import com.puntotres.packinglist.service.corte.FotosTemporada;
@@ -31,6 +36,10 @@ import com.puntotres.packinglist.service.corte.FotosTemporada;
  * misma carpeta subida dos veces no duplica nada. Como mucho una por modelo
  * es la principal (la de la orden de corte); la primera que entra lo es
  * hasta que alguien marca otra.
+ *
+ * Las fotos cuelgan del id del modelo. Las versiones por (cliente, código)
+ * se conservan para el corte, el embalaje y la pantalla, que hablan en
+ * códigos; las versiones por id sirven también para un prototipo sin código.
  */
 @Service
 public class FotosCatalogo {
@@ -47,10 +56,11 @@ public class FotosCatalogo {
     }
 
     public List<ResumenFoto> de(String cliente, String codigoModelo) {
-        if (vacio(cliente) || vacio(codigoModelo)) {
-            return List.of();
-        }
-        return repositorio.resumenes(clave(cliente), List.of(clave(codigoModelo)));
+        return catalogo.modelo(cliente, codigoModelo).map(modelo -> de(modelo.getId())).orElse(List.of());
+    }
+
+    public List<ResumenFoto> de(Long modeloId) {
+        return modeloId == null ? List.of() : repositorio.resumenes(List.of(modeloId));
     }
 
     /**
@@ -61,21 +71,45 @@ public class FotosCatalogo {
      * por dónde se generara.
      */
     public Optional<Long> principalDe(String cliente, String codigoModelo) {
-        List<ResumenFoto> fotos = de(cliente, codigoModelo);
+        return catalogo.modelo(cliente, codigoModelo).flatMap(modelo -> principalDe(modelo.getId()));
+    }
+
+    /** La misma regla que {@link #principalDe(String, String)}, por el id del modelo. */
+    public Optional<Long> principalDe(Long modeloId) {
+        List<ResumenFoto> fotos = de(modeloId);
         return fotos.stream().filter(ResumenFoto::principal).findFirst()
                 .or(() -> fotos.stream().findFirst())
                 .map(ResumenFoto::id);
     }
 
-    /** Modelo → sus fotos, solo para los modelos que tienen alguna. */
+    /**
+     * Código del modelo → sus fotos, solo para los modelos que tienen alguna,
+     * por orden de código. La clave sigue siendo el código porque quien lo
+     * pide (el corte, la pantalla) habla en códigos: se traducen a ids con
+     * una consulta y se vuelve a agrupar por código.
+     */
     public Map<String, List<ResumenFoto>> de(String cliente, Collection<String> modelos) {
         Map<String, List<ResumenFoto>> porModelo = new LinkedHashMap<>();
         if (vacio(cliente) || modelos == null || modelos.isEmpty()) {
             return porModelo;
         }
-        List<String> claves = modelos.stream().filter(modelo -> !vacio(modelo)).map(FotosCatalogo::clave).toList();
-        for (ResumenFoto foto : repositorio.resumenes(clave(cliente), claves)) {
-            porModelo.computeIfAbsent(foto.codigoModelo(), modelo -> new ArrayList<>()).add(foto);
+        Set<String> claves = modelos.stream().filter(modelo -> !vacio(modelo)).map(FotosCatalogo::clave)
+                .collect(Collectors.toSet());
+        Map<Long, String> codigoDe = new HashMap<>();
+        for (Modelo modelo : catalogo.modelosDe(cliente)) {
+            if (modelo.getCodigo() != null && claves.contains(modelo.getCodigo())) {
+                codigoDe.put(modelo.getId(), modelo.getCodigo());
+            }
+        }
+        if (codigoDe.isEmpty()) {
+            return porModelo;
+        }
+        List<ResumenFoto> fotos = new ArrayList<>(repositorio.resumenes(codigoDe.keySet()));
+        fotos.sort(Comparator.comparing((ResumenFoto foto) -> codigoDe.get(foto.modeloId()))
+                .thenComparingInt(ResumenFoto::orden)
+                .thenComparing(ResumenFoto::id));
+        for (ResumenFoto foto : fotos) {
+            porModelo.computeIfAbsent(codigoDe.get(foto.modeloId()), modelo -> new ArrayList<>()).add(foto);
         }
         return porModelo;
     }
@@ -94,29 +128,42 @@ public class FotosCatalogo {
         if (vacio(cliente) || vacio(codigoModelo) || vacio(nombreFichero) || jpeg == null || jpeg.length == 0) {
             throw new IllegalArgumentException("La foto necesita cliente, modelo, nombre y contenido");
         }
-        String elCliente = clave(cliente);
-        String elModelo = clave(codigoModelo);
+        Modelo modelo = catalogo.asegurarModelo(clave(cliente), clave(codigoModelo), "");
+        return guardar(modelo.getId(), nombreFichero, jpeg);
+    }
+
+    /** Como {@link #guardar(String, String, String, byte[])}, en un modelo que ya existe. */
+    @Transactional
+    public ResumenFoto guardar(Long modeloId, String nombreFichero, byte[] jpeg) {
+        if (modeloId == null || vacio(nombreFichero) || jpeg == null || jpeg.length == 0) {
+            throw new IllegalArgumentException("La foto necesita modelo, nombre y contenido");
+        }
         String elNombre = nombreFichero.trim();
-        Optional<FotoCatalogo> existente = repositorio.findByClienteAndCodigoModeloAndNombreFichero(
-                elCliente, elModelo, elNombre);
+        Optional<FotoCatalogo> existente = repositorio.findByModeloIdAndNombreFichero(modeloId, elNombre);
         if (existente.isPresent()) {
             return existente.get().resumen();
         }
-        catalogo.asegurarModelo(elCliente, elModelo, "");
-        List<FotoCatalogo> delModelo = repositorio.findByClienteAndCodigoModeloOrderByOrdenAscIdAsc(elCliente, elModelo);
+        List<FotoCatalogo> delModelo = repositorio.findByModeloIdOrderByOrdenAscIdAsc(modeloId);
         int orden = delModelo.isEmpty() ? 0 : delModelo.get(delModelo.size() - 1).getOrden() + 1;
-        FotoCatalogo nueva = new FotoCatalogo(elCliente, elModelo, elNombre, orden, jpeg);
+        FotoCatalogo nueva = new FotoCatalogo(modeloId, elNombre, orden, jpeg);
         nueva.setPrincipal(delModelo.stream().noneMatch(FotoCatalogo::isPrincipal));
         return repositorio.save(nueva).resumen();
     }
 
     @Transactional
     public void marcarPrincipal(String cliente, String codigoModelo, Long fotoId) {
-        if (vacio(cliente) || vacio(codigoModelo) || fotoId == null) {
+        if (fotoId == null) {
             return;
         }
-        for (FotoCatalogo foto : repositorio.findByClienteAndCodigoModeloOrderByOrdenAscIdAsc(
-                clave(cliente), clave(codigoModelo))) {
+        catalogo.modelo(cliente, codigoModelo).ifPresent(modelo -> marcarPrincipal(modelo.getId(), fotoId));
+    }
+
+    @Transactional
+    public void marcarPrincipal(Long modeloId, Long fotoId) {
+        if (modeloId == null || fotoId == null) {
+            return;
+        }
+        for (FotoCatalogo foto : repositorio.findByModeloIdOrderByOrdenAscIdAsc(modeloId)) {
             foto.setPrincipal(foto.getId().equals(fotoId));
         }
     }
@@ -130,7 +177,7 @@ public class FotosCatalogo {
         }
         repositorio.delete(foto);
         if (foto.isPrincipal()) {
-            repositorio.findByClienteAndCodigoModeloOrderByOrdenAscIdAsc(foto.getCliente(), foto.getCodigoModelo())
+            repositorio.findByModeloIdOrderByOrdenAscIdAsc(foto.getModeloId())
                     .stream().findFirst().ifPresent(siguiente -> siguiente.setPrincipal(true));
         }
     }

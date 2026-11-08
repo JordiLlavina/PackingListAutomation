@@ -87,6 +87,21 @@ class FotosCatalogoTest {
     }
 
     @Test
+    void porIdYPorCodigoSonLasMismasFotos() {
+        Long modeloId = catalogo.asegurarModelo("AMI", "ULL944", "").getId();
+
+        ResumenFoto a = fotos.guardar(modeloId, "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
+        ResumenFoto b = fotos.guardar("AMI", "ULL944", "b.jpg", FotosDePrueba.jpeg(20, 20, Color.BLUE));
+        fotos.marcarPrincipal(modeloId, b.id());
+
+        assertEquals(modeloId, a.modeloId());
+        assertEquals(fotos.de("AMI", "ULL944"), fotos.de(modeloId));
+        assertEquals(b.id(), fotos.principalDe(modeloId).orElseThrow());
+        assertEquals(List.of("ULL944"), List.copyOf(fotos.de("AMI", List.of("ULL944")).keySet()),
+                "el mapa por modelos sigue con clave código");
+    }
+
+    @Test
     void comoFotosTemporadaEscribeLosFicherosYLaPrincipalSeLlamaPrincipal() throws IOException {
         catalogo.asegurarModelo("AMI", "ULL943", "");
         fotos.guardar("AMI", "ULL943", "z-detalle.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
