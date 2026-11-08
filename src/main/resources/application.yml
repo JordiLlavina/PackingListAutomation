@@ -256,3 +256,47 @@ packing-list:
 server:
   tomcat:
     max-part-count: 5100
+  # activar cuando nginx esté delante (ver docs/Modelos/modelos.puntotres.com - guia para el informatico.md)
+  #forward-headers-strategy: framework
+  #address: 127.0.0.1
+
+# App de modelos y modificaciones (segunda aplicación del mismo jar).
+# Los secretos llegan por variables de entorno; vacíos, la función queda
+# apagada y la aplicación lo dice.
+modelos:
+  # Dirección con la que se llega desde fuera: es la del QR de cada modelo.
+  url-publica: ${MODELOS_URL_PUBLICA:http://localhost:8080}
+  admin-password: ${MODELOS_ADMIN_PASSWORD:}
+
+  # Los botones de la cara del taller, en este orden.
+  tipos-cambio:
+    - { clave: PIEL, texto: "Piel / material", icono: piel }
+    - { clave: FORRO, texto: "Forro", icono: forro }
+    - { clave: HERRAJES, texto: "Herrajes", icono: herraje }
+    - { clave: COSTURA, texto: "Costura / construcción", icono: costura }
+    - { clave: MEDIDAS, texto: "Medidas", icono: medidas }
+    - { clave: PATRON, texto: "Patrón", icono: patron }
+    - { clave: OTRO, texto: "Otro", icono: otro }
+
+  # Dónde aplica un cambio el despacho.
+  destinos-aplicacion: [ICSUITE, EXCEL_ESCANDALLOS]
+
+  # Reglas anti-olvido (tarea programada cada hora).
+  recordatorios:
+    taller:                        # órdenes despacho->taller no hechas
+      dias-por-prioridad: { ALTA: 1, NORMAL: 3, BAJA: 7 }   # cada N días, push de nuevo
+    despacho:
+      sin-prioridad-horas: 24      # aviso de taller sin prioridad puesta
+      sin-aplicar-dias: 7          # aviso de taller sin aplicar del todo, cada 7 días
+      respuesta-pendiente-horas: 24
+
+  # Web Push con VAPID; sin las dos claves no hay avisos al móvil.
+  push:
+    vapid-public: ${MODELOS_VAPID_PUBLIC:}
+    vapid-private: ${MODELOS_VAPID_PRIVATE:}
+    asunto: ${MODELOS_VAPID_ASUNTO:mailto:modelos@puntotres.com}
+
+  # Transcripción de las notas de voz; sin clave, solo se guarda el audio.
+  azure-speech:
+    clave: ${AZURE_SPEECH_KEY:}
+    region: ${AZURE_SPEECH_REGION:westeurope}

@@ -238,7 +238,15 @@ El detalle de qué campos usa cada cliente está en [docs/Packing Lists/campos-j
 - **Catálogo de clientes** (`packing-list.clientes`): nombre, plantilla (AMI/APC/GENERIC), y por cliente lo suyo — si sube excel de pedido (`pedido-cliente`), las destinaciones de APC con sus direcciones, abreviaturas del Livraison code y destinos hijo.
 - Límites de subida multipart (las fotos del móvil superan el 1MB por defecto de Spring) y hash del contenido en los nombres de los estáticos (sin él, el navegador reutiliza el CSS viejo tras cada cambio).
 
-La única variable de entorno es `ANTHROPIC_API_KEY` (opcional, ver arriba).
+La única variable de entorno del packing list es `ANTHROPIC_API_KEY` (opcional, ver arriba).
+
+La app de modelos y modificaciones (bloque `modelos` del yml) lee las suyas, todas opcionales; sin ellas la función correspondiente queda apagada y la aplicación lo dice. Despliegue detrás de nginx: ver [la guía para el informático](docs/Modelos/modelos.puntotres.com%20-%20guia%20para%20el%20informatico.md).
+
+- `MODELOS_URL_PUBLICA` — dirección pública con la que se llega a la app (la del QR de cada modelo).
+- `MODELOS_ADMIN_PASSWORD` — contraseña del administrador.
+- `MODELOS_VAPID_PUBLIC` / `MODELOS_VAPID_PRIVATE` — claves VAPID del Web Push; sin las dos no hay avisos al móvil.
+- `MODELOS_VAPID_ASUNTO` — el `mailto:` que acompaña a las claves VAPID.
+- `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` — transcripción de las notas de voz (la región por defecto es `westeurope`).
 
 Si la aplicación corre desde un `.jar` en otro ordenador, estos ajustes se pueden cambiar sin recompilar con un `application.yml` junto al jar: ver [Distribuir la aplicación](#distribuir-la-aplicación-un-jar-para-otro-ordenador).
 
