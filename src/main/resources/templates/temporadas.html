@@ -109,9 +109,10 @@
                 <!-- Lo que de verdad sale de cada excel, por cliente. Ningún
                      pedido trae el nombre de la piel: solo el excel de producción. -->
                 <p class="ayuda texto-cliente" data-texto-cliente="AMI">
-                    Con el excel de pedido se importan los modelos (también los cinturones), sus pieles
-                    (solo la referencia, como AL0103) y los colores con su nombre. El pedido de AMI no trae
-                    el nombre del bolso ni el de la piel: los dos salen del excel de producción.
+                    Con el excel de Pedido Cliente se importan: modelos, sus pieles (solo la referencia,
+                    como AL0103) y sus colores.<br>
+                    Si adjuntas el excel Producción Puntotres también se guardarán el nombre del bolso y el
+                    de la piel; ya que el excel de Cliente no los contiene.
                 </p>
                 <p class="ayuda texto-cliente" data-texto-cliente="APC">
                     Con el excel de pedido se importan los modelos con su nombre, sus pieles (solo la
@@ -124,11 +125,14 @@
                 </p>
             </div>
 
-            <h4 class="subtitulo-temporada">
-                <span class="marca-campo">Opcional</span> Fotos de la temporada
-            </h4>
-            <div th:replace="~{fragmentos :: campoFotos}"></div>
-            <p class="ayuda">
+            <div class="fila-excel fila-fotos">
+                <span class="marca-campo">Opcional</span>
+                <span class="rotulo-fila">Fotos de la temporada</span>
+                <th:block th:with="fotosEnLinea=true">
+                    <div th:replace="~{fragmentos :: campoFotos}"></div>
+                </th:block>
+            </div>
+            <p class="ayuda ayuda-fotos">
                 <strong>Estructura</strong>: una carpeta con el nombre de la temporada y dentro una
                 subcarpeta por modelo, con la referencia completa o parcial del modelo (ULL712 o
                 ULL712.AL0103, F67008 o PXCBC-F67008). Dentro de cada subcarpeta, las fotos del modelo; la

@@ -1697,15 +1697,25 @@ main.catalogo { max-width: 100rem; }
    encima, transparente y a toda la zona, que es lo que recoge el clic y lo
    soltado. Del alto del campo de fichero de antes (el padding de los campos
    del campo, ajustado a lo que medía el botón nativo), con el icono y el
-   texto en línea a la izquierda: la zona grande es solo la de fotos. */
-.zona-subida {
-    position: relative;
+   texto en línea a la izquierda: la zona grande es solo la de fotos, salvo
+   en /temporadas, donde va en su fila como los excels (.en-linea) y mide lo
+   mismo que ellos de alto; de largo, lo que pida su frase. */
+.zona-subida, .campo-fotos.en-linea .zona-fotos {
     flex-direction: row;
     gap: 0.5rem;
     padding: calc(0.45rem + 0.5px) 0.6rem;
     text-align: left;
 }
-.zona-subida .zona-icono { width: 1.25rem; height: 1.25rem; flex: none; }
+.zona-subida { position: relative; }
+.zona-subida .zona-icono, .campo-fotos.en-linea .zona-icono { width: 1.25rem; height: 1.25rem; flex: none; }
+.campo-fotos.en-linea {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem 0.8rem;
+}
+.campo-fotos.en-linea .zona-fotos { flex: 0 1 26rem; }
+.campo-fotos.en-linea .zona-elegido:empty { display: none; }
 .zona-subida input[type="file"] {
     position: absolute;
     inset: 0;
@@ -1746,7 +1756,9 @@ button.enlace:hover { background: none; color: var(--acento); }
     padding: 0.6rem 0;
     border-bottom: 1px solid var(--borde);
 }
-.fila-excel label { margin: 0; min-width: 16rem; }
+.fila-excel label, .fila-excel .rotulo-fila { margin: 0; min-width: 16rem; font-weight: 600; }
+.fila-fotos { margin-top: 0.9rem; }
+.fila-fotos + .ayuda { margin-top: 0.6rem; }
 .fila-excel .zona-subida { flex: 0 1 22rem; }
 .fila-excel .excel-guardado { flex-basis: 100%; margin: 0 0 0 6.6rem; }
 .marca-campo {
@@ -1761,8 +1773,10 @@ button.enlace:hover { background: none; color: var(--acento); }
     text-align: center;
 }
 .marca-campo.obligatorio { border-color: var(--acento); color: var(--acento); background: var(--acento-suave-ini); }
+/* Los textos de debajo de los campos empiezan donde el rótulo, a la altura
+   de la marca más su hueco: el mismo margen que el «Guardado:» de cada excel. */
 .texto-cliente { margin-top: 0.7rem; }
-.subtitulo-temporada { display: flex; align-items: center; gap: 0.8rem; margin: 1.4rem 0 0.6rem; font-size: 1rem; }
+.texto-cliente, .ayuda-fotos { margin-left: 6.6rem; }
 .temporada-guardada .boton-fila { margin: 0; padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .temporada-guardada .temporada-nombre { min-width: 14rem; display: flex; gap: 0.6rem; align-items: baseline; }
 .temporada-guardada .texto-suave { color: var(--texto-suave); }

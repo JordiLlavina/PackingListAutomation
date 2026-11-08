@@ -83,8 +83,11 @@
 <!-- Campo único de fotos de temporada: la carpeta o su zip, arrastrados o
      elegidos. Manda "carpeta" (un fichero por foto con su ruta) o "fotos" (el
      zip), los mismos nombres que leen /documentos-corte y /temporadas. Lo
-     mueve /campo-fotos.js, que la página tiene que cargar. -->
-<div th:fragment="campoFotos" class="campo-fotos" data-campo-fotos>
+     mueve /campo-fotos.js, que la página tiene que cargar. Con fotosEnLinea
+     (un th:with de quien lo incluye) la zona es del alto de las de los excels
+     y va en la fila de su rótulo, como en /temporadas: el enlace del zip y lo
+     elegido salen entonces detrás de la zona y no dentro. -->
+<div th:fragment="campoFotos" class="campo-fotos" th:classappend="${fotosEnLinea} ? 'en-linea'" data-campo-fotos>
     <input type="file" name="carpeta" class="cf-carpeta" webkitdirectory multiple hidden>
     <input type="file" name="fotos" class="cf-zip" accept=".zip" hidden>
     <div class="zona-fotos" tabindex="0" role="button"
@@ -94,11 +97,16 @@
             <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.2l2 2.2h8.8A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/>
             <path d="M12 16.5v-6M9.3 13.1 12 10.4l2.7 2.7"/>
         </svg>
-        <span class="zona-titulo">Suelta aquí la carpeta de fotos o su .zip, o pincha para elegir la carpeta</span>
-        <span class="zona-detalle">¿La tienes en zip? <button type="button" class="enlace cf-elegir-zip">Elige el zip</button></span>
-        <span class="zona-elegido" aria-live="polite"></span>
-        <button type="button" class="enlace cf-quitar" hidden>Quitar las fotos elegidas</button>
+        <span class="zona-titulo">Suelta aquí la carpeta de fotos o su .zip<th:block th:unless="${fotosEnLinea}">, o pincha para elegir la carpeta</th:block></span>
+        <th:block th:unless="${fotosEnLinea}"><th:block th:replace="~{fragmentos :: campoFotosEleccion}"></th:block></th:block>
     </div>
+    <th:block th:if="${fotosEnLinea}"><th:block th:replace="~{fragmentos :: campoFotosEleccion}"></th:block></th:block>
 </div>
+<!-- El zip, lo elegido y quitarlo: dentro de la zona o detrás, según campoFotos. -->
+<th:block th:fragment="campoFotosEleccion">
+    <span class="zona-detalle">¿La tienes en zip? <button type="button" class="enlace cf-elegir-zip">Elige el zip</button></span>
+    <span class="zona-elegido" aria-live="polite"></span>
+    <button type="button" class="enlace cf-quitar" hidden>Quitar las fotos elegidas</button>
+</th:block>
 </body>
 </html>
