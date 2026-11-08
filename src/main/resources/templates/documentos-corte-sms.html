@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Documentos del Corte · SMS')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte · SMS')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <form id="formCorteSms" th:action="@{/documentos-corte/sms/generar}" method="post"
+          enctype="multipart/form-data">
+      <div class="tarjeta isla-pedido">
+        <h3 class="titulo-seccion titulo-entrada-corte">
+            <svg th:replace="~{fragmentos :: iconoPiel('icono-titulo')}"></svg>
+            Hojas de corte de SMS
+        </h3>
+        <p class="ayuda">
+            Del excel de pedido de SMS sale una hoja de corte por referencia y color, con las muestras
+            de «Commande SMS», la piel y su color, el forro y el croquis de la fila. No se guarda nada:
+            la temporada solo da nombre al documento.
+        </p>
+
+        <!-- Solo los clientes cuyo excel de SMS se sabe leer; los demás, apagados. -->
+        <div class="fila-cliente">
+            <div>
+                <label for="cliente">Cliente</label>
+                <select id="cliente" name="cliente" required>
+                    <option th:each="entrada : ${clientes}"
+                            th:value="${entrada.key}"
+                            th:text="${entrada.value.disponible} ? ${entrada.value.nombre}
+                                     : |${entrada.value.nombre} — en desarrollo|"
+                            th:disabled="${!entrada.value.disponible}"
+                            th:selected="${entrada.key == clienteElegido}"></option>
+                </select>
+            </div>
+            <div>
+                <label for="temporada">Temporada</label>
+                <input type="text" id="temporada" name="temporada" placeholder="FALL 27" required
+                       th:value="${temporada}">
+            </div>
+        </div>
+
+        <label for="excel">Excel de pedido de SMS</label>
+        <input type="file" id="excel" name="excel" accept=".xlsx" required>
+      </div>
+
+        <button type="submit">Generar hojas de corte</button>
+        <a class="boton secundario" th:href="@{/documentos-corte}">Volver</a>
+    </form>
+</main>
+</body>
+</html>

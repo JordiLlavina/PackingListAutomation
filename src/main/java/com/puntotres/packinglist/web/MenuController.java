@@ -33,4 +33,14 @@ public class MenuController {
     public String etiquetasArticulo() {
         return "etiquetas-articulo";
     }
+
+    /**
+     * Menú de los documentos del corte: producción (DocumentosCorteController,
+     * en /documentos-corte/produccion) y SMS (CorteSmsController). Solo los
+     * títulos, sin texto: lo que pide cada uno lo dice su pantalla.
+     */
+    @GetMapping("/documentos-corte")
+    public String documentosCorte() {
+        return "documentos-corte-menu";
+    }
 }

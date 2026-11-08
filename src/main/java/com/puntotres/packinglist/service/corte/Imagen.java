@@ -12,11 +12,15 @@ import javax.imageio.ImageIO;
 public record Imagen(byte[] jpeg, int ancho, int alto) {
 
     public static Imagen de(Path fichero) throws IOException {
-        byte[] bytes = Files.readAllBytes(fichero);
-        BufferedImage imagen = ImageIO.read(new ByteArrayInputStream(bytes));
+        return de(Files.readAllBytes(fichero), fichero.getFileName().toString());
+    }
+
+    /** Un JPEG ya reducido que está en memoria (las fotos del catálogo de modelos). */
+    public static Imagen de(byte[] jpeg, String nombre) throws IOException {
+        BufferedImage imagen = ImageIO.read(new ByteArrayInputStream(jpeg));
         if (imagen == null) {
-            throw new IOException("no es una imagen legible: " + fichero.getFileName());
+            throw new IOException("no es una imagen legible: " + nombre);
         }
-        return new Imagen(bytes, imagen.getWidth(), imagen.getHeight());
+        return new Imagen(jpeg, imagen.getWidth(), imagen.getHeight());
     }
 }

@@ -97,6 +97,13 @@ Corte/prod AMI SS27 excel.xlsx`), también sin sus fotos. Su disposición es
 distinta de la de APC (ver `ProduccionPuntotresExcel`), y su pedido (E) más su
 PRESS (G) cuadran exactos con `EAN PUNTOTRES SS27.xlsx`.
 
+`corte/COMMANDE_SMS_APC_FALL27.xlsx` es el **excel de pedido de SMS de APC**
+FALL 27 (`docs/Documentos de Corte/APC SMS FALL 27/COMMANDE SMS_FALL27_PUNTOTRES.xlsx`),
+el que lee `ApcSmsExcel`. Datos reales del cliente, pero la copia va **sin los
+croquis** que el original lleva en la columna CROQUIS de la hoja FEMME: solo
+los valores de las celdas y las celdas combinadas de sus dos hojas. Los tests
+de los croquis (y de su recorte) usan imágenes dibujadas por `FotosDePrueba`.
+
 `taller/packing taller fez ejemplo.xlsx` y `taller/packing taller tanger ejemplos.xlsx`
 son packings de taller con **formato propio**, los que entran por "Excel Formato
 Taller" y Claude pasa al formato Puntotres (`ConversionFormatoTallerService`).

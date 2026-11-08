@@ -5,6 +5,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -115,6 +116,22 @@ public final class ReductorImagen {
         } finally {
             escritor.dispose();
         }
+    }
+
+    /** El JPEG en memoria, con la misma calidad que {@link #escribirJpeg}: para las imágenes que no pasan por disco. */
+    public static byte[] jpeg(BufferedImage imagen) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        ImageWriter escritor = ImageIO.getImageWritersByFormatName("jpeg").next();
+        ImageWriteParam parametros = escritor.getDefaultWriteParam();
+        parametros.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+        parametros.setCompressionQuality(CALIDAD_JPEG);
+        try (ImageOutputStream salida = ImageIO.createImageOutputStream(bytes)) {
+            escritor.setOutput(salida);
+            escritor.write(null, new IIOImage(imagen, null, null), parametros);
+        } finally {
+            escritor.dispose();
+        }
+        return bytes.toByteArray();
     }
 
     private static BufferedImage escalar(BufferedImage origen, int ancho, int alto) {

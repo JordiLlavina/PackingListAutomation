@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Documentos del Corte')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte')}"></header>
+<main>
+    <!-- Solo los títulos, sin texto ni bloque de entrada: lo que pide cada
+         uno lo dice su pantalla. -->
+    <div class="menu-tarjetas">
+        <a class="tarjeta menu-tarjeta solo-titulo" th:href="@{/documentos-corte/produccion}">
+            <h2 class="menu-titulo">
+                <svg th:replace="~{fragmentos :: iconoPiel('menu-icono')}"></svg>
+                Producción
+            </h2>
+        </a>
+
+        <a class="tarjeta menu-tarjeta solo-titulo" th:href="@{/documentos-corte/sms}">
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 6h16v12H4z"/>
+                    <path d="M4 10h16M9 6v12"/>
+                </svg>
+                SMS
+            </h2>
+        </a>
+    </div>
+
+    <p class="menu-ajustes">
+        <a th:href="@{/menu}">Volver al menú</a>
+    </p>
+</main>
+</body>
+</html>

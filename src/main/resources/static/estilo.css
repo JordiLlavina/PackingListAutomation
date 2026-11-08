@@ -891,6 +891,10 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
    inferior solo agrandaba el hueco de abajo. */
 .menu-tarjeta .menu-lista:last-child { margin-bottom: 0; }
 
+/* Una tarjeta de submenú que solo lleva el título (Documentos del Corte):
+   sin texto debajo, el margen del título dejaba aire de más abajo. */
+.menu-tarjeta.solo-titulo .menu-titulo { margin: 0; }
+
 @media (prefers-reduced-motion: reduce) {
     a.menu-tarjeta, .menu-panel { transition: none; }
 }

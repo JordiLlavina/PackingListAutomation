@@ -117,7 +117,7 @@ public class DocumentosCorteController {
 
     // --- Paso 1: entrada ---
 
-    @GetMapping("/documentos-corte")
+    @GetMapping("/documentos-corte/produccion")
     public String entrada(Model model) {
         model.addAttribute("clientes", opcionesDeCliente());
         model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegableDelCorte());
@@ -546,7 +546,7 @@ public class DocumentosCorteController {
     @GetMapping("/documentos-corte/resultados")
     public String resultados(Model model) {
         if (enCurso.getResultado() == null) {
-            return enCurso.tieneCarga() ? "redirect:/documentos-corte/pieles" : "redirect:/documentos-corte";
+            return enCurso.tieneCarga() ? "redirect:/documentos-corte/pieles" : "redirect:/documentos-corte/produccion";
         }
         List<String> avisos = new ArrayList<>(enCurso.getAvisosCarga());
         avisos.addAll(enCurso.getConversion().avisos());
@@ -583,7 +583,7 @@ public class DocumentosCorteController {
     @GetMapping("/documentos-corte/nuevo")
     public String nuevo() {
         enCurso.reiniciar();
-        return "redirect:/documentos-corte";
+        return "redirect:/documentos-corte/produccion";
     }
 
     // --- Internos ---
@@ -735,6 +735,6 @@ public class DocumentosCorteController {
 
     private static String error(RedirectAttributes redirect, String mensaje) {
         redirect.addFlashAttribute("error", mensaje);
-        return "redirect:/documentos-corte";
+        return "redirect:/documentos-corte/produccion";
     }
 }

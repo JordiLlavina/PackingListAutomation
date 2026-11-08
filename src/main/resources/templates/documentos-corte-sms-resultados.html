@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Hojas de corte de SMS generadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte · SMS')}"></header>
+<main>
+    <ul class="ficha-envio">
+        <li><span class="rotulo">Cliente</span>
+            <strong th:text="${cliente}"></strong></li>
+        <li><span class="rotulo">Temporada</span>
+            <strong th:text="${temporada}"></strong></li>
+        <li><span class="rotulo">Muestras</span>
+            <strong th:text="${resultado.muestras}"></strong></li>
+    </ul>
+
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(resultado.avisos)}">
+        <summary th:text="|${#lists.size(resultado.avisos)} aviso(s)|"></summary>
+        <div class="alerta" th:each="aviso : ${resultado.avisos}" th:text="${aviso}"></div>
+    </details>
+
+    <section class="tarjeta seccion-salida">
+        <h3 class="titulo-seccion">
+            <svg th:replace="~{fragmentos :: iconoPiel('icono-titulo')}"></svg>
+            Hojas de Corte
+        </h3>
+        <table>
+            <thead>
+            <tr>
+                <th>Fichero</th>
+                <th>Contenido</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td th:text="${resultado.nombreFichero}"></td>
+                <td th:text="|Hojas de corte (${resultado.fichas} ${resultado.fichas == 1 ? 'hoja' : 'hojas'})|"></td>
+            </tr>
+            </tbody>
+        </table>
+        <a class="boton" th:href="@{/documentos-corte/sms/descargar}">Descargar</a>
+    </section>
+
+    <div class="salidas-pantalla">
+        <a class="boton neutro" th:href="@{/menu}">Volver al menú</a>
+        <a class="boton neutro" th:href="@{/documentos-corte/sms}">Otro excel de SMS</a>
+    </div>
+</main>
+</body>
+</html>

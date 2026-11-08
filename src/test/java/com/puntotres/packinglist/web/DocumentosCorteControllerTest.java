@@ -85,7 +85,7 @@ class DocumentosCorteControllerTest {
      */
     @Test
     void laEntradaArrancaEnElExcelDeProduccionConTodosLosClientes() throws Exception {
-        String pagina = mvc.perform(get("/documentos-corte"))
+        String pagina = mvc.perform(get("/documentos-corte/produccion"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
@@ -105,7 +105,7 @@ class DocumentosCorteControllerTest {
 
     @Test
     void laEntradaVaEnDosIslasConElIconoDePielYUnSoloCampoParaLaCarpetaOElZip() throws Exception {
-        String pagina = mvc.perform(get("/documentos-corte"))
+        String pagina = mvc.perform(get("/documentos-corte/produccion"))
                 .andReturn().getResponse().getContentAsString();
 
         assertTrue(pagina.contains("class=\"icono-titulo\"") && !pagina.contains("✂"), "icono de piel");
@@ -127,7 +127,7 @@ class DocumentosCorteControllerTest {
     @Test
     void unClienteGenericoNoPasaConElExcelDePedido() throws Exception {
         mvc.perform(cargar("ACKERMANN", "H26", pedidoAmi("ULL100"), zipFotos("ULL100")))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("usa el excel de producción")))
                 .andExpect(flash().attribute("origen", "PEDIDO"));
     }
@@ -255,7 +255,7 @@ class DocumentosCorteControllerTest {
         mvc.perform(multipart("/documentos-corte/cargar")
                         .param("origen", "PRODUCCION").param("cliente", "APC")
                         .param("temporada", "SPRING 27").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("Sube el excel de producción")))
                 .andExpect(flash().attribute("origen", "PRODUCCION"));
 
@@ -263,13 +263,13 @@ class DocumentosCorteControllerTest {
                         .file(new MockMultipartFile("produccion", "pedido.xlsx", XLSX, pedidoAmi("ULL120")))
                         .param("origen", "PRODUCCION").param("cliente", "AMI")
                         .param("temporada", "H26").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("excel de producción")));
 
         mvc.perform(multipart("/documentos-corte/cargar")
                         .file(new MockMultipartFile("produccion", "prod.xlsx", XLSX, produccionApc()))
                         .param("origen", "PRODUCCION").param("cliente", "APC").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("Falta el nombre de la temporada")));
     }
 
@@ -344,7 +344,7 @@ class DocumentosCorteControllerTest {
         mvc.perform(cargar("AMI", "H26", pedidoAmi("ULL111"), zipFotos("ULL111"))
                         .file(new MockMultipartFile("carpeta", "H26/ULL111/a.jpg", "image/jpeg",
                                 FotosDePrueba.jpeg(20, 20, Color.RED))))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("no los dos")));
     }
 
@@ -362,7 +362,7 @@ class DocumentosCorteControllerTest {
         mvc.perform(multipart("/documentos-corte/cargar")
                         .file(new MockMultipartFile("fotos", "H26.zip", "application/zip", zipFotos("ULL102")))
                         .param("cliente", "AMI").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("temporada guardada")));
     }
 
@@ -457,7 +457,7 @@ class DocumentosCorteControllerTest {
     @Test
     void volverALasPielesConLaSesionPerdidaLoDiceEnVezDeIrseSinMas() throws Exception {
         mvc.perform(get("/documentos-corte/pieles").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("caducado")));
     }
 
@@ -563,7 +563,7 @@ class DocumentosCorteControllerTest {
                         .file(new MockMultipartFile("fotos", "H26.zip", "application/zip", zipFotos("ULL108")))
                         .param("cliente", "AMI").param("temporadaGuardadaId", String.valueOf(id))
                         .session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("no es de este cliente")));
     }
 
@@ -673,10 +673,10 @@ class DocumentosCorteControllerTest {
         // entrada sin decir por qué, con todo lo tecleado perdido.
         mvc.perform(post("/documentos-corte/generar").session(sesion)
                         .param("filas[0].nombrePiel", "Box"))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("caducado")));
         mvc.perform(post("/documentos-corte/pieles/combinacion").session(sesion))
-                .andExpect(redirectedUrl("/documentos-corte"))
+                .andExpect(redirectedUrl("/documentos-corte/produccion"))
                 .andExpect(flash().attribute("error", containsString("caducado")));
     }
 
