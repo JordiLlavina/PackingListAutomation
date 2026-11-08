@@ -1,0 +1,46 @@
+// Inicio del taller: el saludo, las dos cosas que se vienen a hacer (mirar lo
+// que pide despacho y avisar de un cambio) y, debajo, los modelos.
+import { useNavigate } from 'react-router';
+import { Icono } from '../comun/iconos';
+import { useSesion } from '../comun/sesion';
+
+export default function Inicio() {
+  const navegar = useNavigate();
+  const { sesion } = useSesion();
+  // Las órdenes nuevas de despacho llegan en Task 14.
+  const nuevas = 0;
+
+  return (
+    <>
+      <h2 className="saludo">Hola, {sesion?.nombre}</h2>
+      <p className="sub">No tienes nada pendiente.</p>
+      <div className="losas">
+        <button className="losa" type="button" onClick={() => navegar('/ordenes')}>
+          <span className={nuevas ? 'badge' : 'badge cero'}>{nuevas}</span>
+          <Icono nombre="bandeja" />
+          <span>
+            <span className="t">Tengo que hacer</span>
+            <br />
+            <span className="m">Órdenes de despacho</span>
+          </span>
+        </button>
+        <button className="losa primaria" type="button" onClick={() => navegar('/cambio')}>
+          <Icono nombre="mic" />
+          <span>
+            <span className="t">He cambiado algo</span>
+            <br />
+            <span className="m">Avisar con fotos y voz</span>
+          </span>
+        </button>
+      </div>
+      <div className="fila-titulo">
+        <h2>Modelos</h2>
+        <button className="chip" type="button" onClick={() => navegar('/escanear')}>
+          <Icono nombre="qr" /> Escanear
+        </button>
+      </div>
+      {/* La rejilla de modelos, con sus filtros, llega en Task 10. */}
+      <div className="rejilla" />
+    </>
+  );
+}

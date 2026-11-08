@@ -43,7 +43,9 @@ class CoberturaDeRutasTest {
             "POST /api/sesion/dispositivo",
             "GET /api/sesion",
             "GET /m/{id}",
-            "GET /app/**");
+            // La PWA (SpaController): enseña ella misma el login.
+            "GET /app",
+            "GET /app/{*ruta}");
 
     @Autowired
     private MockMvc mvc;

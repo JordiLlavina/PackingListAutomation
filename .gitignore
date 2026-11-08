@@ -39,3 +39,9 @@ docs/Documentos de Corte/AMI SS27/
 
 # Espacio de trabajo de los planes ejecutados con subagentes (ledger, briefs, informes): borrador local
 .superpowers/
+
+# PWA de modelos: el Node que se baja frontend-maven-plugin, las dependencias
+# de npm y el build (Maven lo copia a target/classes/static/app)
+frontend/node/
+frontend/node_modules/
+frontend/dist/

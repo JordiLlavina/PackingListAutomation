@@ -90,6 +90,30 @@
             </ul>
         </a>
 
+        <!-- La app de modelos (PWA en /app): no es una pantalla de Thymeleaf,
+             la sirve SpaController y pide entrar con usuario o con el código
+             de alta de la tablet. El enlace va sin th:href a propósito: el
+             encadenado de recursos versionados (spring.web.resources.chain)
+             ve que /app/ es una carpeta de static/ cuando se arranca desde
+             target/classes y lo reescribe como si fuera un fichero
+             ("/app-<hash>.null"). -->
+        <a class="tarjeta menu-tarjeta" href="/app/">
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="5" y="2.5" width="14" height="19" rx="2"/>
+                    <path d="M10 18.5h4M8.5 8.5h7M8.5 12h7"/>
+                </svg>
+                Modelos y taller
+            </h2>
+            <p class="menu-entrada">Los cambios de cada modelo, en los dos sentidos.</p>
+            <ul class="menu-lista">
+                <li>Bachir avisa con fotos y voz desde la tablet</li>
+                <li>Despacho manda órdenes y las marca hechas</li>
+                <li>Etapas, histórico y etiqueta de patrones con QR</li>
+            </ul>
+        </a>
+
         <!-- Los ajustes no son un flujo con pantallas, sino un dato que se
              guarda una vez y vale para todos los envíos, así que van en paneles
              pequeños y no en una tarjeta. En la columna caben cuatro (la
