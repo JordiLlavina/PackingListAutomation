@@ -347,7 +347,7 @@ public class CatalogoController {
     // --- Internos ---
 
     private List<FilaCatalogoVista> filas(String cliente, Long temporadaId) {
-        Set<String> enLaTemporada = temporadaId == null ? null : catalogo.codigosDeModeloEn(cliente, temporadaId);
+        Set<Long> enLaTemporada = temporadaId == null ? null : catalogo.idsDeModeloEn(cliente, temporadaId);
         Map<String, String> nombreDeTemporada = new LinkedHashMap<>();
         for (ResumenTemporada temporada : temporadas.de(cliente)) {
             nombreDeTemporada.put(String.valueOf(temporada.id()), temporada.temporada());
@@ -369,7 +369,7 @@ public class CatalogoController {
         Map<String, List<ResumenFoto>> fotosDe = fotos.de(cliente,
                 modelos.stream().map(Modelo::getCodigo).filter(Objects::nonNull).toList());
         for (Modelo modelo : modelos) {
-            if (enLaTemporada != null && !enLaTemporada.contains(modelo.getCodigo())) {
+            if (enLaTemporada != null && !enLaTemporada.contains(modelo.getId())) {
                 continue;
             }
             List<String> nombresTemporada = catalogo.temporadasDeModelo(modelo.getId()).stream()
@@ -383,7 +383,8 @@ public class CatalogoController {
             for (Articulo articulo : porModelo.getOrDefault(modelo.getId(), List.of())) {
                 articulos.add(vistaDe(cliente, articulo, nombreDePiel, descripcionDeColor, conTara));
             }
-            filas.add(new FilaCatalogoVista(modelo.getCodigo(), modelo.getNombre(), modelo.getTipo().name(),
+            filas.add(new FilaCatalogoVista(modelo.getId(), modelo.getCodigo(), modelo.nombreVisible(),
+                    modelo.getEtapa().name(), modelo.getNombre(), modelo.getTipo().name(),
                     nombresTemporada, delModelo, principal, articulos));
         }
         return filas;

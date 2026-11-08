@@ -104,20 +104,20 @@
                 <th data-col="acciones"></th>
             </tr>
             </thead>
-            <tbody class="modelo" th:each="fila : ${filas}" th:attr="data-modelo=${fila.codigoModelo},
-                   data-buscar=${#strings.toUpperCase(fila.codigoModelo + ' ' + fila.nombre + ' '
+            <tbody class="modelo" th:each="fila : ${filas}" th:attr="data-modelo=${fila.nombreVisible},
+                   data-buscar=${#strings.toUpperCase(fila.nombreVisible + ' ' + fila.nombre + ' '
                        + #strings.listJoin(fila.articulos.![referencia + ' ' + nombrePiel], ' '))}">
                 <!-- El modelo no tiene artículos: una fila para poder verlo y darle el primero. -->
                 <tr th:if="${#lists.isEmpty(fila.articulos)}">
                     <td data-col="foto" class="c-foto" th:insert="~{catalogo-fragmentos :: celdaFoto(${fila}, ${cliente}, ${temporadaId})}"></td>
-                    <td data-col="modelo" class="c-modelo" th:text="${fila.codigoModelo}"></td>
+                    <td data-col="modelo" class="c-modelo" th:insert="~{catalogo-fragmentos :: celdaModelo(${fila})}"></td>
                     <td data-col="nombre" th:insert="~{catalogo-fragmentos :: celdaNombre(${fila})}"></td>
                     <td data-col="tipo" th:insert="~{catalogo-fragmentos :: celdaTipo(${fila}, ${tipos})}"></td>
                     <td data-col="temporadas" th:insert="~{catalogo-fragmentos :: celdaTemporadas(${fila})}"></td>
                     <td data-col="nfotos" th:text="${fila.numeroFotos}"></td>
                     <td colspan="11" class="ayuda">Sin artículos todavía: añade uno al pie con su referencia entera.</td>
                     <td data-col="acciones" class="c-acciones">
-                        <form th:action="@{/catalogo/modelo/borrar}" method="post" class="en-linea">
+                        <form th:if="${fila.tieneCodigo}" th:action="@{/catalogo/modelo/borrar}" method="post" class="en-linea">
                             <input type="hidden" name="cliente" th:value="${cliente}">
                             <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
                             <input type="hidden" name="temporada" th:value="${temporadaId}">
@@ -132,7 +132,7 @@
                         <td data-col="foto" class="c-foto" th:rowspan="${#lists.size(fila.articulos)}"
                             th:insert="~{catalogo-fragmentos :: celdaFoto(${fila}, ${cliente}, ${temporadaId})}"></td>
                         <td data-col="modelo" class="c-modelo" th:rowspan="${#lists.size(fila.articulos)}"
-                            th:text="${fila.codigoModelo}"></td>
+                            th:insert="~{catalogo-fragmentos :: celdaModelo(${fila})}"></td>
                         <td data-col="nombre" th:rowspan="${#lists.size(fila.articulos)}"
                             th:insert="~{catalogo-fragmentos :: celdaNombre(${fila})}"></td>
                         <td data-col="tipo" th:rowspan="${#lists.size(fila.articulos)}"
@@ -183,7 +183,7 @@
                         <span class="estado-celda" aria-live="polite"></span>
                     </td>
                     <td data-col="acciones" class="c-acciones">
-                        <button type="button" class="mini alternar-colores" th:attr="aria-controls=|colores-${estado.index}-${fila.codigoModelo}|"
+                        <button type="button" class="mini alternar-colores" th:attr="aria-controls=|colores-${estado.index}-${fila.modeloId}|"
                                 title="Colores de la piel, el forro y las combinaciones en cada color del bolso">▸ colores</button>
                         <form th:action="@{/catalogo/articulo/borrar}" method="post" class="en-linea">
                             <input type="hidden" name="cliente" th:value="${cliente}">
@@ -196,7 +196,7 @@
                 </tr>
                 <!-- Los colores de piel por color del bolso: una matriz que no cabe como
                      columnas. Se despliega bajo su artículo. -->
-                <tr class="detalle-colores" hidden th:id="|colores-${estado.index}-${fila.codigoModelo}|">
+                <tr class="detalle-colores" hidden th:id="|colores-${estado.index}-${fila.modeloId}|">
                     <td colspan="18">
                         <table class="tabla-colores-articulo">
                             <thead>

@@ -3,6 +3,7 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -53,13 +54,37 @@ class CatalogoControllerTest {
     @Autowired
     private com.puntotres.packinglist.service.catalogo.FotosCatalogo fotosCatalogo;
 
+    @Autowired
+    private com.puntotres.packinglist.persistence.ModeloRepository modelos;
+
     @SuppressWarnings("unchecked")
     private List<FilaCatalogoVista> filas(MvcResult resultado) {
         return (List<FilaCatalogoVista>) resultado.getModelAndView().getModel().get("filas");
     }
 
     private FilaCatalogoVista filaDe(List<FilaCatalogoVista> filas, String modelo) {
-        return filas.stream().filter(fila -> fila.codigoModelo().equals(modelo)).findFirst().orElseThrow();
+        return filas.stream().filter(fila -> modelo.equals(fila.codigoModelo())).findFirst().orElseThrow();
+    }
+
+    @Test
+    void laTablaEnsenaLosPrototiposSinCodigoConSuEtapa() throws Exception {
+        modelos.save(new com.puntotres.packinglist.persistence.Modelo("AMI", null, "PROTO Z", null,
+                TipoArticulo.BOLSO, com.puntotres.packinglist.persistence.Etapa.PROTOTIPO, null));
+        catalogo.asegurarArticulo("AMI", "ULL960.AL0001");
+
+        MvcResult resultado = mvc.perform(get("/catalogo").param("cliente", "AMI"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("PROTO Z")))
+                .andExpect(content().string(containsString("data-etapa=\"PROTOTIPO\"")))
+                .andExpect(content().string(containsString("data-etapa=\"PRODUCCION\"")))
+                .andExpect(content().string(containsString("Se edita en la app de modelos")))
+                .andReturn();
+
+        FilaCatalogoVista proto = filas(resultado).stream()
+                .filter(fila -> "PROTO Z".equals(fila.nombreVisible())).findFirst().orElseThrow();
+        assertNull(proto.codigoModelo());
+        assertEquals("PROTOTIPO", proto.etapa());
+        assertEquals("PRODUCCION", filaDe(filas(resultado), "ULL960").etapa());
     }
 
     @Test
@@ -96,8 +121,8 @@ class CatalogoControllerTest {
         List<FilaCatalogoVista> filtradas = filas(mvc.perform(get("/catalogo")
                 .param("cliente", "AMI").param("temporada", String.valueOf(temporada.getId()))).andReturn());
 
-        assertTrue(filtradas.stream().anyMatch(fila -> fila.codigoModelo().equals("ULL951")));
-        assertFalse(filtradas.stream().anyMatch(fila -> fila.codigoModelo().equals("ULL952")));
+        assertTrue(filtradas.stream().anyMatch(fila -> "ULL951".equals(fila.codigoModelo())));
+        assertFalse(filtradas.stream().anyMatch(fila -> "ULL952".equals(fila.codigoModelo())));
         assertEquals(List.of("CAT-PANTALLA"), filaDe(filtradas, "ULL951").temporadas());
         assertEquals("001", filaDe(filtradas, "ULL951").articulos().get(0).colores().get(0).codigoColor());
     }
@@ -140,7 +165,7 @@ class CatalogoControllerTest {
                 .param("temporada", String.valueOf(deOtro.getId()))).andReturn();
 
         assertEquals(null, resultado.getModelAndView().getModel().get("temporadaId"));
-        assertTrue(filas(resultado).stream().anyMatch(fila -> fila.codigoModelo().equals("ULL959")));
+        assertTrue(filas(resultado).stream().anyMatch(fila -> "ULL959".equals(fila.codigoModelo())));
     }
 
     @Test

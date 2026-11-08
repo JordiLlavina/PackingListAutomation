@@ -426,6 +426,15 @@ public class CatalogoModelos {
         return codigos;
     }
 
+    /** Los ids de los modelos que fueron en una temporada, prototipos sin código incluidos. */
+    public Set<Long> idsDeModeloEn(String cliente, Long temporadaId) {
+        Set<Long> ids = new LinkedHashSet<>();
+        for (Modelo modelo : modelosEn(cliente, temporadaId)) {
+            ids.add(modelo.getId());
+        }
+        return ids;
+    }
+
     /** Los modelos del cliente que fueron en una temporada, en el orden de sus vínculos. */
     private List<Modelo> modelosEn(String cliente, Long temporadaId) {
         if (vacio(cliente) || temporadaId == null) {
