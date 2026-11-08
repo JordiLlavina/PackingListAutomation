@@ -79,6 +79,17 @@ public class Dispositivos {
      */
     @Transactional
     public String generarCodigoAlta(Long usuarioId) {
+        return generarCodigo(usuarioId).getCodigo();
+    }
+
+    /**
+     * Lo mismo que {@link #generarCodigoAlta}, pero devolviendo el código
+     * guardado, para quien necesite también cuándo caduca.
+     *
+     * @throws IllegalArgumentException si no hay ningún usuario con ese id
+     */
+    @Transactional
+    public CodigoAlta generarCodigo(Long usuarioId) {
         if (usuarioId == null || !usuarios.existsById(usuarioId)) {
             throw new IllegalArgumentException("No hay ningún usuario con id " + usuarioId);
         }
@@ -88,8 +99,7 @@ public class Dispositivos {
         do {
             codigo = String.format("%06d", azar.nextInt(1_000_000));
         } while (vigente(codigo, ahora).isPresent());
-        codigos.save(new CodigoAlta(usuarioId, codigo, ahora.plus(VIGENCIA_CODIGO)));
-        return codigo;
+        return codigos.save(new CodigoAlta(usuarioId, codigo, ahora.plus(VIGENCIA_CODIGO)));
     }
 
     /**
