@@ -344,3 +344,127 @@ img.foto { object-fit: cover; background: var(--line); }
 /* La pastilla «Enviado» comparte clase con la pantalla .enviado de «He
    cambiado algo» (también en la maqueta), que le metía su padding y su grid. */
 .pill.enviado { display: inline-flex; padding: 0 10px; gap: 0; text-align: left; }
+
+/* ---------- Bandeja de despacho (Task 15): lo que la maqueta no trae ----------
+   Despacho va a 15 px, pero las clases de la maqueta miden en rem (16 px del
+   html, no los 15 del marco); lo nuevo mide en em a propósito para seguir al
+   marco, y lo heredado que salía grande se recoloca aquí. */
+a.boton { text-decoration: none; color: var(--fg); }
+.despacho-barra .pestanas a { display: inline-flex; align-items: center; gap: .5em; }
+.despacho-barra .pepita { min-width: 1.6em; height: 1.6em; padding: 0 .45em; border-radius: 999px; background: var(--alta); color: #fff;
+  font-size: .8em; font-weight: 700; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums; }
+
+/* Pestañas «Del taller» / «Al taller», con el filete de las de la barra. */
+.pestanas-bandeja { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.pestanas-bandeja button { border: 0; background: none; padding: .6em .8em; color: var(--muted); border-bottom: 3px solid transparent; margin-bottom: -1px; font-size: 1.05em; }
+.pestanas-bandeja button[aria-pressed="true"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--accent); }
+
+/* Los cuatro contadores del resumen: un dato pequeño cada uno; a cero, apagado. */
+.contadores { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dato { display: inline-flex; align-items: baseline; gap: .35em; white-space: nowrap; line-height: 1.3; padding: .25em .7em; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: .9em; }
+.dato b { color: var(--fg); font-size: 1.15em; font-variant-numeric: tabular-nums; }
+.dato.nuevo:not(.cero) b { color: var(--new); }
+.dato.vencido:not(.cero) b, .dato.con-respuesta:not(.cero) b { color: var(--alta); }
+.dato.cero { opacity: .65; }
+
+/* La lista: filas de 72 px (.fila-bandeja, de arriba) con foto, título, línea
+   gris y etiquetas; la pastilla de estado a la derecha. Sin prioridad, la
+   franja es azul: un aviso que nadie ha mirado todavía. */
+.lista-bandeja { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.lista-bandeja li:last-child .fila-bandeja { border-bottom: 0; }
+.fila-bandeja { font-size: 1em; }
+.fila-bandeja[data-p="SIN"]::before { background: var(--new); }
+.fila-bandeja .foto { width: 56px; height: 56px; border-radius: 10px; display: block; }
+.fila-bandeja .cuerpo { display: grid; gap: 2px; min-width: 0; }
+.fila-bandeja .tit { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fila-bandeja .meta { color: var(--muted); font-size: .9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.etiquetas { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: .85em; }
+.etiqueta { display: inline-flex; align-items: center; padding: .1em .55em; border-radius: 6px; background: var(--bg); color: var(--fg); }
+.etiqueta.espera { background: color-mix(in oklab, var(--alta) 14%, var(--surface)); color: var(--alta); font-weight: 700; }
+.etiqueta.fallo { background: color-mix(in oklab, var(--alta) 12%, var(--surface)); color: var(--alta); }
+.marcas-destino { display: inline-flex; gap: 8px; white-space: nowrap; }
+.marca-destino { color: var(--muted); font-variant-numeric: tabular-nums; }
+.marca-destino[data-d="hecho"] { color: var(--ok); font-weight: 700; }
+.marca-destino[data-d="no-aplica"] { text-decoration: line-through; opacity: .7; }
+.despacho .pill { height: 1.75em; font-size: .8em; }
+.pill.en-curso { background: color-mix(in oklab, var(--normal) 22%, var(--surface)); color: var(--fg); }
+.pill.descartada { background: var(--line); color: var(--muted); }
+
+/* El chip «IA»: lo que ha escrito la IA (un título, un resumen) se dice. */
+.chip-ia { display: inline-flex; align-items: center; margin-left: .45em; padding: 0 .4em; height: 1.45em; border-radius: 5px; border: 1px solid var(--new);
+  color: var(--new); font-size: .72em; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
+
+/* El detalle: cabecera, y debajo el hilo y el panel de acciones a su lado
+   (apilados por debajo de 1180 px, con las acciones arriba). */
+.despacho .detalle { gap: 16px; }
+.cabecera-modificacion h2 { font-size: 1.35em; }
+.cabecera-modificacion .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.cabecera-modificacion a { color: var(--accent); text-underline-offset: 3px; }
+.cuerpo-modificacion { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 20px; align-items: start; }
+@media (max-width: 1180px) { .cuerpo-modificacion { grid-template-columns: 1fr; } .cuerpo-modificacion .acciones-detalle { order: -1; } }
+.despacho .mensaje { box-shadow: none; border: 1px solid var(--line); padding: 12px 14px; }
+.despacho .mensaje.de-taller { border-left: 4px solid var(--accent); }
+.despacho .mensaje .quien { font-size: .9em; }
+.despacho .mensaje p { font-size: 1.05em; white-space: pre-wrap; }
+.despacho .mensaje .audio.compacto { margin-top: 0; }
+.nota-voz { display: grid; gap: 6px; }
+.despacho .mensaje p.transcripcion { color: var(--fg); font-size: 1em; padding-left: 10px; border-left: 2px solid var(--line); }
+.resumen-ia { display: grid; gap: 4px; padding: 8px 10px; border-radius: 10px; background: color-mix(in oklab, var(--new) 7%, var(--surface)); }
+.resumen-ia .rotulo { font-weight: 700; font-size: .9em; }
+.resumen-ia .chip-ia { margin-left: 0; margin-right: .45em; }
+.estado-transcripcion { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.despacho .miniaturas { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.despacho .miniaturas figure { margin: 0; display: grid; gap: 6px; }
+.despacho .miniaturas img { border-radius: 10px; }
+.despacho .miniaturas figure .chip { height: auto; min-height: 2.2em; padding: .25em .6em; font-size: .8em; line-height: 1.2; border-radius: 8px; }
+.despacho .doc { min-height: 48px; font-size: 1em; border-width: 1px; border-radius: 10px; text-decoration: none; color: var(--fg); }
+.despacho .doc svg { width: 24px; height: 24px; }
+
+/* Panel de acciones: prioridad (tres botones con su color), destinos (una
+   fila cada uno), los botones de cerrar y el estado de una orden. */
+.acciones-detalle { display: grid; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.acciones-detalle fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.acciones-detalle legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
+.acciones-detalle .ayuda { margin: 0; font-size: .9em; }
+.prioridades { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.prioridad { min-height: 2.6em; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); font-weight: 700; font-size: .95em; display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
+.prioridad::before { content: ""; width: .7em; height: .7em; border-radius: 50%; background: var(--baja); }
+.prioridad[data-p="ALTA"]::before { background: var(--alta); }
+.prioridad[data-p="NORMAL"]::before { background: var(--normal); }
+.prioridad[aria-pressed="true"] { color: #fff; border-color: var(--baja); background: var(--baja); }
+.prioridad[aria-pressed="true"]::before { background: currentColor; }
+.prioridad[data-p="ALTA"][aria-pressed="true"] { background: var(--alta); border-color: var(--alta); }
+.prioridad[data-p="NORMAL"][aria-pressed="true"] { background: var(--normal); border-color: var(--normal); color: #16213a; }
+.prioridad[disabled], .acciones-detalle .chip[disabled] { opacity: .45; cursor: not-allowed; }
+.destino { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.destino:first-of-type { border-top: 0; }
+.destino .nombre { font-weight: 700; grid-column: 1 / -1; }
+.destino .casilla { display: inline-flex; align-items: center; gap: .45em; }
+.destino .casilla input { width: 18px; height: 18px; accent-color: var(--ok); }
+.destino .meta { grid-column: 1 / -1; color: var(--muted); font-size: .85em; }
+.acciones-detalle .boton { width: 100%; }
+.estado-cerrada { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface); }
+.estado-cerrada b { display: flex; align-items: center; gap: .4em; }
+.estado-cerrada svg { width: 20px; height: 20px; color: var(--ok); }
+.espera-respuesta { padding: 8px 10px; border-radius: 10px; background: color-mix(in oklab, var(--alta) 12%, var(--surface)); color: var(--alta); font-weight: 700; }
+
+/* Responder y nueva orden: texto, nota de voz con un botón (la grabadora
+   redonda de la tablet es demasiado para el PC) y ficheros. */
+.responder { display: grid; gap: 10px; padding-top: 6px; }
+.responder h3, .formulario h3 { font-size: 1.05em; }
+.voz, .adjuntar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.voz .audio { flex: 1 1 260px; }
+.boton.grabando { border-color: var(--alta); color: var(--alta); }
+.ficheros { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: .9em; }
+.casilla-linea { display: inline-flex; align-items: center; gap: .5em; font-weight: 400; }
+.casilla-linea input { width: 18px; height: 18px; accent-color: var(--accent); }
+.casilla-linea:has(input[disabled]) { color: var(--muted); }
+.formulario.nueva-orden { max-width: 640px; }
+.modelo-elegido { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.modelo-elegido .foto { width: 56px; height: 56px; border-radius: 10px; flex: none; }
+.modelo-elegido .texto { display: grid; flex: 1; min-width: 0; }
+.modelo-elegido .texto span { color: var(--muted); }
+.buscador-modelos .lista-modelos { max-height: 360px; overflow: auto; box-shadow: none; border: 1px solid var(--line); }
+.nueva-orden fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.nueva-orden legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
+.nueva-orden .prioridades { max-width: 360px; }

@@ -36,6 +36,7 @@ function orden(estado: EstadoModificacion, prioridad: Prioridad | null, creadaEn
     fotos: 0,
     audios: 0,
     documentos: 0,
+    duracionAudioSeg: null,
     ...extra,
   };
 }

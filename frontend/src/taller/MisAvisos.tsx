@@ -9,8 +9,8 @@
 // La lista no trae los mensajes. Para no pedir el detalle de cada tarjeta,
 // solo se pide el de los avisos con una respuesta de despacho pendiente
 // (respuestaPendienteDe = TALLER), que son pocos: en esos el último mensaje
-// es de despacho, y es el que se enseña. Por lo mismo, de la nota de voz del
-// aviso solo se sabe si la hay, no cuánto dura.
+// es de despacho, y es el que se enseña. De la nota de voz del aviso, la
+// lista ya dice cuánto dura (duracionAudioSeg).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
@@ -20,6 +20,7 @@ import {
   estadoAviso,
   fotoDelModelo,
   ordenarAvisos,
+  textoVoz,
   type MensajeVista,
   type ModificacionDetalle,
   type ModificacionResumen,
@@ -55,7 +56,7 @@ function Tarjeta({ aviso, respuesta }: { aviso: ModificacionResumen; respuesta: 
           {aviso.tipoCambioTexto ?? 'Cambio'} · {aviso.modeloReferencia}
         </span>
         <span className="meta">
-          {aviso.modeloNombre} · {hace(aviso.creadaEn)} · {aviso.audios > 0 ? 'con voz' : 'sin voz'} · {aviso.fotos}{' '}
+          {aviso.modeloNombre} · {hace(aviso.creadaEn)} · {textoVoz(aviso.duracionAudioSeg)} · {aviso.fotos}{' '}
           {aviso.fotos === 1 ? 'foto' : 'fotos'}
         </span>
         <span className="meta">

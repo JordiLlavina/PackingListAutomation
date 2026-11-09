@@ -8,17 +8,11 @@ import { ErrorApi, api } from '../../comun/api';
 import Audio from '../../comun/Audio';
 import Etapa from '../../comun/Etapa';
 import FotoModelo from '../../comun/FotoModelo';
+import { extensionAudio } from '../../comun/grabador';
 import { Icono } from '../../comun/iconos';
 import { useBorrador } from './Borrador';
 import { motivoNoEnviar } from './reglas';
 import { useTiposCambio } from './tipos';
-
-/** La extensión del fichero de la nota según lo que haya grabado el navegador. */
-function extensionAudio(mime: string): string {
-  if (mime.includes('mp4') || mime.includes('aac')) return 'm4a';
-  if (mime.includes('ogg')) return 'ogg';
-  return 'webm';
-}
 
 /** El nombre con el que viaja una foto: el suyo si no se ha podido reducir (sigue siendo el fichero original). */
 function nombreFoto(blob: Blob, indice: number): string {

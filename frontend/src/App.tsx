@@ -7,7 +7,7 @@ import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { useSesion, type Sesion } from './comun/sesion';
 import ShellDespacho from './despacho/Shell';
-import InicioDespacho from './despacho/Inicio';
+import BandejaDespacho from './despacho/Bandeja';
 import ModelosDespacho from './despacho/Modelos';
 import Entrada from './entrada/Entrada';
 import Duda from './taller/Duda';
@@ -87,8 +87,10 @@ function rutasDespacho(esAdmin: boolean): RouteObject[] {
       path: '/',
       element: <ShellDespacho />,
       children: [
-        { index: true, element: <InicioDespacho /> },
-        { path: 'bandeja/*', element: <PorLlegar /> },
+        // La bandeja es el inicio de despacho.
+        { index: true, element: <Navigate to="/bandeja" replace /> },
+        // Con el id se abre su detalle a la derecha sin volver a montar la lista; «nueva» abre el alta de una orden.
+        { path: 'bandeja/:id?', element: <BandejaDespacho /> },
         // Opcional: con el id se abre su ficha a la derecha sin volver a montar la lista.
         { path: 'modelos/:id?', element: <ModelosDespacho /> },
         ...(esAdmin ? [{ path: 'admin', element: <PorLlegar /> }] : []),

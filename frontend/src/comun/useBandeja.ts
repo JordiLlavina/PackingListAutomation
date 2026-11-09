@@ -1,5 +1,6 @@
 // Los números de la bandeja (GET /api/bandeja/resumen): una sola consulta
-// compartida por la pepita de la barra, la losa de Inicio y las listas, que
+// compartida por la pepita de la barra, la losa de Inicio y las listas (en el
+// taller) o la pepita de «Bandeja» y sus contadores (en despacho), que
 // se vuelven a pedir cuando cambian. Se pregunta cada 20 s mientras la app
 // está a la vista, y en cuanto vuelve a estarlo (la tablet se desbloquea, se
 // vuelve de otra aplicación); escondida no pregunta. El aviso de verdad de

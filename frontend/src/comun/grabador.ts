@@ -12,6 +12,13 @@ export type Grabacion = { blob: Blob; duracionSeg: number; mime: string };
 
 const FORMATOS = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
 
+/** La extensión del fichero de la nota según lo que haya grabado el navegador. */
+export function extensionAudio(mime: string): string {
+  if (mime.includes('mp4') || mime.includes('aac')) return 'm4a';
+  if (mime.includes('ogg')) return 'ogg';
+  return 'webm';
+}
+
 /**
  * Lo que se espera al evento `stop` si la grabadora ya está parada cuando se
  * pide parar (se acaba de parar sola y el evento todavía no ha llegado, o un

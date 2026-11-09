@@ -1,9 +1,11 @@
 // La ficha de un modelo en despacho, en el panel de la derecha: la cabecera
 // (foto principal, referencia, nombre editable, cliente, etapa, temporadas y
-// los nombres que ha tenido), las acciones (cambiar de etapa, subir fotos),
-// la galería con la principal marcada y el historial. Tras cada cambio se
-// vuelve a pedir la ficha y se avisa a la lista para que repinte su fila.
+// los nombres que ha tenido), las acciones (una orden nueva para el taller,
+// cambiar de etapa, subir fotos), la galería con la principal marcada y el
+// historial. Tras cada cambio se vuelve a pedir la ficha y se avisa a la
+// lista para que repinte su fila.
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
@@ -178,6 +180,9 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
       </div>
 
       <div className="botones">
+        <Link className="boton marca" to={`/bandeja/nueva?pestana=despacho&modelo=${m.id}`}>
+          <Icono nombre="mas" /> Nueva orden para este modelo
+        </Link>
         <button className="boton" type="button" onClick={abrirEtapa}>
           Cambiar etapa
         </button>

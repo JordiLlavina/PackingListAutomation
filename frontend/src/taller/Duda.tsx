@@ -8,7 +8,7 @@ import { useLocation, useNavigate, useParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
 import Grabadora, { useGrabadora } from '../comun/Grabadora';
-import type { Grabacion } from '../comun/grabador';
+import { extensionAudio, type Grabacion } from '../comun/grabador';
 import { Icono } from '../comun/iconos';
 import type { ModificacionDetalle } from '../comun/modificaciones';
 import { toast } from '../comun/toast';
@@ -17,13 +17,6 @@ import { useBandeja } from '../comun/useBandeja';
 type Modo = 'duda' | 'contestar';
 
 type Nota = { blob: Blob; duracionSeg: number; url: string };
-
-/** La extensión del fichero de la nota según lo que haya grabado el navegador. */
-function extensionAudio(mime: string): string {
-  if (mime.includes('mp4') || mime.includes('aac')) return 'm4a';
-  if (mime.includes('ogg')) return 'ogg';
-  return 'webm';
-}
 
 const TEXTOS: Record<Modo, { listo: string; enviar: string }> = {
   duda: { listo: '¿Mandamos la duda a despacho?', enviar: 'Enviar la duda' },

@@ -4,6 +4,8 @@
 // del servidor), que es como las lee hace(). Y lo poco que se calcula con ellas
 // en el navegador, en funciones puras para poder probarlas.
 
+import { mmss } from './tiempo';
+
 export type Prioridad = 'ALTA' | 'NORMAL' | 'BAJA';
 export type EstadoModificacion = 'NUEVA' | 'VISTA' | 'EN_CURSO' | 'HECHA' | 'DESCARTADA';
 export type Direccion = 'DESPACHO_A_TALLER' | 'TALLER_A_DESPACHO';
@@ -43,6 +45,8 @@ export type ModificacionResumen = {
   fotos: number;
   audios: number;
   documentos: number;
+  /** Cuánto dura la nota de voz del primer mensaje (el cuerpo); null si no lleva. */
+  duracionAudioSeg: number | null;
 };
 
 /** Un adjunto de un mensaje, sin sus bytes (van en adjuntoUrl). */
@@ -173,4 +177,60 @@ export function llegaronNuevas(antes: number | null, ahora: number): boolean {
  */
 export function fotoDelModelo(r: ModificacionResumen): { id: number; referencia: string; tipo: 'BOLSO'; fotoPrincipalId: number | null } {
   return { id: r.modeloId, referencia: r.modeloReferencia, tipo: 'BOLSO', fotoPrincipalId: r.fotoPrincipalId };
+}
+
+/** «00:35 de voz» o «sin voz»: lo que dura la nota de voz del cuerpo de una modificación. */
+export function textoVoz(duracionAudioSeg: number | null): string {
+  return duracionAudioSeg === null ? 'sin voz' : `${mmss(duracionAudioSeg)} de voz`;
+}
+
+/**
+ * La pepita de «Bandeja» en despacho: lo que le toca mirar ya, los avisos
+ * nuevos del taller y las órdenes con una duda del taller por contestar.
+ * Cero (y sin pepita) mientras no se sabe.
+ */
+export function numeroBandejaDespacho(resumen: ResumenBandeja | null): number {
+  return resumen ? resumen.nuevas + resumen.conRespuesta : 0;
+}
+
+/** La pastilla de estado en la bandeja de despacho (avisos y órdenes). */
+export function estadoModificacion(estado: EstadoModificacion): { texto: string; pill: string } {
+  switch (estado) {
+    case 'NUEVA':
+      return { texto: 'Nueva', pill: 'nueva' };
+    case 'VISTA':
+      return { texto: 'Vista', pill: 'vista' };
+    case 'EN_CURSO':
+      return { texto: 'En curso', pill: 'en-curso' };
+    case 'HECHA':
+      return { texto: 'Hecha', pill: 'hecha' };
+    default:
+      return { texto: 'Descartada', pill: 'descartada' };
+  }
+}
+
+/** Los chips de estado de la bandeja de despacho. */
+export type FiltroEstado = 'ABIERTAS' | 'NUEVAS' | 'HECHAS' | 'DESCARTADAS' | 'TODAS';
+
+/** Los estados que pide cada chip a la API; vacío = todos (la API pone entonces las cerradas al final). */
+export function estadosDelFiltro(filtro: FiltroEstado): EstadoModificacion[] {
+  switch (filtro) {
+    case 'ABIERTAS':
+      return ['NUEVA', 'VISTA', 'EN_CURSO'];
+    case 'NUEVAS':
+      return ['NUEVA'];
+    case 'HECHAS':
+      return ['HECHA'];
+    case 'DESCARTADAS':
+      return ['DESCARTADA'];
+    default:
+      return [];
+  }
+}
+
+/** La marca pequeña de un destino en la fila de un aviso: ✓ aplicado, – por aplicar o no aplica. */
+export function marcaDestino(d: DestinoEstado): { simbolo: string; estado: 'hecho' | 'pendiente' | 'no-aplica'; texto: string } {
+  if (!d.aplica) return { simbolo: '–', estado: 'no-aplica', texto: `${d.texto}: no aplica` };
+  if (d.hechoEn !== null) return { simbolo: '✓', estado: 'hecho', texto: `${d.texto}: aplicado` };
+  return { simbolo: '–', estado: 'pendiente', texto: `${d.texto}: por aplicar` };
 }
