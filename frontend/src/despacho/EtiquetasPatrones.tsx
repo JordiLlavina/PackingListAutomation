@@ -17,6 +17,16 @@ import './etiquetas.css';
 
 type Carga = { modelos: ModeloResumen[]; perdidos: number[] };
 
+/**
+ * Espera a que estén cargadas y decodificadas todas las imágenes de las
+ * etiquetas (QR y fotos). Una que no se puede cargar no bloquea: se imprime
+ * con su hueco, igual que la vería quien imprime.
+ */
+function imagenesListas(): Promise<void> {
+  const imagenes = [...document.querySelectorAll<HTMLImageElement>('.etiqueta-patron img')];
+  return Promise.all(imagenes.map((i) => i.decode().catch(() => undefined))).then(() => undefined);
+}
+
 function Etiqueta({ modelo }: { modelo: ModeloResumen }) {
   return (
     <article className="etiqueta-patron">
@@ -44,10 +54,20 @@ export default function EtiquetasPatrones() {
   const [carga, setCarga] = useState<Carga | null>(null);
   const [marcando, setMarcando] = useState(false);
   const [marcadas, setMarcadas] = useState(false);
+  // Las imágenes (QR y fotos) se piden después de pintar las fichas: imprimir antes dejaría etiquetas sin QR.
+  const [imagenesCargadas, setImagenesCargadas] = useState(false);
+  const [preparando, setPreparando] = useState(false);
+
+  // Las reglas de impresión de etiquetas.css van colgadas de esta clase, para no tocar cómo se imprime otra pantalla.
+  useEffect(() => {
+    document.body.classList.add('imprimiendo-etiquetas');
+    return () => document.body.classList.remove('imprimiendo-etiquetas');
+  }, []);
 
   useEffect(() => {
     let vigente = true;
     const pedidos = idsDe(ids);
+    setImagenesCargadas(false);
     setCarga(null);
     setMarcadas(false);
     // Un modelo que no llega (borrado, sin permiso) no tumba la hoja: se dice cuál falta y se imprimen los demás.
@@ -91,6 +111,29 @@ export default function EtiquetasPatrones() {
 
   const modelos = carga?.modelos ?? [];
   const hayEtiquetas = modelos.length > 0;
+  // Qué imágenes hay en la hoja: marcar como impresas cambia la carga pero no las imágenes, y no hay que volver a esperarlas.
+  const claveImagenes = carga === null ? null : modelos.map((m) => `${m.id}:${m.fotoPrincipalId ?? ''}`).join(',');
+
+  useEffect(() => {
+    if (claveImagenes === null) return;
+    let vigente = true;
+    void imagenesListas().then(() => vigente && setImagenesCargadas(true));
+    return () => {
+      vigente = false;
+    };
+  }, [claveImagenes]);
+
+  const imprimir = async () => {
+    setPreparando(true);
+    try {
+      await imagenesListas();
+    } finally {
+      setPreparando(false);
+    }
+    window.print();
+  };
+
+  const listoParaImprimir = hayEtiquetas && imagenesCargadas && !preparando;
 
   return (
     <div className="despacho etiquetas-patrones">
@@ -112,8 +155,8 @@ export default function EtiquetasPatrones() {
               'Marcar como impresas'
             )}
           </button>
-          <button className="boton marca" type="button" disabled={!hayEtiquetas} onClick={() => window.print()}>
-            <Icono nombre="imprimir" /> Imprimir
+          <button className="boton marca" type="button" disabled={!listoParaImprimir} onClick={() => void imprimir()}>
+            <Icono nombre="imprimir" /> {hayEtiquetas && !listoParaImprimir ? 'Preparando…' : 'Imprimir'}
           </button>
         </div>
         {carga !== null && carga.perdidos.length > 0 && (

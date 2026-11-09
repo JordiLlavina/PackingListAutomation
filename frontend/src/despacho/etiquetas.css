@@ -4,9 +4,18 @@
    que llenan los 190 × 277 mm útiles del A4. La etiqueta es negro sobre
    blanco en los dos temas y no lleva fondos, así que se imprime igual con
    «Gráficos de fondo» apagado. Las líneas de corte son un trazo discontinuo
-   gris de 0,3 pt, una sola vez entre dos etiquetas vecinas. */
+   gris de 0,3 pt, una sola vez entre dos etiquetas vecinas.
 
-@page { size: A4; margin: 10mm; }
+   En alto, cada etiqueta suma 2 + 45 + 1 + 11,7 + 1 + 5,4 + 2 = 68,1 mm de
+   los 69 de su fila: lo de abajo queda a más de 1,5 mm de la línea de corte.
+
+   Lo que solo vale al imprimir va colgado de body.imprimiendo-etiquetas, la
+   clase que pone la vista mientras está montada, y la página es una página
+   con nombre (@page etiquetas, que usan solo las hojas): esta hoja de estilos
+   va en el bundle de toda la app y no debe cambiar cómo se imprime otra
+   pantalla. */
+
+@page etiquetas { size: A4; margin: 10mm; }
 
 .etiquetas-patrones { min-height: 100%; padding-bottom: 32px; }
 
@@ -24,27 +33,29 @@
 .hoja-etiquetas { box-sizing: border-box; width: 210mm; min-height: 297mm; padding: 10mm; background: #fff; color: #000;
   box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(2, 95mm); grid-auto-rows: 69mm; align-content: start; }
 
-.etiqueta-patron { position: relative; box-sizing: border-box; display: flex; flex-direction: column; gap: 1.5mm; min-width: 0;
-  padding: 2.5mm; overflow: hidden; break-inside: avoid; color: #000; font-family: var(--font);
+.etiqueta-patron { position: relative; box-sizing: border-box; display: flex; flex-direction: column; gap: 1mm; min-width: 0;
+  padding: 2mm; overflow: hidden; break-inside: avoid; color: #000; font-family: var(--font);
   border-right: .3pt dashed #8c8c8c; border-bottom: .3pt dashed #8c8c8c; }
 /* La primera fila lleva además la línea de arriba y la columna de la izquierda la suya. */
 .etiqueta-patron:nth-child(-n+2) { border-top: .3pt dashed #8c8c8c; }
 .etiqueta-patron:nth-child(odd) { border-left: .3pt dashed #8c8c8c; }
 
-.etiqueta-patron .arriba { display: flex; gap: 2mm; height: 45mm; flex: none; }
+.etiqueta-patron .arriba { display: flex; gap: 1mm; height: 45mm; flex: none; }
 /* El PNG ya trae su zona muda: se pinta a 45 mm sin margen alrededor. */
 .etiqueta-patron .qr { width: 45mm; height: 45mm; flex: none; display: block; image-rendering: pixelated; }
-.etiqueta-patron .foto-etiqueta { flex: 1; min-width: 0; height: 45mm; display: block; object-fit: cover; }
+/* La foto, cuadrada y del mismo lado que el QR: 45 + 1 + 45 llenan los 91 mm de dentro de la etiqueta. */
+.etiqueta-patron .foto-etiqueta { width: 45mm; height: 45mm; aspect-ratio: 1; flex: none; display: block; object-fit: cover; }
 
 .etiqueta-patron p { margin: 0; }
-/* El nombre: lo más grande de la etiqueta, en un hueco fijo de dos líneas. */
-.etiqueta-patron .nombre { height: 12mm; flex: none; display: flex; align-items: center; font-weight: 700; line-height: 1.05; overflow: hidden; overflow-wrap: anywhere; }
+/* El nombre: lo más grande de la etiqueta, en un hueco fijo de dos líneas. 11,7 mm es lo que ocupa
+   el cuerpo de la letra a 28 pt (la Atkinson mide 1,18 em de alto, más que su line-height). */
+.etiqueta-patron .nombre { height: 11.7mm; flex: none; display: flex; align-items: center; font-weight: 700; line-height: 1.05; overflow: hidden; overflow-wrap: anywhere; }
 .etiqueta-patron .nombre-grande { font-size: 28pt; white-space: nowrap; }
 .etiqueta-patron .nombre-medio { font-size: 21pt; white-space: nowrap; }
-.etiqueta-patron .nombre-pequeno { font-size: 16pt; text-wrap: balance; }
+.etiqueta-patron .nombre-pequeno { font-size: 15pt; text-wrap: balance; }
 .etiqueta-patron .nombre-minimo { font-size: 14pt; text-wrap: balance; }
 
-.etiqueta-patron .datos { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; font-size: 14pt; line-height: 1.15; white-space: nowrap; }
+.etiqueta-patron .datos { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; font-size: 14pt; line-height: 1.1; white-space: nowrap; }
 .etiqueta-patron .datos .cliente { flex: none; }
 .etiqueta-patron .datos .referencia { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
@@ -53,12 +64,14 @@
   background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 700; }
 
 @media print {
-  html, body { height: auto; background: #fff; }
-  body::before { display: none; }
-  .barra-etiquetas, .etiqueta-patron .ya-impresa, .toast { display: none !important; }
-  .etiquetas-patrones { padding: 0; }
-  .hojas { display: block; padding: 0; gap: 0; overflow: visible; }
-  /* Una hoja de papel por cada ocho; el margen ya lo pone @page. */
-  .hoja-etiquetas { width: auto; min-height: 0; padding: 0; box-shadow: none; break-after: page; }
-  .hoja-etiquetas:last-child { break-after: auto; }
+  html:has(body.imprimiendo-etiquetas), body.imprimiendo-etiquetas { height: auto; background: #fff; }
+  body.imprimiendo-etiquetas::before { display: none; }
+  body.imprimiendo-etiquetas .barra-etiquetas,
+  body.imprimiendo-etiquetas .etiqueta-patron .ya-impresa,
+  body.imprimiendo-etiquetas .toast { display: none !important; }
+  body.imprimiendo-etiquetas .etiquetas-patrones { padding: 0; }
+  body.imprimiendo-etiquetas .hojas { display: block; padding: 0; gap: 0; overflow: visible; }
+  /* Una hoja de papel por cada ocho; el margen ya lo pone @page etiquetas. */
+  body.imprimiendo-etiquetas .hoja-etiquetas { page: etiquetas; width: auto; min-height: 0; padding: 0; box-shadow: none; break-after: page; }
+  body.imprimiendo-etiquetas .hoja-etiquetas:last-child { break-after: auto; }
 }
