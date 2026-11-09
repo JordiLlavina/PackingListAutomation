@@ -332,10 +332,7 @@ public class CatalogoModelos {
         Incorporacion enLaTabla = tablaColores.incorporar(elCliente, codigosDeColor);
         if (temporadaId != null) {
             for (Long modeloId : modelosDelPedido) {
-                ModeloTemporadaId id = new ModeloTemporadaId(modeloId, temporadaId);
-                if (!temporadasDeModelo.existsById(id)) {
-                    temporadasDeModelo.save(new ModeloTemporada(modeloId, temporadaId));
-                }
+                vincularTemporada(modeloId, temporadaId);
             }
         }
         return new ResumenAlta(pedido.articulos().size(), articulosNuevos, modelosNuevos, coloresVistos.size(),
@@ -402,6 +399,18 @@ public class CatalogoModelos {
             combinaciones.addAll(articulo.getCombinaciones());
         }
         return new TextosConocidos(List.copyOf(forros), List.copyOf(combinaciones));
+    }
+
+    /** Apunta que el modelo va en esa temporada; si ya lo estaba, no hace nada. */
+    @Transactional
+    public void vincularTemporada(Long modeloId, Long temporadaId) {
+        if (modeloId == null || temporadaId == null) {
+            return;
+        }
+        ModeloTemporadaId id = new ModeloTemporadaId(modeloId, temporadaId);
+        if (!temporadasDeModelo.existsById(id)) {
+            temporadasDeModelo.save(new ModeloTemporada(modeloId, temporadaId));
+        }
     }
 
     /** Suelta los modelos de una temporada (al cambiarla de cliente): los modelos se quedan, el vínculo no. */

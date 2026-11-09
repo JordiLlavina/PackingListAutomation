@@ -76,7 +76,29 @@ public class FotosCatalogo {
 
     /** La misma regla que {@link #principalDe(String, String)}, por el id del modelo. */
     public Optional<Long> principalDe(Long modeloId) {
-        List<ResumenFoto> fotos = de(modeloId);
+        return principalEntre(de(modeloId));
+    }
+
+    /**
+     * La misma regla que {@link #principalDe(Long)} para muchos modelos a la
+     * vez, con una sola consulta: id del modelo → id de su foto, solo para los
+     * que tienen alguna. Para listas, donde una consulta por modelo serían
+     * cientos.
+     */
+    public Map<Long, Long> principalesDe(Collection<Long> modeloIds) {
+        Map<Long, Long> principales = new HashMap<>();
+        if (modeloIds == null || modeloIds.isEmpty()) {
+            return principales;
+        }
+        Map<Long, List<ResumenFoto>> porModelo = new LinkedHashMap<>();
+        for (ResumenFoto foto : repositorio.resumenes(modeloIds)) {
+            porModelo.computeIfAbsent(foto.modeloId(), modelo -> new ArrayList<>()).add(foto);
+        }
+        porModelo.forEach((modelo, fotos) -> principalEntre(fotos).ifPresent(foto -> principales.put(modelo, foto)));
+        return principales;
+    }
+
+    private static Optional<Long> principalEntre(List<ResumenFoto> fotos) {
         return fotos.stream().filter(ResumenFoto::principal).findFirst()
                 .or(() -> fotos.stream().findFirst())
                 .map(ResumenFoto::id);
