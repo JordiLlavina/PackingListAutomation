@@ -72,6 +72,11 @@ public class DocumentosController {
         if (fichero == null || fichero.isEmpty()) {
             throw new IllegalArgumentException("No has elegido ningún documento");
         }
+        // Antes de leerlo: el límite de subida es de 1 GB (por la carpeta de fotos del corte), y un fichero
+        // equivocado de cientos de MB se cargaría entero en memoria solo para rechazarlo después.
+        if (fichero.getSize() > Documentos.MAX_BYTES) {
+            throw new IllegalArgumentException("El documento pesa más de 50 MB");
+        }
         Documentos.Subida subida = documentos.subir(id, fichero.getOriginalFilename(), fichero.getContentType(),
                 fichero.getBytes(), quien);
         return ResponseEntity.status(HttpStatus.CREATED).body(subida);

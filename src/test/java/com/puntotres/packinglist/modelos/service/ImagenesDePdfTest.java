@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,10 @@ import java.util.Optional;
 
 import javax.imageio.ImageIO;
 
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -62,6 +67,63 @@ class ImagenesDePdfTest {
     }
 
     @Test
+    void unaPaginaEnormeSePintaComoMucho40MpYUnaAbsurdaSeSalta() throws Exception {
+        ImagenesDePdf imagenes = new ImagenesDePdf(base);
+        byte[] pdf;
+        try (PDDocument documento = new PDDocument()) {
+            // El tope de la norma PDF (200 pulgadas de lado), uno que se pasa y un A4: solo la caja, sin contenido.
+            documento.addPage(new PDPage(new PDRectangle(14_400, 14_400)));
+            documento.addPage(new PDPage(new PDRectangle(20_000, 300)));
+            documento.addPage(new PDPage(PDRectangle.A4));
+            ByteArrayOutputStream salida = new ByteArrayOutputStream();
+            documento.save(salida);
+            pdf = salida.toByteArray();
+        }
+
+        List<CandidataImagen> candidatas = imagenes.extraer("enorme", pdf);
+
+        assertEquals(List.of("página 1", "página 3"), candidatas.stream().map(CandidataImagen::origen).toList());
+        CandidataImagen enorme = candidatas.get(0);
+        assertTrue((long) enorme.ancho() * enorme.alto() <= ImagenesDePdf.MAX_PIXELES, enorme.toString());
+        assertTrue(enorme.ancho() > 6_000, "se pinta a menos resolución, no a un sello: " + enorme);
+        assertEquals(826, candidatas.get(1).ancho(), "un A4 sigue a 100 ppp");
+        assertEquals(ImagenesDePdf.PPP_PAGINA, ImagenesDePdf.pppPara(595, 842));
+    }
+
+    @Test
+    void unaPaginaQueNoSeDejaLeerSeSaltaSinTumbarLaExtraccion() throws Exception {
+        ImagenesDePdf imagenes = new ImagenesDePdf(base);
+        byte[] pdf;
+        try (PDDocument documento = new PDDocument()) {
+            documento.addPage(new PDPage(PDRectangle.A4));
+            // El árbol de páginas dice que hay dos y solo trae una: pedir la segunda a PDFBox lanza.
+            documento.getPages().getCOSObject().setInt(COSName.COUNT, 2);
+            ByteArrayOutputStream salida = new ByteArrayOutputStream();
+            documento.save(salida);
+            pdf = salida.toByteArray();
+        }
+
+        List<CandidataImagen> candidatas = imagenes.extraer("cojo", pdf);
+
+        assertEquals(List.of("página 1"), candidatas.stream().map(CandidataImagen::origen).toList());
+    }
+
+    @Test
+    void unPdfSinNadaQueEnsenarNoDejaElLote() throws Exception {
+        ImagenesDePdf imagenes = new ImagenesDePdf(base);
+        byte[] pdf;
+        try (PDDocument documento = new PDDocument()) {
+            documento.addPage(new PDPage(new PDRectangle(20_000, 20_000)));
+            ByteArrayOutputStream salida = new ByteArrayOutputStream();
+            documento.save(salida);
+            pdf = salida.toByteArray();
+        }
+
+        assertEquals(List.of(), imagenes.extraer("vacio", pdf));
+        assertFalse(Files.exists(base.resolve(ImagenesDePdf.PREFIJO + "vacio")));
+    }
+
+    @Test
     void unFicheroQueNoEsPdfSeRechazaConSuMensaje() {
         ImagenesDePdf imagenes = new ImagenesDePdf(base);
 
@@ -69,6 +131,7 @@ class ImagenesDePdfTest {
                 () -> imagenes.extraer("lote-2", "esto no es un PDF".getBytes(StandardCharsets.UTF_8)));
 
         assertEquals("El fichero no es un PDF que se pueda leer", error.getMessage());
+        assertFalse(Files.exists(base.resolve(ImagenesDePdf.PREFIJO + "lote-2")));
     }
 
     @Test

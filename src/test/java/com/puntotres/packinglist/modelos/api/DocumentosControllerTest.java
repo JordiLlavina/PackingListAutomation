@@ -16,14 +16,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -37,6 +42,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.modelos.PdfDePrueba;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
+import com.puntotres.packinglist.modelos.service.Documentos;
 import com.puntotres.packinglist.modelos.service.ImagenesDePdf;
 import com.puntotres.packinglist.modelos.service.Usuarios;
 import com.puntotres.packinglist.persistence.ResumenFoto;
@@ -62,6 +68,37 @@ class DocumentosControllerTest {
 
     @Autowired
     private FotosCatalogo fotos;
+
+    /** Los lotes de candidatas que ha dejado cada test en el directorio temporal de verdad, para borrarlos. */
+    private final List<String> lotes = new ArrayList<>();
+
+    @AfterEach
+    void borrarLotes() throws IOException {
+        for (String lote : lotes) {
+            Path directorio = directorioDe(lote);
+            if (Files.exists(directorio)) {
+                try (Stream<Path> dentro = Files.walk(directorio)) {
+                    for (Path ruta : dentro.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.deleteIfExists(ruta);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void unDocumentoDeMasDe50MbSeRechazaSinGuardarlo() throws Exception {
+        long modelo = alta("T22-GRANDE");
+        MockMultipartFile grande = new MockMultipartFile("documento", "grande.pdf", "application/pdf",
+                new byte[(int) Documentos.MAX_BYTES + 1]);
+
+        mvc.perform(multipart("/api/modelos/" + modelo + "/documentos").file(grande)
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("El documento pesa más de 50 MB"));
+        mvc.perform(get("/api/modelos/" + modelo).with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$.documentos", hasSize(0)));
+    }
 
     @Test
     void nadaEntraEnFotoModeloSinElegir() throws Exception {
@@ -126,7 +163,7 @@ class DocumentosControllerTest {
         long documento = subida.get("documento").get("id").asLong();
         String lote = subida.get("loteId").asText();
         String clave = subida.get("candidatas").get(0).get("clave").asText();
-        Path directorio = Path.of(System.getProperty("java.io.tmpdir"), ImagenesDePdf.PREFIJO + lote);
+        Path directorio = directorioDe(lote);
         Files.setLastModifiedTime(directorio,
                 FileTime.from(Instant.now().minus(ImagenesDePdf.VIGENCIA).minusSeconds(60)));
 
@@ -250,7 +287,13 @@ class DocumentosControllerTest {
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
-        return JSON.readTree(cuerpo);
+        JsonNode subida = JSON.readTree(cuerpo);
+        lotes.add(subida.get("loteId").asText());
+        return subida;
+    }
+
+    private static Path directorioDe(String lote) {
+        return Path.of(System.getProperty("java.io.tmpdir"), ImagenesDePdf.PREFIJO + lote);
     }
 
     private static String elegir(long modelo, long documento) {

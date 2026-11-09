@@ -26,6 +26,7 @@ import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.PDXObject;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
@@ -89,6 +90,11 @@ public class ImagenesDePdf {
      */
     static final long MAX_PIXELES = 40_000_000L;
 
+    /** Lo más que puede medir de lado una página para pintarla: más que eso no es una ficha técnica. */
+    static final int MAX_PULGADAS_PAGINA = 200;
+
+    private static final int PUNTOS_POR_PULGADA = 72;
+
     /** Lo hondo que se baja por los formularios anidados buscando imágenes. */
     private static final int MAX_ANIDAMIENTO = 5;
 
@@ -143,24 +149,70 @@ public class ImagenesDePdf {
             List<CandidataImagen> candidatas = new ArrayList<>();
             Set<COSBase> vistas = Collections.newSetFromMap(new IdentityHashMap<>());
             for (int pagina = 0; pagina < paginas; pagina++) {
-                buscarImagenes(documento.getPage(pagina).getResources(), vistas, candidatas, directorio, 0);
+                try {
+                    buscarImagenes(documento.getPage(pagina).getResources(), vistas, candidatas, directorio, 0);
+                } catch (RuntimeException rota) {
+                    // Un diccionario de recursos roto: esa página se queda sin imágenes, las demás siguen.
+                    LOG.warn("No se han podido leer las imágenes de la página {} del PDF del lote {}", pagina + 1,
+                            loteId, rota);
+                }
             }
             PDFRenderer pintor = new PDFRenderer(documento);
             for (int pagina = 0; pagina < paginas; pagina++) {
-                try {
-                    BufferedImage pintada = pintor.renderImageWithDPI(pagina, PPP_PAGINA);
-                    candidatas.add(escribir(directorio, "pagina-" + (pagina + 1), pintada,
-                            "página " + (pagina + 1)));
-                } catch (IOException | RuntimeException sinPintar) {
-                    LOG.warn("No se ha podido pintar la página {} del PDF del lote {}", pagina + 1, loteId,
-                            sinPintar);
-                }
+                pintarPagina(documento, pintor, pagina, directorio, loteId).ifPresent(candidatas::add);
+            }
+            if (candidatas.isEmpty()) {
+                // Nada que elegir: no se deja un directorio vacío esperando a la limpieza.
+                borrar(directorio);
             }
             return candidatas;
         } catch (IOException disco) {
             borrar(directorio);
             throw new UncheckedIOException("No se han podido guardar las imágenes del PDF", disco);
+        } catch (RuntimeException roto) {
+            // PDFBox ha podido abrirlo pero no recorrerlo (sin páginas legibles, un árbol de páginas roto).
+            borrar(directorio);
+            LOG.warn("No se ha podido recorrer el PDF del lote {}", loteId, roto);
+            throw new IllegalArgumentException(NO_ES_PDF);
         }
+    }
+
+    /**
+     * La página pintada a {@value #PPP_PAGINA} ppp o, si así pasaría de
+     * {@link #MAX_PIXELES}, a la resolución que la deja en ese tope: el
+     * tamaño de una página lo declara el propio PDF (hasta 14.400 puntos de
+     * lado, y un lienzo de Illustrator aún más), y a 100 ppp una de 200
+     * pulgadas serían 20.000 × 20.000 px, 1,6 GB en memoria para una sola
+     * imagen. Una página de más de {@value #MAX_PULGADAS_PAGINA} pulgadas de
+     * lado no es una ficha técnica: se salta con un aviso en el log. Vacío
+     * también si PDFBox no sabe pintarla.
+     */
+    private Optional<CandidataImagen> pintarPagina(PDDocument documento, PDFRenderer pintor, int pagina,
+                                                   Path directorio, String loteId) throws IOException {
+        BufferedImage pintada;
+        try {
+            PDRectangle caja = documento.getPage(pagina).getCropBox();
+            float ancho = caja.getWidth();
+            float alto = caja.getHeight();
+            if (!(ancho > 0) || !(alto > 0) || ancho > MAX_PULGADAS_PAGINA * PUNTOS_POR_PULGADA
+                    || alto > MAX_PULGADAS_PAGINA * PUNTOS_POR_PULGADA) {
+                LOG.warn("La página {} del PDF del lote {} mide {} × {} puntos: no se pinta", pagina + 1, loteId,
+                        ancho, alto);
+                return Optional.empty();
+            }
+            pintada = pintor.renderImageWithDPI(pagina, pppPara(ancho, alto));
+        } catch (IOException | RuntimeException sinPintar) {
+            LOG.warn("No se ha podido pintar la página {} del PDF del lote {}", pagina + 1, loteId, sinPintar);
+            return Optional.empty();
+        }
+        // Escribirla sí puede fallar de verdad (el disco): eso no se salta, sube.
+        return Optional.of(escribir(directorio, "pagina-" + (pagina + 1), pintada, "página " + (pagina + 1)));
+    }
+
+    /** {@value #PPP_PAGINA} ppp, o menos si con ellos la página pasaría de {@link #MAX_PIXELES}. */
+    static float pppPara(float anchoPuntos, float altoPuntos) {
+        double tope = PUNTOS_POR_PULGADA * Math.sqrt(MAX_PIXELES / ((double) anchoPuntos * altoPuntos));
+        return (float) Math.min(PPP_PAGINA, tope);
     }
 
     /**
