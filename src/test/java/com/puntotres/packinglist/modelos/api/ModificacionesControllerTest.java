@@ -3,7 +3,9 @@ package com.puntotres.packinglist.modelos.api;
 import static com.puntotres.packinglist.modelos.ComoUsuario.comoUsuario;
 import static com.puntotres.packinglist.modelos.ComoUsuario.usuarioDePrueba;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -19,10 +21,18 @@ import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Stream;
 
 import javax.imageio.ImageIO;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,8 +45,10 @@ import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequ
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.puntotres.packinglist.modelos.PdfDePrueba;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
+import com.puntotres.packinglist.modelos.service.ImagenesDePdf;
 import com.puntotres.packinglist.modelos.service.Usuarios;
 
 /**
@@ -60,6 +72,23 @@ class ModificacionesControllerTest {
     @Autowired
     private Usuarios usuarios;
 
+    /** Los lotes de candidatas que ha dejado cada test en el directorio temporal de verdad, para borrarlos. */
+    private final List<String> lotes = new ArrayList<>();
+
+    @AfterEach
+    void borrarLotes() throws IOException {
+        for (String lote : lotes) {
+            Path directorio = Path.of(System.getProperty("java.io.tmpdir"), ImagenesDePdf.PREFIJO + lote);
+            if (Files.exists(directorio)) {
+                try (Stream<Path> dentro = Files.walk(directorio)) {
+                    for (Path ruta : dentro.sorted(Comparator.reverseOrder()).toList()) {
+                        Files.deleteIfExists(ruta);
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     void elTallerCreaUnAvisoConFotoYDespachoLoVeEnSuBandeja() throws Exception {
         long modeloId = alta("T12-AVISO");
@@ -69,15 +98,17 @@ class ModificacionesControllerTest {
                         .param("tipoCambio", "PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.modeloId").value(modeloId))
-                .andExpect(jsonPath("$.modeloReferencia").value("T12-AVISO"))
-                .andExpect(jsonPath("$.direccion").value("TALLER_A_DESPACHO"))
-                .andExpect(jsonPath("$.estado").value("NUEVA"))
-                .andExpect(jsonPath("$.tipoCambioTexto").value("Piel / material"))
-                .andExpect(jsonPath("$.fotos").value(1))
-                .andExpect(jsonPath("$.destinos", hasSize(2)))
+                .andExpect(jsonPath("$.modificacion.modeloId").value(modeloId))
+                .andExpect(jsonPath("$.modificacion.modeloReferencia").value("T12-AVISO"))
+                .andExpect(jsonPath("$.modificacion.direccion").value("TALLER_A_DESPACHO"))
+                .andExpect(jsonPath("$.modificacion.estado").value("NUEVA"))
+                .andExpect(jsonPath("$.modificacion.tipoCambioTexto").value("Piel / material"))
+                .andExpect(jsonPath("$.modificacion.fotos").value(1))
+                .andExpect(jsonPath("$.modificacion.destinos", hasSize(2)))
+                .andExpect(jsonPath("$.documentosGuardados", hasSize(0)))
+                .andExpect(jsonPath("$.avisos", hasSize(0)))
                 .andReturn().getResponse().getContentAsString();
-        long id = JSON.readTree(creada).get("id").asLong();
+        long id = JSON.readTree(creada).get("modificacion").get("id").asLong();
 
         mvc.perform(get("/api/modificaciones").param("direccion", "TALLER_A_DESPACHO")
                         .param("modelo", String.valueOf(modeloId)).with(comoUsuario(despacho())))
@@ -137,11 +168,11 @@ class ModificacionesControllerTest {
                         .param("prioridad", "ALTA")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.direccion").value("TALLER_A_DESPACHO"))
-                .andExpect(jsonPath("$.titulo").value(nullValue()))
-                .andExpect(jsonPath("$.prioridad").value(nullValue()))
+                .andExpect(jsonPath("$.modificacion.direccion").value("TALLER_A_DESPACHO"))
+                .andExpect(jsonPath("$.modificacion.titulo").value(nullValue()))
+                .andExpect(jsonPath("$.modificacion.prioridad").value(nullValue()))
                 .andReturn().getResponse().getContentAsString();
-        long id = JSON.readTree(creada).get("id").asLong();
+        long id = JSON.readTree(creada).get("modificacion").get("id").asLong();
 
         mvc.perform(post("/api/modificaciones/" + id + "/prioridad").with(comoUsuario(taller())).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"prioridad\":\"ALTA\"}"))
@@ -166,9 +197,9 @@ class ModificacionesControllerTest {
                         .param("prioridad", "NORMAL")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.direccion").value("DESPACHO_A_TALLER"))
-                .andExpect(jsonPath("$.titulo").value("Cambiar el forro"))
-                .andExpect(jsonPath("$.prioridad").value("NORMAL"));
+                .andExpect(jsonPath("$.modificacion.direccion").value("DESPACHO_A_TALLER"))
+                .andExpect(jsonPath("$.modificacion.titulo").value("Cambiar el forro"))
+                .andExpect(jsonPath("$.modificacion.prioridad").value("NORMAL"));
 
         mvc.perform(post("/api/modificaciones/" + id + "/descartar").with(comoUsuario(despacho())).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"motivo\":\"Repetido\"}"))
@@ -197,8 +228,11 @@ class ModificacionesControllerTest {
                         .param("prioridad", "BAJA").param("guardarEnModelo", "true")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.direccion").value("DESPACHO_A_TALLER"))
-                .andExpect(jsonPath("$.documentos").value(1));
+                .andExpect(jsonPath("$.modificacion.documentos").value(1))
+                // Un «PDF» que no es un PDF: la orden sale igual y lo que no se pudo copiar al modelo se dice.
+                .andExpect(jsonPath("$.documentosGuardados", hasSize(0)))
+                .andExpect(jsonPath("$.avisos", hasSize(1)))
+                .andExpect(jsonPath("$.avisos[0]").value(startsWith("No se pudo guardar plano.pdf en el modelo: ")));
     }
 
     @Test
@@ -250,11 +284,11 @@ class ModificacionesControllerTest {
                         .file(fotoSinElegir).file(sinElegir).file(audioSinElegir).param("tipoCambio", "PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.fotos").value(1))
-                .andExpect(jsonPath("$.audios").value(0))
-                .andExpect(jsonPath("$.documentos").value(0))
+                .andExpect(jsonPath("$.modificacion.fotos").value(1))
+                .andExpect(jsonPath("$.modificacion.audios").value(0))
+                .andExpect(jsonPath("$.modificacion.documentos").value(0))
                 .andReturn().getResponse().getContentAsString();
-        long id = JSON.readTree(creada).get("id").asLong();
+        long id = JSON.readTree(creada).get("modificacion").get("id").asLong();
         mvc.perform(get("/api/modificaciones/" + id).with(comoUsuario(despacho())))
                 .andExpect(jsonPath("$.mensajes[0].adjuntos", hasSize(1)))
                 .andExpect(jsonPath("$.mensajes[0].adjuntos[0].nombre").value("foto.jpg"));
@@ -274,9 +308,9 @@ class ModificacionesControllerTest {
                         .param("tipoCambio", "COSTURA")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.audios").value(1))
+                .andExpect(jsonPath("$.modificacion.audios").value(1))
                 .andReturn().getResponse().getContentAsString();
-        long adjuntoId = primerAdjunto(JSON.readTree(creada).get("id").asLong());
+        long adjuntoId = primerAdjunto(JSON.readTree(creada).get("modificacion").get("id").asLong());
 
         byte[] trozo = mvc.perform(get("/api/adjuntos/" + adjuntoId).header(HttpHeaders.RANGE, "bytes=0-3")
                         .with(comoUsuario(despacho())))
@@ -304,7 +338,7 @@ class ModificacionesControllerTest {
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        long fotoId = primerAdjunto(JSON.readTree(aviso).get("id").asLong());
+        long fotoId = primerAdjunto(JSON.readTree(aviso).get("modificacion").get("id").asLong());
 
         mvc.perform(get("/api/adjuntos/" + fotoId).with(comoUsuario(taller())))
                 .andExpect(status().isOk())
@@ -318,7 +352,7 @@ class ModificacionesControllerTest {
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        long documentoId = primerAdjunto(JSON.readTree(orden).get("id").asLong());
+        long documentoId = primerAdjunto(JSON.readTree(orden).get("modificacion").get("id").asLong());
         mvc.perform(get("/api/adjuntos/" + documentoId).with(comoUsuario(taller())))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
@@ -334,7 +368,7 @@ class ModificacionesControllerTest {
                             .with(comoUsuario(despacho())).with(csrf()))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            long htmlId = primerAdjunto(JSON.readTree(conHtml).get("id").asLong());
+            long htmlId = primerAdjunto(JSON.readTree(conHtml).get("modificacion").get("id").asLong());
             mvc.perform(get("/api/adjuntos/" + htmlId).with(comoUsuario(taller())))
                     .andExpect(status().isOk())
                     .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE))
@@ -361,7 +395,7 @@ class ModificacionesControllerTest {
         String aviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.RED)).param("tipoCambio", "PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andReturn().getResponse().getContentAsString();
-        long fotoId = primerAdjunto(JSON.readTree(aviso).get("id").asLong());
+        long fotoId = primerAdjunto(JSON.readTree(aviso).get("modificacion").get("id").asLong());
 
         mvc.perform(post("/api/adjuntos/" + fotoId + "/a-galeria").with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isForbidden());
@@ -378,7 +412,7 @@ class ModificacionesControllerTest {
         String otroAviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.BLUE))
                         .param("tipoCambio", "PIEL").with(comoUsuario(taller())).with(csrf()))
                 .andReturn().getResponse().getContentAsString();
-        long otraFotoId = primerAdjunto(JSON.readTree(otroAviso).get("id").asLong());
+        long otraFotoId = primerAdjunto(JSON.readTree(otroAviso).get("modificacion").get("id").asLong());
         mvc.perform(post("/api/adjuntos/" + otraFotoId + "/a-galeria").with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
@@ -391,7 +425,7 @@ class ModificacionesControllerTest {
         String conAudio = mvc.perform(nueva(modeloId).file(audio()).param("audioDuracionSeg", "3")
                         .param("tipoCambio", "PIEL").with(comoUsuario(taller())).with(csrf()))
                 .andReturn().getResponse().getContentAsString();
-        long audioId = primerAdjunto(JSON.readTree(conAudio).get("id").asLong());
+        long audioId = primerAdjunto(JSON.readTree(conAudio).get("modificacion").get("id").asLong());
         mvc.perform(post("/api/adjuntos/" + audioId + "/a-galeria").with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("Solo se puede pasar una foto a la galería"));
@@ -416,6 +450,59 @@ class ModificacionesControllerTest {
         mvc.perform(get("/api/modificaciones/987654321").with(comoUsuario(despacho())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensaje").value("No hay ninguna modificación con id 987654321"));
+    }
+
+    @Test
+    void unaOrdenConPdfYGuardarEnModeloLoDejaEnLosDosSitios() throws Exception {
+        long modeloId = alta("T23-GUARDAR");
+        MockMultipartFile ficha = new MockMultipartFile("documentos", "ficha.pdf", MediaType.APPLICATION_PDF_VALUE,
+                PdfDePrueba.fichaTecnica());
+
+        String creada = mvc.perform(nueva(modeloId).file(ficha).param("titulo", "Nuevo patrón")
+                        .param("prioridad", "NORMAL").param("guardarEnModelo", "true")
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.modificacion.documentos").value(1))
+                .andExpect(jsonPath("$.avisos", hasSize(0)))
+                .andExpect(jsonPath("$.documentosGuardados", hasSize(1)))
+                .andExpect(jsonPath("$.documentosGuardados[0].documento.nombre").value("ficha.pdf"))
+                .andExpect(jsonPath("$.documentosGuardados[0].candidatas", hasSize(PdfDePrueba.CANDIDATAS)))
+                .andExpect(jsonPath("$.documentosGuardados[0].loteId", notNullValue()))
+                .andReturn().getResponse().getContentAsString();
+        JsonNode respuesta = JSON.readTree(creada);
+        lotes.add(respuesta.get("documentosGuardados").get(0).get("loteId").asText());
+        long ordenId = respuesta.get("modificacion").get("id").asLong();
+
+        // En el modelo...
+        mvc.perform(get("/api/modelos/" + modeloId).with(comoUsuario(despacho())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentos", hasSize(1)))
+                .andExpect(jsonPath("$.documentos[0].nombre").value("ficha.pdf"))
+                // Ninguna imagen del PDF entra en las fotos del modelo sin elegirla.
+                .andExpect(jsonPath("$.fotos", hasSize(0)));
+        // ... y en la orden.
+        mvc.perform(get("/api/modificaciones/" + ordenId).with(comoUsuario(despacho())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mensajes[0].adjuntos[0].tipo").value("DOCUMENTO"))
+                .andExpect(jsonPath("$.mensajes[0].adjuntos[0].nombre").value("ficha.pdf"));
+    }
+
+    @Test
+    void sinLaCasillaElDocumentoSoloVaEnLaOrden() throws Exception {
+        long modeloId = alta("T23-SOLOORDEN");
+        MockMultipartFile ficha = new MockMultipartFile("documentos", "ficha.pdf", MediaType.APPLICATION_PDF_VALUE,
+                PdfDePrueba.fichaTecnica());
+
+        mvc.perform(nueva(modeloId).file(ficha).param("titulo", "Nuevo patrón").param("prioridad", "NORMAL")
+                        .param("guardarEnModelo", "false")
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.modificacion.documentos").value(1))
+                .andExpect(jsonPath("$.documentosGuardados", hasSize(0)))
+                .andExpect(jsonPath("$.avisos", hasSize(0)));
+
+        mvc.perform(get("/api/modelos/" + modeloId).with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$.documentos", hasSize(0)));
     }
 
     private MockMultipartHttpServletRequestBuilder nueva(long modeloId) {

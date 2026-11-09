@@ -4,6 +4,7 @@
 // del servidor), que es como las lee hace(). Y lo poco que se calcula con ellas
 // en el navegador, en funciones puras para poder probarlas.
 
+import type { Subida } from './modelos';
 import { mmss } from './tiempo';
 
 export type Prioridad = 'ALTA' | 'NORMAL' | 'BAJA';
@@ -78,6 +79,9 @@ export type MensajeVista = {
   creadoEn: string;
   adjuntos: AdjuntoVista[];
 };
+
+/** Lo que contesta crear (POST /api/modificaciones): la creada y, con «guardar también en el modelo», lo que se copió al modelo y lo que no se pudo (avisos). */
+export type ModificacionCreada = { modificacion: ModificacionResumen; documentosGuardados: Subida[]; avisos: string[] };
 
 export type ModificacionDetalle = {
   resumen: ModificacionResumen;

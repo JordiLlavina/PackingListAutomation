@@ -10,6 +10,7 @@ import Etapa from '../../comun/Etapa';
 import FotoModelo from '../../comun/FotoModelo';
 import { extensionAudio } from '../../comun/grabador';
 import { Icono } from '../../comun/iconos';
+import type { ModificacionCreada } from '../../comun/modificaciones';
 import { useBorrador } from './Borrador';
 import { motivoNoEnviar } from './reglas';
 import { useTiposCambio } from './tipos';
@@ -45,7 +46,7 @@ export default function Revisar() {
     }
     fotos.forEach((f, i) => datos.append('fotos', f.blob, nombreFoto(f.blob, i)));
     try {
-      await api<unknown>('/api/modificaciones', { method: 'POST', body: datos });
+      await api<ModificacionCreada>('/api/modificaciones', { method: 'POST', body: datos });
       // Sin vuelta atrás a esta pantalla: el aviso ya está en despacho.
       navegar('/cambio/enviado', { replace: true });
     } catch (e: unknown) {

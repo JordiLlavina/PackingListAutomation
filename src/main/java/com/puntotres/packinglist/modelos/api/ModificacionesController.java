@@ -1,10 +1,14 @@
 package com.puntotres.packinglist.modelos.api;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.puntotres.packinglist.modelos.api.dto.MensajeVista;
+import com.puntotres.packinglist.modelos.api.dto.ModificacionCreada;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionDetalle;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionResumen;
 import com.puntotres.packinglist.modelos.persistence.DestinoAplicacion;
@@ -32,6 +37,7 @@ import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 import com.puntotres.packinglist.modelos.service.AdjuntoNuevo;
+import com.puntotres.packinglist.modelos.service.Documentos;
 import com.puntotres.packinglist.modelos.service.Modificaciones;
 
 /**
@@ -52,9 +58,13 @@ public class ModificacionesController {
 
     private static final String DESPACHO = "hasAnyRole('DESPACHO','ADMIN')";
 
-    private final Modificaciones modificaciones;
+    private static final Logger LOG = LoggerFactory.getLogger(ModificacionesController.class);
 
-    public ModificacionesController(Modificaciones modificaciones) {
+    private final Modificaciones modificaciones;
+    private final Documentos documentosDelModelo;
+
+    public ModificacionesController(Modificaciones modificaciones, Documentos documentos) {
+        this.documentosDelModelo = documentos;
         this.modificaciones = modificaciones;
     }
 
@@ -75,19 +85,19 @@ public class ModificacionesController {
     }
 
     @PostMapping
-    public ResponseEntity<ModificacionResumen> crear(@RequestParam(required = false) Long modeloId,
-                                                     @RequestParam(required = false) String tipoCambio,
-                                                     @RequestParam(required = false) String titulo,
-                                                     @RequestParam(required = false) String texto,
-                                                     @RequestParam(required = false) Prioridad prioridad,
-                                                     @RequestParam(required = false) MultipartFile audio,
-                                                     @RequestParam(required = false) String audioDuracionSeg,
-                                                     @RequestParam(name = "fotos", required = false)
-                                                     List<MultipartFile> fotos,
-                                                     @RequestParam(name = "documentos", required = false)
-                                                     List<MultipartFile> documentos,
-                                                     @RequestParam(required = false) Boolean guardarEnModelo,
-                                                     @AuthenticationPrincipal UsuarioActual quien)
+    public ResponseEntity<ModificacionCreada> crear(@RequestParam(required = false) Long modeloId,
+                                                    @RequestParam(required = false) String tipoCambio,
+                                                    @RequestParam(required = false) String titulo,
+                                                    @RequestParam(required = false) String texto,
+                                                    @RequestParam(required = false) Prioridad prioridad,
+                                                    @RequestParam(required = false) MultipartFile audio,
+                                                    @RequestParam(required = false) String audioDuracionSeg,
+                                                    @RequestParam(name = "fotos", required = false)
+                                                    List<MultipartFile> fotos,
+                                                    @RequestParam(name = "documentos", required = false)
+                                                    List<MultipartFile> documentos,
+                                                    @RequestParam(required = false) Boolean guardarEnModelo,
+                                                    @AuthenticationPrincipal UsuarioActual quien)
             throws IOException {
         if (modeloId == null) {
             throw new IllegalArgumentException("Falta el modelo");
@@ -98,17 +108,45 @@ public class ModificacionesController {
             throw new IllegalArgumentException("El taller no adjunta documentos");
         }
         List<AdjuntoNuevo> adjuntos = adjuntos(audio, audioDuracionSeg, fotos);
-        // guardarEnModelo: guardar además los documentos en documento_modelo es de la tarea 23.
         Modificacion creada;
+        List<Documentos.Subida> guardados = new ArrayList<>();
+        List<String> avisos = new ArrayList<>();
         if (esTaller) {
             creada = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, tipoCambio,
                     adjuntos), quien);
         } else {
-            adjuntos.addAll(convertir(documentos, TipoAdjunto.DOCUMENTO));
+            List<AdjuntoNuevo> losDocumentos = convertir(documentos, TipoAdjunto.DOCUMENTO);
+            adjuntos.addAll(losDocumentos);
+            // Primero la orden: sus adjuntos topan en 15 MB (Adjuntos), así que un documento mayor falla aquí
+            // con ese mensaje, antes de llegar a la copia al modelo (tope de 50 MB) y sin dejar nada a medias.
             creada = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, tipoCambio,
                     titulo, texto, prioridad, adjuntos), quien);
+            if (Boolean.TRUE.equals(guardarEnModelo)) {
+                copiarAlModelo(modeloId, losDocumentos, quien, guardados, avisos);
+            }
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(resumen(creada.getId()));
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ModificacionCreada(resumen(creada.getId()), guardados, avisos));
+    }
+
+    /**
+     * Copia cada documento al modelo con el mismo camino que subirlo desde su
+     * ficha ({@link Documentos#subir}: si es un PDF, saca sus candidatas fuera
+     * de cualquier transacción). La orden ya está creada y no se deshace: lo
+     * que no se pueda copiar se cuenta en los avisos, una línea por documento,
+     * para que el despacho lo sepa y lo suba desde la ficha del modelo.
+     */
+    private void copiarAlModelo(Long modeloId, List<AdjuntoNuevo> losDocumentos, UsuarioActual quien,
+                                List<Documentos.Subida> guardados, List<String> avisos) {
+        for (AdjuntoNuevo documento : losDocumentos) {
+            try {
+                guardados.add(documentosDelModelo.subir(modeloId, documento.nombre(), documento.mime(), documento.bytes(),
+                        quien));
+            } catch (IllegalArgumentException | UncheckedIOException | NoSuchElementException e) {
+                LOG.warn("No se ha podido copiar {} al modelo {}: {}", documento.nombre(), modeloId, e.getMessage());
+                avisos.add("No se pudo guardar " + documento.nombre() + " en el modelo: " + e.getMessage());
+            }
+        }
     }
 
     @GetMapping

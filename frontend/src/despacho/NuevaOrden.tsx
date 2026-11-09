@@ -13,11 +13,12 @@ import { useGrabadora } from '../comun/Grabadora';
 import { extensionAudio, type Grabacion } from '../comun/grabador';
 import { Icono } from '../comun/iconos';
 import { reducirImagen } from '../comun/imagen';
-import type { ModeloFicha, ModeloResumen } from '../comun/modelos';
-import type { ModificacionResumen, Prioridad } from '../comun/modificaciones';
+import type { ModeloFicha, ModeloResumen, Subida } from '../comun/modelos';
+import type { ModificacionCreada, ModificacionResumen, Prioridad } from '../comun/modificaciones';
 import { mmss } from '../comun/tiempo';
 import { toast } from '../comun/toast';
 import { useTiposCambio } from '../taller/cambio/tipos';
+import ElegirImagenesPdf from './ElegirImagenesPdf';
 
 const PRIORIDADES: [Prioridad, string][] = [
   ['ALTA', 'Alta'],
@@ -29,6 +30,9 @@ const PRIORIDADES: [Prioridad, string][] = [
 const MAXIMO_RESULTADOS = 12;
 
 type Nota = { blob: Blob; duracionSeg: number; url: string };
+
+/** Tras crear, los PDFs guardados en el modelo con imágenes que elegir, de uno en uno, antes de abrir la orden. */
+type Eleccion = { orden: ModificacionResumen; modeloId: number; actual: Subida; siguientes: Subida[] };
 
 type Props = {
   modeloInicial: number | null;
@@ -51,6 +55,7 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
   const [guardarEnModelo, setGuardarEnModelo] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [eleccion, setEleccion] = useState<Eleccion | null>(null);
   const { tipos } = useTiposCambio();
 
   // El modelo de partida (desde su ficha).
@@ -128,18 +133,33 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
     for (const d of documentos) datos.append('documentos', d, d.name);
     if (documentos.length > 0) datos.append('guardarEnModelo', String(guardarEnModelo));
     try {
-      const orden = await api<ModificacionResumen>('/api/modificaciones', { method: 'POST', body: datos });
+      const creada = await api<ModificacionCreada>('/api/modificaciones', { method: 'POST', body: datos });
       toast('Orden enviada al taller');
-      onCreada(orden);
+      // La orden ya está creada; lo que no se pudo copiar al modelo se dice, no se calla.
+      for (const aviso of creada.avisos) toast(aviso);
+      const [primero, ...siguientes] = creada.documentosGuardados.filter((s) => s.loteId !== null && s.candidatas.length > 0);
+      if (primero === undefined) onCreada(creada.modificacion);
+      else setEleccion({ orden: creada.modificacion, modeloId: modelo.id, actual: primero, siguientes });
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se ha podido crear la orden');
       setEnviando(false);
     }
   };
 
+  // Un PDF resuelto (con fotos elegidas o sin ellas): el siguiente, y al acabar, la orden.
+  const siguienteDocumento = () => {
+    if (!eleccion) return;
+    const [siguiente, ...resto] = eleccion.siguientes;
+    if (siguiente === undefined) {
+      setEleccion(null);
+      onCreada(eleccion.orden);
+    } else setEleccion({ ...eleccion, actual: siguiente, siguientes: resto });
+  };
+
   const nombres = (ficheros: File[]) => ficheros.map((f) => f.name).join(', ');
 
   return (
+    <>
     <form className="formulario nueva-orden" onSubmit={(e) => void crear(e)}>
       <h2>Nueva orden para el taller</h2>
 
@@ -280,5 +300,9 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
         </p>
       )}
     </form>
+    {eleccion && (
+      <ElegirImagenesPdf key={eleccion.actual.documento.id} modeloId={eleccion.modeloId} subida={eleccion.actual} onGuardadas={() => undefined} onCerrar={siguienteDocumento} />
+    )}
+    </>
   );
 }
