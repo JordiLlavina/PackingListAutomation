@@ -1,7 +1,6 @@
 package com.puntotres.packinglist.modelos.api;
 
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.ModelosProperties.TipoCambio;
+import com.puntotres.packinglist.modelos.service.TextosDestino;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.FicheroExcel;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
@@ -28,11 +28,6 @@ import com.puntotres.packinglist.persistence.TemporadaGuardada;
 @RestController
 @RequestMapping("/api")
 public class CatalogoAuxController {
-
-    /** Cómo se llama cada destino de aplicación en pantalla; uno desconocido se enseña con su clave. */
-    private static final Map<String, String> TEXTOS_DESTINO = Map.of(
-            "ICSUITE", "ICSUITE",
-            "EXCEL_ESCANDALLOS", "Excel de escandallos");
 
     private final ClientesProperties clientes;
     private final ArchivoTemporadas temporadas;
@@ -100,7 +95,7 @@ public class CatalogoAuxController {
     @GetMapping("/destinos-aplicacion")
     public List<DestinoAplicacionDto> destinosAplicacion() {
         return props.destinosAplicacion().stream()
-                .map(clave -> new DestinoAplicacionDto(clave, TEXTOS_DESTINO.getOrDefault(clave, clave)))
+                .map(clave -> new DestinoAplicacionDto(clave, TextosDestino.texto(clave)))
                 .toList();
     }
 
