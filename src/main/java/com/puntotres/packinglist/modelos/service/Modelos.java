@@ -171,7 +171,7 @@ public class Modelos {
                 .filter(temporada -> suyas.contains(temporada.id()))
                 .map(ResumenTemporada::temporada)
                 .toList();
-        List<ModeloCodigoHistorico> historico = codigos.findByModeloIdOrderByDesdeDesc(id);
+        List<ModeloCodigoHistorico> historico = codigos.findByModeloIdOrderByDesdeDescIdDesc(id);
         List<CodigoHistorico> nombres = historico.stream()
                 .map(apunte -> new CodigoHistorico(apunte.getCodigo(), apunte.getDesde(), apunte.getHasta(),
                         apunte.getMotivo()))
@@ -360,7 +360,7 @@ public class Modelos {
     }
 
     private List<Evento> lineaTiempo(Modelo modelo, List<ModeloCodigoHistorico> historico) {
-        List<CambioEtapa> etapas = cambiosEtapa.findByModeloIdOrderByFechaDesc(modelo.getId());
+        List<CambioEtapa> etapas = cambiosEtapa.findByModeloIdOrderByFechaDescIdDesc(modelo.getId());
         Map<Long, String> nombres = nombresDeUsuario(etapas);
         List<Evento> eventos = new ArrayList<>();
         for (CambioEtapa cambio : etapas) {
@@ -376,7 +376,9 @@ public class Modelos {
         for (FuenteEventos fuente : fuentes) {
             eventos.addAll(fuente.eventosDe(modelo.getId()));
         }
-        // Estable: a la misma hora, la etapa antes que el código y estos antes que lo de las fuentes.
+        // Estable: a la misma hora, la etapa antes que el código y estos antes que lo de las fuentes, y
+        // dentro de cada uno el orden en que llegan (etapas y códigos, el último apuntado primero: los
+        // repositorios desempatan por id, porque dos apuntes seguidos pueden caer en el mismo instante).
         eventos.sort(Comparator.comparing(Evento::fecha, Comparator.nullsLast(Comparator.reverseOrder())));
         return eventos;
     }

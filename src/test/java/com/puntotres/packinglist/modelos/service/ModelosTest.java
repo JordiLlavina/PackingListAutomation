@@ -165,7 +165,7 @@ class ModelosTest {
 
         modelos.cambiarEtapa(modelo.getId(), Etapa.PRODUCCION, "aprobado", despacho());
 
-        List<CambioEtapa> apuntes = cambiosEtapa.findByModeloIdOrderByFechaDesc(modelo.getId());
+        List<CambioEtapa> apuntes = cambiosEtapa.findByModeloIdOrderByFechaDescIdDesc(modelo.getId());
         assertEquals(2, apuntes.size());
         assertEquals(Etapa.PROTOTIPO, apuntes.get(0).getDe());
         assertEquals(Etapa.PRODUCCION, apuntes.get(0).getA());
