@@ -8,6 +8,7 @@ import { RouterProvider } from 'react-router/dom';
 import { useSesion, type Sesion } from './comun/sesion';
 import ShellDespacho from './despacho/Shell';
 import BandejaDespacho from './despacho/Bandeja';
+import EtiquetasPatrones from './despacho/EtiquetasPatrones';
 import ModelosDespacho from './despacho/Modelos';
 import Entrada from './entrada/Entrada';
 import Duda from './taller/Duda';
@@ -97,6 +98,8 @@ function rutasDespacho(esAdmin: boolean): RouteObject[] {
         { path: '*', element: <Navigate to="/" replace /> },
       ],
     },
+    // La hoja de etiquetas de patrones va fuera del marco: es para imprimir y en el papel no sale nada más.
+    { path: '/etiquetas-patrones', element: <EtiquetasPatrones /> },
   ];
 }
 

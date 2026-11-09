@@ -29,6 +29,7 @@ const I = {
   ok: '<circle cx="12" cy="12" r="9.5"/><path d="m8 12.5 3 3 5-6"/>',
   salir: '<path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/>',
   lapiz: '<path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  imprimir: '<path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/>',
 } as const;
 
 export type NombreIcono = keyof typeof I;

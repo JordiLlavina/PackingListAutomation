@@ -1,0 +1,64 @@
+/* La hoja de etiquetas de patrones. En pantalla, cada hoja se ve como un A4
+   blanco con sus márgenes de 10 mm y, encima, la barra con las acciones; en
+   el papel solo salen las etiquetas. Ocho por hoja (2 × 4) de 95 × 69 mm,
+   que llenan los 190 × 277 mm útiles del A4. La etiqueta es negro sobre
+   blanco en los dos temas y no lleva fondos, así que se imprime igual con
+   «Gráficos de fondo» apagado. Las líneas de corte son un trazo discontinuo
+   gris de 0,3 pt, una sola vez entre dos etiquetas vecinas. */
+
+@page { size: A4; margin: 10mm; }
+
+.etiquetas-patrones { min-height: 100%; padding-bottom: 32px; }
+
+.barra-etiquetas { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) 12px max(16px, env(safe-area-inset-left, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line); }
+.barra-etiquetas .texto { display: grid; gap: 2px; flex: 1 1 280px; min-width: 0; }
+.barra-etiquetas .texto span { color: var(--muted); }
+.barra-etiquetas .acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.barra-etiquetas a.boton { text-decoration: none; color: var(--fg); }
+.barra-etiquetas .aviso-perdidos { flex-basis: 100%; margin: 0; color: var(--alta); font-weight: 700; }
+
+.hojas { display: grid; justify-items: center; gap: 24px; padding: 24px 16px 0; overflow-x: auto; }
+
+.hoja-etiquetas { box-sizing: border-box; width: 210mm; min-height: 297mm; padding: 10mm; background: #fff; color: #000;
+  box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(2, 95mm); grid-auto-rows: 69mm; align-content: start; }
+
+.etiqueta-patron { position: relative; box-sizing: border-box; display: flex; flex-direction: column; gap: 1.5mm; min-width: 0;
+  padding: 2.5mm; overflow: hidden; break-inside: avoid; color: #000; font-family: var(--font);
+  border-right: .3pt dashed #8c8c8c; border-bottom: .3pt dashed #8c8c8c; }
+/* La primera fila lleva además la línea de arriba y la columna de la izquierda la suya. */
+.etiqueta-patron:nth-child(-n+2) { border-top: .3pt dashed #8c8c8c; }
+.etiqueta-patron:nth-child(odd) { border-left: .3pt dashed #8c8c8c; }
+
+.etiqueta-patron .arriba { display: flex; gap: 2mm; height: 45mm; flex: none; }
+/* El PNG ya trae su zona muda: se pinta a 45 mm sin margen alrededor. */
+.etiqueta-patron .qr { width: 45mm; height: 45mm; flex: none; display: block; image-rendering: pixelated; }
+.etiqueta-patron .foto-etiqueta { flex: 1; min-width: 0; height: 45mm; display: block; object-fit: cover; }
+
+.etiqueta-patron p { margin: 0; }
+/* El nombre: lo más grande de la etiqueta, en un hueco fijo de dos líneas. */
+.etiqueta-patron .nombre { height: 12mm; flex: none; display: flex; align-items: center; font-weight: 700; line-height: 1.05; overflow: hidden; overflow-wrap: anywhere; }
+.etiqueta-patron .nombre-grande { font-size: 28pt; white-space: nowrap; }
+.etiqueta-patron .nombre-medio { font-size: 21pt; white-space: nowrap; }
+.etiqueta-patron .nombre-pequeno { font-size: 16pt; text-wrap: balance; }
+.etiqueta-patron .nombre-minimo { font-size: 14pt; text-wrap: balance; }
+
+.etiqueta-patron .datos { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; font-size: 14pt; line-height: 1.15; white-space: nowrap; }
+.etiqueta-patron .datos .cliente { flex: none; }
+.etiqueta-patron .datos .referencia { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Solo en pantalla: una etiqueta que ya se imprimió otra vez. */
+.etiqueta-patron .ya-impresa { position: absolute; top: 3.5mm; right: 3.5mm; padding: .15em .55em; border-radius: 6px;
+  background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 700; }
+
+@media print {
+  html, body { height: auto; background: #fff; }
+  body::before { display: none; }
+  .barra-etiquetas, .etiqueta-patron .ya-impresa, .toast { display: none !important; }
+  .etiquetas-patrones { padding: 0; }
+  .hojas { display: block; padding: 0; gap: 0; overflow: visible; }
+  /* Una hoja de papel por cada ocho; el margen ya lo pone @page. */
+  .hoja-etiquetas { width: auto; min-height: 0; padding: 0; box-shadow: none; break-after: page; }
+  .hoja-etiquetas:last-child { break-after: auto; }
+}

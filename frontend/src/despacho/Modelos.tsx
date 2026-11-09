@@ -1,6 +1,7 @@
 // Los modelos en despacho, en dos paneles: a la izquierda los filtros
 // (cliente, etapa, temporada y texto) y la lista, con una casilla por modelo
-// para elegir varios; a la derecha la ficha del elegido o el alta de uno
+// para elegir varios (los elegidos van a la hoja de etiquetas de patrones,
+// /app/etiquetas-patrones); a la derecha la ficha del elegido o el alta de uno
 // nuevo. El elegido va en la dirección (/app/modelos/12), así que un enlace o
 // el QR de un patrón (/m/12) abren su ficha. Por debajo de 900 px los paneles
 // se apilan y, con un modelo elegido, solo se ve su ficha.
@@ -22,18 +23,43 @@ const CHIPS_ETAPA: [TipoEtapa | '', string][] = [
   ['INACTIVO', 'Inactivos'],
 ];
 
+type Filtros = { cliente: string; etapa: TipoEtapa | ''; temporada: string; texto: string; sinEtiqueta: boolean };
+
+const CLAVE_FILTROS = 'despacho-modelos-filtros';
+const SIN_FILTROS: Filtros = { cliente: '', etapa: '', temporada: '', texto: '', sinEtiqueta: false };
+
+/**
+ * Los filtros se recuerdan en la pestaña (sessionStorage): la hoja de
+ * etiquetas va fuera del marco y, al volver de imprimir, la lista se vuelve a
+ * montar con los mismos filtros, «Sin etiqueta impresa» incluido.
+ */
+function filtrosGuardados(): Filtros {
+  try {
+    const guardado: unknown = JSON.parse(sessionStorage.getItem(CLAVE_FILTROS) ?? 'null');
+    if (!guardado || typeof guardado !== 'object') return SIN_FILTROS;
+    const f = guardado as Partial<Record<keyof Filtros, unknown>>;
+    const texto = (v: unknown) => (typeof v === 'string' ? v : '');
+    const etapa = CHIPS_ETAPA.some(([clave]) => clave === f.etapa) ? (f.etapa as TipoEtapa | '') : '';
+    return { cliente: texto(f.cliente), etapa, temporada: texto(f.temporada), texto: texto(f.texto), sinEtiqueta: f.sinEtiqueta === true };
+  } catch {
+    return SIN_FILTROS;
+  }
+}
+
 export default function Modelos() {
   const { id } = useParams();
   const elegido = id && /^\d+$/.test(id) ? Number(id) : null;
   const navegar = useNavigate();
 
+  const [inicial] = useState(filtrosGuardados);
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [cliente, setCliente] = useState('');
-  const [etapa, setEtapa] = useState<TipoEtapa | ''>('');
+  const [cliente, setCliente] = useState(inicial.cliente);
+  const [etapa, setEtapa] = useState<TipoEtapa | ''>(inicial.etapa);
   const [temporadas, setTemporadas] = useState<Temporada[]>([]);
-  const [temporada, setTemporada] = useState('');
-  const [texto, setTexto] = useState('');
-  const [busqueda, setBusqueda] = useState('');
+  const [temporada, setTemporada] = useState(inicial.temporada);
+  const [texto, setTexto] = useState(inicial.texto);
+  const [busqueda, setBusqueda] = useState(inicial.texto.trim());
+  const [sinEtiqueta, setSinEtiqueta] = useState(inicial.sinEtiqueta);
   const [modelos, setModelos] = useState<ModeloResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
@@ -46,8 +72,9 @@ export default function Modelos() {
       .catch(() => setClientes([]));
   }, []);
 
+  // La temporada elegida se borra al cambiar de cliente (cambiarCliente), no aquí: al volver a la
+  // lista con los filtros recordados, la temporada guardada tiene que sobrevivir a esta carga.
   useEffect(() => {
-    setTemporada('');
     setTemporadas([]);
     if (!cliente) return;
     let vigente = true;
@@ -71,6 +98,7 @@ export default function Modelos() {
     if (etapa) params.set('etapa', etapa);
     if (temporada) params.set('temporada', temporada);
     if (busqueda) params.set('q', busqueda);
+    if (sinEtiqueta) params.set('sinEtiqueta', 'true');
     let vigente = true;
     setError(null);
     api<ModeloResumen[]>(`/api/modelos?${params}`)
@@ -83,9 +111,26 @@ export default function Modelos() {
     return () => {
       vigente = false;
     };
-  }, [cliente, etapa, temporada, busqueda, version]);
+  }, [cliente, etapa, temporada, busqueda, sinEtiqueta, version]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CLAVE_FILTROS, JSON.stringify({ cliente, etapa, temporada, texto, sinEtiqueta } satisfies Filtros));
+    } catch {
+      // Sin almacenamiento (ventana privada, bloqueado) los filtros simplemente no se recuerdan.
+    }
+  }, [cliente, etapa, temporada, texto, sinEtiqueta]);
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
+
+  const cambiarCliente = (clave: string) => {
+    setCliente(clave);
+    setTemporada('');
+  };
+
+  const elegidos = (modelos ?? []).filter((m) => marcados.has(m.id));
+
+  const imprimirEtiquetas = () => navegar(`/etiquetas-patrones?ids=${elegidos.map((m) => m.id).join(',')}`);
 
   const marcar = (modeloId: number) =>
     setMarcados((antes) => {
@@ -104,7 +149,7 @@ export default function Modelos() {
 
   const creado = (m: ModeloResumen) => {
     setAlta(false);
-    if (cliente && cliente !== m.cliente) setCliente(m.cliente);
+    if (cliente && cliente !== m.cliente) cambiarCliente(m.cliente);
     recargar();
     navegar(`/modelos/${m.id}`);
   };
@@ -115,7 +160,7 @@ export default function Modelos() {
   };
 
   const nombreCliente = clientes.find((c) => c.clave === cliente)?.nombre ?? cliente;
-  const otrosFiltros = Boolean(etapa || temporada || busqueda);
+  const otrosFiltros = Boolean(etapa || temporada || busqueda || sinEtiqueta);
 
   const vacio = () => {
     if (otrosFiltros) return <p className="ayuda">Ningún modelo con estos filtros.</p>;
@@ -139,15 +184,22 @@ export default function Modelos() {
           <button className="boton marca" type="button" onClick={darDeAlta}>
             <Icono nombre="mas" /> Dar de alta un modelo
           </button>
-          <button className="boton" type="button" disabled title="Llega en la siguiente entrega">
-            Imprimir etiquetas de patrones
+          <button
+            className="boton"
+            type="button"
+            disabled={elegidos.length === 0}
+            title={elegidos.length === 0 ? 'Elige uno o varios modelos con su casilla' : undefined}
+            onClick={imprimirEtiquetas}
+          >
+            <Icono nombre="imprimir" />
+            {elegidos.length === 0 ? 'Imprimir etiquetas de patrones' : `Imprimir etiquetas de patrones (${elegidos.length})`}
           </button>
         </div>
 
         <div className="filtros">
           <label className="campo">
             Cliente
-            <select value={cliente} onChange={(e) => setCliente(e.target.value)}>
+            <select value={cliente} onChange={(e) => cambiarCliente(e.target.value)}>
               <option value="">Todos los clientes</option>
               {clientes.map((c) => (
                 <option key={c.clave} value={c.clave}>
@@ -178,6 +230,9 @@ export default function Modelos() {
               {txt}
             </button>
           ))}
+          <button className="chip" type="button" aria-pressed={sinEtiqueta} onClick={() => setSinEtiqueta((s) => !s)}>
+            Sin etiqueta impresa
+          </button>
         </div>
 
         {marcados.size > 0 && (
