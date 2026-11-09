@@ -1,7 +1,7 @@
 // La ficha de un modelo en el taller, la de la maqueta: foto, referencia,
 // nombre, cliente y etapa; el botón para avisar de un cambio en este modelo, y
 // el historial de lo que le ha pasado.
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
@@ -9,6 +9,7 @@ import FotoModelo from '../comun/FotoModelo';
 import Historial from '../comun/Historial';
 import { Icono } from '../comun/iconos';
 import type { ModeloFicha } from '../comun/modelos';
+import { useTitulo } from './Shell';
 
 export default function FichaModelo() {
   const { id } = useParams();
@@ -16,15 +17,20 @@ export default function FichaModelo() {
   const [ficha, setFicha] = useState<ModeloFicha | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Solo vale la respuesta de la última petición: al saltar de ficha en ficha
+  // (el escáner), una respuesta lenta del modelo anterior no debe pisar la buena.
+  const peticion = useRef(0);
   const cargar = useCallback(() => {
+    const esta = ++peticion.current;
     setError(null);
     setFicha(null);
     api<ModeloFicha>(`/api/modelos/${id}`)
-      .then(setFicha)
-      .catch((e: unknown) => setError(e instanceof ErrorApi ? e.message : 'No se ha podido cargar el modelo'));
+      .then((f) => esta === peticion.current && setFicha(f))
+      .catch((e: unknown) => esta === peticion.current && setError(e instanceof ErrorApi ? e.message : 'No se ha podido cargar el modelo'));
   }, [id]);
 
   useEffect(cargar, [cargar]);
+  useTitulo(ficha?.modelo.referencia ?? null);
 
   if (error) {
     return (

@@ -223,7 +223,8 @@ export default function Modelos() {
         {alta ? (
           <AltaModelo clientes={clientes} clienteInicial={cliente} onCreado={creado} onCancelar={() => setAlta(false)} />
         ) : elegido !== null ? (
-          <FichaModelo id={elegido} onCambiado={recargar} />
+          // Con key, cada modelo monta su propia ficha: nada del anterior (estado, diálogo, nombre a medio editar) pasa al nuevo.
+          <FichaModelo key={elegido} id={elegido} onCambiado={recargar} />
         ) : (
           <div className="vacio">
             <b>Elige un modelo de la lista</b>

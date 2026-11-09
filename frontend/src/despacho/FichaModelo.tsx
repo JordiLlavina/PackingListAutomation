@@ -31,18 +31,28 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
   const [errorEtapa, setErrorEtapa] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
+  // Solo vale la respuesta de la última petición: si llega tarde la de otro
+  // modelo (o una recarga vieja), se tira, para que la ficha y las acciones
+  // sean siempre del modelo que se ve.
+  const peticion = useRef(0);
   const cargar = useCallback(() => {
+    const esta = ++peticion.current;
     setError(null);
     return api<ModeloFicha>(`/api/modelos/${id}`)
-      .then(setFicha)
-      .catch((e: unknown) => setError(mensaje(e, 'No se ha podido cargar el modelo')));
+      .then((f) => {
+        if (esta === peticion.current) setFicha(f);
+      })
+      .catch((e: unknown) => {
+        if (esta === peticion.current) setError(mensaje(e, 'No se ha podido cargar el modelo'));
+      });
   }, [id]);
 
   useEffect(() => {
-    setFicha(null);
-    setNombre(null);
-    setErrorAccion(null);
     void cargar();
+    // Al desmontar, cualquier respuesta pendiente deja de valer.
+    return () => {
+      peticion.current++;
+    };
   }, [cargar]);
 
   const trasCambiar = async () => {

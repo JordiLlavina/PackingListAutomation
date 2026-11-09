@@ -3,6 +3,7 @@
 // scroll; la barra inferior con los cuatro destinos, y el botón flotante de
 // escanear en las pantallas de consulta. Cada ruta dice en su `handle` cómo
 // se pinta el marco (ver Pantalla).
+import { createContext, useContext, useEffect, useState } from 'react';
 import { Outlet, useMatches, useNavigate } from 'react-router';
 import { Icono, type NombreIcono } from '../comun/iconos';
 
@@ -31,10 +32,27 @@ const DESTINOS: { seccion: Seccion; ruta: string; texto: string; icono: NombreIc
 
 const PANTALLA_POR_DEFECTO: Pantalla = { titulo: 'Modelos · Puntotres', seccion: 'inicio' };
 
+/**
+ * El título que una pantalla pone en la cabecera cuando el de su ruta no basta
+ * (la ficha de un modelo lleva su referencia, como en la maqueta). Mientras
+ * llega, o con null, se ve el título fijo de la ruta; al salir de la pantalla
+ * vuelve el fijo.
+ */
+const TituloContexto = createContext<(titulo: string | null) => void>(() => {});
+
+export function useTitulo(titulo: string | null) {
+  const poner = useContext(TituloContexto);
+  useEffect(() => {
+    poner(titulo);
+    return () => poner(null);
+  }, [poner, titulo]);
+}
+
 export default function Shell() {
   const navegar = useNavigate();
   const matches = useMatches();
   const pantalla = (matches.at(-1)?.handle as Pantalla | undefined) ?? PANTALLA_POR_DEFECTO;
+  const [tituloPropio, setTituloPropio] = useState<string | null>(null);
   // Las órdenes nuevas de despacho llegan en Task 14; hasta entonces la pepita no sale.
   const pendientes: Partial<Record<Seccion, number>> = {};
 
@@ -51,10 +69,12 @@ export default function Shell() {
             <Icono nombre="atras" />
           </button>
         )}
-        <h1>{pantalla.titulo}</h1>
+        <h1>{tituloPropio ?? pantalla.titulo}</h1>
       </header>
       <main>
-        <Outlet />
+        <TituloContexto.Provider value={setTituloPropio}>
+          <Outlet />
+        </TituloContexto.Provider>
       </main>
       {pantalla.fab && (
         <button className="fab" type="button" aria-label="Escanear etiqueta" title="Escanear etiqueta" onClick={() => navegar('/escanear')}>
