@@ -304,3 +304,13 @@ img.foto { object-fit: cover; background: var(--line); }
 .opciones-radio input { width: 18px; height: 18px; accent-color: var(--accent); }
 .dialogo { border: 0; border-radius: 18px; padding: 24px; background: var(--surface); color: var(--fg); box-shadow: var(--shadow); width: min(92vw, 480px); }
 .dialogo::backdrop { background: rgba(22, 33, 58, .45); }
+
+/* «He cambiado algo»: lo que la maqueta no trae. Cada miniatura del paso de
+   fotos lleva su botón de quitar (objetivo de 64 px, encima de la foto); el
+   error del envío va en rojo debajo de «Volver a intentar»; el selector de
+   ficheros escondido se queda dentro de su recuadro de cámara. */
+.camara { position: relative; }
+.miniaturas .con-quitar { position: relative; margin: 0; }
+.quitar-foto { position: absolute; top: 6px; right: 6px; min-width: 64px; min-height: 64px; padding: 0 12px; border-radius: 14px; border: 0; background: rgba(22, 33, 58, .78); color: #fff; font-size: 1rem; font-weight: 700; }
+.error-envio { color: var(--alta); font-weight: 700; margin: 0; }
+.ficha svg.foto { padding: 18px; background: var(--bg); color: var(--fg); }

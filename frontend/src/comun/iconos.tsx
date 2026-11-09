@@ -50,3 +50,8 @@ export function Icono({ nombre, className }: { nombre: NombreIcono; className?: 
     />
   );
 }
+
+/** Si un nombre que llega de la API (los tipos de cambio) es uno de nuestros iconos. */
+export function esNombreIcono(nombre: string): nombre is NombreIcono {
+  return Object.prototype.hasOwnProperty.call(I, nombre);
+}

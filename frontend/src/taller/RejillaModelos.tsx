@@ -16,7 +16,7 @@ const CHIPS_ETAPA: [string, string][] = [
   ['PRODUCCION', 'Producción'],
 ];
 
-export default function RejillaModelos({ onElegir }: { onElegir: (id: number) => void }) {
+export default function RejillaModelos({ onElegir }: { onElegir: (id: number, modelo: ModeloResumen) => void }) {
   const [modelos, setModelos] = useState<ModeloResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
@@ -70,7 +70,7 @@ export default function RejillaModelos({ onElegir }: { onElegir: (id: number) =>
       ) : (
         <div className="rejilla">
           {lista.map((m) => (
-            <button key={m.id} className="tarjeta-modelo" type="button" onClick={() => onElegir(m.id)}>
+            <button key={m.id} className="tarjeta-modelo" type="button" onClick={() => onElegir(m.id, m)}>
               <FotoModelo modelo={m} />
               <div className="pie">
                 <span className="ref">{m.referencia}</span>

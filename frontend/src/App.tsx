@@ -11,6 +11,13 @@ import InicioDespacho from './despacho/Inicio';
 import ModelosDespacho from './despacho/Modelos';
 import Entrada from './entrada/Entrada';
 import ShellTaller, { type Pantalla } from './taller/Shell';
+import { BorradorProvider } from './taller/cambio/Borrador';
+import ElegirModelo from './taller/cambio/ElegirModelo';
+import Enviado from './taller/cambio/Enviado';
+import Fotos from './taller/cambio/Fotos';
+import Grabar from './taller/cambio/Grabar';
+import QueHasCambiado from './taller/cambio/QueHasCambiado';
+import Revisar from './taller/cambio/Revisar';
 import FichaModeloTaller from './taller/FichaModelo';
 import InicioTaller from './taller/Inicio';
 import ModelosTaller from './taller/Modelos';
@@ -28,17 +35,38 @@ function pantalla(datos: Pantalla): { handle: Pantalla } {
   return { handle: datos };
 }
 
+/**
+ * «He cambiado algo», paso a paso: cada paso es su ruta (atrás, recargar y el
+ * título de la cabecera funcionan solos) y el borrador va en un contexto por
+ * encima de todas, así que salir por la barra de abajo no lo pierde. Sin
+ * escáner flotante: taparía los botones de abajo y aquí no hace falta.
+ */
+const rutasCambio: RouteObject[] = [
+  { index: true, element: <ElegirModelo />, ...pantalla({ titulo: '¿Qué modelo?', atras: '/', seccion: 'inicio' }) },
+  // El título lo pone el paso con la referencia y el nombre del modelo.
+  { path: 'tipo', element: <QueHasCambiado />, ...pantalla({ titulo: 'He cambiado algo', atras: '/cambio', seccion: 'inicio' }) },
+  { path: 'fotos', element: <Fotos />, ...pantalla({ titulo: 'Fotos del cambio', atras: '/cambio/tipo', seccion: 'inicio' }) },
+  { path: 'voz', element: <Grabar />, ...pantalla({ titulo: 'Nota de voz', atras: '/cambio/fotos', seccion: 'inicio' }) },
+  { path: 'revisar', element: <Revisar />, ...pantalla({ titulo: 'Revisar y enviar', atras: '/cambio/voz', seccion: 'inicio' }) },
+  { path: 'enviado', element: <Enviado />, ...pantalla({ titulo: 'Enviado', seccion: 'inicio' }) },
+  { path: '*', element: <Navigate to="/cambio" replace /> },
+];
+
 const rutasTaller: RouteObject[] = [
   {
     path: '/',
-    element: <ShellTaller />,
+    element: (
+      <BorradorProvider>
+        <ShellTaller />
+      </BorradorProvider>
+    ),
     children: [
       { index: true, element: <InicioTaller />, ...pantalla({ titulo: 'Modelos · Puntotres', seccion: 'inicio', fab: true }) },
       { path: 'ordenes', element: <PorLlegar />, ...pantalla({ titulo: 'Tengo que hacer', seccion: 'ordenes', fab: true }) },
       { path: 'avisos', element: <PorLlegar />, ...pantalla({ titulo: 'Mis avisos', seccion: 'avisos', fab: true }) },
       { path: 'modelos', element: <ModelosTaller />, ...pantalla({ titulo: 'Modelos', seccion: 'modelos', fab: true }) },
       { path: 'modelos/:id', element: <FichaModeloTaller />, ...pantalla({ titulo: 'Modelo', atras: '/modelos', seccion: 'modelos', fab: true }) },
-      { path: 'cambio/*', element: <PorLlegar />, ...pantalla({ titulo: 'He cambiado algo', atras: '/', seccion: 'inicio' }) },
+      { path: 'cambio', children: rutasCambio },
       { path: 'escanear', element: <PorLlegar />, ...pantalla({ titulo: 'Escanear etiqueta', atras: '/' }) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],

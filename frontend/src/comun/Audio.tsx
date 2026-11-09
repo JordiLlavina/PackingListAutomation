@@ -1,12 +1,19 @@
 // Reproductor de una nota de voz, el de la maqueta: botón grande de escuchar,
 // barra de avance y duración. Por debajo, un <audio> de verdad que pide el
-// adjunto a la API. `compacto` es la versión de dentro de la línea de tiempo
-// (sin sombra, con filete y el botón más pequeño).
+// adjunto a la API, o una grabación que todavía está en el navegador (`src`,
+// la nota recién grabada antes de mandarla). `compacto` es la versión de
+// dentro de la línea de tiempo (sin sombra, con filete y el botón más pequeño).
 import { useEffect, useRef, useState } from 'react';
 import { Icono } from './iconos';
 import { mmss } from './tiempo';
 
-export default function Audio({ adjuntoId, compacto = false }: { adjuntoId: number; compacto?: boolean }) {
+type Props = {
+  compacto?: boolean;
+  /** La duración que ya se sabe (la de la grabación), para enseñarla antes de oírla. */
+  duracionSeg?: number;
+} & ({ adjuntoId: number; src?: never } | { src: string; adjuntoId?: never });
+
+export default function Audio({ adjuntoId, src, compacto = false, duracionSeg = 0 }: Props) {
   const audio = useRef<HTMLAudioElement>(null);
   const [sonando, setSonando] = useState(false);
   const [actual, setActual] = useState(0);
@@ -50,17 +57,18 @@ export default function Audio({ adjuntoId, compacto = false }: { adjuntoId: numb
     }
   };
 
-  const avance = duracion > 0 ? Math.min(100, (actual / duracion) * 100) : 0;
+  const total = duracion > 0 ? duracion : duracionSeg;
+  const avance = total > 0 ? Math.min(100, (actual / total) * 100) : 0;
   return (
     <div className={compacto ? 'audio compacto' : 'audio'}>
-      <audio ref={audio} src={`/api/adjuntos/${adjuntoId}`} preload="metadata" />
+      <audio ref={audio} src={src ?? `/api/adjuntos/${adjuntoId}`} preload="metadata" />
       <button className="play" type="button" aria-label={sonando ? 'Parar' : 'Escuchar'} onClick={alternar}>
         <Icono nombre={sonando ? 'pausa' : 'play'} />
       </button>
       <div className="barra">
         <i style={{ width: `${avance}%` }} />
       </div>
-      <span className="dur">{mmss(sonando || duracion === 0 ? actual : duracion)}</span>
+      <span className="dur">{mmss(sonando || total === 0 ? actual : total)}</span>
     </div>
   );
 }
