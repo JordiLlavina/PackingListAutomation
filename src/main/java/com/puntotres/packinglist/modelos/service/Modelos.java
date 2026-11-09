@@ -460,6 +460,11 @@ public class Modelos {
         if (!uno.getCliente().equals(otro.getCliente())) {
             throw new IllegalArgumentException("Los dos modelos tienen que ser del mismo cliente");
         }
+        if (uno.getCodigo() != null && otro.getCodigo() != null) {
+            // Juntar dos referencias del cliente perdería una (y dejaría huérfanas las hojas de embalaje que la
+            // nombran): la pantalla solo ofrece fusionar un prototipo, y la API tampoco deja hacer otra cosa.
+            throw new IllegalArgumentException("Los dos modelos tienen referencia: elige cuál es el prototipo");
+        }
         Modelo superviviente = uno.getId() < otro.getId() ? uno : otro;
         Modelo absorbido = superviviente == uno ? otro : uno;
         Long idAbsorbido = absorbido.getId();
@@ -488,8 +493,9 @@ public class Modelos {
             apunte.moverA(superviviente.getId());
         }
         // Se borra antes de dar su código y su nombre de prototipo al superviviente: los dos son únicos por
-        // cliente. Lo movido se escribe en el mismo flush, antes que el borrado, así que la cascada del SQL no
-        // se lleva nada.
+        // cliente. Lo movido se escribe en la base ANTES del borrado (este flush): las modificaciones y los
+        // documentos restringen el borrado del modelo desde la V5, y lo que tiene cascada no debe llevarse nada.
+        repositorio.flush();
         repositorio.delete(absorbido);
         repositorio.flush();
 

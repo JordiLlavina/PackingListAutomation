@@ -28,8 +28,12 @@ import com.puntotres.packinglist.modelos.api.dto.Fusion;
 import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapa;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapaRepository;
+import com.puntotres.packinglist.modelos.persistence.AdjuntoRepository;
 import com.puntotres.packinglist.modelos.persistence.DocumentoModeloRepository;
+import com.puntotres.packinglist.modelos.persistence.Mensaje;
+import com.puntotres.packinglist.modelos.persistence.MensajeRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
+import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
@@ -106,6 +110,12 @@ class FusionTest {
 
     @Autowired
     private ModeloCodigoHistoricoRepository codigosHistoricos;
+
+    @Autowired
+    private MensajeRepository mensajes;
+
+    @Autowired
+    private AdjuntoRepository adjuntosRepositorio;
 
     @Autowired
     private MockMvc mvc;
@@ -308,17 +318,71 @@ class FusionTest {
     }
 
     @Test
-    void dosConReferenciaSoloDejanVigenteLaDelSuperviviente() {
+    void dosConReferenciaNoSeFusionan() {
         Modelo uno = modelos.darDeAlta(new Modelos.AltaManual("AMI", null, "T22-UNO", null, null, null, null),
                 despacho());
         Modelo otro = modelos.darDeAlta(new Modelos.AltaManual("AMI", null, "T22-OTRO", null, null, null, null),
                 despacho());
 
-        modelos.fusionar(otro.getId(), uno.getId(), despacho());
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> modelos.fusionar(otro.getId(), uno.getId(), despacho()));
 
-        List<CodigoHistorico> codigos = modelos.ficha(uno.getId()).codigos();
-        assertEquals(List.of("T22-UNO"), codigos.stream().filter(codigo -> codigo.hasta() == null)
-                .map(CodigoHistorico::codigo).toList(), codigos.toString());
+        assertEquals("Los dos modelos tienen referencia: elige cuál es el prototipo", error.getMessage());
+        assertTrue(repositorioModelos.existsById(uno.getId()));
+        assertTrue(repositorioModelos.existsById(otro.getId()));
+    }
+
+    @Test
+    void siSobreviveElPrototipoSeLlevaElHistorialDelTallerDelImportado() {
+        Long temporada = temporada("T26-HISTORIAL-PROTO");
+        Modelo proto = prototipo("PROTO T26 HISTORIAL", temporada);
+        Modelo importado = importado("T26-HIST-PROTO.AL0001");
+        Historial historial = historialEn(importado);
+
+        Modelo superviviente = modelos.asignarReferencia(proto.getId(), "T26-HIST-PROTO", true, despacho());
+
+        assertEquals(proto.getId(), superviviente.getId(), "sobrevive el de menor id, el prototipo");
+        comprobarQueSeHaMovido(historial, proto.getId());
+    }
+
+    @Test
+    void siSobreviveElImportadoConservaSuHistorialDelTaller() {
+        Long temporada = temporada("T26-HISTORIAL-IMP");
+        // El importado primero, para que tenga el id menor y sea él quien sobreviva.
+        Modelo importado = importado("T26-HIST-IMP.AL0001");
+        Modelo proto = prototipo("PROTO T26 HISTORIAL IMP", temporada);
+        Historial historial = historialEn(proto);
+
+        Modelo superviviente = modelos.asignarReferencia(proto.getId(), "T26-HIST-IMP", true, despacho());
+
+        assertEquals(importado.getId(), superviviente.getId());
+        comprobarQueSeHaMovido(historial, importado.getId());
+    }
+
+    /** Lo que el absorbido tenía de la app del taller, para buscarlo después por su id. */
+    private record Historial(Long modificacionId, Long mensajeId, Long adjuntoId, Long cambioEtapaId) {
+    }
+
+    /** Un aviso del taller con su nota de voz y un cambio de etapa: lo que la V5 no deja que caiga con el modelo. */
+    private Historial historialEn(Modelo modelo) {
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo.getId(),
+                "PIEL", List.of(ModificacionesTest.audio(30))), taller());
+        Mensaje mensaje = mensajes.findByModificacionIdOrderByCreadoEnAscIdAsc(aviso.getId()).get(0);
+        Long adjuntoId = adjuntosRepositorio.resumenes(List.of(mensaje.getId())).get(0).id();
+        modelos.cambiarEtapa(modelo.getId(), Etapa.SMS, "T26 a muestras", despacho());
+        Long cambioId = cambiosEtapa.findByModeloIdOrderByFechaDescIdDesc(modelo.getId()).stream()
+                .filter(cambio -> "T26 a muestras".equals(cambio.getMotivo())).findFirst().orElseThrow().getId();
+        return new Historial(aviso.getId(), mensaje.getId(), adjuntoId, cambioId);
+    }
+
+    private void comprobarQueSeHaMovido(Historial historial, Long supervivienteId) {
+        assertEquals(supervivienteId,
+                modificacionesRepositorio.findById(historial.modificacionId()).orElseThrow().getModeloId());
+        assertEquals(historial.modificacionId(),
+                mensajes.findById(historial.mensajeId()).orElseThrow().getModificacionId());
+        assertTrue(adjuntosRepositorio.existsById(historial.adjuntoId()), "la nota de voz sigue ahí");
+        assertTrue(cambiosEtapa.findByModeloIdOrderByFechaDescIdDesc(supervivienteId).stream()
+                .anyMatch(cambio -> cambio.getId().equals(historial.cambioEtapaId())));
     }
 
     @Test
@@ -348,6 +412,11 @@ class FusionTest {
 
     private Long temporada(String nombre) {
         return temporadas.guardar(null, "AMI", nombre, (FicheroExcel) null, null).getId();
+    }
+
+    private UsuarioActual taller() {
+        Usuario usuario = ComoUsuario.usuarioDePrueba(usuarios, Rol.TALLER);
+        return new UsuarioActual(usuario.getId(), usuario.getNombre(), usuario.getRol(), null);
     }
 
     private UsuarioActual despacho() {
