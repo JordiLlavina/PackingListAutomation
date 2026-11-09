@@ -47,6 +47,19 @@ public class Adjuntos {
     /** Lo más que puede pesar un adjunto: 15 MB. */
     public static final long MAX_BYTES = 15L * 1024 * 1024;
 
+    /**
+     * Un 400 si el fichero pasa de {@link #MAX_BYTES}. Los controladores lo
+     * llaman con el tamaño que dice el multipart ANTES de leer los bytes: el
+     * multipart admite 1 GB (por la carpeta de fotos del corte), y leer un
+     * fichero así entero en memoria para rechazarlo después es justo lo que
+     * no se puede hacer.
+     */
+    public static void comprobarTamano(String nombre, long tamano) {
+        if (tamano > MAX_BYTES) {
+            throw new IllegalArgumentException("El fichero " + nombre + " pesa más de 15 MB");
+        }
+    }
+
     /** Lo que cabe en {@code adjunto.mime}. */
     private static final int LARGO_MIME = 100;
 

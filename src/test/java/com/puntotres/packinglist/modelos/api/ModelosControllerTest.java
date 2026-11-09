@@ -196,6 +196,22 @@ class ModelosControllerTest {
     }
 
     @Test
+    void unaFotoDeMasDe15MbSeRechazaSinLeerlaYNoGuardaNinguna() throws Exception {
+        long id = alta("T27-API-ENORME");
+
+        mvc.perform(multipart("/api/modelos/" + id + "/fotos")
+                        .file(new MockMultipartFile("fotos", "buena.png", MediaType.IMAGE_PNG_VALUE,
+                                png(40, 30, Color.RED)))
+                        .file(ModificacionesControllerTest.enorme("fotos", "enorme.jpg", MediaType.IMAGE_JPEG_VALUE))
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("El fichero enorme.jpg pesa más de 15 MB"));
+
+        mvc.perform(get("/api/modelos/" + id).with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$.fotos", hasSize(0)));
+    }
+
+    @Test
     void dosFotosLlamadasIgualSeGuardanLasDosConNombresDistintos() throws Exception {
         long id = alta("T9-API-MISMONOMBRE");
 

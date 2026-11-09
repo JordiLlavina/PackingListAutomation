@@ -48,6 +48,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.modelos.PdfDePrueba;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
+import com.puntotres.packinglist.modelos.service.Adjuntos;
 import com.puntotres.packinglist.modelos.service.ImagenesDePdf;
 import com.puntotres.packinglist.modelos.service.Usuarios;
 
@@ -503,6 +504,49 @@ class ModificacionesControllerTest {
 
         mvc.perform(get("/api/modelos/" + modeloId).with(comoUsuario(despacho())))
                 .andExpect(jsonPath("$.documentos", hasSize(0)));
+    }
+
+    @Test
+    void unFicheroDeMasDe15MbSeRechazaSinLeerloYNoCreaNada() throws Exception {
+        long modeloId = alta("T27-ENORME");
+
+        mvc.perform(nueva(modeloId).file(enorme("audio", "nota.webm", "audio/webm")).param("tipoCambio", "PIEL")
+                        .param("audioDuracionSeg", "30").with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("El fichero nota.webm pesa más de 15 MB"));
+        mvc.perform(nueva(modeloId).file(enorme("fotos", "foto.jpg", MediaType.IMAGE_JPEG_VALUE))
+                        .param("tipoCambio", "PIEL").with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("El fichero foto.jpg pesa más de 15 MB"));
+        mvc.perform(nueva(modeloId).file(enorme("documentos", "ficha.pdf", MediaType.APPLICATION_PDF_VALUE))
+                        .param("titulo", "Nuevo patrón").param("prioridad", "NORMAL")
+                        .param("guardarEnModelo", "true").with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("El fichero ficha.pdf pesa más de 15 MB"));
+
+        mvc.perform(get("/api/modificaciones").param("modelo", String.valueOf(modeloId))
+                        .with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/api/modelos/" + modeloId).with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$.documentos", hasSize(0)));
+    }
+
+    /**
+     * Un fichero que dice pesar más de 15 MB y no se deja leer: si el
+     * controlador leyera los bytes antes de mirar el tamaño, el test lo vería.
+     */
+    static MockMultipartFile enorme(String campo, String nombre, String mime) {
+        return new MockMultipartFile(campo, nombre, mime, new byte[] {1, 2, 3}) {
+            @Override
+            public long getSize() {
+                return Adjuntos.MAX_BYTES + 1;
+            }
+
+            @Override
+            public byte[] getBytes() {
+                throw new IllegalStateException("No se lee un fichero de más de 15 MB");
+            }
+        };
     }
 
     private MockMultipartHttpServletRequestBuilder nueva(long modeloId) {

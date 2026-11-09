@@ -37,6 +37,7 @@ import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 import com.puntotres.packinglist.modelos.service.AdjuntoNuevo;
+import com.puntotres.packinglist.modelos.service.Adjuntos;
 import com.puntotres.packinglist.modelos.service.Documentos;
 import com.puntotres.packinglist.modelos.service.Modificaciones;
 
@@ -145,6 +146,11 @@ public class ModificacionesController {
             } catch (IllegalArgumentException | UncheckedIOException | NoSuchElementException e) {
                 LOG.warn("No se ha podido copiar {} al modelo {}: {}", documento.nombre(), modeloId, e.getMessage());
                 avisos.add("No se pudo guardar " + documento.nombre() + " en el modelo: " + e.getMessage());
+            } catch (RuntimeException e) {
+                // La orden ya está creada: un fallo que nadie esperaba aquí no puede convertirse en un 500 que
+                // haga creer al despacho que la orden no ha salido (y que la mande dos veces).
+                LOG.error("Error inesperado al copiar {} al modelo {}", documento.nombre(), modeloId, e);
+                avisos.add("No se pudo guardar " + documento.nombre() + " en el modelo: error inesperado");
             }
         }
     }
@@ -242,6 +248,7 @@ public class ModificacionesController {
                                                List<MultipartFile> fotos) throws IOException {
         List<AdjuntoNuevo> adjuntos = new ArrayList<>();
         if (audio != null && !audio.isEmpty()) {
+            Adjuntos.comprobarTamano(nombreBase(audio.getOriginalFilename()), audio.getSize());
             adjuntos.add(new AdjuntoNuevo(TipoAdjunto.AUDIO, nombreBase(audio.getOriginalFilename()),
                     audio.getContentType(), audio.getBytes(), duracion(audioDuracionSeg)));
         }
@@ -252,6 +259,8 @@ public class ModificacionesController {
     private static List<AdjuntoNuevo> convertir(List<MultipartFile> ficheros, TipoAdjunto tipo) throws IOException {
         List<AdjuntoNuevo> nuevos = new ArrayList<>();
         for (MultipartFile fichero : conContenido(ficheros)) {
+            // El tamaño antes que los bytes: un fichero de 1 GB no se lee entero para rechazarlo.
+            Adjuntos.comprobarTamano(nombreBase(fichero.getOriginalFilename()), fichero.getSize());
             nuevos.add(new AdjuntoNuevo(tipo, nombreBase(fichero.getOriginalFilename()), fichero.getContentType(),
                     fichero.getBytes(), null));
         }

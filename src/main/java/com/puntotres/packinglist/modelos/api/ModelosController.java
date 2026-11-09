@@ -25,6 +25,7 @@ import com.puntotres.packinglist.modelos.api.dto.Fusion;
 import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.api.dto.ModeloResumen;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
+import com.puntotres.packinglist.modelos.service.Adjuntos;
 import com.puntotres.packinglist.modelos.service.EtiquetasPatrones;
 import com.puntotres.packinglist.modelos.service.Modelos;
 import com.puntotres.packinglist.persistence.Etapa;
@@ -174,6 +175,8 @@ public class ModelosController {
         modeloQueExiste(id);
         List<Modelos.FotoSubida> subidas = new ArrayList<>();
         for (MultipartFile fichero : ficheros == null ? List.<MultipartFile>of() : ficheros) {
+            // El tamaño antes que los bytes: un fichero de 1 GB no se lee entero para rechazarlo.
+            Adjuntos.comprobarTamano(fichero.getOriginalFilename(), fichero.getSize());
             subidas.add(new Modelos.FotoSubida(fichero.getOriginalFilename(), fichero.getBytes()));
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(modelos.subirFotos(id, subidas));
