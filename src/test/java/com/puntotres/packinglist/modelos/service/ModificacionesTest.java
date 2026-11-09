@@ -137,7 +137,10 @@ class ModificacionesTest {
         AdjuntoVista nota = primero.adjuntos().get(0);
         assertEquals(TipoAdjunto.AUDIO, nota.tipo());
         assertEquals(30, nota.duracionSeg());
-        assertEquals(EstadoTranscripcion.PENDIENTE, nota.estadoTranscripcion());
+        // Nace PENDIENTE y la transcripción corre aparte, en su hilo (TranscripcionService): en los tests no hay
+        // Azure, así que según llegue ese hilo ya puede estar en NO_APLICA. Lo que no puede es quedarse sin estado.
+        assertTrue(Set.of(EstadoTranscripcion.PENDIENTE, EstadoTranscripcion.NO_APLICA)
+                .contains(nota.estadoTranscripcion()), String.valueOf(nota.estadoTranscripcion()));
 
         Evento evento = modelos.ficha(modeloId).lineaTiempo().stream()
                 .filter(e -> "MODIFICACION".equals(e.tipo()))

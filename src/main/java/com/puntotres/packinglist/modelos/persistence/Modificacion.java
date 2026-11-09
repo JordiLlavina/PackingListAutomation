@@ -198,4 +198,16 @@ public class Modificacion {
     public void pedirRespuesta() {
         necesitaRespuesta = true;
     }
+
+    /** El título que ha sacado la IA de la nota de voz; se marca como suyo para que se vea y se pueda corregir. */
+    public void ponerTituloDeIa(String titulo) {
+        this.titulo = titulo;
+        this.tituloDeIa = true;
+    }
+
+    /** El título que pone (o corrige) una persona: deja de ser de la IA. */
+    public void cambiarTitulo(String titulo) {
+        this.titulo = titulo;
+        this.tituloDeIa = false;
+    }
 }

@@ -136,6 +136,39 @@ public class Adjuntos {
         adjuntoQueExiste(id).marcarResumen(resumenIa);
     }
 
+    /**
+     * Como {@link #marcarTranscripcion}, pero solo si sigue {@code PENDIENTE}:
+     * lo usa quien transcribe en segundo plano, para no pisar lo que se haya
+     * marcado mientras tanto. Dice si lo ha apuntado.
+     */
+    @Transactional
+    public boolean marcarTranscripcionSiPendiente(Long id, EstadoTranscripcion estado, String transcripcion,
+                                                  String error) {
+        return repositorio.marcarTranscripcionSiSigue(id, EstadoTranscripcion.PENDIENTE, estado, transcripcion,
+                error) > 0;
+    }
+
+    /**
+     * Devuelve una nota de voz a {@code PENDIENTE} para transcribirla otra
+     * vez: sin texto, sin resumen y sin error. Un 400 si no es una nota de
+     * voz, un 404 si no existe. Encolarla es cosa de quien transcribe.
+     */
+    @Transactional
+    public void volverAPendiente(Long id) {
+        Adjunto adjunto = adjuntoQueExiste(id);
+        if (adjunto.getTipo() != TipoAdjunto.AUDIO) {
+            throw new IllegalArgumentException("Solo se transcribe una nota de voz");
+        }
+        adjunto.marcarTranscripcion(EstadoTranscripcion.PENDIENTE, null, null);
+        adjunto.marcarResumen(null);
+    }
+
+    /** Las notas de voz que siguen pendientes de transcribir, de la más vieja a la más nueva. */
+    @Transactional(readOnly = true)
+    public List<Long> notasPendientes() {
+        return repositorio.idsPorTipoYEstado(TipoAdjunto.AUDIO, EstadoTranscripcion.PENDIENTE);
+    }
+
     private Adjunto adjuntoQueExiste(Long id) {
         return conBytes(id).orElseThrow(() -> new NoSuchElementException("No hay ningún adjunto con id " + id));
     }

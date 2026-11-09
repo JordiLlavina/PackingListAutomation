@@ -358,6 +358,24 @@ public class Modificaciones implements Modelos.FuenteEventos {
         modificacion.descartar(motivo.trim());
     }
 
+    /**
+     * El título que pone o corrige el despacho (el de un aviso lo pone la IA
+     * al resumir la nota de voz, y se corrige aquí): deja de ser de la IA.
+     */
+    @Transactional
+    public void cambiarTitulo(Long id, String titulo, UsuarioActual quien) {
+        exigirDespacho(quien);
+        Modificacion modificacion = modificacionQueExiste(id);
+        if (vacio(titulo)) {
+            throw new IllegalArgumentException("Falta el título");
+        }
+        String limpio = titulo.trim();
+        if (limpio.length() > LARGO_TITULO) {
+            throw new IllegalArgumentException("El título no puede pasar de " + LARGO_TITULO + " caracteres");
+        }
+        modificacion.cambiarTitulo(limpio);
+    }
+
     /** Un mensaje más, también en una descartada; deja la pelota en el otro lado. */
     @Transactional
     public Mensaje responder(Long id, String texto, List<AdjuntoNuevo> adjuntosNuevos, UsuarioActual quien) {

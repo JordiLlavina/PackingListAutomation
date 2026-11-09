@@ -20,14 +20,17 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.puntotres.packinglist.modelos.persistence.Adjunto;
+import com.puntotres.packinglist.modelos.persistence.EstadoTranscripcion;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 import com.puntotres.packinglist.modelos.service.Adjuntos;
 import com.puntotres.packinglist.modelos.service.Modificaciones;
+import com.puntotres.packinglist.modelos.service.transcripcion.TranscripcionService;
 import com.puntotres.packinglist.persistence.ResumenFoto;
 
 /**
- * Los adjuntos de los mensajes: descargarlos (cualquiera que haya entrado) y
- * pasar una foto a la galería del modelo (el despacho).
+ * Los adjuntos de los mensajes: descargarlos y volver a transcribir una nota
+ * de voz (cualquiera que haya entrado), y pasar una foto a la galería del
+ * modelo (el despacho).
  *
  * Se sirven como {@link Resource} para que Spring conteste a las peticiones
  * con {@code Range} (206 y {@code Content-Range}): el {@code <audio>} de
@@ -50,10 +53,12 @@ public class AdjuntosController {
 
     private final Adjuntos adjuntos;
     private final Modificaciones modificaciones;
+    private final TranscripcionService transcripcion;
 
-    public AdjuntosController(Adjuntos adjuntos, Modificaciones modificaciones) {
+    public AdjuntosController(Adjuntos adjuntos, Modificaciones modificaciones, TranscripcionService transcripcion) {
         this.adjuntos = adjuntos;
         this.modificaciones = modificaciones;
+        this.transcripcion = transcripcion;
     }
 
     @GetMapping("/{id}")
@@ -89,6 +94,21 @@ public class AdjuntosController {
             case "text" -> tipo.getSubtype().equals("plain");
             default -> false;
         };
+    }
+
+    /** Cómo queda una nota de voz que se vuelve a transcribir. */
+    public record NotaEnCola(Long id, EstadoTranscripcion estadoTranscripcion) {
+    }
+
+    /**
+     * Vuelve a transcribir una nota de voz (el «Reintentar» de una que falló):
+     * queda {@code PENDIENTE} y se transcribe en segundo plano, así que la
+     * respuesta no espera a Azure. 400 si el adjunto no es una nota de voz.
+     */
+    @PostMapping("/{id}/retranscribir")
+    public NotaEnCola retranscribir(@PathVariable Long id) {
+        transcripcion.retranscribir(id);
+        return new NotaEnCola(id, EstadoTranscripcion.PENDIENTE);
     }
 
     /** Copia la foto al modelo de su modificación y contesta con todas las fotos del modelo. */

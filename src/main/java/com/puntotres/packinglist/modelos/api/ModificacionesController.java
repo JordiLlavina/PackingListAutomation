@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,7 +36,7 @@ import com.puntotres.packinglist.modelos.service.Modificaciones;
 
 /**
  * Las modificaciones en la app: crear, listar, abrir, el ciclo (vista,
- * prioridad, destinos, hecha, descartada) y los mensajes.
+ * prioridad, título, destinos, hecha, descartada) y los mensajes.
  *
  * <b>La dirección la decide el rol de quien la crea, nunca lo que mande</b>:
  * lo que crea el taller es siempre un aviso para el despacho (su título y su
@@ -67,6 +68,10 @@ public class ModificacionesController {
 
     /** Por qué se descarta; obligatorio. */
     public record Descarte(String motivo) {
+    }
+
+    /** El título que pone o corrige el despacho; obligatorio. */
+    public record CambioTitulo(String titulo) {
     }
 
     @PostMapping
@@ -153,6 +158,15 @@ public class ModificacionesController {
     @PostMapping("/{id}/hecha")
     public ModificacionResumen marcarHecha(@PathVariable Long id, @AuthenticationPrincipal UsuarioActual quien) {
         modificaciones.marcarHecha(id, quien);
+        return resumen(id);
+    }
+
+    /** Corrige el título (el que puso la IA en un aviso, o el de una orden): deja de ser de la IA. */
+    @PatchMapping("/{id}/titulo")
+    @PreAuthorize(DESPACHO)
+    public ModificacionResumen cambiarTitulo(@PathVariable Long id, @RequestBody CambioTitulo cambio,
+                                             @AuthenticationPrincipal UsuarioActual quien) {
+        modificaciones.cambiarTitulo(id, cambio.titulo(), quien);
         return resumen(id);
     }
 

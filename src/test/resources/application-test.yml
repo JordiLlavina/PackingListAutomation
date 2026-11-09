@@ -21,3 +21,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+# Sin Azure Speech en los tests aunque la máquina tenga AZURE_SPEECH_KEY: las
+# notas de voz de los tests quedan NO_APLICA y nunca se llama a Azure ni, por
+# tanto, al resumen de Claude (que solo corre tras una transcripción hecha).
+# TranscripcionServiceTest pone sus propios falsos.
+modelos:
+  azure-speech:
+    clave: ""
