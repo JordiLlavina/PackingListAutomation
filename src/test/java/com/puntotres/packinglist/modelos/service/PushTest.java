@@ -12,8 +12,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -21,9 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.Import;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,6 +32,7 @@ import com.puntotres.packinglist.modelos.persistence.SuscripcionPush;
 import com.puntotres.packinglist.modelos.persistence.SuscripcionPushRepository;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
+import com.puntotres.packinglist.modelos.service.PushDePrueba.EnviadorFalso;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
 import com.puntotres.packinglist.persistence.TipoArticulo;
@@ -53,6 +50,7 @@ import com.puntotres.packinglist.persistence.TipoArticulo;
  * otros tests, los envíos se miran solo los de los usuarios de cada test.
  */
 @SpringBootTest
+@Import(PushDePrueba.class)
 class PushTest {
 
     /** Lo más que se espera al hilo de los push. */
@@ -83,39 +81,12 @@ class PushTest {
 
     private final ObjectMapper json = new ObjectMapper();
 
-    @TestConfiguration
-    static class Falsos {
-
-        @Bean
-        @Primary
-        EnviadorFalso enviadorFalso() {
-            return new EnviadorFalso();
-        }
-    }
-
-    /** Un servidor de push de mentira: apunta cada envío y da por caducados los endpoints que se le digan. */
-    static class EnviadorFalso implements EnviadorPush {
-
-        record Envio(Long usuarioId, String endpoint, String payload) {
-        }
-
-        final List<Envio> envios = new CopyOnWriteArrayList<>();
-        final Set<String> caducados = ConcurrentHashMap.newKeySet();
-
-        @Override
-        public void enviar(SuscripcionPush s, String payloadJson) throws IOException {
-            if (caducados.contains(s.getEndpoint())) {
-                throw new SuscripcionCaducada("410 Gone");
-            }
-            envios.add(new Envio(s.getUsuarioId(), s.getEndpoint(), payloadJson));
-        }
-    }
-
     @BeforeEach
     void limpiar() {
         esperarALaCola();
         enviador.envios.clear();
         enviador.caducados.clear();
+        enviador.fallidos.clear();
     }
 
     @Test
@@ -181,6 +152,39 @@ class PushTest {
         assertTrue(existe(bueno), "la otra sigue");
         assertEquals(List.of(otroTaller.getId()), enviosDe(orden.getId(), taller, otroTaller).stream()
                 .map(EnviadorFalso.Envio::usuarioId).toList());
+    }
+
+    @Test
+    void unFalloCualquieraNoBorraLaSuscripcionAunqueLleveUn410EnElTexto() throws IOException {
+        Usuario taller = usuario(Rol.TALLER);
+        Usuario despacho = usuario(Rol.DESPACHO);
+        String fallido = suscribir(taller, "fallido");
+        enviador.fallidos.add(fallido);
+
+        modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modelo("FALLO"), null, "Coser el asa",
+                "", Prioridad.NORMAL, List.of()), actual(despacho));
+        esperarALaCola();
+
+        assertTrue(existe(fallido), "solo se borra la que el servidor de push da por caducada");
+    }
+
+    @Test
+    void unAvisoSinCreadorDiceDeRayaYSaleIgual() throws IOException {
+        Usuario taller = usuario(Rol.TALLER);
+        Usuario despacho = usuario(Rol.DESPACHO);
+        suscribir(despacho, "despacho");
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("SIN-CREADOR"),
+                "PIEL", List.of(ModificacionesTest.foto())), actual(taller));
+        esperarALaCola();
+        enviador.envios.clear();
+
+        push.alCrear(new ModificacionCreada(aviso.getId(), aviso.getDireccion(), null));
+        esperarALaCola();
+
+        List<EnviadorFalso.Envio> envios = enviosDe(aviso.getId(), despacho);
+        assertEquals(1, envios.size(), "sin creador el aviso sale igual");
+        String referencia = repositorioModelos.findById(aviso.getModeloId()).orElseThrow().nombreVisible();
+        assertEquals(referencia + " · de —", json.readTree(envios.get(0).payload()).get("cuerpo").asText());
     }
 
     @Test

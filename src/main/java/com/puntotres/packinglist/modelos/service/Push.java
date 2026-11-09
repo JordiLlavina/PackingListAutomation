@@ -1,9 +1,12 @@
 package com.puntotres.packinglist.modelos.service;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -59,8 +62,10 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  * en un hilo aparte ({@code push}): el servidor de push del navegador puede
  * tardar, y la petición no lo espera.</li>
  * <li>Cada envío va por su cuenta: una suscripción que el navegador ya ha
- * tirado (404 o 410) se borra; cualquier otro fallo se apunta en el log y se
- * sigue con las demás. Nada de esto llega nunca a quien ha creado o
+ * tirado (el enviador lo dice con {@link SuscripcionCaducada}) se borra;
+ * cualquier otro fallo se apunta en el log y se sigue con las demás, aunque
+ * su texto lleve un 404 o un 410: un proxy que contesta mal no es motivo para
+ * tirar la suscripción. Nada de esto llega nunca a quien ha creado o
  * contestado: la modificación ya está guardada.</li>
  * </ul>
  */
@@ -73,15 +78,28 @@ public class Push {
     static final int LARGO_CUERPO = 80;
 
     /**
-     * Lo que dice un aviso al móvil. El {@code tag} de la notificación es
-     * {@code modificacion-<id>}: un segundo aviso de la misma modificación
-     * sustituye al primero en vez de apilarse.
+     * Lo más largo que se admite de una suscripción. Los de verdad son mucho
+     * más cortos (un endpoint de FCM ronda los 200 caracteres, la clave p256dh
+     * 87 y el secreto 22): pasarse es basura, no un navegador.
      */
-    public record Aviso(String titulo, String cuerpo, String url, Long modificacionId) {
+    static final int LARGO_ENDPOINT = 2000;
+    static final int LARGO_P256DH = 200;
+    static final int LARGO_AUTH = 100;
 
-        /** La etiqueta de la notificación. */
-        public String tag() {
-            return "modificacion-" + modificacionId;
+    /** Los únicos servidores a los que se admite un endpoint sin TLS: la propia máquina, en desarrollo. */
+    private static final Set<String> SERVIDORES_LOCALES = Set.of("localhost", "127.0.0.1");
+
+    /**
+     * Lo que dice un aviso al móvil. El {@code tag} de la notificación es, si
+     * no se dice otro, {@code modificacion-<id>}: un segundo aviso de la misma
+     * modificación sustituye al primero en vez de apilarse. Los recordatorios
+     * llevan el suyo ({@code recordatorio-<id>}) para no tapar el aviso de
+     * creación ni una respuesta.
+     */
+    public record Aviso(String titulo, String cuerpo, String url, Long modificacionId, String tag) {
+
+        public Aviso(String titulo, String cuerpo, String url, Long modificacionId) {
+            this(titulo, cuerpo, url, modificacionId, "modificacion-" + modificacionId);
         }
     }
 
@@ -145,6 +163,9 @@ public class Push {
         String elEndpoint = obligatorio(endpoint, "Falta el endpoint");
         String laClave = obligatorio(p256dh, "Falta la clave p256dh");
         String elSecreto = obligatorio(auth, "Falta la clave auth");
+        if (!endpointValido(elEndpoint) || laClave.length() > LARGO_P256DH || elSecreto.length() > LARGO_AUTH) {
+            throw new IllegalArgumentException("Suscripción no válida");
+        }
         suscripciones.findFirstByEndpoint(elEndpoint).ifPresentOrElse(
                 existente -> existente.renovar(quien.id(), quien.dispositivoId(), laClave, elSecreto),
                 () -> suscripciones.save(new SuscripcionPush(quien.id(), quien.dispositivoId(), elEndpoint, laClave,
@@ -179,6 +200,18 @@ public class Push {
         } catch (RuntimeException e) {
             LOG.warn("No se han podido mandar los avisos al móvil de la modificación {}", aviso.modificacionId(), e);
         }
+    }
+
+    /**
+     * A quién le llega lo que se manda a ese rol: los usuarios activos con él
+     * (con DESPACHO, también los ADMIN), tengan o no el móvil suscrito.
+     */
+    public Set<Long> destinatarios(Rol rol) {
+        if (rol == null) {
+            return Set.of();
+        }
+        Set<Rol> roles = rol.esDespacho() ? EnumSet.of(Rol.DESPACHO, Rol.ADMIN) : EnumSet.of(rol);
+        return usuarios.findByRolInAndActivoTrue(roles).stream().map(Usuario::getId).collect(Collectors.toSet());
     }
 
     /** Un aviso o una orden recién creados: al otro lado, cuando la transacción se confirma. */
@@ -238,7 +271,9 @@ public class Push {
         if (m.esAviso()) {
             String tipo = props.tipoCambio(m.getTipoCambio()).map(ModelosProperties.TipoCambio::texto)
                     .orElse(Objects.toString(m.getTipoCambio(), "cambio"));
-            String quien = usuarios.findById(evento.creadaPorId()).map(Usuario::getNombre).orElse("el taller");
+            // Sin creador el aviso sale igual, con una raya: findById(null) tiraría el push entero.
+            String quien = evento.creadaPorId() == null ? "—"
+                    : usuarios.findById(evento.creadaPorId()).map(Usuario::getNombre).orElse("el taller");
             return new Destino(Rol.DESPACHO, new Aviso("Aviso del taller: " + tipo,
                     juntar(referencia, "de " + quien), "/app/bandeja/" + m.getId(), m.getId()));
         }
@@ -280,9 +315,7 @@ public class Push {
 
     /** Las suscripciones de los usuarios activos de ese rol, sin las de un aparato revocado. */
     private List<SuscripcionPush> suscripcionesDe(Rol rol) {
-        Set<Rol> roles = rol.esDespacho() ? EnumSet.of(Rol.DESPACHO, Rol.ADMIN) : EnumSet.of(rol);
-        Set<Long> ids = usuarios.findByRolInAndActivoTrue(roles).stream().map(Usuario::getId)
-                .collect(Collectors.toSet());
+        Set<Long> ids = destinatarios(rol);
         if (ids.isEmpty()) {
             return List.of();
         }
@@ -300,7 +333,7 @@ public class Push {
         try {
             enviador.enviar(s, carga);
         } catch (IOException e) {
-            if (caducada(e)) {
+            if (e instanceof SuscripcionCaducada) {
                 LOG.info("La suscripción {} ya no existe en el navegador; se borra", s.getId());
                 borrarSinFallar(s);
             } else {
@@ -309,12 +342,6 @@ public class Push {
         } catch (RuntimeException e) {
             LOG.warn("No se ha podido mandar el aviso a la suscripción {}", s.getId(), e);
         }
-    }
-
-    private static boolean caducada(IOException e) {
-        String mensaje = e.getMessage();
-        return e instanceof SuscripcionCaducada
-                || (mensaje != null && (mensaje.contains("410") || mensaje.contains("404")));
     }
 
     private void borrarSinFallar(SuscripcionPush s) {
@@ -344,6 +371,31 @@ public class Push {
             return referencia;
         }
         return referencia.isBlank() ? resto : referencia + " · " + resto;
+    }
+
+    /**
+     * Un endpoint al que el servidor puede mandar avisos: el de un servidor de
+     * push, siempre {@code https://}, o en desarrollo el de la propia máquina.
+     * Sin esto, cualquiera que haya entrado haría que el servidor mandara
+     * peticiones a donde quisiera.
+     */
+    private static boolean endpointValido(String endpoint) {
+        if (endpoint.length() > LARGO_ENDPOINT) {
+            return false;
+        }
+        URI uri;
+        try {
+            uri = new URI(endpoint);
+        } catch (URISyntaxException e) {
+            return false;
+        }
+        String esquema = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        String servidor = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
+        if (servidor.isEmpty()) {
+            return false;
+        }
+        // http solo con el host exacto: «http://localhost.otro.com» no es la propia máquina.
+        return esquema.equals("https") || (esquema.equals("http") && SERVIDORES_LOCALES.contains(servidor));
     }
 
     private static String obligatorio(String valor, String mensaje) {

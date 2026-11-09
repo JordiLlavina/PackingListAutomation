@@ -13,9 +13,9 @@ public interface EnviadorPush {
 
     /**
      * Manda el aviso, ya en JSON, a esa suscripción. Una suscripción que el
-     * navegador ya ha tirado se dice con {@link SuscripcionCaducada} (o con una
-     * {@link IOException} que lleve "404" o "410" en el mensaje); cualquier
-     * otro fallo, con una {@link IOException} cualquiera.
+     * navegador ya ha tirado se dice con {@link SuscripcionCaducada}, que es lo
+     * único que la borra; cualquier otro fallo, con una {@link IOException}
+     * cualquiera (aunque su mensaje lleve un 404 o un 410, no se borra nada).
      */
     void enviar(SuscripcionPush s, String payloadJson) throws IOException;
 }

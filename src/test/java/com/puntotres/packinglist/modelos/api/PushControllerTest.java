@@ -96,6 +96,37 @@ class PushControllerTest {
         assertTrue(conEndpoint(endpoint).isEmpty());
     }
 
+    @Test
+    void unaSuscripcionQueNoEsDeUnServidorDePushContesta400() throws Exception {
+        Usuario taller = usuarioDePrueba(usuarios, Rol.TALLER);
+        String largo = "https://push.example/T17-" + "x".repeat(2000);
+        for (String cuerpo : List.of(
+                "{\"endpoint\":\"http://push.example/T17-sin-tls\",\"p256dh\":\"BPclave\",\"auth\":\"secreto\"}",
+                "{\"endpoint\":\"file:///etc/passwd\",\"p256dh\":\"BPclave\",\"auth\":\"secreto\"}",
+                "{\"endpoint\":\"http://localhost.otro.example/T17-sin-tls\",\"p256dh\":\"BPclave\",\"auth\":\"x\"}",
+                "{\"endpoint\":\"" + largo + "\",\"p256dh\":\"BPclave\",\"auth\":\"secreto\"}",
+                "{\"endpoint\":\"https://push.example/T17-p256dh\",\"p256dh\":\"" + "p".repeat(201)
+                        + "\",\"auth\":\"secreto\"}",
+                "{\"endpoint\":\"https://push.example/T17-auth\",\"p256dh\":\"BPclave\",\"auth\":\"" + "a".repeat(101)
+                        + "\"}")) {
+            mvc.perform(post("/api/push/suscripcion").with(comoUsuario(taller)).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(content().json("{\"mensaje\":\"Suscripción no válida\"}"));
+        }
+        assertTrue(suscripciones.findAll().stream().noneMatch(s -> s.getEndpoint().contains("T17-sin-tls")
+                || s.getEndpoint().contains("T17-p256dh") || s.getEndpoint().contains("T17-auth")));
+
+        // En desarrollo, el navegador de la propia máquina.
+        for (String local : List.of("http://localhost:8080/T17-local", "http://127.0.0.1:8080/T17-local")) {
+            mvc.perform(post("/api/push/suscripcion").with(comoUsuario(taller)).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"endpoint\":\"" + local + "\",\"p256dh\":\"BPclave\",\"auth\":\"secreto\"}"))
+                    .andExpect(status().isNoContent());
+            assertEquals(1, conEndpoint(local).size());
+        }
+    }
+
     private List<SuscripcionPush> conEndpoint(String endpoint) {
         return suscripciones.findAll().stream().filter(s -> endpoint.equals(s.getEndpoint())).toList();
     }
