@@ -16,6 +16,7 @@ import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
+import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 
 /**
  * Los usuarios de la app de modelos: alta, comprobación de contraseña y
@@ -109,8 +110,33 @@ public class Usuarios implements ApplicationRunner {
      */
     @Transactional
     public void cambiar(Long id, String nombre, Rol rol, Boolean activo, String passwordNueva) {
+        cambiar(id, nombre, rol, activo, passwordNueva, null);
+    }
+
+    /**
+     * Como {@link #cambiar(Long, String, Rol, Boolean, String)}, sabiendo
+     * quién lo pide (la pantalla de administración). Dos reglas, porque de
+     * otro modo la app se queda sin nadie que la administre: nadie puede
+     * desactivarse ni cambiarse el rol a sí mismo, y tiene que quedar al menos
+     * un administrador activo (esta vale también sin {@code quien}).
+     *
+     * @param quien quien hace el cambio; null si no lo hace una persona
+     * @throws IllegalArgumentException si no hay ningún usuario con ese id o
+     *                                  el cambio rompe una de las dos reglas
+     */
+    @Transactional
+    public void cambiar(Long id, String nombre, Rol rol, Boolean activo, String passwordNueva, UsuarioActual quien) {
         Usuario usuario = porId(id)
                 .orElseThrow(() -> new IllegalArgumentException("No hay ningún usuario con id " + id));
+        boolean seDesactiva = Boolean.FALSE.equals(activo) && usuario.isActivo();
+        boolean cambiaDeRol = rol != null && rol != usuario.getRol();
+        if (quien != null && id.equals(quien.id()) && (seDesactiva || cambiaDeRol)) {
+            throw new IllegalArgumentException("No puedes desactivarte ni cambiarte el rol a ti mismo");
+        }
+        if (usuario.getRol() == Rol.ADMIN && usuario.isActivo() && (seDesactiva || cambiaDeRol)
+                && repositorio.countByRolAndActivoTrue(Rol.ADMIN) <= 1) {
+            throw new IllegalArgumentException("Tiene que quedar al menos un administrador activo");
+        }
         String nombreNuevo = recortado(nombre);
         if (nombreNuevo != null) {
             usuario.setNombre(nombreNuevo);
@@ -133,9 +159,26 @@ public class Usuarios implements ApplicationRunner {
         return repositorio.findFirstByRolAndActivoTrueOrderByIdAsc(Rol.TALLER);
     }
 
-    /** Primer arranque: sin usuarios, crea el {@code admin} si hay contraseña configurada. */
+    /**
+     * Si la dirección pública es la del propio PC: los QR de las etiquetas de
+     * patrones la llevan dentro, y un móvil que lea {@code localhost} se
+     * busca a sí mismo.
+     */
+    static boolean apuntaALocalhost(String urlPublica) {
+        if (urlPublica == null) {
+            return false;
+        }
+        String url = urlPublica.toLowerCase(java.util.Locale.ROOT);
+        return url.contains("localhost") || url.contains("127.0.0.1");
+    }
+
+    /** Primer arranque: sin usuarios, crea el {@code admin} si hay contraseña configurada; avisa de una URL local. */
     @Override
     public void run(ApplicationArguments args) {
+        if (apuntaALocalhost(props.urlPublica())) {
+            // No impide arrancar (en desarrollo es lo normal), pero una etiqueta impresa así no la lee nadie más.
+            LOG.warn("modelos.url-publica apunta a localhost: los QR de las etiquetas impresas llevarán esa URL");
+        }
         if (repositorio.count() > 0) {
             return;
         }

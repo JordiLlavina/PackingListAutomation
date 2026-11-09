@@ -211,6 +211,11 @@ nueva parte **crece**: audios (~200 KB por nota) y fotos (~300 KB cada una) van
 dentro de la base de datos. Cientos de MB al año, no más; la copia diaria debe
 seguir incluyéndola, y que alguna vez se haya **probado a restaurar**.
 
+**Antes del primer arranque con esta versión, copia de `datos` aparte**: la
+migración de la app de modelos (V4) rehace la tabla `modelo` y H2 confirma
+cada cambio de esquema según lo hace, así que si algo falla a medias no se
+vuelve atrás solo.
+
 ## 10. Comprobación final
 
 1. Desde un PC y desde la tablet: `https://modelos.puntotres.com/app/` con candado.

@@ -15,6 +15,9 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findFirstByRolAndActivoTrueOrderByIdAsc(Rol rol);
 
+    /** Cuántos activos tienen ese rol: tiene que quedar al menos un administrador activo. */
+    long countByRolAndActivoTrue(Rol rol);
+
     /** Los activos con alguno de esos roles: a quién se le manda un push. */
     List<Usuario> findByRolInAndActivoTrue(Collection<Rol> roles);
 }

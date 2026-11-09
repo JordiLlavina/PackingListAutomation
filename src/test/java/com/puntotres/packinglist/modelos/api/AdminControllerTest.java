@@ -73,6 +73,27 @@ class AdminControllerTest {
     }
 
     @Test
+    void elAdminNoPuedeDesactivarseNiCambiarseElRolASiMismo() throws Exception {
+        Usuario admin = usuarioDePrueba(usuarios, Rol.ADMIN);
+
+        for (String cambio : new String[] {"{\"activo\":false}", "{\"rol\":\"DESPACHO\"}"}) {
+            mvc.perform(patch("/api/usuarios/" + admin.getId()).with(comoUsuario(admin)).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(cambio))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.mensaje").value("No puedes desactivarte ni cambiarte el rol a ti mismo"));
+        }
+        Usuario guardado = usuarios.porId(admin.getId()).orElseThrow();
+        assertTrue(guardado.isActivo());
+        assertEquals(Rol.ADMIN, guardado.getRol());
+
+        // Lo demás de uno mismo sí se cambia (el rol que ya tiene tampoco es un cambio).
+        mvc.perform(patch("/api/usuarios/" + admin.getId()).with(comoUsuario(admin)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nombre\":\"" + admin.getNombre() + "\",\"rol\":\"ADMIN\",\"activo\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void elAdminCreaYCambiaUsuarios() throws Exception {
         Usuario admin = usuarioDePrueba(usuarios, Rol.ADMIN);
 

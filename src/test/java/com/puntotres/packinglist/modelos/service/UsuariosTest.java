@@ -54,7 +54,7 @@ class UsuariosTest {
 
     @Test
     void autenticarRechazaInactivosYContrasenaMala() {
-        Usuario ana = usuarios.crear(new Usuarios.Alta("Ana", "t5-ana", "buena", Rol.ADMIN));
+        Usuario ana = usuarios.crear(new Usuarios.Alta("Ana", "t5-ana", "buena", Rol.DESPACHO));
 
         assertTrue(usuarios.autenticar("t5-ana", "buena").isPresent());
         assertFalse(usuarios.autenticar("t5-ana", "mala").isPresent());
@@ -66,5 +66,14 @@ class UsuariosTest {
         usuarios.cambiar(ana.getId(), null, null, true, "nueva");
         assertFalse(usuarios.autenticar("t5-ana", "buena").isPresent());
         assertTrue(usuarios.autenticar("t5-ana", "nueva").isPresent());
+    }
+
+    @Test
+    void unaUrlPublicaDeLocalhostSeReconoceParaAvisar() {
+        assertTrue(Usuarios.apuntaALocalhost("http://localhost:8080"));
+        assertTrue(Usuarios.apuntaALocalhost("http://127.0.0.1:8080/"));
+        assertTrue(Usuarios.apuntaALocalhost("HTTP://LOCALHOST"));
+        assertFalse(Usuarios.apuntaALocalhost("https://modelos.puntotres.com"));
+        assertFalse(Usuarios.apuntaALocalhost(null));
     }
 }

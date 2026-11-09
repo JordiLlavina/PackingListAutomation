@@ -140,6 +140,8 @@ pause
 
 Los excels generados se sirven al navegador y se descargan a la carpeta de descargas del usuario. Lo único que la aplicación escribe en disco es su base de datos, en la carpeta `datos/` junto al jar: las taras, las temporadas con sus excels y el catálogo de modelos (cartones, unidades por caja, pieles, colores y fotos). Copiar esa carpeta es llevarse todo lo aprendido a otro ordenador. El esquema lo crea Flyway al arrancar; una base de una versión anterior a Flyway no arranca y hay que apartarla.
 
+**Antes de arrancar por primera vez la versión con la app de modelos, copiar la carpeta `datos/`**: su migración (la V4) rehace la tabla `modelo` y recoloca sus hijos, y H2 confirma cada cambio de esquema según lo hace, así que un fallo a medias no se deshace solo.
+
 ### 4. Cambiar taras o clientes sin recompilar
 
 El `application.yml` **sigue estando dentro del jar** y sigue siendo el que manda por defecto: el jar arranca solo, sin ningún fichero al lado. Lo que hace Spring Boot es leer *además* un `application.yml` que esté **junto al jar** (o en una subcarpeta `config/`) y **fusionar los dos, propiedad a propiedad**, ganando el de fuera. No es "o uno u otro": el de fuera no sustituye al de dentro, solo añade lo que no está y pisa lo que repite.
