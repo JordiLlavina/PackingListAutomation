@@ -15,6 +15,7 @@ mvn test                                      # toda la suite
 mvn test -Dtest=PackingListGenerationServiceTest   # una clase de test
 mvn -q compile exec:java                      # prueba manual: Main.java, flujo completo → excels en target/
 mvn spring-boot:run                           # asistente web en http://localhost:8080
+mvn verify -Pe2e                              # recorrido de humo de la PWA con Playwright: arranca el jar en el 8089 con base en memoria (la 1ª vez se baja Chromium)
 ```
 
 - El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual.

@@ -45,3 +45,7 @@ docs/Documentos de Corte/AMI SS27/
 frontend/node/
 frontend/node_modules/
 frontend/dist/
+# Lo que deja el recorrido de humo de Playwright (mvn verify -Pe2e): trazas
+# de los fallos y el informe JSON que comprueba Maven
+frontend/test-results/
+frontend/playwright-report/

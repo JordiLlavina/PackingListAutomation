@@ -333,4 +333,117 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- mvn verify -Pe2e: el recorrido de humo de la PWA de modelos con
+             Playwright (frontend/e2e/). Arranca la aplicación de verdad en
+             el puerto 8089 con la base en memoria (nunca la de ./datos), pasa
+             Chromium sin ventana por las pantallas y la para al acabar,
+             también si el recorrido falla. La primera vez se baja Chromium
+             (unos 150 MB, a la caché de Playwright del usuario). Sin el
+             perfil, el build de siempre no cambia. -->
+        <profile>
+            <id>e2e</id>
+            <properties>
+                <e2e.port>8089</e2e.port>
+                <!-- Para que comprobar-e2e sepa si -DskipTests se ha
+                     saltado el recorrido (la línea de comandos manda). -->
+                <skipTests>false</skipTests>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>arrancar-para-e2e</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Esperar a que la aplicación conteste
+                                         (Flyway incluido): hasta 3 minutos. -->
+                                    <wait>1000</wait>
+                                    <maxAttempts>180</maxAttempts>
+                                    <!-- Lo de las variables de entorno de la
+                                         máquina se apaga a propósito: el
+                                         recorrido no llama a Azure, ni a
+                                         Claude, ni manda avisos al móvil. -->
+                                    <arguments>
+                                        <argument>--server.port=${e2e.port}</argument>
+                                        <argument>--spring.datasource.url=jdbc:h2:mem:e2e;DB_CLOSE_DELAY=-1</argument>
+                                        <argument>--modelos.admin-password=prueba</argument>
+                                        <argument>--modelos.recordatorios.activo=false</argument>
+                                        <argument>--modelos.resumen-ia.activo=false</argument>
+                                        <argument>--modelos.azure-speech.clave=</argument>
+                                        <argument>--modelos.push.vapid-public=</argument>
+                                        <argument>--modelos.push.vapid-private=</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>parar-tras-e2e</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.github.eirslett</groupId>
+                        <artifactId>frontend-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>playwright-install-chromium</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>npx</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>playwright install chromium</arguments>
+                                </configuration>
+                            </execution>
+                            <!-- El recorrido NO para el build aunque falle
+                                 (testFailureIgnore): si lo parase aquí, Maven
+                                 no llegaría a post-integration-test y el jar
+                                 se quedaría arrancado con el puerto. Lo que
+                                 decide es la comprobación de verify, ya con la
+                                 aplicación parada, como hace failsafe. -->
+                            <execution>
+                                <id>npm-run-e2e</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>run e2e</arguments>
+                                    <testFailureIgnore>true</testFailureIgnore>
+                                    <environmentVariables>
+                                        <E2E_BASE_URL>http://localhost:${e2e.port}</E2E_BASE_URL>
+                                    </environmentVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>comprobar-e2e</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>run e2e:comprobar</arguments>
+                                    <environmentVariables>
+                                        <E2E_INICIO_BUILD>${maven.build.timestamp}</E2E_INICIO_BUILD>
+                                        <E2E_SIN_TESTS>${skipTests}</E2E_SIN_TESTS>
+                                    </environmentVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
