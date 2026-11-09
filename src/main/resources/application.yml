@@ -300,3 +300,8 @@ modelos:
   azure-speech:
     clave: ${AZURE_SPEECH_KEY:}
     region: ${AZURE_SPEECH_REGION:westeurope}
+
+  # Resumen de las notas de voz con Claude (con ANTHROPIC_API_KEY). Con false
+  # no se resume aunque haya clave; el perfil de los tests lo apaga.
+  resumen-ia:
+    activo: true

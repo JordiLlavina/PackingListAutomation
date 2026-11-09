@@ -22,7 +22,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.persistence.Adjunto;
 import com.puntotres.packinglist.modelos.persistence.AdjuntoRepository;
+import com.puntotres.packinglist.modelos.persistence.Direccion;
 import com.puntotres.packinglist.modelos.persistence.EstadoTranscripcion;
+import com.puntotres.packinglist.modelos.persistence.Mensaje;
 import com.puntotres.packinglist.modelos.persistence.MensajeRepository;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
@@ -243,17 +245,19 @@ public class TranscripcionService {
                 .ifPresent(cambio::aplicar);
     }
 
-    /** El título de la IA en un aviso del taller que aún no tiene ninguno. */
+    /**
+     * El título de la IA en un aviso del taller que aún no tiene ninguno. Va
+     * en una sola sentencia condicional y no cambiando la entidad: si el
+     * despacho pone el título mientras tanto, el suyo no se pisa.
+     */
     private void ponerTituloSiFalta(Adjunto adjunto, String tituloIa) {
         if (tituloIa == null || tituloIa.isBlank()) {
             return;
         }
-        Modificacion modificacion = modificacionDe(adjunto);
-        if (modificacion == null || !modificacion.esAviso()
-                || (modificacion.getTitulo() != null && !modificacion.getTitulo().isBlank())) {
-            return;
-        }
-        modificacion.ponerTituloDeIa(recortar(tituloIa.strip(), LARGO_TITULO));
+        mensajes.findById(adjunto.getMensajeId())
+                .map(Mensaje::getModificacionId)
+                .ifPresent(id -> modificaciones.ponerTituloDeIaSiNoTiene(id, Direccion.TALLER_A_DESPACHO,
+                        recortar(tituloIa.strip(), LARGO_TITULO)));
     }
 
     private Modificacion modificacionDe(Adjunto adjunto) {

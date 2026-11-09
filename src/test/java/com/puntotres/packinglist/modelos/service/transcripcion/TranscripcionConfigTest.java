@@ -47,6 +47,12 @@ class TranscripcionConfigTest {
         assertTrue(real.disponible());
     }
 
+    @Test
+    void conElResumenApagadoNoSeResumeAunqueHayaClave() {
+        assertInstanceOf(ResumidorDesactivado.class, TranscripcionConfig.resumidor(props("", ""),
+                Map.of("ANTHROPIC_API_KEY", "sk-prueba")::get, false));
+    }
+
     private static ModelosProperties props(String clave, String region) {
         return new ModelosProperties(null, null, List.of(), List.of(), null, null,
                 new ModelosProperties.AzureSpeech(clave, region));

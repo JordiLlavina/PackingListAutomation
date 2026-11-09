@@ -4,6 +4,9 @@ import java.util.Collection;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /**
  * Las modificaciones. Los filtros de la lista que no son la dirección y el
@@ -29,4 +32,17 @@ public interface ModificacionRepository extends JpaRepository<Modificacion, Long
     List<Modificacion> findByDireccionAndNecesitaRespuestaTrue(Direccion direccion);
 
     List<Modificacion> findByDireccionAndNecesitaRespuestaTrueAndCreadaPor(Direccion direccion, Long creadaPor);
+
+    /**
+     * Pone el título de la IA a un aviso del taller solo si todavía no tiene
+     * ninguno, en una sola sentencia: si mientras se resumía la nota de voz el
+     * despacho ha puesto o corregido el título, no se pisa. Devuelve cuántas
+     * filas ha cambiado (0 o 1).
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Modificacion m set m.titulo = :titulo, m.tituloDeIa = true
+            where m.id = :id and m.direccion = :direccion and (m.titulo is null or trim(m.titulo) = '')""")
+    int ponerTituloDeIaSiNoTiene(@Param("id") Long id, @Param("direccion") Direccion direccion,
+                                 @Param("titulo") String titulo);
 }

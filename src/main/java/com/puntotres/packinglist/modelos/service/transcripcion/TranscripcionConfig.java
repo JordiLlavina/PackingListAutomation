@@ -3,6 +3,7 @@ package com.puntotres.packinglist.modelos.service.transcripcion;
 import java.time.Duration;
 import java.util.function.UnaryOperator;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -21,7 +22,7 @@ import com.puntotres.packinglist.modelos.ModelosProperties;
  * Azure Speech ({@link ModelosProperties#transcripcionConfigurada()}).</li>
  * <li>Resumidor: {@link ResumidorClaude} si hay {@code ANTHROPIC_API_KEY}, la
  * misma clave que usan la extracción por imágenes y la conversión del excel
- * del taller.</li>
+ * del taller, y si {@code modelos.resumen-ia.activo} no es {@code false}.</li>
  * </ul>
  *
  * Se decide al arrancar: poner una clave pide reiniciar. Los tests sustituyen
@@ -46,13 +47,27 @@ public class TranscripcionConfig {
         return new AzureSpeechTranscriptor(builder.requestFactory(fabrica), props);
     }
 
+    /**
+     * El resumidor. Con {@code modelos.resumen-ia.activo: false} (el perfil de
+     * los tests) siempre el apagado, aunque la máquina tenga
+     * {@code ANTHROPIC_API_KEY}: ningún contexto de test puede llamar a Claude.
+     */
     @Bean
-    public ResumidorModificacion resumidorModificacion(ModelosProperties props) {
-        return resumidor(props, System::getenv);
+    public ResumidorModificacion resumidorModificacion(ModelosProperties props,
+            @Value("${modelos.resumen-ia.activo:true}") boolean activo) {
+        return resumidor(props, System::getenv, activo);
     }
 
     /** El resumidor según las variables de entorno que se le den; aparte para poder probarlo. */
     static ResumidorModificacion resumidor(ModelosProperties props, UnaryOperator<String> entorno) {
+        return resumidor(props, entorno, true);
+    }
+
+    /** Lo mismo, con el interruptor de {@code modelos.resumen-ia.activo}. */
+    static ResumidorModificacion resumidor(ModelosProperties props, UnaryOperator<String> entorno, boolean activo) {
+        if (!activo) {
+            return new ResumidorDesactivado();
+        }
         ResumidorClaude claude = new ResumidorClaude(props, entorno);
         return claude.disponible() ? claude : new ResumidorDesactivado();
     }
