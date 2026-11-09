@@ -11,6 +11,8 @@ export type EstadoModificacion = 'NUEVA' | 'VISTA' | 'EN_CURSO' | 'HECHA' | 'DES
 export type Direccion = 'DESPACHO_A_TALLER' | 'TALLER_A_DESPACHO';
 export type Rol = 'TALLER' | 'DESPACHO' | 'ADMIN';
 export type TipoAdjunto = 'AUDIO' | 'FOTO' | 'DOCUMENTO';
+/** Por dónde va la transcripción de una nota de voz; una foto o un documento son NO_APLICA. */
+export type EstadoTranscripcion = 'PENDIENTE' | 'HECHA' | 'FALLIDA' | 'NO_APLICA';
 
 /** Dónde se aplica un aviso y si ya está hecho allí (las órdenes no tienen; el taller no los usa). */
 export type DestinoEstado = { destino: string; texto: string; aplica: boolean; hechoEn: string | null; hechoPor: string | null };
@@ -60,7 +62,7 @@ export type AdjuntoVista = {
   duracionSeg: number | null;
   transcripcion: string | null;
   resumenIa: string | null;
-  estadoTranscripcion: string | null;
+  estadoTranscripcion: EstadoTranscripcion;
   error: string | null;
 };
 
@@ -233,4 +235,25 @@ export function marcaDestino(d: DestinoEstado): { simbolo: string; estado: 'hech
   if (!d.aplica) return { simbolo: '–', estado: 'no-aplica', texto: `${d.texto}: no aplica` };
   if (d.hechoEn !== null) return { simbolo: '✓', estado: 'hecho', texto: `${d.texto}: aplicado` };
   return { simbolo: '–', estado: 'pendiente', texto: `${d.texto}: por aplicar` };
+}
+
+/** Si alguna nota de voz del detalle se está transcribiendo todavía: mientras tanto el detalle se vuelve a pedir solo. */
+export function hayTranscripcionPendiente(detalle: ModificacionDetalle): boolean {
+  return detalle.mensajes.some((m) => m.adjuntos.some((a) => a.tipo === 'AUDIO' && a.estadoTranscripcion === 'PENDIENTE'));
+}
+
+/**
+ * Si el despacho puede corregir el título desde la cabecera: el que ha puesto
+ * la IA y, en un aviso que se ha quedado sin él (sin IA configurada), ponerlo.
+ */
+export function tituloEditable(r: ModificacionResumen): boolean {
+  return r.tituloDeIa || (r.direccion === 'TALLER_A_DESPACHO' && !r.titulo);
+}
+
+/**
+ * Los destinos de un aviso se pueden tocar mientras no esté descartado: en uno
+ * hecho, desmarcar un destino lo devuelve a «en curso» (lo hace el servidor).
+ */
+export function destinosEditables(estado: EstadoModificacion): boolean {
+  return estado !== 'DESCARTADA';
 }

@@ -412,6 +412,11 @@ a.boton { text-decoration: none; color: var(--fg); }
 .resumen-ia { display: grid; gap: 4px; padding: 8px 10px; border-radius: 10px; background: color-mix(in oklab, var(--new) 7%, var(--surface)); }
 .resumen-ia .rotulo { font-weight: 700; font-size: .9em; }
 .resumen-ia .chip-ia { margin-left: 0; margin-right: .45em; }
+.resumen-ia .texto-resumen { white-space: pre-line; }
+/* El lápiz del título que puso la IA: pequeño, al lado del chip. */
+.editar-titulo { display: inline-flex; align-items: center; justify-content: center; margin-left: .35em; width: 1.6em; height: 1.6em; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); vertical-align: middle; cursor: pointer; }
+.editar-titulo svg { width: .9em; height: .9em; }
+.editar-titulo:hover { color: var(--fg); border-color: var(--fg); }
 .estado-transcripcion { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .despacho .miniaturas { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
 .despacho .miniaturas figure { margin: 0; display: grid; gap: 6px; }

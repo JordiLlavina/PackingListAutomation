@@ -3,9 +3,12 @@
 // de mensajes con sus notas de voz (y lo que se transcribió), fotos y
 // documentos, y al lado el panel de acciones: en un aviso del taller la
 // prioridad, los destinos donde hay que aplicarlo, «Marcar hecha» y
-// «Descartar»; en una orden, en qué punto la tiene el taller. Debajo del hilo,
-// «Responder». Abrir un aviso NUEVO lo da por visto. Tras cada acción se
-// vuelve a pedir el detalle y se avisa a la bandeja (lista y números).
+// «Descartar»; en una orden, su prioridad y en qué punto la tiene el taller.
+// Debajo del hilo, «Responder». Abrir un aviso NUEVO lo da por visto. Tras
+// cada acción se vuelve a pedir el detalle y se avisa a la bandeja (lista y
+// números). Mientras alguna nota de voz se está transcribiendo, el detalle se
+// vuelve a pedir solo cada pocos segundos; una que falló se puede reintentar,
+// y el título que puso la IA se corrige con el lápiz.
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
@@ -19,9 +22,12 @@ import { reducirImagen } from '../comun/imagen';
 import type { ModeloFicha, ModeloResumen, ResumenFoto } from '../comun/modelos';
 import {
   adjuntoUrl,
+  destinosEditables,
   estaCerrada,
   estadoModificacion,
   fotoDelModelo,
+  hayTranscripcionPendiente,
+  tituloEditable,
   type AdjuntoVista,
   type DestinoEstado,
   type MensajeVista,
@@ -49,12 +55,23 @@ function tamano(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
 }
 
-/** Lo que se sabe de la transcripción de una nota de voz, debajo de su reproductor. */
-function Transcripcion({ audio }: { audio: AdjuntoVista }) {
+type Reintento = { reintentando: number | null; onReintentar: (adjuntoId: number) => void };
+
+/**
+ * Lo que se sabe de la transcripción de una nota de voz, debajo de su
+ * reproductor. Si falló el resumen de la IA, la transcripción sigue HECHA y el
+ * motivo sale aparte.
+ */
+function Transcripcion({ audio, reintentando, onReintentar }: { audio: AdjuntoVista } & Reintento) {
   let estado = null;
   switch (audio.estadoTranscripcion) {
     case 'HECHA':
-      estado = audio.transcripcion ? <p className="transcripcion">{audio.transcripcion}</p> : null;
+      estado = (
+        <>
+          {audio.transcripcion ? <p className="transcripcion">{audio.transcripcion}</p> : <span className="etiqueta">no se ha oído nada</span>}
+          {audio.error && <span className="etiqueta">{audio.error}</span>}
+        </>
+      );
       break;
     case 'NO_APLICA':
       estado = <span className="etiqueta">sin transcripción (servicio no configurado)</span>;
@@ -66,8 +83,8 @@ function Transcripcion({ audio }: { audio: AdjuntoVista }) {
       estado = (
         <span className="estado-transcripcion">
           <span className="etiqueta fallo">falló: {audio.error ?? 'sin motivo'}</span>
-          <button className="chip" type="button" disabled title="Llega en la próxima entrega">
-            Reintentar
+          <button className="chip" type="button" disabled={reintentando !== null} onClick={() => onReintentar(audio.id)}>
+            {reintentando === audio.id ? 'Reintentando…' : 'Reintentar'}
           </button>
         </span>
       );
@@ -81,14 +98,20 @@ function Transcripcion({ audio }: { audio: AdjuntoVista }) {
           <span className="rotulo">
             <span className="chip-ia">IA</span>Resumen de la IA
           </span>
-          <span>{audio.resumenIa}</span>
+          <span className="texto-resumen">{audio.resumenIa}</span>
         </div>
       )}
     </>
   );
 }
 
-function Mensaje({ m, pasando, onAGaleria }: { m: MensajeVista; pasando: number | null; onAGaleria: (id: number) => void }) {
+function Mensaje({
+  m,
+  pasando,
+  onAGaleria,
+  reintentando,
+  onReintentar,
+}: { m: MensajeVista; pasando: number | null; onAGaleria: (id: number) => void } & Reintento) {
   const audios = m.adjuntos.filter((a) => a.tipo === 'AUDIO');
   const fotos = m.adjuntos.filter((a) => a.tipo === 'FOTO');
   const documentos = m.adjuntos.filter((a) => a.tipo === 'DOCUMENTO');
@@ -102,7 +125,7 @@ function Mensaje({ m, pasando, onAGaleria }: { m: MensajeVista; pasando: number 
       {audios.map((a) => (
         <div key={a.id} className="nota-voz">
           <Audio compacto adjuntoId={a.id} duracionSeg={a.duracionSeg ?? 0} />
-          <Transcripcion audio={a} />
+          <Transcripcion audio={a} reintentando={reintentando} onReintentar={onReintentar} />
         </div>
       ))}
       {fotos.length > 0 && (
@@ -248,6 +271,10 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
   const dialogo = useRef<HTMLDialogElement>(null);
   const [motivo, setMotivo] = useState('');
   const [errorDescarte, setErrorDescarte] = useState<string | null>(null);
+  const [reintentando, setReintentando] = useState<number | null>(null);
+  // El título mientras se corrige; null = no se está corrigiendo.
+  const [titulo, setTitulo] = useState<string | null>(null);
+  const [errorTitulo, setErrorTitulo] = useState<string | null>(null);
 
   // La última versión del aviso a la bandeja, sin que cada pintado del padre vuelva a pedir el detalle.
   const avisar = useRef(onCambiado);
@@ -308,6 +335,15 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
     };
   }, [modeloId]);
 
+  // Mientras alguna nota de voz se está transcribiendo, el detalle se vuelve a
+  // pedir cada pocos segundos; cada respuesta nueva arma la siguiente espera.
+  const transcribiendo = detalle !== null && hayTranscripcionPendiente(detalle);
+  useEffect(() => {
+    if (!transcribiendo) return;
+    const espera = window.setTimeout(() => void cargar(), 4000);
+    return () => window.clearTimeout(espera);
+  }, [transcribiendo, detalle, cargar]);
+
   const trasCambiar = async () => {
     await cargar();
     avisar.current();
@@ -361,6 +397,41 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
     }
   };
 
+  const reintentar = async (adjuntoId: number) => {
+    setReintentando(adjuntoId);
+    setErrorAccion(null);
+    try {
+      await api(`/api/adjuntos/${adjuntoId}/retranscribir`, { method: 'POST' });
+      // Vuelve como «transcribiendo…», y la recarga sola sigue hasta que acabe.
+      await cargar();
+    } catch (e) {
+      setErrorAccion(mensaje(e, 'No se ha podido volver a transcribir la nota'));
+    } finally {
+      setReintentando(null);
+    }
+  };
+
+  const guardarTitulo = async (e: FormEvent) => {
+    e.preventDefault();
+    const limpio = (titulo ?? '').trim();
+    if (!limpio) {
+      setErrorTitulo('Falta el título');
+      return;
+    }
+    setOcupado(true);
+    setErrorTitulo(null);
+    try {
+      await api(`/api/modificaciones/${id}/titulo`, { method: 'PATCH', body: JSON.stringify({ titulo: limpio }) });
+      setTitulo(null);
+      toast('Título guardado');
+      await trasCambiar();
+    } catch (err) {
+      setErrorTitulo(mensaje(err, 'No se ha podido guardar el título'));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const marcar = (d: DestinoEstado, aplica: boolean, hecho: boolean) =>
     void accion(`/destinos/${d.destino}`, { aplica, hecho }, 'No se ha podido marcar el destino');
 
@@ -397,14 +468,45 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
       <div className="ficha cabecera-modificacion">
         <FotoModelo modelo={fotoModelo} />
         <div className="texto">
-          <h2>
-            {r.titulo ?? 'Sin título'}
-            {r.tituloDeIa && (
-              <span className="chip-ia" title="Título escrito por la IA">
-                IA
-              </span>
-            )}
-          </h2>
+          {titulo === null ? (
+            <h2>
+              {r.titulo ?? 'Sin título'}
+              {r.tituloDeIa && (
+                <span className="chip-ia" title="Título escrito por la IA">
+                  IA
+                </span>
+              )}
+              {tituloEditable(r) && (
+                <button
+                  className="editar-titulo"
+                  type="button"
+                  aria-label={r.titulo ? 'Corregir el título' : 'Poner un título'}
+                  title={r.titulo ? 'Corregir el título' : 'Poner un título'}
+                  onClick={() => {
+                    setErrorTitulo(null);
+                    setTitulo(r.titulo ?? '');
+                  }}
+                >
+                  <Icono nombre="lapiz" />
+                </button>
+              )}
+            </h2>
+          ) : (
+            <form className="editar-nombre" onSubmit={(e) => void guardarTitulo(e)}>
+              <input aria-label="Título" value={titulo} maxLength={200} autoFocus onChange={(e) => setTitulo(e.target.value)} />
+              <button className="boton ok" type="submit" disabled={ocupado}>
+                Guardar
+              </button>
+              <button className="boton" type="button" onClick={() => setTitulo(null)}>
+                Cancelar
+              </button>
+            </form>
+          )}
+          {errorTitulo && (
+            <p className="error" role="alert">
+              {errorTitulo}
+            </p>
+          )}
           <span>
             <b>{r.modeloReferencia}</b> · {r.modeloNombre} · {r.cliente}
           </span>
@@ -424,7 +526,14 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
       <div className="cuerpo-modificacion">
         <div className="hilo">
           {detalle.mensajes.map((m) => (
-            <Mensaje key={m.id} m={m} pasando={pasando} onAGaleria={(adj) => void aGaleria(adj)} />
+            <Mensaje
+              key={m.id}
+              m={m}
+              pasando={pasando}
+              onAGaleria={(adj) => void aGaleria(adj)}
+              reintentando={reintentando}
+              onReintentar={(adj) => void reintentar(adj)}
+            />
           ))}
           <Responder id={r.id} onEnviado={trasCambiar} />
         </div>
@@ -453,27 +562,31 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
             </div>
           )}
 
+          {/* La prioridad se cambia en avisos y órdenes mientras no estén cerradas; en una orden cerrada solo se dice. */}
+          {(esAviso || !cerrada) && (
+            <fieldset>
+              <legend>Prioridad</legend>
+              <div className="prioridades">
+                {PRIORIDADES.map(([p, texto]) => (
+                  <button
+                    key={p}
+                    className="prioridad"
+                    type="button"
+                    data-p={p}
+                    aria-pressed={r.prioridad === p}
+                    disabled={cerrada || ocupado}
+                    onClick={() => void accion('/prioridad', { prioridad: p }, 'No se ha podido poner la prioridad')}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+              {r.prioridad === null && !cerrada && <p className="ayuda">Todavía sin prioridad.</p>}
+            </fieldset>
+          )}
+
           {esAviso ? (
             <>
-              <fieldset>
-                <legend>Prioridad</legend>
-                <div className="prioridades">
-                  {PRIORIDADES.map(([p, texto]) => (
-                    <button
-                      key={p}
-                      className="prioridad"
-                      type="button"
-                      data-p={p}
-                      aria-pressed={r.prioridad === p}
-                      disabled={cerrada || ocupado}
-                      onClick={() => void accion('/prioridad', { prioridad: p }, 'No se ha podido poner la prioridad')}
-                    >
-                      {texto}
-                    </button>
-                  ))}
-                </div>
-                {r.prioridad === null && !cerrada && <p className="ayuda">Todavía sin prioridad.</p>}
-              </fieldset>
               <fieldset>
                 <legend>Aplicar en</legend>
                 {r.destinos.map((d) => (
@@ -483,12 +596,18 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
                       <input
                         type="checkbox"
                         checked={d.hechoEn !== null}
-                        disabled={!d.aplica || cerrada || ocupado}
+                        disabled={!d.aplica || !destinosEditables(r.estado) || ocupado}
                         onChange={(e) => marcar(d, true, e.target.checked)}
                       />
                       Aplicado
                     </label>
-                    <button className="chip" type="button" aria-pressed={!d.aplica} disabled={cerrada || ocupado} onClick={() => marcar(d, !d.aplica, false)}>
+                    <button
+                      className="chip"
+                      type="button"
+                      aria-pressed={!d.aplica}
+                      disabled={!destinosEditables(r.estado) || ocupado}
+                      onClick={() => marcar(d, !d.aplica, false)}
+                    >
                       No aplica
                     </button>
                     {d.hechoEn && (
@@ -504,7 +623,7 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
           ) : (
             <fieldset>
               <legend>En el taller</legend>
-              {r.prioridad && <span>Prioridad {PRIORIDADES.find(([p]) => p === r.prioridad)?.[1].toLowerCase()}</span>}
+              {cerrada && r.prioridad && <span>Prioridad {PRIORIDADES.find(([p]) => p === r.prioridad)?.[1].toLowerCase()}</span>}
               <span className="meta">{r.vistaEn ? `La vio ${hace(r.vistaEn)}` : 'Todavía no la ha abierto'}</span>
             </fieldset>
           )}

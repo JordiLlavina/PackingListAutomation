@@ -28,6 +28,7 @@ const I = {
   campana: '<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   ok: '<circle cx="12" cy="12" r="9.5"/><path d="m8 12.5 3 3 5-6"/>',
   salir: '<path d="M10 5H5v14h5M14 8l4 4-4 4M8 12h10"/>',
+  lapiz: '<path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
 } as const;
 
 export type NombreIcono = keyof typeof I;
