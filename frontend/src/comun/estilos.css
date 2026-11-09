@@ -492,3 +492,7 @@ a.boton { text-decoration: none; color: var(--fg); }
 .avisos-bloqueados { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0 0 18px; color: var(--muted); }
 .avisos-bloqueados svg { width: 20px; height: 20px; flex: none; }
 .avisos-bloqueados .enlace { padding: 0; }
+
+/* Escáner: el vídeo llena el recuadro y el marco queda por encima. */
+.escaner { width: 100%; }
+.escaner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }

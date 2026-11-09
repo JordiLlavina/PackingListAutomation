@@ -49,7 +49,7 @@ export default function ElegirModelo() {
       <h2 className="pregunta">¿Qué modelo has cambiado?</h2>
       {error && <p className="error-envio" role="alert">{error}. Elígelo en la lista.</p>}
       <div className="acciones" style={{ margin: '0 0 18px' }}>
-        <button className="boton marca ancho" type="button" onClick={() => navegar('/escanear')}>
+        <button className="boton marca ancho" type="button" onClick={() => navegar('/escanear?para=cambio')}>
           <Icono nombre="qr" /> Escanear la etiqueta del patrón
         </button>
       </div>

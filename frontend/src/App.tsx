@@ -22,6 +22,7 @@ import Enviado from './taller/cambio/Enviado';
 import Fotos from './taller/cambio/Fotos';
 import Grabar from './taller/cambio/Grabar';
 import QueHasCambiado from './taller/cambio/QueHasCambiado';
+import Escanear from './taller/Escanear';
 import Revisar from './taller/cambio/Revisar';
 import FichaModeloTaller from './taller/FichaModelo';
 import InicioTaller from './taller/Inicio';
@@ -76,7 +77,7 @@ const rutasTaller: RouteObject[] = [
       { path: 'modelos', element: <ModelosTaller />, ...pantalla({ titulo: 'Modelos', seccion: 'modelos', fab: true }) },
       { path: 'modelos/:id', element: <FichaModeloTaller />, ...pantalla({ titulo: 'Modelo', atras: '/modelos', seccion: 'modelos', fab: true }) },
       { path: 'cambio', children: rutasCambio },
-      { path: 'escanear', element: <PorLlegar />, ...pantalla({ titulo: 'Escanear etiqueta', atras: '/' }) },
+      { path: 'escanear', element: <Escanear />, ...pantalla({ titulo: 'Escanear etiqueta', atras: '/' }) },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
