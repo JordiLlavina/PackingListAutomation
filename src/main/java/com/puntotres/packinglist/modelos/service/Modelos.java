@@ -1,5 +1,8 @@
 package com.puntotres.packinglist.modelos.service;
 
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,6 +16,8 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import javax.imageio.ImageIO;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,10 +38,12 @@ import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.Etapa;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
+import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.persistence.ResumenTemporada;
 import com.puntotres.packinglist.persistence.TipoArticulo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
+import com.puntotres.packinglist.service.corte.ReductorImagen;
 
 /**
  * Los modelos tal como los ve la app de modelos: la lista con sus filtros,
@@ -53,6 +60,11 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
  * mayúsculas, como hace el catálogo con los códigos: "Proto A" y "PROTO A "
  * son el mismo prototipo y la restricción única de la base de datos no lo
  * sabría.
+ *
+ * Las fotos se reducen con {@link ReductorImagen} de {@code service.corte},
+ * una excepción declarada a la disciplina de paquete de la app de modelos:
+ * es una utilidad estática y sin estado, la misma que deja las fotos del
+ * corte y del catálogo a 1.600 px.
  */
 @Service
 public class Modelos {
@@ -65,6 +77,12 @@ public class Modelos {
 
     /** Lo que cabe en el nombre del modelo y en el motivo de un cambio de etapa. */
     private static final int LARGO_TEXTO = 200;
+
+    /** Lo que cabe en {@code foto_modelo.nombre_fichero}. */
+    private static final int LARGO_NOMBRE_FOTO = 255;
+
+    /** Hasta dónde un punto final se lee como extensión ({@code .jpeg} sí; {@code .algo muy largo} no). */
+    private static final int LARGO_EXTENSION = 10;
 
     private final ModeloRepository repositorio;
     private final CatalogoModelos catalogo;
@@ -240,6 +258,88 @@ public class Modelos {
         }
         LocalDateTime ahora = LocalDateTime.now();
         repositorio.findAllById(ids).forEach(modelo -> modelo.marcarEtiquetaImpresa(ahora));
+    }
+
+    /** Un fichero de foto tal como llega: su nombre original y sus bytes, sin leer todavía. */
+    public record FotoSubida(String nombre, byte[] bytes) {
+    }
+
+    /**
+     * Sube una o varias fotos al modelo, reducidas a {@value ReductorImagen#LADO_MAXIMO}
+     * px. Se leen y se reducen todas antes de guardar ninguna, y se guardan en
+     * una sola transacción: si una no es una imagen (400 que la nombra) o la
+     * base de datos falla a mitad, no se queda la mitad de la subida.
+     *
+     * El catálogo identifica una foto por su nombre dentro del modelo, y un
+     * móvil llama {@code image.jpg} a todas las de la cámara: con el nombre
+     * tal cual, la segunda se descartaría en silencio. Por eso cada una se
+     * guarda con un nombre libre ({@code image (2).jpg}) frente a las que ya
+     * tiene el modelo y a las de la misma subida.
+     *
+     * @return todas las fotos del modelo
+     */
+    @Transactional
+    public List<ResumenFoto> subirFotos(Long modeloId, List<FotoSubida> ficheros) throws IOException {
+        modeloQueExiste(modeloId);
+        List<FotoSubida> conContenido = ficheros == null ? List.of() : ficheros.stream()
+                .filter(fichero -> fichero != null && fichero.bytes() != null && fichero.bytes().length > 0)
+                .toList();
+        if (conContenido.isEmpty()) {
+            throw new IllegalArgumentException("No has elegido ninguna foto");
+        }
+        List<String> nombres = new ArrayList<>();
+        List<byte[]> jpegs = new ArrayList<>();
+        for (FotoSubida fichero : conContenido) {
+            String nombre = vacio(fichero.nombre()) ? "foto.jpg" : fichero.nombre().trim();
+            BufferedImage imagen = leerImagen(fichero.bytes(), nombre);
+            nombres.add(nombre);
+            jpegs.add(ReductorImagen.jpeg(ReductorImagen.reducir(imagen, ReductorImagen.LADO_MAXIMO)));
+        }
+        Set<String> usados = new HashSet<>();
+        for (ResumenFoto existente : fotos.de(modeloId)) {
+            usados.add(existente.nombreFichero().toLowerCase(Locale.ROOT));
+        }
+        for (int i = 0; i < jpegs.size(); i++) {
+            String libre = nombreLibre(nombres.get(i), usados);
+            usados.add(libre.toLowerCase(Locale.ROOT));
+            fotos.guardar(modeloId, libre, jpegs.get(i));
+        }
+        return fotos.de(modeloId);
+    }
+
+    /**
+     * El nombre tal cual si está libre; si no, con {@code " (2)"},
+     * {@code " (3)"}... delante de la extensión. Sin mirar mayúsculas
+     * ({@code IMAGE.JPG} e {@code image.jpg} son el mismo fichero para quien
+     * los descarga en Windows) y cortando el nombre, nunca la extensión, para
+     * que quepa en la columna.
+     */
+    static String nombreLibre(String nombre, Set<String> usados) {
+        int punto = nombre.lastIndexOf('.');
+        boolean conExtension = punto > 0 && nombre.length() - punto <= LARGO_EXTENSION;
+        String base = conExtension ? nombre.substring(0, punto) : nombre;
+        String extension = conExtension ? nombre.substring(punto) : "";
+        for (int numero = 1; ; numero++) {
+            String sufijo = numero == 1 ? "" : " (" + numero + ")";
+            int cabe = LARGO_NOMBRE_FOTO - sufijo.length() - extension.length();
+            String candidato = base.substring(0, Math.min(base.length(), cabe)) + sufijo + extension;
+            if (!usados.contains(candidato.toLowerCase(Locale.ROOT))) {
+                return candidato;
+            }
+        }
+    }
+
+    /** La imagen de esos bytes; un 400 que nombra el fichero si no es una imagen que Java sepa leer. */
+    private static BufferedImage leerImagen(byte[] bytes, String nombre) {
+        try {
+            BufferedImage imagen = ImageIO.read(new ByteArrayInputStream(bytes));
+            if (imagen != null) {
+                return imagen;
+            }
+        } catch (IOException ilegible) {
+            // Igual que si no fuera una imagen: el mensaje de abajo.
+        }
+        throw new IllegalArgumentException("El fichero " + nombre + " no es una imagen");
     }
 
     /**

@@ -182,6 +182,31 @@ class ModelosControllerTest {
     }
 
     @Test
+    void dosFotosLlamadasIgualSeGuardanLasDosConNombresDistintos() throws Exception {
+        long id = alta("T9-API-MISMONOMBRE");
+
+        mvc.perform(multipart("/api/modelos/" + id + "/fotos")
+                        .file(new MockMultipartFile("fotos", "image.jpg", MediaType.IMAGE_PNG_VALUE,
+                                png(40, 30, Color.RED)))
+                        .file(new MockMultipartFile("fotos", "image.jpg", MediaType.IMAGE_PNG_VALUE,
+                                png(40, 30, Color.BLUE)))
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].nombreFichero").value("image.jpg"))
+                .andExpect(jsonPath("$[1].nombreFichero").value("image (2).jpg"));
+
+        // Otra subida más tarde, como hace un móvil con cada foto de la cámara.
+        mvc.perform(multipart("/api/modelos/" + id + "/fotos")
+                        .file(new MockMultipartFile("fotos", "IMAGE.JPG", MediaType.IMAGE_PNG_VALUE,
+                                png(40, 30, Color.GREEN)))
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[2].nombreFichero").value("IMAGE (3).JPG"));
+    }
+
+    @Test
     void marcarOtraFotoComoPrincipal() throws Exception {
         long id = alta("T9-API-PRINCIPAL");
         mvc.perform(multipart("/api/modelos/" + id + "/fotos")

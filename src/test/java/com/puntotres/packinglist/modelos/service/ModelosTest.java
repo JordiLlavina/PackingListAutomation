@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -292,6 +293,22 @@ class ModelosTest {
         assertEquals(4, linea.size());
         assertEquals(futuro, linea.get(0));
         assertEquals(antiguo, linea.get(3));
+    }
+
+    @Test
+    void elNombreDeUnaFotoSeHaceLibreYCabeEnSuColumna() {
+        assertEquals("image.jpg", Modelos.nombreLibre("image.jpg", Set.of()));
+        assertEquals("image (2).jpg", Modelos.nombreLibre("image.jpg", Set.of("image.jpg")));
+        assertEquals("image (3).jpg", Modelos.nombreLibre("image.jpg", Set.of("image.jpg", "image (2).jpg")));
+        assertEquals("foto (2)", Modelos.nombreLibre("foto", Set.of("foto")));
+
+        String largo = "a".repeat(300) + ".jpeg";
+        String cortado = Modelos.nombreLibre(largo, Set.of());
+        assertEquals(255, cortado.length());
+        assertTrue(cortado.endsWith("a.jpeg"), "se corta el nombre, nunca la extensión");
+        String repetido = Modelos.nombreLibre(largo, Set.of(cortado));
+        assertEquals(255, repetido.length());
+        assertTrue(repetido.endsWith("a (2).jpeg"), repetido);
     }
 
     private Long temporada(String nombre) {

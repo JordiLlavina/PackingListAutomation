@@ -1,12 +1,8 @@
 package com.puntotres.packinglist.modelos.api;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.imageio.ImageIO;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -37,17 +33,11 @@ import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.persistence.TipoArticulo;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
-import com.puntotres.packinglist.service.corte.ReductorImagen;
 
 /**
  * Los modelos en la app: lista, ficha, alta a mano, etapa, QR de la etiqueta
  * de patrones y fotos. Mirar es de cualquiera que haya entrado (el taller
  * también); cambiar algo es del despacho.
- *
- * Las fotos se reducen con {@link ReductorImagen} de {@code service.corte},
- * una excepción declarada a la disciplina de paquete de la app de modelos:
- * es una utilidad estática y sin estado, la misma que deja las fotos del
- * corte y del catálogo a 1.600 px.
  */
 @RestController
 @RequestMapping("/api")
@@ -137,9 +127,10 @@ public class ModelosController {
     }
 
     /**
-     * Sube una o varias fotos. Se leen y se reducen todas antes de guardar
-     * ninguna: si una no es una imagen, no se queda la mitad de la subida
-     * guardada. Contesta con todas las fotos del modelo.
+     * Sube una o varias fotos (parte {@code fotos}, repetida). Leerlas,
+     * reducirlas, darles un nombre libre y guardarlas es de
+     * {@link Modelos#subirFotos}; aquí solo se pasa del multipart a
+     * {@link Modelos.FotoSubida}. Contesta con todas las fotos del modelo.
      */
     @PostMapping("/modelos/{id}/fotos")
     @PreAuthorize(DESPACHO)
@@ -147,24 +138,11 @@ public class ModelosController {
                                                         @RequestParam(name = "fotos", required = false)
                                                         List<MultipartFile> ficheros) throws IOException {
         modeloQueExiste(id);
-        if (ficheros == null || ficheros.stream().allMatch(MultipartFile::isEmpty)) {
-            throw new IllegalArgumentException("No has elegido ninguna foto");
+        List<Modelos.FotoSubida> subidas = new ArrayList<>();
+        for (MultipartFile fichero : ficheros == null ? List.<MultipartFile>of() : ficheros) {
+            subidas.add(new Modelos.FotoSubida(fichero.getOriginalFilename(), fichero.getBytes()));
         }
-        List<String> nombres = new ArrayList<>();
-        List<byte[]> jpegs = new ArrayList<>();
-        for (MultipartFile fichero : ficheros) {
-            if (fichero.isEmpty()) {
-                continue;
-            }
-            String nombre = nombreDe(fichero);
-            BufferedImage imagen = leer(fichero, nombre);
-            nombres.add(nombre);
-            jpegs.add(ReductorImagen.jpeg(ReductorImagen.reducir(imagen, ReductorImagen.LADO_MAXIMO)));
-        }
-        for (int i = 0; i < jpegs.size(); i++) {
-            fotos.guardar(id, nombres.get(i), jpegs.get(i));
-        }
-        return ResponseEntity.status(HttpStatus.CREATED).body(fotos.de(id));
+        return ResponseEntity.status(HttpStatus.CREATED).body(modelos.subirFotos(id, subidas));
     }
 
     @PostMapping("/modelos/{id}/fotos/{fotoId}/principal")
@@ -196,23 +174,5 @@ public class ModelosController {
     private Modelo modeloQueExiste(Long id) {
         return catalogo.modelo(id).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No hay ningún modelo con id " + id));
-    }
-
-    private static String nombreDe(MultipartFile fichero) {
-        String original = fichero.getOriginalFilename();
-        return original == null || original.isBlank() ? "foto.jpg" : original.trim();
-    }
-
-    /** La imagen del fichero; un 400 que lo nombra si no es una imagen que Java sepa leer. */
-    private static BufferedImage leer(MultipartFile fichero, String nombre) {
-        try (InputStream entrada = fichero.getInputStream()) {
-            BufferedImage imagen = ImageIO.read(entrada);
-            if (imagen != null) {
-                return imagen;
-            }
-        } catch (IOException ilegible) {
-            // Igual que si no fuera una imagen: el mensaje de abajo.
-        }
-        throw new IllegalArgumentException("El fichero " + nombre + " no es una imagen");
     }
 }
