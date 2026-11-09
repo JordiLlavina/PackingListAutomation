@@ -3,7 +3,9 @@
 // los nombres que ha tenido), las acciones (una orden nueva para el taller,
 // cambiar de etapa, subir fotos, asignar la referencia a un prototipo o, en
 // uno importado, juntarlo con el prototipo que ya teníamos), la galería con
-// la principal marcada y el historial. Juntar dos modelos deja el de menor id,
+// la principal marcada, los documentos y el historial. Al subir un PDF, se
+// eligen sus imágenes que son fotos del modelo (ElegirImagenesPdf); las demás no
+// se guardan. Juntar dos modelos deja el de menor id,
 // que puede no ser este: entonces se navega a la ficha del superviviente.
 // Tras cada cambio se vuelve a pedir la ficha y se avisa a la lista para que
 // repinte su fila.
@@ -13,18 +15,23 @@ import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
 import Historial from '../comun/Historial';
+import ElegirImagenesPdf from './ElegirImagenesPdf';
 import { Icono } from '../comun/iconos';
 import {
   ETAPAS,
   antesEra,
+  documentoUrl,
   etapaTexto,
   fotoUrl,
   prototiposCandidatos,
+  tamanoTexto,
   textoFusion,
+  type DocumentoResumen,
   type Etapa as TipoEtapa,
   type Fusion,
   type ModeloFicha,
   type ModeloResumen,
+  type Subida,
 } from '../comun/modelos';
 import { toast } from '../comun/toast';
 
@@ -42,6 +49,12 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [nombre, setNombre] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  // Documentos: el que se está subiendo, las candidatas del PDF recién subido
+  // (abre la elección de imágenes) y el que se va a quitar (pide confirmación).
+  const [subiendoDocumento, setSubiendoDocumento] = useState(false);
+  const [subidaPdf, setSubidaPdf] = useState<Subida | null>(null);
+  const dialogoQuitar = useRef<HTMLDialogElement>(null);
+  const [aQuitar, setAQuitar] = useState<DocumentoResumen | null>(null);
   const dialogo = useRef<HTMLDialogElement>(null);
   const [etapa, setEtapa] = useState<TipoEtapa>('PROTOTIPO');
   const [motivo, setMotivo] = useState('');
@@ -276,6 +289,53 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
     }
   };
 
+  // Un PDF vuelve con candidatas: se abre la elección de imágenes. Cualquier
+  // otro documento (o un PDF sin ninguna) solo se guarda.
+  const subirDocumento = async (e: ChangeEvent<HTMLInputElement>) => {
+    const fichero = e.target.files?.[0];
+    e.target.value = '';
+    if (!fichero) return;
+    const datos = new FormData();
+    datos.append('documento', fichero);
+    setSubiendoDocumento(true);
+    setErrorAccion(null);
+    try {
+      const subida = await api<Subida>(`/api/modelos/${m.id}/documentos`, { method: 'POST', body: datos });
+      await trasCambiar();
+      if (subida.loteId !== null && subida.candidatas.length > 0) {
+        setSubidaPdf(subida);
+      } else {
+        toast('Documento añadido');
+      }
+    } catch (err) {
+      setErrorAccion(mensaje(err, 'No se ha podido subir el documento'));
+    } finally {
+      setSubiendoDocumento(false);
+    }
+  };
+
+  const pedirQuitar = (documento: DocumentoResumen) => {
+    setAQuitar(documento);
+    dialogoQuitar.current?.showModal();
+  };
+
+  const quitarDocumento = async () => {
+    if (!aQuitar) return;
+    setOcupado(true);
+    setErrorAccion(null);
+    try {
+      await api(`/api/documentos/${aQuitar.id}`, { method: 'DELETE' });
+      dialogoQuitar.current?.close();
+      toast('Documento quitado');
+      await trasCambiar();
+    } catch (err) {
+      dialogoQuitar.current?.close();
+      setErrorAccion(mensaje(err, 'No se ha podido quitar el documento'));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   return (
     <div className="detalle">
       <div className="ficha grande">
@@ -334,6 +394,15 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
           <Icono nombre="cam" /> {subiendo ? 'Subiendo fotos…' : 'Subir fotos'}
           <input type="file" multiple accept="image/*" disabled={subiendo} onChange={(e) => void subirFotos(e)} />
         </label>
+        <label className="boton subir" aria-disabled={subiendoDocumento}>
+          <Icono nombre="pdf" /> {subiendoDocumento ? 'Subiendo documento…' : 'Subir PDF / documento'}
+          <input
+            type="file"
+            accept=".pdf,application/pdf,image/*,.doc,.docx,.xlsx"
+            disabled={subiendoDocumento}
+            onChange={(e) => void subirDocumento(e)}
+          />
+        </label>
       </div>
       {errorAccion && <p className="error">{errorAccion}</p>}
 
@@ -362,9 +431,60 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
       )}
 
       <div className="fila-titulo">
+        <h2>Documentos</h2>
+      </div>
+      {ficha.documentos.length === 0 ? (
+        <p className="ayuda">Este modelo aún no tiene documentos. Súbelos con «Subir PDF / documento».</p>
+      ) : (
+        <ul className="lista-documentos">
+          {ficha.documentos.map((d) => (
+            <li key={d.id}>
+              <Icono nombre="pdf" />
+              <span className="texto">
+                <b>{d.nombre}</b>
+                <span className="meta">
+                  {tamanoTexto(d.tamano)} · {fecha(d.fecha)}
+                </span>
+              </span>
+              <a className="chip" href={documentoUrl(d.id)} target="_blank" rel="noopener">
+                Abrir
+              </a>
+              <button className="chip" type="button" onClick={() => pedirQuitar(d)}>
+                Quitar
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="fila-titulo">
         <h2>Historial</h2>
       </div>
       <Historial eventos={ficha.lineaTiempo} />
+
+      {subidaPdf && (
+        <ElegirImagenesPdf
+          modeloId={m.id}
+          subida={subidaPdf}
+          onCerrar={() => setSubidaPdf(null)}
+          onGuardadas={() => void trasCambiar()}
+        />
+      )}
+
+      <dialog ref={dialogoQuitar} className="dialogo" aria-labelledby="titulo-quitar">
+        <div className="formulario">
+          <h2 id="titulo-quitar">¿Quitar {aQuitar?.nombre}?</h2>
+          <p>Se borra el documento del modelo. Las fotos que ya se sacaron de él se quedan en la galería.</p>
+          <div className="botones">
+            <button className="boton peligro" type="button" disabled={ocupado} onClick={() => void quitarDocumento()}>
+              Quitar
+            </button>
+            <button className="boton" type="button" onClick={() => dialogoQuitar.current?.close()}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </dialog>
 
       <dialog ref={dialogo} className="dialogo" aria-labelledby="titulo-etapa">
         <form onSubmit={(e) => void cambiarEtapa(e)}>

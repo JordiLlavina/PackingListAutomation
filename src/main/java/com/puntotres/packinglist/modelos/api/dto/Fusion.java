@@ -12,7 +12,7 @@ package com.puntotres.packinglist.modelos.api.dto;
  * @param articulos      los artículos del absorbido
  * @param fotos          sus fotos
  * @param modificaciones sus modificaciones
- * @param documentos     sus documentos; 0 hasta que existan los documentos del modelo
+ * @param documentos     sus documentos
  */
 public record Fusion(Long superviviente, Long absorbido, int articulos, int fotos, int modificaciones,
                      int documentos) {

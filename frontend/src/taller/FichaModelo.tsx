@@ -1,6 +1,7 @@
 // La ficha de un modelo en el taller, la de la maqueta: foto, referencia,
-// nombre, cliente y etapa; el botón para avisar de un cambio en este modelo, y
-// el historial de lo que le ha pasado.
+// nombre, cliente y etapa; el botón para avisar de un cambio en este modelo, sus
+// documentos (fichas técnicas: se abren en otra pestaña, con el visor de la
+// tablet) y el historial de lo que le ha pasado.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
@@ -8,7 +9,7 @@ import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
 import Historial from '../comun/Historial';
 import { Icono } from '../comun/iconos';
-import type { ModeloFicha } from '../comun/modelos';
+import { documentoUrl, type ModeloFicha } from '../comun/modelos';
 import { useTitulo } from './Shell';
 
 export default function FichaModelo() {
@@ -61,6 +62,19 @@ export default function FichaModelo() {
           <Icono nombre="mic" /> He cambiado algo en este modelo
         </button>
       </div>
+      {ficha.documentos.length > 0 && (
+        <div className="docs">
+          {ficha.documentos.map((d) => (
+            <button key={d.id} className="doc" type="button" onClick={() => window.open(documentoUrl(d.id), '_blank', 'noopener')}>
+              <Icono nombre="pdf" />
+              <span>
+                {d.nombre}
+                <small>Toca para abrir · vuelve con «atrás»</small>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="fila-titulo">
         <h2>Historial</h2>
       </div>

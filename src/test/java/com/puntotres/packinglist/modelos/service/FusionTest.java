@@ -22,11 +22,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.puntotres.packinglist.modelos.ComoUsuario;
 import com.puntotres.packinglist.modelos.api.dto.CodigoHistorico;
+import com.puntotres.packinglist.modelos.api.dto.DocumentoResumen;
 import com.puntotres.packinglist.modelos.api.dto.Evento;
 import com.puntotres.packinglist.modelos.api.dto.Fusion;
 import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapa;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapaRepository;
+import com.puntotres.packinglist.modelos.persistence.DocumentoModeloRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Prioridad;
@@ -50,8 +52,9 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
  * Asignar la referencia a un prototipo y, si ya existe un modelo con ella
  * (el que ha entrado por el pedido), juntar los dos. La base de datos es la
  * misma para toda la suite: los códigos de este test empiezan por
- * {@code T19-}, los prototipos por {@code PROTO T19} y las temporadas por
- * {@code T19-}.
+ * {@code T19-} (o {@code T22-} los de los documentos y los arreglos de la
+ * fusión), los prototipos por {@code PROTO T19} (o {@code PROTO T22}) y las
+ * temporadas igual.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -61,6 +64,12 @@ class FusionTest {
 
     @Autowired
     private Modelos modelos;
+
+    @Autowired
+    private Documentos documentos;
+
+    @Autowired
+    private DocumentoModeloRepository documentosRepositorio;
 
     @Autowired
     private Modificaciones modificaciones;
@@ -250,6 +259,80 @@ class FusionTest {
         mvc.perform(get("/m/" + a.getId()))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/app/modelos/" + c.getId()));
+    }
+
+    @Test
+    void fusionarSeLlevaLosDocumentosAlSuperviviente() {
+        Long temporada = temporada("T22-DOCS");
+        Modelo proto = prototipo("PROTO T22 DOCS", temporada);
+        documentos.guardar(proto.getId(), "boceto.pdf", "application/pdf", JPEG, despacho());
+        Modelo importado = importado("T22-DOCS.AL0001");
+        documentos.guardar(importado.getId(), "ficha.pdf", "application/pdf", JPEG, despacho());
+        documentos.guardar(importado.getId(), "medidas.xlsx", "application/octet-stream", JPEG, despacho());
+        Long viejo = importado.getId();
+
+        assertEquals(new Fusion(proto.getId(), viejo, 1, 0, 0, 2),
+                modelos.previsualizarReferencia(proto.getId(), "T22-DOCS"));
+
+        modelos.asignarReferencia(proto.getId(), "T22-DOCS", true, despacho());
+
+        assertEquals(0, documentosRepositorio.countByModeloId(viejo));
+        assertEquals(Set.of("boceto.pdf", "ficha.pdf", "medidas.xlsx"),
+                documentos.de(proto.getId()).stream().map(DocumentoResumen::nombre).collect(Collectors.toSet()));
+        assertEquals(3, modelos.ficha(proto.getId()).documentos().size());
+    }
+
+    @Test
+    void siSobreviveElImportadoSeQuedaConElNombreDePrototipoYSoloUnNombreVigente() {
+        Long temporada = temporada("T22-PROTO");
+        // El importado primero, para que tenga el id menor y sea él quien sobreviva.
+        Modelo importado = importado("T22-PROTO.AL0001");
+        Modelo proto = prototipo("PROTO T22 PROTO", temporada);
+
+        Modelo superviviente = modelos.asignarReferencia(proto.getId(), "T22-PROTO", true, despacho());
+
+        assertEquals(importado.getId(), superviviente.getId());
+        Modelo guardado = repositorioModelos.findById(importado.getId()).orElseThrow();
+        assertEquals("T22-PROTO", guardado.getCodigo());
+        assertEquals("PROTO T22 PROTO", guardado.getNombrePrototipo());
+        assertEquals(temporada, guardado.getTemporadaAltaId());
+
+        List<CodigoHistorico> codigos = modelos.ficha(importado.getId()).codigos();
+        // El importado entró por el pedido, sin apuntes: el único nombre que tenía en el histórico era el del
+        // prototipo, y ya no es el vigente.
+        assertTrue(codigos.stream().noneMatch(codigo -> codigo.hasta() == null), codigos.toString());
+        assertNotNull(codigos.stream().filter(codigo -> "PROTO T22 PROTO".equals(codigo.codigo())).findFirst()
+                .orElseThrow().hasta(), "el nombre de prototipo que se ha movido deja de ser el vigente");
+        assertTrue(modelos.ficha(importado.getId()).lineaTiempo().stream().map(Evento::texto)
+                .anyMatch("Prototipo PROTO T22 PROTO"::equals));
+    }
+
+    @Test
+    void dosConReferenciaSoloDejanVigenteLaDelSuperviviente() {
+        Modelo uno = modelos.darDeAlta(new Modelos.AltaManual("AMI", null, "T22-UNO", null, null, null, null),
+                despacho());
+        Modelo otro = modelos.darDeAlta(new Modelos.AltaManual("AMI", null, "T22-OTRO", null, null, null, null),
+                despacho());
+
+        modelos.fusionar(otro.getId(), uno.getId(), despacho());
+
+        List<CodigoHistorico> codigos = modelos.ficha(uno.getId()).codigos();
+        assertEquals(List.of("T22-UNO"), codigos.stream().filter(codigo -> codigo.hasta() == null)
+                .map(CodigoHistorico::codigo).toList(), codigos.toString());
+    }
+
+    @Test
+    void unaReferenciaQueEmpiezaPorAlmohadillaNoSeDaDeAlta() {
+        Long temporada = temporada("T22-ALMOHADILLA");
+
+        IllegalArgumentException codigo = assertThrows(IllegalArgumentException.class,
+                () -> modelos.darDeAlta(new Modelos.AltaManual("AMI", null, " #12", null, null, null, null),
+                        despacho()));
+        assertEquals("La referencia no puede empezar por #", codigo.getMessage());
+
+        IllegalArgumentException prototipo = assertThrows(IllegalArgumentException.class,
+                () -> prototipo("#PROTO T22", temporada));
+        assertEquals("La referencia no puede empezar por #", prototipo.getMessage());
     }
 
     private Modelo prototipo(String nombre, Long temporada) {

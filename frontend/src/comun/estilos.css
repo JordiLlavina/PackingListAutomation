@@ -295,6 +295,26 @@ img.foto { object-fit: cover; background: var(--line); }
 .galeria figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
 .galeria .principal { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 700; font-size: .95rem; }
 
+/* Documentos de la ficha: nombre, peso y fecha, con «Abrir» y «Quitar» a la derecha. */
+.lista-documentos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lista-documentos li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.lista-documentos li > svg { width: 24px; height: 24px; color: var(--alta); flex: none; }
+.lista-documentos .texto { display: grid; flex: 1; min-width: 0; }
+.lista-documentos .texto b { overflow-wrap: anywhere; }
+.lista-documentos a.chip { display: inline-flex; align-items: center; text-decoration: none; color: var(--fg); }
+
+/* «¿Cuáles son del modelo?»: las imágenes de un PDF en rejilla, la marcada con borde. */
+.dialogo.elegir-imagenes { width: min(94vw, 900px); }
+.elegir-imagenes .formulario { max-width: none; }
+.candidatas { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; max-height: 60vh; overflow: auto; }
+.candidatas figure { margin: 0; display: grid; gap: 6px; padding: 6px; border: 2px solid var(--line); border-radius: 12px; }
+.candidatas figure.marcada { border-color: var(--accent); }
+.candidatas img { width: 100%; aspect-ratio: 1; object-fit: contain; background: var(--bg); border-radius: 8px; display: block; }
+.candidatas figcaption { display: grid; gap: 4px; }
+.candidatas label { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; }
+.candidatas input { width: 18px; height: 18px; accent-color: var(--accent); }
+.candidatas label.apagada { opacity: .45; }
+
 /* Formularios del panel derecho y el diálogo de cambiar etapa. */
 .formulario, .dialogo form { display: grid; gap: 14px; max-width: 520px; }
 .formulario h2, .dialogo h2 { font-size: 1.25rem; }

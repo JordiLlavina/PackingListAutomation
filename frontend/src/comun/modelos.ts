@@ -28,6 +28,16 @@ export type ResumenFoto = { id: number; modeloId: number; nombreFichero: string;
 
 export type DocumentoResumen = { id: number; nombre: string; mime: string; tamano: number; fecha: string };
 
+/** Una imagen sacada de un PDF que podría ser foto del modelo; `origen` es «imagen» o «página N». */
+export type CandidataImagen = { clave: string; ancho: number; alto: number; origen: string };
+
+/**
+ * Lo que contesta subir un documento: el documento guardado y, si era un PDF,
+ * el lote de sus candidatas (media hora de vida) para elegir cuáles son fotos
+ * del modelo; si no, `loteId` nulo y ninguna candidata.
+ */
+export type Subida = { documento: DocumentoResumen; loteId: string | null; candidatas: CandidataImagen[] };
+
 /** Una entrada de la línea de tiempo: un cambio de etapa, un nombre nuevo o una modificación. */
 export type Evento = {
   fecha: string;
@@ -102,7 +112,9 @@ export function textoFusion(codigo: string, fusion: Fusion): string {
   return (
     `Se va a juntar con ${codigo}: ${cuenta(fusion.articulos, 'artículo', 'artículos')}, ` +
     `${cuenta(fusion.fotos, 'foto', 'fotos')}, ` +
-    `${cuenta(fusion.modificaciones, 'modificación', 'modificaciones')}. No se puede deshacer.`
+    `${cuenta(fusion.modificaciones, 'modificación', 'modificaciones')}` +
+    (fusion.documentos > 0 ? `, ${cuenta(fusion.documentos, 'documento', 'documentos')}` : '') +
+    '. No se puede deshacer.'
   );
 }
 
@@ -127,4 +139,51 @@ export function prototiposCandidatos(modelos: ModeloResumen[], esteId: number, t
       m.id !== esteId &&
       (buscado === '' || m.referencia.toUpperCase().includes(buscado) || m.nombre.toUpperCase().includes(buscado)),
   );
+}
+
+export function documentoUrl(id: number): string {
+  return `/api/documentos/${id}`;
+}
+
+export function candidataUrl(modeloId: number, loteId: string, clave: string): string {
+  return `/api/modelos/${modeloId}/documentos/candidatas/${encodeURIComponent(loteId)}/${encodeURIComponent(clave)}`;
+}
+
+/** «820 KB», «2,4 MB»: el peso de un documento, redondeado como lo dice una persona. */
+export function tamanoTexto(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace('.', ',')} MB`;
+}
+
+/**
+ * Qué candidatas de un PDF ha marcado el despacho como fotos del modelo y
+ * cuál de ellas es la principal (o ninguna: entonces la principal del modelo
+ * no cambia).
+ */
+export type EleccionImagenes = { marcadas: string[]; principal: string | null };
+
+/** Marca o desmarca una candidata; si se desmarca la principal, deja de haber principal. */
+export function alternarMarcada(eleccion: EleccionImagenes, clave: string): EleccionImagenes {
+  if (eleccion.marcadas.includes(clave)) {
+    return {
+      marcadas: eleccion.marcadas.filter((c) => c !== clave),
+      principal: eleccion.principal === clave ? null : eleccion.principal,
+    };
+  }
+  return { marcadas: [...eleccion.marcadas, clave], principal: eleccion.principal };
+}
+
+/** La principal solo puede ser una de las marcadas: con otra, no cambia nada. */
+export function elegirPrincipal(eleccion: EleccionImagenes, clave: string): EleccionImagenes {
+  return eleccion.marcadas.includes(clave) ? { ...eleccion, principal: clave } : eleccion;
+}
+
+/** Las claves marcadas en el orden de las candidatas, que es como se guardan en la galería. */
+export function clavesMarcadas(candidatas: CandidataImagen[], eleccion: EleccionImagenes): string[] {
+  return candidatas.map((c) => c.clave).filter((clave) => eleccion.marcadas.includes(clave));
+}
+
+/** «1 foto añadida al modelo», «3 fotos añadidas al modelo». */
+export function textoFotosAnadidas(n: number): string {
+  return n === 1 ? '1 foto añadida al modelo' : `${n} fotos añadidas al modelo`;
 }

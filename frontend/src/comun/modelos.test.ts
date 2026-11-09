@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alternarMarcada,
   antesEra,
+  candidataUrl,
+  clavesMarcadas,
+  documentoUrl,
+  elegirPrincipal,
   etapaTexto,
   filtrarRejilla,
   fotoUrl,
   prototiposCandidatos,
+  tamanoTexto,
+  textoFotosAnadidas,
   textoFusion,
+  type CandidataImagen,
+  type EleccionImagenes,
   type ModeloResumen,
 } from './modelos';
 
@@ -73,6 +82,9 @@ describe('asignar referencia y juntar', () => {
     expect(textoFusion('ULL770', fusion)).toBe(
       'Se va a juntar con ULL770: 3 artículos, 1 foto, 0 modificaciones. No se puede deshacer.',
     );
+    expect(textoFusion('ULL770', { ...fusion, documentos: 2 })).toBe(
+      'Se va a juntar con ULL770: 3 artículos, 1 foto, 0 modificaciones, 2 documentos. No se puede deshacer.',
+    );
   });
 
   it('antes era: nada sin fusiones, uno o varios con su #', () => {
@@ -94,5 +106,44 @@ describe('asignar referencia y juntar', () => {
     expect(ids(prototiposCandidatos(lista, 4, ''))).toEqual([1, 3]);
     expect(ids(prototiposCandidatos(lista, 4, 'candy'))).toEqual([1]);
     expect(ids(prototiposCandidatos(lista, 4, 'proto 3'))).toEqual([3]);
+  });
+});
+
+describe('documentos e imágenes de un PDF', () => {
+  const candidatas: CandidataImagen[] = [
+    { clave: 'imagen-1', ancho: 400, alto: 400, origen: 'imagen' },
+    { clave: 'imagen-2', ancho: 400, alto: 400, origen: 'imagen' },
+    { clave: 'pagina-1', ancho: 826, alto: 1169, origen: 'página 1' },
+  ];
+  const nada: EleccionImagenes = { marcadas: [], principal: null };
+
+  it('las direcciones del documento y de cada candidata', () => {
+    expect(documentoUrl(5)).toBe('/api/documentos/5');
+    expect(candidataUrl(3, 'a1-b2', 'pagina-1')).toBe('/api/modelos/3/documentos/candidatas/a1-b2/pagina-1');
+  });
+
+  it('el peso se dice en KB o en MB con coma', () => {
+    expect(tamanoTexto(100)).toBe('1 KB');
+    expect(tamanoTexto(820 * 1024)).toBe('820 KB');
+    expect(tamanoTexto(2.4 * 1024 * 1024)).toBe('2,4 MB');
+  });
+
+  it('la principal solo puede ser una marcada y se pierde al desmarcarla', () => {
+    expect(elegirPrincipal(nada, 'imagen-1')).toEqual(nada);
+    const dos = alternarMarcada(alternarMarcada(nada, 'pagina-1'), 'imagen-1');
+    const conPrincipal = elegirPrincipal(dos, 'imagen-1');
+    expect(conPrincipal.principal).toBe('imagen-1');
+    expect(alternarMarcada(conPrincipal, 'pagina-1')).toEqual({ marcadas: ['imagen-1'], principal: 'imagen-1' });
+    expect(alternarMarcada(conPrincipal, 'imagen-1')).toEqual({ marcadas: ['pagina-1'], principal: null });
+  });
+
+  it('las marcadas se mandan en el orden de las candidatas', () => {
+    const marcadas = alternarMarcada(alternarMarcada(nada, 'pagina-1'), 'imagen-1');
+    expect(clavesMarcadas(candidatas, marcadas)).toEqual(['imagen-1', 'pagina-1']);
+  });
+
+  it('el aviso de las fotos añadidas va en singular o plural', () => {
+    expect(textoFotosAnadidas(1)).toBe('1 foto añadida al modelo');
+    expect(textoFotosAnadidas(3)).toBe('3 fotos añadidas al modelo');
   });
 });

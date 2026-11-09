@@ -3,9 +3,9 @@ package com.puntotres.packinglist.modelos.api.dto;
 import java.time.LocalDateTime;
 
 /**
- * Un documento del modelo (ficha técnica, PDF del cliente) sin sus bytes.
- * La ficha lo lista vacío hasta que existan los documentos del modelo; sus
- * campos son las columnas de {@code documento_modelo} que se enseñan.
+ * Un documento del modelo (ficha técnica, PDF del cliente) sin sus bytes:
+ * lo que se enseña en la ficha. Sale de {@code documento_modelo} con una
+ * consulta que no carga los bytes.
  */
 public record DocumentoResumen(Long id, String nombre, String mime, long tamano, LocalDateTime fecha) {
 }

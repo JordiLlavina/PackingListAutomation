@@ -94,6 +94,15 @@
             <version>5.4.1</version>
         </dependency>
 
+        <!-- Apache PDFBox: de un PDF subido a un modelo saca las imágenes
+             incrustadas y pinta cada página, para que el despacho elija cuáles
+             son fotos del modelo (ImagenesDePdf). No la gestiona Boot. -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.8</version>
+        </dependency>
+
         <!-- Barcode4J: generación de códigos de barras Code 128 para las
              etiquetas de caja (imagen PNG con el número legible debajo). -->
         <dependency>

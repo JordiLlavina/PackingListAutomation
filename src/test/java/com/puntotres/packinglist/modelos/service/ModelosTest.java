@@ -23,6 +23,7 @@ import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.api.dto.ModeloResumen;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapa;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapaRepository;
+import com.puntotres.packinglist.modelos.persistence.DocumentoModeloRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistorico;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
@@ -80,6 +81,9 @@ class ModelosTest {
 
     @Autowired
     private ModificacionRepository repositorioModificaciones;
+
+    @Autowired
+    private DocumentoModeloRepository repositorioDocumentos;
 
     @Test
     void unPrototipoRepetidoEnLaMismaTemporadaDa400YEnOtraVale() {
@@ -291,7 +295,8 @@ class ModelosTest {
         Modelos.FuenteEventos fuente = modeloId -> modeloId.equals(modelo.getId()) ? List.of(antiguo, futuro)
                 : List.of();
         Modelos conFuente = new Modelos(repositorioModelos, catalogo, fotos, temporadas, clientes, cambiosEtapa,
-                codigosHistoricos, repositorioUsuarios, repositorioModificaciones, List.of(fuente));
+                codigosHistoricos, repositorioUsuarios, repositorioModificaciones, repositorioDocumentos,
+                List.of(fuente));
 
         List<Evento> linea = conFuente.ficha(modelo.getId()).lineaTiempo();
         assertEquals(4, linea.size());

@@ -30,6 +30,8 @@ import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.api.dto.ModeloResumen;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapa;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapaRepository;
+import com.puntotres.packinglist.modelos.persistence.DocumentoModelo;
+import com.puntotres.packinglist.modelos.persistence.DocumentoModeloRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistorico;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
@@ -97,12 +99,14 @@ public class Modelos {
     private final ModeloCodigoHistoricoRepository codigos;
     private final UsuarioRepository usuarios;
     private final ModificacionRepository modificaciones;
+    private final DocumentoModeloRepository documentos;
     private final List<FuenteEventos> fuentes;
 
     public Modelos(ModeloRepository repositorio, CatalogoModelos catalogo, FotosCatalogo fotos,
                    ArchivoTemporadas temporadas, ClientesProperties clientes, CambioEtapaRepository cambiosEtapa,
                    ModeloCodigoHistoricoRepository codigos, UsuarioRepository usuarios,
-                   ModificacionRepository modificaciones, List<FuenteEventos> fuentes) {
+                   ModificacionRepository modificaciones, DocumentoModeloRepository documentos,
+                   List<FuenteEventos> fuentes) {
         this.repositorio = repositorio;
         this.catalogo = catalogo;
         this.fotos = fotos;
@@ -112,6 +116,7 @@ public class Modelos {
         this.codigos = codigos;
         this.usuarios = usuarios;
         this.modificaciones = modificaciones;
+        this.documentos = documentos;
         this.fuentes = fuentes == null ? List.of() : List.copyOf(fuentes);
     }
 
@@ -192,7 +197,7 @@ public class Modelos {
                         apunte.getMotivo()))
                 .toList();
         return new ModeloFicha(ModeloResumen.de(modelo, fotos.principalDe(id).orElse(null)), nombresTemporada,
-                nombres, fotos.de(id), List.of(), lineaTiempo(modelo, historico), fusionadosDesde);
+                nombres, fotos.de(id), documentos.resumenes(id), lineaTiempo(modelo, historico), fusionadosDesde);
     }
 
     @Transactional
@@ -206,6 +211,11 @@ public class Modelos {
         String nombreInicial = codigo != null ? codigo : prototipo;
         if (nombreInicial.length() > LARGO_CODIGO) {
             throw new IllegalArgumentException("La referencia no puede pasar de " + LARGO_CODIGO + " caracteres");
+        }
+        if ((codigo != null && codigo.startsWith(PREFIJO_FUSIONADO))
+                || (prototipo != null && prototipo.startsWith(PREFIJO_FUSIONADO))) {
+            // Su apunte en el histórico se confundiría con el de un modelo absorbido y resolverId llevaría a él.
+            throw new IllegalArgumentException("La referencia no puede empezar por " + PREFIJO_FUSIONADO);
         }
         if (alta.temporadaId() != null && temporadas.de(cliente).stream()
                 .noneMatch(temporada -> temporada.id().equals(alta.temporadaId()))) {
@@ -423,18 +433,20 @@ public class Modelos {
     /**
      * Junta dos modelos del mismo cliente en uno, sin vuelta atrás. Sobrevive
      * el de menor id (casi siempre el prototipo, que es el que tiene fotos e
-     * histórico), que recibe el código del otro si no tenía y su nombre si no
-     * tenía. La etapa final es la del que tenía código (lo que dice el
-     * pedido); si los dos o ninguno lo tenían, la del superviviente. Todo lo
-     * del absorbido pasa al superviviente: artículos, fotos y temporadas (del
-     * catálogo), modificaciones, cambios de etapa y su histórico de nombres
-     * (con los {@code "#"} de los que él ya había absorbido, para que una
-     * cadena de fusiones lleve al último). Después el absorbido se borra y su
-     * id queda en el histórico del superviviente como {@code "#" + id}, con
-     * motivo {@code FUSION}, para que su QR siga valiendo.
-     *
-     * Los documentos del modelo todavía no existen; cuando existan, también
-     * tendrán que pasar aquí, o el {@code on delete cascade} se los llevaría.
+     * histórico), que recibe el código del otro si no tenía, su nombre si no
+     * tenía y su nombre de prototipo (con su temporada de alta, si él no la
+     * tenía) si no tenía: cuando sobrevive el importado, sin eso se perdería
+     * por qué nombre se conocía el prototipo. La etapa final es la del que
+     * tenía código (lo que dice el pedido); si los dos o ninguno lo tenían, la
+     * del superviviente. Todo lo del absorbido pasa al superviviente:
+     * artículos, fotos y temporadas (del catálogo), modificaciones, cambios de
+     * etapa, documentos y su histórico de nombres (con los {@code "#"} de los
+     * que él ya había absorbido, para que una cadena de fusiones lleve al
+     * último). De los nombres que se lleva, los que seguían vigentes y no son
+     * el nombre de hoy del superviviente dejan de serlo: un modelo tiene un
+     * solo nombre vigente. Después el absorbido se borra y su id queda en el
+     * histórico del superviviente como {@code "#" + id}, con motivo
+     * {@code FUSION}, para que su QR siga valiendo.
      *
      * @return el superviviente
      */
@@ -454,6 +466,10 @@ public class Modelos {
         String codigoQueRecibe = superviviente.getCodigo() == null ? absorbido.getCodigo() : null;
         String nombreQueRecibe = superviviente.getNombre().isEmpty() && !absorbido.getNombre().isEmpty()
                 ? absorbido.getNombre() : null;
+        String prototipoQueRecibe = superviviente.getNombrePrototipo().isEmpty()
+                && !absorbido.getNombrePrototipo().isEmpty() ? absorbido.getNombrePrototipo() : null;
+        Long temporadaDelPrototipo = superviviente.getTemporadaAltaId() != null ? superviviente.getTemporadaAltaId()
+                : absorbido.getTemporadaAltaId();
         Etapa etapaFinal = absorbido.getCodigo() != null && superviviente.getCodigo() == null
                 ? absorbido.getEtapa() : superviviente.getEtapa();
 
@@ -464,11 +480,16 @@ public class Modelos {
         for (CambioEtapa cambio : cambiosEtapa.findByModeloIdOrderByFechaDescIdDesc(idAbsorbido)) {
             cambio.moverA(superviviente.getId());
         }
-        for (ModeloCodigoHistorico apunte : codigos.findByModeloIdOrderByDesdeDescIdDesc(idAbsorbido)) {
+        for (DocumentoModelo documento : documentos.findByModeloIdOrderByIdAsc(idAbsorbido)) {
+            documento.moverA(superviviente.getId());
+        }
+        List<ModeloCodigoHistorico> movidos = codigos.findByModeloIdOrderByDesdeDescIdDesc(idAbsorbido);
+        for (ModeloCodigoHistorico apunte : movidos) {
             apunte.moverA(superviviente.getId());
         }
-        // Se borra antes de dar su código al superviviente: el código es único por cliente. Lo movido se
-        // escribe en el mismo flush, antes que el borrado, así que la cascada del SQL no se lleva nada.
+        // Se borra antes de dar su código y su nombre de prototipo al superviviente: los dos son únicos por
+        // cliente. Lo movido se escribe en el mismo flush, antes que el borrado, así que la cascada del SQL no
+        // se lleva nada.
         repositorio.delete(absorbido);
         repositorio.flush();
 
@@ -481,6 +502,15 @@ public class Modelos {
             if (!yaApuntado) {
                 codigos.save(new ModeloCodigoHistorico(superviviente.getId(), codigoQueRecibe, ahora,
                         "REFERENCIA"));
+            }
+        }
+        if (prototipoQueRecibe != null && prototipoLibre(superviviente, prototipoQueRecibe, temporadaDelPrototipo)) {
+            superviviente.recibirPrototipo(prototipoQueRecibe, temporadaDelPrototipo);
+        }
+        String vigente = superviviente.nombreVisible();
+        for (ModeloCodigoHistorico apunte : movidos) {
+            if (!esDeFusion(apunte) && !vigente.equals(apunte.getCodigo())) {
+                apunte.cerrar(ahora);
             }
         }
         if (nombreQueRecibe != null) {
@@ -497,12 +527,25 @@ public class Modelos {
         return superviviente;
     }
 
+    /**
+     * Si ningún otro modelo del cliente se llama ya así en esa temporada (la
+     * restricción única de la base de datos). El absorbido ya está borrado,
+     * así que solo puede chocar un tercero cuando el superviviente tenía otra
+     * temporada de alta; entonces el nombre de prototipo no se copia, pero
+     * sigue en su histórico.
+     */
+    private boolean prototipoLibre(Modelo superviviente, String prototipo, Long temporada) {
+        return repositorio.findByClienteAndNombrePrototipoAndTemporadaAltaId(superviviente.getCliente(), prototipo,
+                temporada).map(otro -> otro.getId().equals(superviviente.getId())).orElse(true);
+    }
+
     /** Lo que pasaría al juntar esos dos: sobrevive el de menor id y se cuenta lo que se lleva el otro. */
     private Fusion fusionEntre(Modelo uno, Modelo otro) {
         Long superviviente = Math.min(uno.getId(), otro.getId());
         Long absorbido = Math.max(uno.getId(), otro.getId());
         return new Fusion(superviviente, absorbido, catalogo.articulosDelModelo(absorbido).size(),
-                fotos.de(absorbido).size(), (int) modificaciones.countByModeloId(absorbido), 0);
+                fotos.de(absorbido).size(), (int) modificaciones.countByModeloId(absorbido),
+                (int) documentos.countByModeloId(absorbido));
     }
 
     /** La referencia recortada y en mayúsculas; un 400 si está en blanco, no cabe o es la que ya tiene. */

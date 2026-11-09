@@ -9,7 +9,7 @@ import com.puntotres.packinglist.persistence.ResumenFoto;
  *
  * @param temporadas      los nombres de las temporadas en que ha ido
  * @param codigos         los nombres que ha tenido, del más nuevo al más viejo
- * @param documentos      vacío hasta que existan los documentos del modelo
+ * @param documentos      sus documentos, sin bytes, del más nuevo al más viejo
  * @param lineaTiempo     lo que le ha pasado, de lo más nuevo a lo más viejo
  * @param fusionadosDesde los ids de los modelos que se han juntado con este (y
  *                        ya no existen), del más reciente al más antiguo: para

@@ -184,6 +184,23 @@ public class Modelo {
         tocar();
     }
 
+    /**
+     * El nombre de prototipo de otro modelo que se ha juntado con este (el
+     * importado que sobrevive a su prototipo), con la temporada en que nació
+     * si este no tenía. Un nombre en blanco no cambia nada.
+     */
+    public void recibirPrototipo(String nombrePrototipo, Long temporadaAltaId) {
+        String limpio = vacioANulo(nombrePrototipo);
+        if (limpio == null) {
+            return;
+        }
+        this.nombrePrototipo = limpio;
+        if (this.temporadaAltaId == null) {
+            this.temporadaAltaId = temporadaAltaId;
+        }
+        tocar();
+    }
+
     public void marcarEtiquetaImpresa(LocalDateTime cuando) {
         this.etiquetaImpresaEn = cuando;
         tocar();
