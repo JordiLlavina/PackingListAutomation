@@ -27,7 +27,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -185,6 +187,54 @@ class SeguridadTest {
                 .andExpect(content().json("{\"mensaje\":\"No tienes permiso para esto\"}", true));
         mvc.perform(delete("/api/sesion").with(comoUsuario(despacho)).with(csrf()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void desactivarAlUsuarioCortaSuSesionDeContrasenaEnLaPeticionSiguiente() throws Exception {
+        Usuario despacho = usuarios.crear(new Usuarios.Alta("Despacho T27", "t27-desactivado", "clave-t27",
+                Rol.DESPACHO));
+        MockHttpSession sesion = entrar("t27-desactivado", "clave-t27");
+        mvc.perform(get("/api/sesion").session(sesion)).andExpect(status().isOk());
+
+        usuarios.cambiar(despacho.getId(), null, null, false, null);
+
+        mvc.perform(get("/api/sesion").session(sesion))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().json(HACE_FALTA_ENTRAR, true));
+        assertNull(sesion.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY),
+                "la sesión deja de estar entrada, no solo esta petición");
+        // Ni reactivándolo vuelve a valer la sesión: hay que entrar otra vez.
+        usuarios.cambiar(despacho.getId(), null, null, true, null);
+        mvc.perform(get("/api/sesion").session(sesion)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cambiarElRolSeNotaDentroDeLaMismaSesion() throws Exception {
+        Usuario despacho = usuarios.crear(new Usuarios.Alta("Despacho T27 rol", "t27-rol", "clave-t27",
+                Rol.DESPACHO));
+        MockHttpSession sesion = entrar("t27-rol", "clave-t27");
+        mvc.perform(post("/api/modelos").session(sesion).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"AMI\",\"codigo\":\"T27-ROL-1\"}"))
+                .andExpect(status().isCreated());
+
+        usuarios.cambiar(despacho.getId(), "Taller T27 rol", Rol.TALLER, null, null);
+
+        mvc.perform(post("/api/modelos").session(sesion).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"AMI\",\"codigo\":\"T27-ROL-2\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/sesion").session(sesion))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rol").value("TALLER"))
+                .andExpect(jsonPath("$.nombre").value("Taller T27 rol"));
+    }
+
+    /** Entra con contraseña, como el PC, y devuelve la sesión. */
+    private MockHttpSession entrar(String login, String password) throws Exception {
+        MvcResult resultado = mvc.perform(post("/api/sesion").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"" + login + "\",\"password\":\"" + password + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        return (MockHttpSession) resultado.getRequest().getSession(false);
     }
 
     private LocalDateTime ultimoUso(Dispositivos.TokenDispositivo token) {

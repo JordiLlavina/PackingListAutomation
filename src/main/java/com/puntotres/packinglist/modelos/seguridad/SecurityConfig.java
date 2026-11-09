@@ -40,7 +40,8 @@ import com.puntotres.packinglist.modelos.service.Usuarios;
  * (la SPA enseña ella misma el login) y entrar, mirar si se ha entrado y
  * canjear un código de alta también están abiertos; el resto de la API pide
  * haber entrado, con sesión o con la cookie del dispositivo
- * ({@link FiltroDispositivo}). CSRF por cookie {@code XSRF-TOKEN} que la SPA
+ * ({@link FiltroDispositivo}); una sesión de contraseña vuelve a mirar a su
+ * usuario en cada petición ({@link RevalidacionSesion}). CSRF por cookie {@code XSRF-TOKEN} que la SPA
  * devuelve en la cabecera {@code X-XSRF-TOKEN}. Los errores son SIEMPRE un
  * JSON con {@code mensaje} y nunca una redirección a un formulario de login,
  * que un {@code fetch} seguiría en silencio y acabaría leyendo HTML.</li>
@@ -77,6 +78,8 @@ public class SecurityConfig {
                 .addFilterAfter(new CargaTokenCsrf(), CsrfFilter.class)
                 .addFilterBefore(new FiltroDispositivo(dispositivos, usuarios,
                         SecurityContextHolder.getContextHolderStrategy()), UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new RevalidacionSesion(usuarios,
+                        SecurityContextHolder.getContextHolderStrategy()), FiltroDispositivo.class)
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((request, response, error) ->
                                 json(response, HttpServletResponse.SC_UNAUTHORIZED, HACE_FALTA_ENTRAR))
