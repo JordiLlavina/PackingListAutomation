@@ -222,3 +222,85 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .fila-bandeja[data-p="ALTA"]::before { background: var(--alta); }
 .fila-bandeja[data-p="NORMAL"]::before { background: var(--normal); }
 .fila-bandeja[aria-current="true"] { background: color-mix(in oklab, var(--accent) 10%, var(--surface)); }
+
+/* ---------- Modelos (Task 10): lo que la maqueta no trae ---------- */
+
+/* Una foto de verdad ocupa su hueco como la silueta, sin deformarse. */
+img.foto { object-fit: cover; background: var(--line); }
+
+/* Ficha de modelo grande (las dos caras): la foto más grande que en el
+   resumen de un aviso, la referencia a 1,6 rem y el nombre a 1,15. */
+.ficha.grande { align-items: flex-start; }
+.ficha.grande .foto { width: 160px; height: 160px; }
+.ficha.grande .texto b { font-size: 1.6rem; }
+.ficha.grande .texto .nombre { font-size: 1.15rem; }
+.ficha .meta { color: var(--muted); font-size: .95rem; }
+@media (max-width: 480px) { .ficha.grande .foto { width: 112px; height: 112px; } }
+
+/* El reproductor dentro de la línea de tiempo (la maqueta lo pone en línea). */
+.audio.compacto { padding: 8px; margin-top: 8px; box-shadow: none; border: 1px solid var(--line); }
+.audio.compacto .play { width: 52px; height: 52px; }
+
+/* Despacho: los botones y campos de la tablet, a la medida del ratón. */
+.despacho .boton { min-height: 44px; font-size: 1rem; border-radius: 12px; padding: 0 16px; gap: 8px; }
+.despacho .boton svg { width: 20px; height: 20px; }
+.despacho .chip { height: 36px; padding: 0 12px; font-size: .95rem; }
+.despacho .campo input, .despacho .campo select, .despacho .campo textarea { min-height: 40px; padding: 0 10px; border-radius: 10px; }
+.despacho .campo textarea { padding: 8px 10px; }
+.despacho .vacio { padding: 32px 16px; }
+.despacho .fila-titulo h2 { font-size: 1.1rem; }
+.campo select, .campo textarea { font: inherit; font-weight: 400; color: var(--fg); background: var(--surface); min-height: 60px; padding: 0 16px; border: 2px solid var(--line); border-radius: 14px; }
+.campo textarea { padding: 12px 16px; resize: vertical; }
+.campo select:focus-visible, .campo textarea:focus-visible { outline: 3px solid var(--new); outline-offset: 2px; }
+.botones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* Los dos paneles de modelos: con un modelo elegido, en pantalla estrecha
+   solo se ve su ficha, con «Volver a la lista» encima. */
+.panel-lista { display: grid; gap: 14px; }
+.panel-lista .chips { margin-bottom: 0; }
+.panel-lista .ayuda { margin: 0; }
+.panel-detalle { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 20px; min-width: 0; }
+.panel-detalle .detalle .ficha { box-shadow: none; padding: 0; }
+.volver-lista { display: none; }
+@media (max-width: 900px) {
+  .paneles.con-detalle > .panel-lista, .paneles:not(.con-detalle) > .panel-detalle { display: none; }
+  .volver-lista { display: block; justify-self: start; margin-bottom: 8px; }
+}
+.filtros { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filtros .ancho { grid-column: 1 / -1; }
+
+/* Lista de modelos de despacho: filas de 72 px con casilla, foto de 56 px,
+   referencia en negrita, nombre y etapa. */
+.lista-modelos { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.fila-modelo { min-height: 72px; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.fila-modelo:last-child { border-bottom: 0; }
+.fila-modelo[aria-current="true"] { background: color-mix(in oklab, var(--accent) 10%, var(--surface)); }
+.fila-modelo input[type="checkbox"] { width: 20px; height: 20px; flex: none; accent-color: var(--accent); }
+.fila-modelo .abrir { flex: 1; min-width: 0; display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; border: 0; background: none; padding: 0; text-align: left; }
+.fila-modelo .foto { width: 56px; height: 56px; border-radius: 10px; display: block; }
+.fila-modelo .texto { display: grid; min-width: 0; }
+.fila-modelo .texto span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Nombre editable de la ficha de despacho: parece texto hasta que se toca. */
+.editable { border: 0; background: none; padding: 0; text-align: left; text-decoration: underline dotted var(--muted); text-underline-offset: 4px; }
+.editar-nombre { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.editar-nombre input { font: inherit; color: var(--fg); background: var(--surface); min-height: 44px; padding: 0 10px; border: 2px solid var(--line); border-radius: 10px; min-width: 14em; }
+
+/* Subir fotos: un botón que por dentro es el selector de ficheros. */
+.boton.subir { position: relative; cursor: pointer; }
+.boton.subir input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.boton.subir[aria-disabled="true"] { opacity: .45; cursor: progress; }
+
+/* Galería de fotos de la ficha: la principal marcada, las demás con su botón. */
+.galeria figure { margin: 0; display: grid; gap: 6px; justify-items: start; }
+.galeria .principal { display: inline-flex; align-items: center; height: 36px; padding: 0 12px; border-radius: 999px; background: var(--fg); color: var(--bg); font-weight: 700; font-size: .95rem; }
+
+/* Formularios del panel derecho y el diálogo de cambiar etapa. */
+.formulario, .dialogo form { display: grid; gap: 14px; max-width: 520px; }
+.formulario h2, .dialogo h2 { font-size: 1.25rem; }
+.opciones-radio { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.opciones-radio legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
+.opciones-radio label { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; }
+.opciones-radio input { width: 18px; height: 18px; accent-color: var(--accent); }
+.dialogo { border: 0; border-radius: 18px; padding: 24px; background: var(--surface); color: var(--fg); box-shadow: var(--shadow); width: min(92vw, 480px); }
+.dialogo::backdrop { background: rgba(22, 33, 58, .45); }

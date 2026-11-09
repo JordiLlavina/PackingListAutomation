@@ -3,6 +3,7 @@
 import { useNavigate } from 'react-router';
 import { Icono } from '../comun/iconos';
 import { useSesion } from '../comun/sesion';
+import RejillaModelos from './RejillaModelos';
 
 export default function Inicio() {
   const navegar = useNavigate();
@@ -39,8 +40,7 @@ export default function Inicio() {
           <Icono nombre="qr" /> Escanear
         </button>
       </div>
-      {/* La rejilla de modelos, con sus filtros, llega en Task 10. */}
-      <div className="rejilla" />
+      <RejillaModelos onElegir={(id) => navegar(`/modelos/${id}`)} />
     </>
   );
 }
