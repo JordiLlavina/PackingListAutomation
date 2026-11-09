@@ -20,7 +20,7 @@ mvn test -Dskip.frontend=true                 # solo Java: se salta Node, npm ci
 MODELOS_ADMIN_PASSWORD=prueba mvn spring-boot:run   # con la app de modelos: http://localhost:8080/app/ como admin (solo si ./datos no tiene usuarios)
 ```
 
-- **La app de modelos** (`/app/`, ver su sección): en PowerShell, `$env:MODELOS_ADMIN_PASSWORD="prueba"; mvn spring-boot:run`. Para probar cámara, micrófono y push desde una tablet de la red sin HTTPS: en su Chrome, `chrome://flags/#unsafely-treat-insecure-origin-as-secure` con `http://<ip-del-pc>:8080`. Las claves VAPID del push se generan con `GenerarClavesVapid` (comando en el README).
+- **La app de modelos** (`/app/`, ver su sección): en PowerShell, `$env:MODELOS_ADMIN_PASSWORD="prueba"; mvn spring-boot:run "-Dskip.frontend=true"`. **En PowerShell toda opción `-D` con un punto va entre comillas**: sin ellas PowerShell la parte por el punto y Maven falla con `Unknown lifecycle phase ".frontend=true"` (en Git Bash y cmd no hace falta). Para probar cámara, micrófono y push desde una tablet de la red sin HTTPS: en su Chrome, `chrome://flags/#unsafely-treat-insecure-origin-as-secure` con `http://<ip-del-pc>:8080`. Las claves VAPID del push se generan con `GenerarClavesVapid` (comando en el README).
 - El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual.
 - El modo CLAUDE de la pantalla de entrada (fotos o PDFs → JSON) necesita la variable de entorno `ANTHROPIC_API_KEY`. Sin ella la app arranca igual y el resto de modos funciona (cliente HTTP perezoso).
 - **Windows**: matar `mvn spring-boot:run` no mata el proceso `java` hijo y el 8080 queda ocupado. Liberarlo: `netstat -ano | findstr :8080` + `taskkill /F /PID <pid>`.

@@ -87,6 +87,8 @@ mvn test -Dskip.frontend=true                     # solo Java: sin Node, npm ci 
 mvn verify -Pe2e                                  # recorrido de humo de la PWA con Playwright (la 1ª vez se baja Chromium)
 ```
 
+En **PowerShell**, una opción `-D` con un punto va entre comillas (`mvn test "-Dskip.frontend=true"`): sin ellas PowerShell la parte por el punto y Maven contesta `Unknown lifecycle phase ".frontend=true"`.
+
 El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual, y `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx`.
 
 ## Distribuir la aplicación: un `.jar` para otro ordenador
@@ -263,7 +265,7 @@ La app de modelos y modificaciones (bloque `modelos` del yml: tipos de cambio, d
 
 - `MODELOS_URL_PUBLICA` — dirección pública con la que se llega a la app (la del QR de cada modelo; por defecto `http://localhost:8080`, así que en producción es obligatoria: un QR impreso con la de desarrollo no lleva a ningún sitio).
 - `MODELOS_ADMIN_PASSWORD` — contraseña del usuario `admin`, que se crea solo en el primer arranque sin ningún usuario; después la variable sobra (la contraseña se cambia en la pestaña «Admin» de `/app/`, que es también donde se dan de alta los usuarios, se genera el código de alta de la tablet y se revocan los dispositivos).
-- `MODELOS_VAPID_PUBLIC` / `MODELOS_VAPID_PRIVATE` — claves VAPID del Web Push; sin las dos no hay avisos al móvil. Se generan una vez por instalación (cambiarlas deja sin avisos a todos los navegadores suscritos hasta que los vuelvan a activar) con `mvn -q test-compile exec:java -Dskip.frontend=true -Dexec.classpathScope=test -Dexec.mainClass=com.puntotres.packinglist.modelos.GenerarClavesVapid`, que escribe las dos líneas listas para copiar.
+- `MODELOS_VAPID_PUBLIC` / `MODELOS_VAPID_PRIVATE` — claves VAPID del Web Push; sin las dos no hay avisos al móvil. Se generan una vez por instalación (cambiarlas deja sin avisos a todos los navegadores suscritos hasta que los vuelvan a activar) con `mvn -q test-compile exec:java "-Dskip.frontend=true" "-Dexec.classpathScope=test" "-Dexec.mainClass=com.puntotres.packinglist.modelos.GenerarClavesVapid"` (las comillas hacen falta en PowerShell), que escribe las dos líneas listas para copiar.
 - `MODELOS_VAPID_ASUNTO` — el `mailto:` que acompaña a las claves VAPID.
 - `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` — transcripción de las notas de voz (la región por defecto es `westeurope`).
 
