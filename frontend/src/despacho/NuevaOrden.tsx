@@ -34,6 +34,9 @@ type Nota = { blob: Blob; duracionSeg: number; url: string };
 /** Tras crear, los PDFs guardados en el modelo con imágenes que elegir, de uno en uno, antes de abrir la orden. */
 type Eleccion = { orden: ModificacionResumen; modeloId: number; actual: Subida; siguientes: Subida[] };
 
+/** La orden ya creada con algún documento que no se pudo copiar al modelo: se queda a la vista hasta «Continuar». */
+type ConAvisos = { orden: ModificacionResumen; modeloId: number; avisos: string[]; porElegir: Subida[] };
+
 type Props = {
   modeloInicial: number | null;
   onCreada: (orden: ModificacionResumen) => void;
@@ -56,6 +59,7 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [eleccion, setEleccion] = useState<Eleccion | null>(null);
+  const [conAvisos, setConAvisos] = useState<ConAvisos | null>(null);
   const { tipos } = useTiposCambio();
 
   // El modelo de partida (desde su ficha).
@@ -135,15 +139,24 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
     try {
       const creada = await api<ModificacionCreada>('/api/modificaciones', { method: 'POST', body: datos });
       toast('Orden enviada al taller');
-      // La orden ya está creada; lo que no se pudo copiar al modelo se dice, no se calla.
-      for (const aviso of creada.avisos) toast(aviso);
-      const [primero, ...siguientes] = creada.documentosGuardados.filter((s) => s.loteId !== null && s.candidatas.length > 0);
-      if (primero === undefined) onCreada(creada.modificacion);
-      else setEleccion({ orden: creada.modificacion, modeloId: modelo.id, actual: primero, siguientes });
+      const porElegir = creada.documentosGuardados.filter((s) => s.loteId !== null && s.candidatas.length > 0);
+      // La orden ya está creada; lo que no se pudo copiar al modelo se dice en el propio formulario, una línea
+      // por documento, y se queda a la vista hasta que el despacho lo ha leído (un toast se va solo).
+      if (creada.avisos.length > 0) {
+        setConAvisos({ orden: creada.modificacion, modeloId: modelo.id, avisos: creada.avisos, porElegir });
+      } else continuar(creada.modificacion, modelo.id, porElegir);
     } catch (err) {
       setError(err instanceof ErrorApi ? err.message : 'No se ha podido crear la orden');
       setEnviando(false);
     }
+  };
+
+  // Con la orden creada: elegir las imágenes de los PDFs guardados en el modelo, si hay, y después abrirla.
+  const continuar = (orden: ModificacionResumen, modeloId: number, porElegir: Subida[]) => {
+    setConAvisos(null);
+    const [primero, ...siguientes] = porElegir;
+    if (primero === undefined) onCreada(orden);
+    else setEleccion({ orden, modeloId, actual: primero, siguientes });
   };
 
   // Un PDF resuelto (con fotos elegidas o sin ellas): el siguiente, y al acabar, la orden.
@@ -286,14 +299,32 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
         </label>
       </div>
 
-      <div className="botones">
-        <button className="boton ok" type="submit" disabled={enviando || grabadora.grabando}>
-          <Icono nombre="check" /> {enviando ? 'Enviando…' : 'Crear orden'}
-        </button>
-        <button className="boton" type="button" disabled={enviando} onClick={onCancelar}>
-          Cancelar
-        </button>
-      </div>
+      {conAvisos ? (
+        <div className="resultado-orden" role="status">
+          <p>
+            <b>Orden enviada al taller.</b> Lo que no se ha podido guardar en el modelo (súbelo desde su ficha):
+          </p>
+          <ul className="avisos-orden">
+            {conAvisos.avisos.map((aviso) => (
+              <li key={aviso}>{aviso}</li>
+            ))}
+          </ul>
+          <div className="botones">
+            <button className="boton ok" type="button" onClick={() => continuar(conAvisos.orden, conAvisos.modeloId, conAvisos.porElegir)}>
+              Continuar
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="botones">
+          <button className="boton ok" type="submit" disabled={enviando || grabadora.grabando}>
+            <Icono nombre="check" /> {enviando ? 'Enviando…' : 'Crear orden'}
+          </button>
+          <button className="boton" type="button" disabled={enviando} onClick={onCancelar}>
+            Cancelar
+          </button>
+        </div>
+      )}
       {error && (
         <p className="error" role="alert">
           {error}

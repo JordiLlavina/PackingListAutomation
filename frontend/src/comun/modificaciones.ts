@@ -263,3 +263,29 @@ export function tituloEditable(r: ModificacionResumen): boolean {
 export function destinosEditables(estado: EstadoModificacion): boolean {
   return estado !== 'DESCARTADA';
 }
+
+/**
+ * La frase del inicio del taller, debajo del saludo: las órdenes nuevas si
+ * las hay; si no, las que siguen abiertas (vistas o empezadas), que también
+ * son trabajo por hacer; y solo sin ninguna, «No tienes nada pendiente».
+ */
+export function fraseInicio(resumen: ResumenBandeja | null): string {
+  const nuevas = resumen?.nuevas ?? 0;
+  const pendientes = resumen?.pendientes ?? 0;
+  if (nuevas > 0) {
+    return `Tienes ${nuevas} ${nuevas === 1 ? 'orden nueva' : 'órdenes nuevas'} de despacho.`;
+  }
+  if (pendientes > 0) {
+    return `Tienes ${pendientes} ${pendientes === 1 ? 'orden' : 'órdenes'} por hacer.`;
+  }
+  return 'No tienes nada pendiente.';
+}
+
+/**
+ * El título que se enseña de una modificación: el suyo o, sin él (un aviso
+ * cuya nota de voz todavía no ha resumido la IA), el tipo de cambio y el
+ * modelo, «Piel · ULL027». La misma regla en las dos caras: nunca «Sin título».
+ */
+export function tituloVisible(m: Pick<ModificacionResumen, 'titulo' | 'tipoCambioTexto' | 'modeloReferencia'>): string {
+  return m.titulo ?? `${m.tipoCambioTexto ?? 'Cambio'} · ${m.modeloReferencia}`;
+}

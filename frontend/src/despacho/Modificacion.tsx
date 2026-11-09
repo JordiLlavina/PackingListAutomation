@@ -28,6 +28,7 @@ import {
   fotoDelModelo,
   hayTranscripcionPendiente,
   tituloEditable,
+  tituloVisible,
   type AdjuntoVista,
   type DestinoEstado,
   type MensajeVista,
@@ -470,7 +471,7 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
         <div className="texto">
           {titulo === null ? (
             <h2>
-              {r.titulo ?? 'Sin título'}
+              {tituloVisible(r)}
               {r.tituloDeIa && (
                 <span className="chip-ia" title="Título escrito por la IA">
                   IA

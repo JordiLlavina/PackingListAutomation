@@ -18,6 +18,7 @@ import {
   estadosDelFiltro,
   fotoDelModelo,
   marcaDestino,
+  tituloVisible,
   type FiltroEstado,
   type ModificacionResumen,
 } from '../comun/modificaciones';
@@ -58,7 +59,7 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
         <FotoModelo modelo={fotoDelModelo(m)} />
         <span className="cuerpo">
           <span className="tit">
-            {m.titulo ?? 'Sin título'}
+            {tituloVisible(m)}
             {m.tituloDeIa && <span className="chip-ia">IA</span>}
           </span>
           <span className="meta">

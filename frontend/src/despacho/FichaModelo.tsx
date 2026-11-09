@@ -381,6 +381,9 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
         <button className="boton" type="button" onClick={abrirEtapa}>
           Cambiar etapa
         </button>
+        <Link className="boton" to={`/etiquetas-patrones?ids=${m.id}`}>
+          <Icono nombre="imprimir" /> Imprimir etiqueta
+        </Link>
         {m.codigo === null ? (
           <button className="boton" type="button" onClick={abrirReferencia}>
             Asignar referencia

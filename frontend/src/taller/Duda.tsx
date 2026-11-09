@@ -10,7 +10,7 @@ import Audio from '../comun/Audio';
 import Grabadora, { useGrabadora } from '../comun/Grabadora';
 import { extensionAudio, type Grabacion } from '../comun/grabador';
 import { Icono } from '../comun/iconos';
-import type { ModificacionDetalle } from '../comun/modificaciones';
+import { tituloVisible, type ModificacionDetalle } from '../comun/modificaciones';
 import { toast } from '../comun/toast';
 import { useBandeja } from '../comun/useBandeja';
 
@@ -72,7 +72,7 @@ export default function Duda({ modo }: { modo: Modo }) {
   if (!detalle) return null;
 
   const r = detalle.resumen;
-  const sobre = r.titulo ?? `${r.tipoCambioTexto ?? 'Cambio'} · ${r.modeloReferencia}`;
+  const sobre = tituloVisible(r);
   const listo = !grabando && nota !== null;
   const textos = TEXTOS[modo];
   const pregunta = grabando
