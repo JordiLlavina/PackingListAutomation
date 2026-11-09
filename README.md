@@ -9,13 +9,16 @@ Alrededor de ese flujo central hay tres salidas más:
 - Dos flujos independientes del envío: **etiquetas de artículo** (desde el excel de pedido del cliente) y **procesado de escandallos ICSUITE** (excels del ERP → un libro con una hoja por escandallo).
 - **Hoja de info de embalaje para el taller** (`/info-embalaje`): un A4 en Word por artículo, con caja, destinaciones y pedidos sacados del excel de pedido, reparto y comentarios tecleados y un QR al vídeo de embalaje; se guarda para volver a descargarla o importarla (`/info-embalaje/antiguos`), y los comentarios tipo se mantienen en `/comentarios-embalaje`.
 
-Todo se maneja desde un asistente web (Spring Boot + Thymeleaf). Código y documentación en **español** (nombres de clases en inglés; javadoc, comentarios y UI en español).
+Dentro del mismo jar vive además una **segunda aplicación, la de modelos y modificaciones** (`/app/`): una PWA para tablet y PC con la que el taller avisa con fotos y notas de voz de los cambios que hace en un modelo y recibe órdenes de despacho, con etapas de cada modelo (prototipo, SMS, producción, inactivo), fusión de prototipos con la referencia del pedido, transcripción, avisos push, recordatorios y etiqueta de patrones con QR. Diseño en [docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md](docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md); lo que hay que saber para tocarla, en su sección de [CLAUDE.md](CLAUDE.md).
+
+Todo lo demás se maneja desde un asistente web (Spring Boot + Thymeleaf). Código y documentación en **español** (nombres de clases en inglés; javadoc, comentarios y UI en español).
 
 ## Requisitos
 
 - **Java 17** (probado con Temurin 17)
 - **Maven 3.9+**
 - *(Opcional)* Variable de entorno `ANTHROPIC_API_KEY` — solo para el modo CLAUDE de la pantalla de entrada (extracción desde fotos/PDFs). Sin ella la aplicación arranca igual y el resto de modos funciona.
+- **No hace falta Node**: la PWA de modelos (`frontend/`) la construye Maven con `frontend-maven-plugin`, que se baja su propio Node a `frontend/node/` la primera vez (no entra en el repo).
 
 Dependencias clave (las versiones las gestiona el parent de Spring Boot salvo donde se indica, ver [pom.xml](pom.xml)):
 
@@ -26,6 +29,10 @@ Dependencias clave (las versiones las gestiona el parent de Spring Boot salvo do
 | Jackson | Parseo del JSON de envío |
 | SDK Java de Anthropic | Extracción desde fotos/PDFs |
 | Barcode4J | Códigos de barras de las etiquetas |
+| Spring Security | Usuarios, roles y dispositivos de la app de modelos (solo protege `/app`, `/api` y `/m`) |
+| `nl.martijndwars:web-push` + BouncyCastle | Avisos push (VAPID) de la app de modelos |
+| Apache PDFBox | Sacar las imágenes de los PDF de un modelo |
+| React + Vite + TypeScript (`frontend/`) | La PWA de modelos, compilada por Maven y servida en `/app/` |
 
 ## Puesta en marcha en local desde cero
 
@@ -50,6 +57,7 @@ Con el servidor levantado, abrir **http://localhost:8080** (redirige al menú `/
 - `/packing-list` — asistente de packing lists en 3 pantallas: **entrada** (pegar JSON o subir fotos/PDFs) → **revisión** (avisos y tabla editable) → **resultados** (descarga individual, ZIP, volcado ERP y etiquetas de caja).
 - `/etiquetas-articulo` — menú de etiquetas de artículo: `/etiquetas-articulo-produccion` (a partir del excel de pedido, sin envío), SMS y prototipos todavía en desarrollo.
 - `/clickup` — escandallos ICSUITE para ClickUp (sin envío ni cliente).
+- `/app/` — la app de modelos y modificaciones. Pide entrar: el primer arranque con la base vacía crea el usuario `admin` con la contraseña de `MODELOS_ADMIN_PASSWORD` (en PowerShell, `$env:MODELOS_ADMIN_PASSWORD = "..."` antes de `mvn spring-boot:run`); sin ella nadie puede entrar en `/app/`, y el resto del programa sigue igual. La cámara, el micrófono y el push solo funcionan en HTTPS o en `localhost`: para probarlos desde una tablet de la red, en su Chrome `chrome://flags/#unsafely-treat-insecure-origin-as-secure` con `http://<ip-del-pc>:8080`.
 
 Para usar el **modo CLAUDE** (fotos/PDFs → JSON) hay que exportar la clave antes de arrancar. En PowerShell:
 
@@ -73,8 +81,10 @@ Ejecuta [Main.java](src/main/java/com/puntotres/packinglist/Main.java) con el JS
 ### Tests
 
 ```bash
-mvn test                                          # toda la suite
+mvn test                                          # toda la suite (Java y Vitest de la PWA)
 mvn test -Dtest=PackingListGenerationServiceTest  # una clase
+mvn test -Dskip.frontend=true                     # solo Java: sin Node, npm ci ni build de la PWA (~30 s menos)
+mvn verify -Pe2e                                  # recorrido de humo de la PWA con Playwright (la 1ª vez se baja Chromium)
 ```
 
 El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `target/` para inspección manual, y `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx`.
@@ -190,6 +200,13 @@ src/main/java/com/puntotres/packinglist/
                                      (EnvioEnCurso), tabla de revisión compactada
     config/                          Taras, catálogo de clientes (ClientesProperties),
                                      TipoPlantilla (AMI, APC, GENERIC)
+    modelos/                         La app de modelos y modificaciones: persistence, service
+                                     (+ transcripcion), api (JSON bajo /api, /m/{id}, la PWA en
+                                     /app) y seguridad (Spring Security solo para lo suyo)
+
+frontend/                            La PWA de modelos (React + Vite + TypeScript): src/taller,
+                                     src/despacho, src/entrada, src/comun, sw.ts; e2e/ con el
+                                     recorrido de humo de Playwright (mvn verify -Pe2e)
 
 src/main/resources/
     application.yml                  Taras por tamaño de caja + catálogo de clientes + límites
@@ -240,10 +257,10 @@ El detalle de qué campos usa cada cliente está en [docs/Packing Lists/campos-j
 
 La única variable de entorno del packing list es `ANTHROPIC_API_KEY` (opcional, ver arriba).
 
-La app de modelos y modificaciones (bloque `modelos` del yml) lee las suyas, todas opcionales; sin ellas la función correspondiente queda apagada y la aplicación lo dice. Despliegue detrás de nginx: ver [la guía para el informático](docs/Modelos/modelos.puntotres.com%20-%20guia%20para%20el%20informatico.md).
+La app de modelos y modificaciones (bloque `modelos` del yml: tipos de cambio, destinos de aplicación y plazos de los recordatorios) lee las suyas, todas opcionales; sin ellas la función correspondiente queda apagada y la aplicación lo dice. **Despliegue**: nginx con certificado en `https://modelos.puntotres.com` reenvía todo a `127.0.0.1:8080` y manda `/` a `/app/` (la app vieja sigue en `/menu`); el detalle —DNS, certificado, `nginx.conf`, cortafuegos, tablet y las dos líneas `server.*` comentadas del yml que se activan cuando nginx esté delante— está en [la guía para el informático](docs/Modelos/modelos.puntotres.com%20-%20guia%20para%20el%20informatico.md).
 
-- `MODELOS_URL_PUBLICA` — dirección pública con la que se llega a la app (la del QR de cada modelo).
-- `MODELOS_ADMIN_PASSWORD` — contraseña del administrador.
+- `MODELOS_URL_PUBLICA` — dirección pública con la que se llega a la app (la del QR de cada modelo; por defecto `http://localhost:8080`, así que en producción es obligatoria: un QR impreso con la de desarrollo no lleva a ningún sitio).
+- `MODELOS_ADMIN_PASSWORD` — contraseña del usuario `admin`, que se crea solo en el primer arranque sin ningún usuario; después la variable sobra (la contraseña se cambia con `PATCH /api/usuarios/{id}`: la pantalla de administración de `/app/admin` todavía no está hecha, y hoy los usuarios y el código de alta de la tablet se gestionan por la API).
 - `MODELOS_VAPID_PUBLIC` / `MODELOS_VAPID_PRIVATE` — claves VAPID del Web Push; sin las dos no hay avisos al móvil. Se generan una vez por instalación (cambiarlas deja sin avisos a todos los navegadores suscritos hasta que los vuelvan a activar) con `mvn -q test-compile exec:java -Dskip.frontend=true -Dexec.classpathScope=test -Dexec.mainClass=com.puntotres.packinglist.modelos.GenerarClavesVapid`, que escribe las dos líneas listas para copiar.
 - `MODELOS_VAPID_ASUNTO` — el `mailto:` que acompaña a las claves VAPID.
 - `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` — transcripción de las notas de voz (la región por defecto es `westeurope`).
@@ -268,5 +285,6 @@ Las plantillas de packing list viven en `src/main/resources/client-packinglist/`
 - [ARCHITECTURE.md](ARCHITECTURE.md) — recorrido interno del pipeline de dominio. ⚠️ Parcialmente desactualizado (no cuenta la web, la extracción ni los builders nuevos; lo que cuenta del pipeline sigue siendo válido).
 - [ESTADO_ANTES_VACACIONES.md](ESTADO_ANTES_VACACIONES.md) — foto del estado del proyecto a 2026-08-08.
 - [docs/superpowers/specs/2026-11-01-catalogo-modelos-design.md](docs/superpowers/specs/2026-11-01-catalogo-modelos-design.md) — el catálogo de modelos (pantalla `/catalogo`), la memoria única de la que leen el taller y el corte.
+- [docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md](docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md) — la app de modelos y modificaciones (`/app/`); su maqueta clicable está en `docs/Modelos/maqueta-tablet.html` y lo que hay que pedir a informática, en [la guía para el informático](docs/Modelos/modelos.puntotres.com%20-%20guia%20para%20el%20informatico.md).
 - [TODO](TODO) — pendientes (lo mantiene Jordi).
 - [docs/](docs/) — ejemplos de plantillas por cliente, análisis de las hojas manuscritas y prompts de extracción.

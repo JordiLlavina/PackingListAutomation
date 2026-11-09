@@ -1,5 +1,7 @@
 # Modelos y modificaciones (la app del taller) — plan de implementación
 
+Ejecutado con subagentes (noviembre de 2026, rama `modelos-y-modificaciones`); ledger de rulings y de lo que se dejó para después en `.superpowers/sdd/2026-11-08-modelos-y-modificaciones/progress.md` (no versionado). Las casillas de abajo son de seguimiento y no se marcan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Una segunda aplicación dentro del mismo jar, con dos caras (taller en tablet, despacho en PC), donde cada cambio en un modelo queda avisado y apuntado: modificaciones en los dos sentidos con fotos y voz, etapas, fusión de prototipos, transcripción, push, recordatorios y etiqueta de patrones con QR.
