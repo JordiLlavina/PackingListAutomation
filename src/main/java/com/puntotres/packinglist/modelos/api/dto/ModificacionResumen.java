@@ -20,6 +20,7 @@ import com.puntotres.packinglist.modelos.persistence.Rol;
  * @param vencida              se le ha pasado el plazo a quien tiene que actuar
  * @param destinos             dónde se aplica; vacío en las órdenes para el taller
  * @param fotos                fotos de todos sus mensajes (y lo mismo audios y documentos)
+ * @param duracionAudioSeg     cuánto dura la primera nota de voz del primer mensaje; null si no tiene
  */
 public record ModificacionResumen(Long id, Long modeloId, String modeloReferencia, String modeloNombre,
                                   String cliente, Long fotoPrincipalId, Direccion direccion, String tipoCambio,
@@ -27,5 +28,5 @@ public record ModificacionResumen(Long id, Long modeloId, String modeloReferenci
                                   String titulo, boolean tituloDeIa, LocalDateTime creadaEn, String creadaPor,
                                   LocalDateTime vistaEn, LocalDateTime hechaEn, String hechaPor,
                                   Rol respuestaPendienteDe, boolean vencida, List<DestinoEstado> destinos, int fotos,
-                                  int audios, int documentos) {
+                                  int audios, int documentos, Integer duracionAudioSeg) {
 }

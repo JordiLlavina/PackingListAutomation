@@ -657,6 +657,12 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     .map(d -> new DestinoEstado(d.getDestino(), TextosDestino.texto(d.getDestino()), d.isAplica(),
                             d.getHechoEn(), nombre(d.getHechoPor())))
                     .toList();
+            // La nota de voz del cuerpo (el primer mensaje), para decir en la lista cuánto dura.
+            Integer duracionAudio = suyos.isEmpty() ? null : adjuntosDe(suyos.get(0)).stream()
+                    .filter(adjunto -> adjunto.tipo() == TipoAdjunto.AUDIO)
+                    .findFirst()
+                    .map(ResumenAdjunto::duracionSeg)
+                    .orElse(null);
             boolean vencida = false; // Las vencidas llegan con los recordatorios (tarea 18).
             return new ModificacionResumen(m.getId(), m.getModeloId(),
                     modelo == null ? null : modelo.nombreVisible(), modelo == null ? null : modelo.getNombre(),
@@ -664,7 +670,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     m.getDireccion(), m.getTipoCambio(), tipoCambioTexto(m.getTipoCambio()), m.getPrioridad(),
                     m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
                     m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()), pendiente, vencida, estados,
-                    numeroFotos, audios, documentos);
+                    numeroFotos, audios, documentos, duracionAudio);
         }
 
         private String nombre(Long usuarioId) {

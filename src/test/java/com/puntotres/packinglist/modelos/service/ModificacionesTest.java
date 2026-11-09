@@ -120,6 +120,7 @@ class ModificacionesTest {
         assertFalse(resumen.vencida());
         assertEquals(0, resumen.fotos());
         assertEquals(1, resumen.audios());
+        assertEquals(30, resumen.duracionAudioSeg(), "cuánto dura la nota de voz del primer mensaje");
         assertEquals(0, resumen.documentos());
         assertEquals(List.of(DestinoAplicacion.ICSUITE, DestinoAplicacion.EXCEL_ESCANDALLOS),
                 resumen.destinos().stream().map(DestinoEstado::destino).toList());
@@ -222,6 +223,7 @@ class ModificacionesTest {
         assertEquals(Prioridad.ALTA, detalle.resumen().prioridad());
         assertEquals("Cambiar asa", detalle.resumen().titulo());
         assertTrue(detalle.resumen().destinos().isEmpty(), "una orden no tiene destinos");
+        assertNull(detalle.resumen().duracionAudioSeg(), "sin nota de voz no hay duración");
         assertEquals("Asa de 2 cm", detalle.mensajes().get(0).texto());
         assertThrows(IllegalArgumentException.class, () -> modificaciones.marcarDestino(orden.getId(),
                 DestinoAplicacion.ICSUITE, true, true, despacho()));
