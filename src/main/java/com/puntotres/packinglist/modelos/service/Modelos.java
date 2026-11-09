@@ -25,17 +25,21 @@ import org.springframework.transaction.annotation.Transactional;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.modelos.api.dto.CodigoHistorico;
 import com.puntotres.packinglist.modelos.api.dto.Evento;
+import com.puntotres.packinglist.modelos.api.dto.Fusion;
 import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.api.dto.ModeloResumen;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapa;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapaRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistorico;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
+import com.puntotres.packinglist.modelos.persistence.Modificacion;
+import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.Etapa;
+import com.puntotres.packinglist.persistence.FotoCatalogo;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
 import com.puntotres.packinglist.persistence.ResumenFoto;
@@ -78,11 +82,11 @@ public class Modelos {
     /** Lo que cabe en el nombre del modelo y en el motivo de un cambio de etapa. */
     private static final int LARGO_TEXTO = 200;
 
-    /** Lo que cabe en {@code foto_modelo.nombre_fichero}. */
-    private static final int LARGO_NOMBRE_FOTO = 255;
+    /** Lo que se apunta en el histórico del superviviente por cada modelo que absorbe: {@code "#" + id}. */
+    private static final String PREFIJO_FUSIONADO = "#";
 
-    /** Hasta dónde un punto final se lee como extensión ({@code .jpeg} sí; {@code .algo muy largo} no). */
-    private static final int LARGO_EXTENSION = 10;
+    /** Cuántos saltos sigue {@link #resolverId}; una cadena más larga sería un error de datos, no una fusión. */
+    private static final int MAXIMO_SALTOS = 10;
 
     private final ModeloRepository repositorio;
     private final CatalogoModelos catalogo;
@@ -92,12 +96,13 @@ public class Modelos {
     private final CambioEtapaRepository cambiosEtapa;
     private final ModeloCodigoHistoricoRepository codigos;
     private final UsuarioRepository usuarios;
+    private final ModificacionRepository modificaciones;
     private final List<FuenteEventos> fuentes;
 
     public Modelos(ModeloRepository repositorio, CatalogoModelos catalogo, FotosCatalogo fotos,
                    ArchivoTemporadas temporadas, ClientesProperties clientes, CambioEtapaRepository cambiosEtapa,
                    ModeloCodigoHistoricoRepository codigos, UsuarioRepository usuarios,
-                   List<FuenteEventos> fuentes) {
+                   ModificacionRepository modificaciones, List<FuenteEventos> fuentes) {
         this.repositorio = repositorio;
         this.catalogo = catalogo;
         this.fotos = fotos;
@@ -106,6 +111,7 @@ public class Modelos {
         this.cambiosEtapa = cambiosEtapa;
         this.codigos = codigos;
         this.usuarios = usuarios;
+        this.modificaciones = modificaciones;
         this.fuentes = fuentes == null ? List.of() : List.copyOf(fuentes);
     }
 
@@ -171,13 +177,22 @@ public class Modelos {
                 .filter(temporada -> suyas.contains(temporada.id()))
                 .map(ResumenTemporada::temporada)
                 .toList();
-        List<ModeloCodigoHistorico> historico = codigos.findByModeloIdOrderByDesdeDescIdDesc(id);
+        List<ModeloCodigoHistorico> apuntes = codigos.findByModeloIdOrderByDesdeDescIdDesc(id);
+        // Los "#id" de los modelos absorbidos no son nombres: van aparte, para el «antes era el #12».
+        List<ModeloCodigoHistorico> historico = apuntes.stream()
+                .filter(apunte -> !esDeFusion(apunte))
+                .toList();
+        List<Long> fusionadosDesde = apuntes.stream()
+                .filter(Modelos::esDeFusion)
+                .map(apunte -> idFusionado(apunte.getCodigo()))
+                .filter(absorbido -> absorbido != null)
+                .toList();
         List<CodigoHistorico> nombres = historico.stream()
                 .map(apunte -> new CodigoHistorico(apunte.getCodigo(), apunte.getDesde(), apunte.getHasta(),
                         apunte.getMotivo()))
                 .toList();
         return new ModeloFicha(ModeloResumen.de(modelo, fotos.principalDe(id).orElse(null)), nombresTemporada,
-                nombres, fotos.de(id), List.of(), lineaTiempo(modelo, historico));
+                nombres, fotos.de(id), List.of(), lineaTiempo(modelo, historico), fusionadosDesde);
     }
 
     @Transactional
@@ -309,24 +324,12 @@ public class Modelos {
 
     /**
      * El nombre tal cual si está libre; si no, con {@code " (2)"},
-     * {@code " (3)"}... delante de la extensión. Sin mirar mayúsculas
-     * ({@code IMAGE.JPG} e {@code image.jpg} son el mismo fichero para quien
-     * los descarga en Windows) y cortando el nombre, nunca la extensión, para
-     * que quepa en la columna.
+     * {@code " (3)"}... delante de la extensión. La regla es la de
+     * {@link FotoCatalogo#nombreLibre}, la misma que usa el catálogo al juntar
+     * las fotos de dos modelos.
      */
     static String nombreLibre(String nombre, Set<String> usados) {
-        int punto = nombre.lastIndexOf('.');
-        boolean conExtension = punto > 0 && nombre.length() - punto <= LARGO_EXTENSION;
-        String base = conExtension ? nombre.substring(0, punto) : nombre;
-        String extension = conExtension ? nombre.substring(punto) : "";
-        for (int numero = 1; ; numero++) {
-            String sufijo = numero == 1 ? "" : " (" + numero + ")";
-            int cabe = LARGO_NOMBRE_FOTO - sufijo.length() - extension.length();
-            String candidato = base.substring(0, Math.min(base.length(), cabe)) + sufijo + extension;
-            if (!usados.contains(candidato.toLowerCase(Locale.ROOT))) {
-                return candidato;
-            }
-        }
+        return FotoCatalogo.nombreLibre(nombre, usados);
     }
 
     /** La imagen de esos bytes; un 400 que nombra el fichero si no es una imagen que Java sepa leer. */
@@ -344,19 +347,208 @@ public class Modelos {
 
     /**
      * El modelo al que lleva un id, aunque ya no exista: el mismo si existe;
-     * si no, el que lo absorbió (apuntado en su histórico como {@code "#" + id});
-     * vacío si ninguno. Es lo que deja seguir valiendo el QR de un modelo
+     * si no, el que lo absorbió (apuntado en su histórico como {@code "#" + id}),
+     * siguiendo la cadena si ese también se juntó con otro; vacío si no se
+     * llega a ninguno. Es lo que deja seguir valiendo el QR de un modelo
      * fusionado.
+     *
+     * {@link #fusionar} ya deja los {@code "#"} de una cadena colgando del
+     * último superviviente, así que normalmente basta un salto; seguir la
+     * cadena (con tope y sin volver a un id ya visto) es por si unos datos
+     * viejos o tocados a mano no lo cumplen.
      */
     @Transactional(readOnly = true)
     public Optional<Long> resolverId(Long id) {
-        if (id == null) {
-            return Optional.empty();
+        Long actual = id;
+        Set<Long> vistos = new HashSet<>();
+        for (int salto = 0; actual != null && salto <= MAXIMO_SALTOS; salto++) {
+            if (repositorio.existsById(actual)) {
+                return Optional.of(actual);
+            }
+            if (!vistos.add(actual)) {
+                return Optional.empty();
+            }
+            actual = codigos.findFirstByCodigo(PREFIJO_FUSIONADO + actual)
+                    .map(ModeloCodigoHistorico::getModeloId)
+                    .orElse(null);
         }
-        if (repositorio.existsById(id)) {
-            return Optional.of(id);
+        return Optional.empty();
+    }
+
+    /**
+     * Qué pasaría al asignar esa referencia al modelo: si ningún otro modelo
+     * del cliente la tiene, nada que juntar ({@code absorbido} nulo); si otro
+     * la tiene, quién sobreviviría y cuánto se llevaría el absorbido.
+     */
+    @Transactional(readOnly = true)
+    public Fusion previsualizarReferencia(Long id, String codigo) {
+        Modelo modelo = modeloQueExiste(id);
+        String elCodigo = referenciaValida(modelo, codigo);
+        return repositorio.findByClienteAndCodigo(modelo.getCliente(), elCodigo)
+                .map(otro -> fusionEntre(modelo, otro))
+                .orElse(new Fusion(modelo.getId(), null, 0, 0, 0, 0));
+    }
+
+    /**
+     * Da al modelo la referencia del cliente (normalmente a un prototipo que
+     * por fin la tiene). Si está libre, se escribe: el nombre de prototipo se
+     * conserva en su columna y su apunte del histórico deja de ser el vigente,
+     * y la referencia se apunta con motivo {@code REFERENCIA}. Si ya la tiene
+     * otro modelo del cliente (el que ha entrado por el pedido), asignarla es
+     * juntar los dos: sin {@code confirmar} no se toca nada y se lanza
+     * {@link FusionPendiente} con lo que se juntaría; con {@code confirmar}, se
+     * juntan ({@link #fusionar}).
+     *
+     * @return el modelo con la referencia: el mismo, o el superviviente si se han juntado
+     */
+    @Transactional
+    public Modelo asignarReferencia(Long id, String codigo, boolean confirmar, UsuarioActual quien) {
+        Modelo modelo = modeloQueExiste(id);
+        String elCodigo = referenciaValida(modelo, codigo);
+        Optional<Modelo> otro = repositorio.findByClienteAndCodigo(modelo.getCliente(), elCodigo);
+        if (otro.isPresent()) {
+            if (!confirmar) {
+                throw new FusionPendiente("Ya existe " + elCodigo + ": se juntará con el prototipo",
+                        fusionEntre(modelo, otro.get()));
+            }
+            return fusionar(modelo.getId(), otro.get().getId(), quien);
         }
-        return codigos.findFirstByCodigo("#" + id).map(ModeloCodigoHistorico::getModeloId);
+        LocalDateTime ahora = LocalDateTime.now();
+        cerrarNombresVigentes(modelo.getId(), ahora);
+        modelo.asignarCodigo(elCodigo);
+        codigos.save(new ModeloCodigoHistorico(modelo.getId(), elCodigo, ahora, "REFERENCIA"));
+        return modelo;
+    }
+
+    /**
+     * Junta dos modelos del mismo cliente en uno, sin vuelta atrás. Sobrevive
+     * el de menor id (casi siempre el prototipo, que es el que tiene fotos e
+     * histórico), que recibe el código del otro si no tenía y su nombre si no
+     * tenía. La etapa final es la del que tenía código (lo que dice el
+     * pedido); si los dos o ninguno lo tenían, la del superviviente. Todo lo
+     * del absorbido pasa al superviviente: artículos, fotos y temporadas (del
+     * catálogo), modificaciones, cambios de etapa y su histórico de nombres
+     * (con los {@code "#"} de los que él ya había absorbido, para que una
+     * cadena de fusiones lleve al último). Después el absorbido se borra y su
+     * id queda en el histórico del superviviente como {@code "#" + id}, con
+     * motivo {@code FUSION}, para que su QR siga valiendo.
+     *
+     * Los documentos del modelo todavía no existen; cuando existan, también
+     * tendrán que pasar aquí, o el {@code on delete cascade} se los llevaría.
+     *
+     * @return el superviviente
+     */
+    @Transactional
+    public Modelo fusionar(Long unId, Long otroId, UsuarioActual quien) {
+        if (unId != null && unId.equals(otroId)) {
+            throw new IllegalArgumentException("No se puede fusionar un modelo consigo mismo");
+        }
+        Modelo uno = modeloQueExiste(unId);
+        Modelo otro = modeloQueExiste(otroId);
+        if (!uno.getCliente().equals(otro.getCliente())) {
+            throw new IllegalArgumentException("Los dos modelos tienen que ser del mismo cliente");
+        }
+        Modelo superviviente = uno.getId() < otro.getId() ? uno : otro;
+        Modelo absorbido = superviviente == uno ? otro : uno;
+        Long idAbsorbido = absorbido.getId();
+        String codigoQueRecibe = superviviente.getCodigo() == null ? absorbido.getCodigo() : null;
+        String nombreQueRecibe = superviviente.getNombre().isEmpty() && !absorbido.getNombre().isEmpty()
+                ? absorbido.getNombre() : null;
+        Etapa etapaFinal = absorbido.getCodigo() != null && superviviente.getCodigo() == null
+                ? absorbido.getEtapa() : superviviente.getEtapa();
+
+        catalogo.moverHijos(idAbsorbido, superviviente.getId());
+        for (Modificacion modificacion : modificaciones.findByModeloIdOrderByCreadaEnDescIdDesc(idAbsorbido)) {
+            modificacion.moverA(superviviente.getId());
+        }
+        for (CambioEtapa cambio : cambiosEtapa.findByModeloIdOrderByFechaDescIdDesc(idAbsorbido)) {
+            cambio.moverA(superviviente.getId());
+        }
+        for (ModeloCodigoHistorico apunte : codigos.findByModeloIdOrderByDesdeDescIdDesc(idAbsorbido)) {
+            apunte.moverA(superviviente.getId());
+        }
+        // Se borra antes de dar su código al superviviente: el código es único por cliente. Lo movido se
+        // escribe en el mismo flush, antes que el borrado, así que la cascada del SQL no se lleva nada.
+        repositorio.delete(absorbido);
+        repositorio.flush();
+
+        LocalDateTime ahora = LocalDateTime.now();
+        if (codigoQueRecibe != null) {
+            cerrarNombresVigentes(superviviente.getId(), ahora, codigoQueRecibe);
+            superviviente.asignarCodigo(codigoQueRecibe);
+            boolean yaApuntado = codigos.findByModeloIdOrderByDesdeDescIdDesc(superviviente.getId()).stream()
+                    .anyMatch(apunte -> codigoQueRecibe.equals(apunte.getCodigo()) && apunte.getHasta() == null);
+            if (!yaApuntado) {
+                codigos.save(new ModeloCodigoHistorico(superviviente.getId(), codigoQueRecibe, ahora,
+                        "REFERENCIA"));
+            }
+        }
+        if (nombreQueRecibe != null) {
+            superviviente.setNombre(nombreQueRecibe);
+        }
+        Etapa anterior = superviviente.getEtapa();
+        if (etapaFinal != anterior) {
+            superviviente.cambiarEtapa(etapaFinal);
+            cambiosEtapa.save(new CambioEtapa(superviviente.getId(), anterior, etapaFinal,
+                    superviviente.getFechaEtapa(), idDe(quien), "Fusión con #" + idAbsorbido));
+        }
+        codigos.save(new ModeloCodigoHistorico(superviviente.getId(), PREFIJO_FUSIONADO + idAbsorbido, ahora,
+                "FUSION"));
+        return superviviente;
+    }
+
+    /** Lo que pasaría al juntar esos dos: sobrevive el de menor id y se cuenta lo que se lleva el otro. */
+    private Fusion fusionEntre(Modelo uno, Modelo otro) {
+        Long superviviente = Math.min(uno.getId(), otro.getId());
+        Long absorbido = Math.max(uno.getId(), otro.getId());
+        return new Fusion(superviviente, absorbido, catalogo.articulosDelModelo(absorbido).size(),
+                fotos.de(absorbido).size(), (int) modificaciones.countByModeloId(absorbido), 0);
+    }
+
+    /** La referencia recortada y en mayúsculas; un 400 si está en blanco, no cabe o es la que ya tiene. */
+    private static String referenciaValida(Modelo modelo, String codigo) {
+        String elCodigo = normalizar(codigo);
+        if (elCodigo == null) {
+            throw new IllegalArgumentException("Falta la referencia");
+        }
+        if (elCodigo.length() > LARGO_CODIGO) {
+            throw new IllegalArgumentException("La referencia no puede pasar de " + LARGO_CODIGO + " caracteres");
+        }
+        if (elCodigo.startsWith(PREFIJO_FUSIONADO)) {
+            // Se confundiría con el apunte de un modelo absorbido.
+            throw new IllegalArgumentException("La referencia no puede empezar por " + PREFIJO_FUSIONADO);
+        }
+        if (elCodigo.equals(modelo.getCodigo())) {
+            throw new IllegalArgumentException("El modelo ya tiene esa referencia");
+        }
+        return elCodigo;
+    }
+
+    /**
+     * Da por acabados los nombres vigentes del modelo (el de prototipo, o la
+     * referencia que tenía), salvo los {@code "#"} de las fusiones, que no son
+     * nombres, y los que se llamen {@code salvo}.
+     */
+    private void cerrarNombresVigentes(Long modeloId, LocalDateTime cuando, String... salvo) {
+        Set<String> seQuedan = Set.of(salvo);
+        for (ModeloCodigoHistorico apunte : codigos.findByModeloIdOrderByDesdeDescIdDesc(modeloId)) {
+            if (!esDeFusion(apunte) && !seQuedan.contains(apunte.getCodigo())) {
+                apunte.cerrar(cuando);
+            }
+        }
+    }
+
+    private static boolean esDeFusion(ModeloCodigoHistorico apunte) {
+        return apunte.getCodigo().startsWith(PREFIJO_FUSIONADO);
+    }
+
+    /** El id de un apunte {@code "#12"}; null si lo de detrás no es un número. */
+    private static Long idFusionado(String codigo) {
+        try {
+            return Long.valueOf(codigo.substring(PREFIJO_FUSIONADO.length()));
+        } catch (NumberFormatException noEsUnId) {
+            return null;
+        }
     }
 
     private List<Evento> lineaTiempo(Modelo modelo, List<ModeloCodigoHistorico> historico) {

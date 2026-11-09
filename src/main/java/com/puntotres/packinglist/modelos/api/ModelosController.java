@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.puntotres.packinglist.modelos.api.dto.Fusion;
 import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.api.dto.ModeloResumen;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
@@ -69,6 +70,10 @@ public class ModelosController {
     public record CambioDeEtapa(Etapa etapa, String motivo) {
     }
 
+    /** La referencia que se da al modelo; sin {@code confirmar}, si ya la tiene otro modelo no se juntan. */
+    public record AsignacionReferencia(String codigo, Boolean confirmar) {
+    }
+
     @GetMapping("/modelos")
     public List<ModeloResumen> listar(@RequestParam(required = false) String cliente,
                                       @RequestParam(required = false) Etapa etapa,
@@ -104,6 +109,35 @@ public class ModelosController {
                                       @AuthenticationPrincipal UsuarioActual quien) {
         modelos.cambiarEtapa(id, cambio.etapa(), cambio.motivo(), quien);
         return resumen(id);
+    }
+
+    /**
+     * Da la referencia al modelo. Si ya la tiene otro modelo del cliente y no
+     * se confirma, contesta 409 con {@code {mensaje, fusion}} (lo que se
+     * juntaría); confirmado, los junta y contesta con el superviviente.
+     */
+    @PostMapping("/modelos/{id}/referencia")
+    @PreAuthorize(DESPACHO)
+    public ModeloResumen asignarReferencia(@PathVariable Long id, @RequestBody AsignacionReferencia asignacion,
+                                           @AuthenticationPrincipal UsuarioActual quien) {
+        Modelo modelo = modelos.asignarReferencia(id, asignacion.codigo(),
+                Boolean.TRUE.equals(asignacion.confirmar()), quien);
+        return resumen(modelo.getId());
+    }
+
+    /** Qué pasaría al dar esa referencia al modelo, sin tocar nada. */
+    @GetMapping("/modelos/{id}/referencia/previsualizar")
+    @PreAuthorize(DESPACHO)
+    public Fusion previsualizarReferencia(@PathVariable Long id, @RequestParam(required = false) String codigo) {
+        return modelos.previsualizarReferencia(id, codigo);
+    }
+
+    /** Junta los dos modelos (sobrevive el de menor id) y contesta con el superviviente. No se deshace. */
+    @PostMapping("/modelos/{id}/fusionar-con/{otroId}")
+    @PreAuthorize(DESPACHO)
+    public ModeloResumen fusionar(@PathVariable Long id, @PathVariable Long otroId,
+                                  @AuthenticationPrincipal UsuarioActual quien) {
+        return resumen(modelos.fusionar(id, otroId, quien).getId());
     }
 
     @PostMapping("/modelos/{id}/etiqueta-impresa")

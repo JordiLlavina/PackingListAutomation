@@ -25,6 +25,7 @@ import com.puntotres.packinglist.modelos.persistence.CambioEtapa;
 import com.puntotres.packinglist.modelos.persistence.CambioEtapaRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistorico;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
+import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
@@ -76,6 +77,9 @@ class ModelosTest {
 
     @Autowired
     private UsuarioRepository repositorioUsuarios;
+
+    @Autowired
+    private ModificacionRepository repositorioModificaciones;
 
     @Test
     void unPrototipoRepetidoEnLaMismaTemporadaDa400YEnOtraVale() {
@@ -287,7 +291,7 @@ class ModelosTest {
         Modelos.FuenteEventos fuente = modeloId -> modeloId.equals(modelo.getId()) ? List.of(antiguo, futuro)
                 : List.of();
         Modelos conFuente = new Modelos(repositorioModelos, catalogo, fotos, temporadas, clientes, cambiosEtapa,
-                codigosHistoricos, repositorioUsuarios, List.of(fuente));
+                codigosHistoricos, repositorioUsuarios, repositorioModificaciones, List.of(fuente));
 
         List<Evento> linea = conFuente.ficha(modelo.getId()).lineaTiempo();
         assertEquals(4, linea.size());

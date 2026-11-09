@@ -25,6 +25,8 @@ public interface ModificacionRepository extends JpaRepository<Modificacion, Long
     /** Las de un modelo, de la más nueva a la más vieja (a la misma hora, la última creada primero). */
     List<Modificacion> findByModeloIdOrderByCreadaEnDescIdDesc(Long modeloId);
 
+    long countByModeloId(Long modeloId);
+
     long countByDireccionAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);
 
     long countByDireccionAndPrioridadIsNullAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);

@@ -1,17 +1,32 @@
 // La ficha de un modelo en despacho, en el panel de la derecha: la cabecera
 // (foto principal, referencia, nombre editable, cliente, etapa, temporadas y
 // los nombres que ha tenido), las acciones (una orden nueva para el taller,
-// cambiar de etapa, subir fotos), la galería con la principal marcada y el
-// historial. Tras cada cambio se vuelve a pedir la ficha y se avisa a la
-// lista para que repinte su fila.
+// cambiar de etapa, subir fotos, asignar la referencia a un prototipo o, en
+// uno importado, juntarlo con el prototipo que ya teníamos), la galería con
+// la principal marcada y el historial. Juntar dos modelos deja el de menor id,
+// que puede no ser este: entonces se navega a la ficha del superviviente.
+// Tras cada cambio se vuelve a pedir la ficha y se avisa a la lista para que
+// repinte su fila.
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
 import Historial from '../comun/Historial';
 import { Icono } from '../comun/iconos';
-import { ETAPAS, etapaTexto, fotoUrl, type Etapa as TipoEtapa, type ModeloFicha } from '../comun/modelos';
+import {
+  ETAPAS,
+  antesEra,
+  etapaTexto,
+  fotoUrl,
+  prototiposCandidatos,
+  textoFusion,
+  type Etapa as TipoEtapa,
+  type Fusion,
+  type ModeloFicha,
+  type ModeloResumen,
+} from '../comun/modelos';
+import { toast } from '../comun/toast';
 
 function mensaje(e: unknown, porDefecto: string): string {
   return e instanceof ErrorApi ? e.message : porDefecto;
@@ -32,6 +47,20 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
   const [motivo, setMotivo] = useState('');
   const [errorEtapa, setErrorEtapa] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const navegar = useNavigate();
+  // Asignar referencia: el código tecleado y, si ya lo tiene otro modelo, lo
+  // que se juntaría (con el código que se previsualizó, para confirmar ese).
+  const dialogoReferencia = useRef<HTMLDialogElement>(null);
+  const [codigo, setCodigo] = useState('');
+  const [prevista, setPrevista] = useState<{ codigo: string; fusion: Fusion } | null>(null);
+  const [errorReferencia, setErrorReferencia] = useState<string | null>(null);
+  // Juntar un importado con un prototipo: los prototipos del cliente, el
+  // buscador y el elegido con lo que se juntaría.
+  const dialogoPrototipo = useRef<HTMLDialogElement>(null);
+  const [prototipos, setPrototipos] = useState<ModeloResumen[] | null>(null);
+  const [busca, setBusca] = useState('');
+  const [elegido, setElegido] = useState<{ prototipo: ModeloResumen; fusion: Fusion } | null>(null);
+  const [errorPrototipo, setErrorPrototipo] = useState<string | null>(null);
 
   // Solo vale la respuesta de la última petición: si llega tarde la de otro
   // modelo (o una recarga vieja), se tira, para que la ficha y las acciones
@@ -114,6 +143,111 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
     }
   };
 
+  // Tras asignar o juntar: si sobrevive este, se recarga; si sobrevive el
+  // otro (el de menor id), este ya no existe y se va a la ficha de aquel.
+  const irAlSuperviviente = async (superviviente: ModeloResumen, aviso: string) => {
+    toast(aviso);
+    if (superviviente.id === m.id) {
+      await trasCambiar();
+    } else {
+      onCambiado();
+      navegar(`/modelos/${superviviente.id}`);
+    }
+  };
+
+  const previsualizar = (modeloId: number, conCodigo: string) =>
+    api<Fusion>(`/api/modelos/${modeloId}/referencia/previsualizar?codigo=${encodeURIComponent(conCodigo)}`);
+
+  const abrirReferencia = () => {
+    setCodigo('');
+    setPrevista(null);
+    setErrorReferencia(null);
+    dialogoReferencia.current?.showModal();
+  };
+
+  // Primero se pregunta qué pasaría: con la referencia libre se asigna sin
+  // más; si ya la tiene otro modelo, se enseña qué se junta y hace falta
+  // darle a «Juntar», que la manda confirmada.
+  const asignarReferencia = async (e: FormEvent) => {
+    e.preventDefault();
+    const elCodigo = prevista ? prevista.codigo : codigo.trim().toUpperCase();
+    if (!elCodigo) {
+      setErrorReferencia('Falta la referencia');
+      return;
+    }
+    setOcupado(true);
+    setErrorReferencia(null);
+    try {
+      const confirmar = prevista !== null;
+      if (!confirmar) {
+        const fusion = await previsualizar(m.id, elCodigo);
+        if (fusion.absorbido !== null) {
+          setPrevista({ codigo: elCodigo, fusion });
+          return;
+        }
+      }
+      const superviviente = await api<ModeloResumen>(`/api/modelos/${m.id}/referencia`, {
+        method: 'POST',
+        body: JSON.stringify({ codigo: elCodigo, confirmar }),
+      });
+      dialogoReferencia.current?.close();
+      await irAlSuperviviente(superviviente, confirmar ? 'Modelos juntados' : 'Referencia asignada');
+    } catch (err) {
+      setErrorReferencia(mensaje(err, 'No se ha podido asignar la referencia'));
+      // Otro la ha dado de alta mientras tanto: se enseña qué se juntaría.
+      if (err instanceof ErrorApi && err.estado === 409) {
+        try {
+          setPrevista({ codigo: elCodigo, fusion: await previsualizar(m.id, elCodigo) });
+        } catch {
+          // Ya se ha dicho el error de arriba.
+        }
+      }
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  const abrirPrototipos = async () => {
+    setBusca('');
+    setElegido(null);
+    setPrototipos(null);
+    setErrorPrototipo(null);
+    dialogoPrototipo.current?.showModal();
+    try {
+      setPrototipos(await api<ModeloResumen[]>(`/api/modelos?cliente=${encodeURIComponent(m.cliente)}`));
+    } catch (err) {
+      setErrorPrototipo(mensaje(err, 'No se han podido cargar los prototipos'));
+    }
+  };
+
+  // Lo que se juntaría es lo mismo que daría asignar al prototipo el código de este.
+  const elegirPrototipo = async (prototipo: ModeloResumen) => {
+    if (m.codigo === null) return;
+    setErrorPrototipo(null);
+    try {
+      setElegido({ prototipo, fusion: await previsualizar(prototipo.id, m.codigo) });
+    } catch (err) {
+      setErrorPrototipo(mensaje(err, 'No se ha podido ver qué se junta'));
+    }
+  };
+
+  const juntarConPrototipo = async () => {
+    if (!elegido) return;
+    setOcupado(true);
+    setErrorPrototipo(null);
+    try {
+      const superviviente = await api<ModeloResumen>(`/api/modelos/${elegido.prototipo.id}/fusionar-con/${m.id}`, {
+        method: 'POST',
+      });
+      dialogoPrototipo.current?.close();
+      await irAlSuperviviente(superviviente, 'Modelos juntados');
+    } catch (err) {
+      setErrorPrototipo(mensaje(err, 'No se han podido juntar los modelos'));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const subirFotos = async (e: ChangeEvent<HTMLInputElement>) => {
     const ficheros = [...(e.target.files ?? [])];
     e.target.value = '';
@@ -168,6 +302,7 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
           <span className="meta">
             {ficha.temporadas.length > 0 ? `Temporadas: ${ficha.temporadas.join(', ')}` : 'Sin temporada'}
           </span>
+          {antesEra(ficha.fusionadosDesde) && <span className="meta">{antesEra(ficha.fusionadosDesde)}</span>}
           {anteriores.length > 0 && (
             <span className="meta">
               Antes:{' '}
@@ -186,6 +321,15 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
         <button className="boton" type="button" onClick={abrirEtapa}>
           Cambiar etapa
         </button>
+        {m.codigo === null ? (
+          <button className="boton" type="button" onClick={abrirReferencia}>
+            Asignar referencia
+          </button>
+        ) : (
+          <button className="boton" type="button" onClick={() => void abrirPrototipos()}>
+            Es un prototipo que ya tenemos
+          </button>
+        )}
         <label className="boton subir" aria-disabled={subiendo}>
           <Icono nombre="cam" /> {subiendo ? 'Subiendo fotos…' : 'Subir fotos'}
           <input type="file" multiple accept="image/*" disabled={subiendo} onChange={(e) => void subirFotos(e)} />
@@ -249,6 +393,89 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
             </button>
           </div>
         </form>
+      </dialog>
+
+      <dialog ref={dialogoReferencia} className="dialogo" aria-labelledby="titulo-referencia">
+        <form onSubmit={(e) => void asignarReferencia(e)}>
+          <h2 id="titulo-referencia">Asignar referencia a {m.referencia}</h2>
+          <label className="campo">
+            Referencia del cliente
+            <input
+              value={codigo}
+              maxLength={80}
+              autoFocus
+              onChange={(e) => {
+                setCodigo(e.target.value);
+                setPrevista(null);
+              }}
+            />
+          </label>
+          {prevista && <p className="aviso-fusion">{textoFusion(prevista.codigo, prevista.fusion)}</p>}
+          {errorReferencia && <p className="error">{errorReferencia}</p>}
+          <div className="botones">
+            <button className="boton ok" type="submit" disabled={ocupado || !codigo.trim()}>
+              {prevista ? 'Juntar' : 'Asignar'}
+            </button>
+            <button className="boton" type="button" onClick={() => dialogoReferencia.current?.close()}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog ref={dialogoPrototipo} className="dialogo" aria-labelledby="titulo-prototipo">
+        <div className="formulario">
+          <h2 id="titulo-prototipo">¿Qué prototipo era {m.referencia}?</h2>
+          {elegido ? (
+            <>
+              <div className="modelo-elegido">
+                <FotoModelo modelo={elegido.prototipo} />
+                <span className="texto">
+                  <b>{elegido.prototipo.referencia}</b>
+                  <span>{elegido.prototipo.nombre}</span>
+                </span>
+                <button className="chip" type="button" onClick={() => setElegido(null)}>
+                  Cambiar
+                </button>
+              </div>
+              <p className="aviso-fusion">{textoFusion(m.referencia, elegido.fusion)}</p>
+            </>
+          ) : (
+            <div className="buscador-modelos">
+              <input type="search" aria-label="Buscar el prototipo" value={busca} placeholder="Referencia de prototipo o nombre" onChange={(e) => setBusca(e.target.value)} />
+              {prototipos !== null &&
+                (prototiposCandidatos(prototipos, m.id, busca).length === 0 ? (
+                  <p className="ayuda">No hay ningún prototipo de {m.cliente}{busca.trim() ? ` con «${busca.trim()}»` : ''}.</p>
+                ) : (
+                  <ul className="lista-modelos">
+                    {prototiposCandidatos(prototipos, m.id, busca).map((p) => (
+                      <li key={p.id} className="fila-modelo">
+                        <button className="abrir" type="button" onClick={() => void elegirPrototipo(p)}>
+                          <FotoModelo modelo={p} />
+                          <span className="texto">
+                            <b>{p.referencia}</b>
+                            <span>{p.nombre || 'Sin nombre'}</span>
+                          </span>
+                          <Etapa etapa={p.etapa} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ))}
+            </div>
+          )}
+          {errorPrototipo && <p className="error">{errorPrototipo}</p>}
+          <div className="botones">
+            {elegido && (
+              <button className="boton ok" type="button" disabled={ocupado} onClick={() => void juntarConPrototipo()}>
+                Juntar
+              </button>
+            )}
+            <button className="boton" type="button" onClick={() => dialogoPrototipo.current?.close()}>
+              Cancelar
+            </button>
+          </div>
+        </div>
       </dialog>
     </div>
   );

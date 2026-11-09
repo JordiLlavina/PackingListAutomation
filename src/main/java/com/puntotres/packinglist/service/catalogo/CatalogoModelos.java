@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.catalogo;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -21,6 +22,8 @@ import com.puntotres.packinglist.persistence.ArticuloColorId;
 import com.puntotres.packinglist.persistence.ArticuloColorRepository;
 import com.puntotres.packinglist.persistence.ArticuloId;
 import com.puntotres.packinglist.persistence.ArticuloRepository;
+import com.puntotres.packinglist.persistence.FotoCatalogo;
+import com.puntotres.packinglist.persistence.FotoCatalogoRepository;
 import com.puntotres.packinglist.persistence.Incorporacion;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
@@ -197,17 +200,20 @@ public class CatalogoModelos {
     private final PielRepository pieles;
     private final ArticuloColorRepository coloresDeArticulo;
     private final ModeloTemporadaRepository temporadasDeModelo;
+    private final FotoCatalogoRepository fotosDeModelo;
     private final TablaColores tablaColores;
     private final DocumentosCorteService reglas;
 
     public CatalogoModelos(ModeloRepository modelos, ArticuloRepository articulos, PielRepository pieles,
                            ArticuloColorRepository coloresDeArticulo, ModeloTemporadaRepository temporadasDeModelo,
-                           TablaColores tablaColores, DocumentosCorteService reglas) {
+                           FotoCatalogoRepository fotosDeModelo, TablaColores tablaColores,
+                           DocumentosCorteService reglas) {
         this.modelos = modelos;
         this.articulos = articulos;
         this.pieles = pieles;
         this.coloresDeArticulo = coloresDeArticulo;
         this.temporadasDeModelo = temporadasDeModelo;
+        this.fotosDeModelo = fotosDeModelo;
         this.tablaColores = tablaColores;
         this.reglas = reglas;
     }
@@ -693,6 +699,41 @@ public class CatalogoModelos {
     @Transactional
     public void borrarModelo(String cliente, String codigo) {
         modelo(cliente, codigo).ifPresent(modelos::delete);
+    }
+
+    /**
+     * Pasa al modelo {@code aModeloId} todo lo del catálogo que cuelga de
+     * {@code deModeloId}: sus artículos (con sus colores, que cuelgan del
+     * artículo), sus fotos y sus temporadas. Es la parte del catálogo de
+     * juntar dos modelos; borrar el que se queda vacío es de quien llama.
+     *
+     * Las fotos van detrás de las que ya tenía el destino, con un nombre libre
+     * si chocan (una foto se identifica por su nombre dentro del modelo), y
+     * la principal del origen solo sigue siéndolo si el destino no tenía
+     * ninguna. Una temporada que ya tenía el destino no se duplica.
+     */
+    @Transactional
+    public void moverHijos(Long deModeloId, Long aModeloId) {
+        if (deModeloId == null || aModeloId == null || deModeloId.equals(aModeloId)) {
+            return;
+        }
+        for (Articulo articulo : articulos.findByModeloIdOrderByReferencia(deModeloId)) {
+            articulo.moverA(aModeloId);
+        }
+        List<FotoCatalogo> delDestino = fotosDeModelo.findByModeloIdOrderByOrdenAscIdAsc(aModeloId);
+        int orden = delDestino.isEmpty() ? 0 : delDestino.get(delDestino.size() - 1).getOrden() + 1;
+        boolean tienePrincipal = delDestino.stream().anyMatch(FotoCatalogo::isPrincipal);
+        Set<String> usados = new HashSet<>();
+        delDestino.forEach(foto -> usados.add(foto.getNombreFichero().toLowerCase(Locale.ROOT)));
+        for (FotoCatalogo foto : fotosDeModelo.findByModeloIdOrderByOrdenAscIdAsc(deModeloId)) {
+            String nombre = FotoCatalogo.nombreLibre(foto.getNombreFichero(), usados);
+            usados.add(nombre.toLowerCase(Locale.ROOT));
+            foto.moverA(aModeloId, nombre, orden++, !tienePrincipal && foto.isPrincipal());
+        }
+        for (ModeloTemporada vinculo : temporadasDeModelo.findByModeloId(deModeloId)) {
+            vincularTemporada(aModeloId, vinculo.getTemporadaId());
+            temporadasDeModelo.delete(vinculo);
+        }
     }
 
     /** Lo que ha hecho {@link #quitarModelosDeTemporada}: para el mensaje de la pantalla. */

@@ -73,6 +73,11 @@ public class CambioEtapa {
         return modeloId;
     }
 
+    /** Pasa a otro modelo: al juntar dos, la historia de etapas del que desaparece se va al que se queda. */
+    public void moverA(Long modeloId) {
+        this.modeloId = modeloId;
+    }
+
     public Etapa getDe() {
         return de;
     }

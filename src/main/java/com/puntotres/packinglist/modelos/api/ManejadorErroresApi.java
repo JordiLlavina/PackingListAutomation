@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.puntotres.packinglist.modelos.service.FusionPendiente;
 
 /**
  * Los errores de la API de modelos, siempre como {@code {"mensaje": ...}}: la
@@ -37,6 +38,18 @@ public class ManejadorErroresApi {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> datoQueNoVale(IllegalArgumentException error) {
         return respuesta(HttpStatus.BAD_REQUEST, error.getMessage(), error);
+    }
+
+    /**
+     * Asignar una referencia que ya tiene otro modelo es juntar los dos, y eso
+     * pide confirmación: un 409 con el mensaje y lo que se juntaría
+     * ({@code {"mensaje": ..., "fusion": {...}}}), para que la pantalla lo
+     * diga antes de volver a pedirlo confirmado.
+     */
+    @ExceptionHandler(FusionPendiente.class)
+    public ResponseEntity<Map<String, Object>> fusionPendiente(FusionPendiente pendiente) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("mensaje", pendiente.getMessage(), "fusion", pendiente.fusion()));
     }
 
     /** Un parámetro de la URL que no se deja convertir: casi siempre un valor de un desplegable que no existe. */

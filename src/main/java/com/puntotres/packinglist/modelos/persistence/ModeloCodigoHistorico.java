@@ -14,9 +14,9 @@ import jakarta.persistence.Table;
  * nació prototipo, su nombre de prototipo. El modelo guarda solo el nombre de
  * hoy; esto es lo que permite seguir encontrándolo por el nombre de ayer.
  *
- * {@code hasta} nulo es el nombre vigente. Una fusión apuntará aquí el id
- * del modelo absorbido como {@code "#" + id}, para que su QR siga llevando
- * al superviviente.
+ * {@code hasta} nulo es el nombre vigente. Una fusión apunta aquí el id del
+ * modelo absorbido como {@code "#" + id}, para que su QR siga llevando al
+ * superviviente; esos apuntes no son nombres y la ficha no los enseña como tales.
  */
 @Entity
 @Table(name = "modelo_codigo_historico")
@@ -76,5 +76,21 @@ public class ModeloCodigoHistorico {
 
     public String getMotivo() {
         return motivo;
+    }
+
+    /**
+     * Pasa a otro modelo: al juntar dos, los nombres del que desaparece (y los
+     * {@code "#" + id} de los que ya había absorbido) se van al que se queda,
+     * para que una cadena de fusiones siga llevando al último.
+     */
+    public void moverA(Long modeloId) {
+        this.modeloId = modeloId;
+    }
+
+    /** Deja de ser el nombre vigente desde {@code cuando}; si ya no lo era, no cambia nada. */
+    public void cerrar(LocalDateTime cuando) {
+        if (hasta == null) {
+            this.hasta = cuando;
+        }
     }
 }

@@ -102,6 +102,12 @@ public class Articulo {
         return modeloId;
     }
 
+    /** Pasa a otro modelo (al juntar dos, los artículos del que desaparece se van al que se queda). */
+    public void moverA(Long modeloId) {
+        this.modeloId = modeloId;
+        tocar();
+    }
+
     /** La referencia de la piel, o "" si la regla del cliente no la separó. */
     public String getRefPiel() {
         return refPiel == null ? "" : refPiel;

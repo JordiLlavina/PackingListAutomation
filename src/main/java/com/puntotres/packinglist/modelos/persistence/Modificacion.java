@@ -104,6 +104,11 @@ public class Modificacion {
         return modeloId;
     }
 
+    /** Pasa a otro modelo: al juntar dos, las modificaciones del que desaparece se van al que se queda. */
+    public void moverA(Long modeloId) {
+        this.modeloId = modeloId;
+    }
+
     public Direccion getDireccion() {
         return direccion;
     }

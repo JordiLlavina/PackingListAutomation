@@ -42,11 +42,16 @@ import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.service.Usuarios;
+import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.FicheroExcel;
+import com.puntotres.packinglist.persistence.ModeloRepository;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 
 /**
- * La API de modelos: quién puede qué, el QR, las fotos y la etiqueta impresa.
- * La base de datos es la misma para toda la suite: los códigos de este test
- * empiezan por {@code T9-API-}.
+ * La API de modelos: quién puede qué, el QR, las fotos, la etiqueta impresa
+ * y asignar referencia o juntar dos modelos. La base de datos es la misma
+ * para toda la suite: los códigos de este test empiezan por {@code T9-API-}
+ * o {@code T19-API-}.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -62,6 +67,15 @@ class ModelosControllerTest {
 
     @Autowired
     private ModelosProperties props;
+
+    @Autowired
+    private ArchivoTemporadas temporadas;
+
+    @Autowired
+    private CatalogoModelos catalogo;
+
+    @Autowired
+    private ModeloRepository repositorioModelos;
 
     @Test
     void elTallerListaYVeLaFichaPeroNoDaDeAlta() throws Exception {
@@ -264,6 +278,97 @@ class ModelosControllerTest {
                 .andExpect(jsonPath("$", hasSize(0)));
         mvc.perform(get("/api/modelos").param("q", "T9-API-ETIQUETA").with(comoUsuario(despacho())))
                 .andExpect(jsonPath("$[0].etiquetaImpresaEn").isNotEmpty());
+    }
+
+    @Test
+    void asignarUnCodigoQueYaExisteSinConfirmarDevuelveLaPrevisualizacion() throws Exception {
+        long proto = altaPrototipo("PROTO T19 API PREVIA", "T19-API-PREVIA");
+        long importado = catalogo.asegurarArticulo("AMI", "T19-API-PREVIA.AL0001").getModeloId();
+
+        mvc.perform(get("/api/modelos/" + proto + "/referencia/previsualizar").param("codigo", "t19-api-previa")
+                        .with(comoUsuario(despacho())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.superviviente").value(proto))
+                .andExpect(jsonPath("$.absorbido").value(importado))
+                .andExpect(jsonPath("$.articulos").value(1))
+                .andExpect(jsonPath("$.fotos").value(0))
+                .andExpect(jsonPath("$.modificaciones").value(0))
+                .andExpect(jsonPath("$.documentos").value(0));
+        mvc.perform(get("/api/modelos/" + proto + "/referencia/previsualizar").param("codigo", "T19-API-LIBRE-NO")
+                        .with(comoUsuario(despacho())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.absorbido").isEmpty());
+
+        mvc.perform(post("/api/modelos/" + proto + "/referencia").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"t19-api-previa\",\"confirmar\":false}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensaje").value("Ya existe T19-API-PREVIA: se juntará con el prototipo"))
+                .andExpect(jsonPath("$.fusion.superviviente").value(proto))
+                .andExpect(jsonPath("$.fusion.absorbido").value(importado))
+                .andExpect(jsonPath("$.fusion.articulos").value(1));
+        assertTrue(repositorioModelos.existsById(importado));
+
+        mvc.perform(post("/api/modelos/" + proto + "/referencia").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"t19-api-previa\",\"confirmar\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(proto))
+                .andExpect(jsonPath("$.codigo").value("T19-API-PREVIA"))
+                .andExpect(jsonPath("$.etapa").value("PRODUCCION"));
+        mvc.perform(get("/api/modelos/" + proto).with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$.fusionadosDesde[0]").value(importado));
+    }
+
+    @Test
+    void asignarUnCodigoLibrePorLaApiYFusionarDesdeElImportado() throws Exception {
+        long proto = altaPrototipo("PROTO T19 API LIBRE", "T19-API-LIBRE");
+        mvc.perform(post("/api/modelos/" + proto + "/referencia").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"t19-api-libre\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codigo").value("T19-API-LIBRE"))
+                .andExpect(jsonPath("$.nombrePrototipo").value("PROTO T19 API LIBRE"));
+
+        long otroProto = altaPrototipo("PROTO T19 API OTRO", "T19-API-OTRO");
+        long importado = catalogo.asegurarArticulo("AMI", "T19-API-OTRO.AL0001").getModeloId();
+        mvc.perform(post("/api/modelos/" + importado + "/fusionar-con/" + otroProto).with(comoUsuario(despacho()))
+                        .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(otroProto))
+                .andExpect(jsonPath("$.codigo").value("T19-API-OTRO"));
+        mvc.perform(post("/api/modelos/" + otroProto + "/fusionar-con/" + otroProto).with(comoUsuario(despacho()))
+                        .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("No se puede fusionar un modelo consigo mismo"));
+    }
+
+    @Test
+    void elTallerNoAsignaReferenciasNiFusiona() throws Exception {
+        long proto = altaPrototipo("PROTO T19 API TALLER", "T19-API-TALLER");
+        Usuario taller = usuarioDePrueba(usuarios, Rol.TALLER);
+
+        mvc.perform(post("/api/modelos/" + proto + "/referencia").with(comoUsuario(taller)).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigo\":\"T19-API-TALLER\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/modelos/" + proto + "/referencia/previsualizar").param("codigo", "X")
+                        .with(comoUsuario(taller)))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/modelos/" + proto + "/fusionar-con/" + proto).with(comoUsuario(taller)).with(csrf()))
+                .andExpect(status().isForbidden());
+    }
+
+    /** Da de alta un prototipo por la API, en una temporada nueva, y devuelve su id. */
+    private long altaPrototipo(String nombre, String temporada) throws Exception {
+        Long temporadaId = temporadas.guardar(null, "AMI", temporada, (FicheroExcel) null, null).getId();
+        String respuesta = mvc.perform(post("/api/modelos").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"cliente\":\"AMI\",\"nombrePrototipo\":\"" + nombre
+                                + "\",\"temporadaId\":" + temporadaId + "}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return JSON.readTree(respuesta).get("id").asLong();
     }
 
     /** Da de alta un modelo con código por la API, como el despacho, y devuelve su id. */

@@ -471,6 +471,8 @@ a.boton { text-decoration: none; color: var(--fg); }
 .modelo-elegido .foto { width: 56px; height: 56px; border-radius: 10px; flex: none; }
 .modelo-elegido .texto { display: grid; flex: 1; min-width: 0; }
 .modelo-elegido .texto span { color: var(--muted); }
+/* El aviso de antes de juntar dos modelos: qué se junta y que no se deshace. */
+.aviso-fusion { margin: 0; padding: 10px 12px; border-left: 4px solid var(--normal); border-radius: 8px; background: color-mix(in oklab, var(--normal) 12%, var(--surface)); font-weight: 700; }
 .buscador-modelos .lista-modelos { max-height: 360px; overflow: auto; box-shadow: none; border: 1px solid var(--line); }
 .nueva-orden fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
 .nueva-orden legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
