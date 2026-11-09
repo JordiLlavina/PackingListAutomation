@@ -220,7 +220,13 @@ public class CatalogoController {
     @PostMapping("/catalogo/modelo/borrar")
     public String borrarModelo(@RequestParam String cliente, @RequestParam String codigo,
                                @RequestParam(required = false) Long temporada, RedirectAttributes redirect) {
-        catalogo.borrarModelo(cliente, codigo);
+        try {
+            catalogo.borrarModelo(cliente, codigo);
+        } catch (IllegalStateException e) {
+            // Tiene historial de la app del taller: no se borra (CatalogoModelos.borrarModelo).
+            redirect.addFlashAttribute("mensajeError", e.getMessage() + ".");
+            return volver(cliente, temporada);
+        }
         redirect.addFlashAttribute("mensaje", "Borrado el modelo " + codigo.trim().toUpperCase(Locale.ROOT)
                 + " con sus artículos, colores y fotos.");
         return volver(cliente, temporada);
@@ -245,8 +251,12 @@ public class CatalogoController {
                 + (quitados.borrados() == 1 ? " borrado" : " borrados") + " del catálogo";
         if (quitados.desvinculados() > 0) {
             mensaje += ", y " + quitados.desvinculados() + (quitados.desvinculados() == 1
-                    ? " que también va en otra temporada se queda en el catálogo, sin esta"
-                    : " que también van en otras temporadas se quedan en el catálogo, sin esta");
+                    ? " desvinculado que se queda en el catálogo, sin esta"
+                    : " desvinculados que se quedan en el catálogo, sin esta");
+            if (quitados.conHistorial() > 0) {
+                mensaje += " (de ellos " + quitados.conHistorial() + " con historial del taller que se "
+                        + (quitados.conHistorial() == 1 ? "conserva" : "conservan") + ")";
+            }
         }
         redirect.addFlashAttribute("mensaje", mensaje + ".");
         return volver(cliente, temporada);

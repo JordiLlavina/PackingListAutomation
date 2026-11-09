@@ -56,7 +56,7 @@
              que entró al guardarla (un excel equivocado, una prueba). -->
         <form th:if="${temporadaId != null and !#lists.isEmpty(filas)}" class="quitar-temporada"
               th:action="@{/catalogo/temporada/quitar-modelos}" method="post"
-              th:attr="data-confirmar=|¿Quitar del catálogo los ${#lists.size(filas)} modelos de la temporada ${nombreTemporada}? Los que solo van en esta temporada se borran con sus artículos, colores y fotos; los que también van en otra se quedan, solo sin esta.|"
+              th:attr="data-confirmar=|¿Quitar del catálogo los ${#lists.size(filas)} modelos de la temporada ${nombreTemporada}? Los que solo van en esta temporada se borran con sus artículos, colores y fotos; los que también van en otra o tienen historial del taller se quedan, solo sin esta.|"
               onsubmit="return confirm(this.dataset.confirmar)">
             <input type="hidden" name="cliente" th:value="${cliente}">
             <input type="hidden" name="temporada" th:value="${temporadaId}">
@@ -122,7 +122,7 @@
                             <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
                             <input type="hidden" name="temporada" th:value="${temporadaId}">
                             <button type="submit" class="mini" title="Borrar el modelo"
-                                    onclick="return confirm('¿Borrar el modelo y sus fotos?')">Borrar modelo</button>
+                                    onclick="return confirm('¿Borrar el modelo y sus fotos? Si tiene historial del taller, no se podrá borrar.')">Borrar modelo</button>
                         </form>
                     </td>
                 </tr>

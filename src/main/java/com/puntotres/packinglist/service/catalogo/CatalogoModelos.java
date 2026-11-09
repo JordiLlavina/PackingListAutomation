@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -203,11 +204,12 @@ public class CatalogoModelos {
     private final FotoCatalogoRepository fotosDeModelo;
     private final TablaColores tablaColores;
     private final DocumentosCorteService reglas;
+    private final HistorialDelTaller historial;
 
     public CatalogoModelos(ModeloRepository modelos, ArticuloRepository articulos, PielRepository pieles,
                            ArticuloColorRepository coloresDeArticulo, ModeloTemporadaRepository temporadasDeModelo,
                            FotoCatalogoRepository fotosDeModelo, TablaColores tablaColores,
-                           DocumentosCorteService reglas) {
+                           DocumentosCorteService reglas, ObjectProvider<HistorialDelTaller> historial) {
         this.modelos = modelos;
         this.articulos = articulos;
         this.pieles = pieles;
@@ -216,6 +218,8 @@ public class CatalogoModelos {
         this.fotosDeModelo = fotosDeModelo;
         this.tablaColores = tablaColores;
         this.reglas = reglas;
+        // Sin la app del taller en el contexto, ningún modelo tiene historial.
+        this.historial = historial.getIfAvailable(() -> modeloId -> false);
     }
 
     // --- Alta automática desde el excel de una temporada ---
@@ -695,10 +699,28 @@ public class CatalogoModelos {
         }
     }
 
-    /** Borra el modelo; sus artículos, colores, fotos y temporadas caen con él (FK del esquema). */
+    /** El mensaje de no poder borrar un modelo con historial del taller. */
+    public static final String NO_SE_BORRA_CON_HISTORIAL = "El modelo tiene modificaciones o documentos de la app "
+            + "del taller y no se puede borrar; quítalo de la temporada o déjalo inactivo";
+
+    /**
+     * Borra el modelo; sus artículos, colores, fotos y temporadas caen con él
+     * (FK del esquema). Un modelo con historial del taller (modificaciones o
+     * documentos) NO se borra: esta pantalla no sabe nada del taller y un
+     * clic aquí no debe llevarse avisos y órdenes que no se borran nunca.
+     *
+     * @throws IllegalStateException si el modelo tiene historial del taller
+     */
     @Transactional
     public void borrarModelo(String cliente, String codigo) {
-        modelo(cliente, codigo).ifPresent(modelos::delete);
+        Optional<Modelo> modelo = modelo(cliente, codigo);
+        if (modelo.isEmpty()) {
+            return;
+        }
+        if (historial.tieneHistorial(modelo.get().getId())) {
+            throw new IllegalStateException(NO_SE_BORRA_CON_HISTORIAL);
+        }
+        modelos.delete(modelo.get());
     }
 
     /**
@@ -737,7 +759,12 @@ public class CatalogoModelos {
     }
 
     /** Lo que ha hecho {@link #quitarModelosDeTemporada}: para el mensaje de la pantalla. */
-    public record ModelosQuitados(int borrados, int desvinculados) {
+    /**
+     * Lo que ha hecho {@link #quitarModelosDeTemporada}: para el mensaje de la
+     * pantalla. {@code conHistorial} cuenta los desvinculados que solo iban en
+     * esta temporada y se conservan por tener historial del taller.
+     */
+    public record ModelosQuitados(int borrados, int desvinculados, int conHistorial) {
     }
 
     /**
@@ -745,22 +772,30 @@ public class CatalogoModelos {
      * en esta temporada se borra entero (artículos, colores y fotos, por las
      * FK del esquema); uno que también va en otra se queda y solo pierde el
      * vínculo con esta, porque borrarlo vaciaría las otras temporadas sin
-     * que nadie lo pidiera.
+     * que nadie lo pidiera. Un modelo con historial del taller (modificaciones
+     * o documentos) nunca se borra: solo pierde el vínculo, como si fuera en
+     * otra temporada.
      */
     @Transactional
     public ModelosQuitados quitarModelosDeTemporada(String cliente, Long temporadaId) {
         int borrados = 0;
         int desvinculados = 0;
+        int conHistorial = 0;
         for (Modelo modelo : modelosEn(cliente, temporadaId)) {
-            if (temporadasDeModelo(modelo.getId()).stream().allMatch(temporadaId::equals)) {
+            boolean soloEnEsta = temporadasDeModelo(modelo.getId()).stream().allMatch(temporadaId::equals);
+            boolean tieneHistorial = historial.tieneHistorial(modelo.getId());
+            if (soloEnEsta && !tieneHistorial) {
                 modelos.delete(modelo);
                 borrados++;
             } else {
                 temporadasDeModelo.deleteById(new ModeloTemporadaId(modelo.getId(), temporadaId));
                 desvinculados++;
+                if (tieneHistorial) {
+                    conHistorial++;
+                }
             }
         }
-        return new ModelosQuitados(borrados, desvinculados);
+        return new ModelosQuitados(borrados, desvinculados, conHistorial);
     }
 
     /** Borra el artículo; sus colores caen con él (FK del esquema). El modelo se queda aunque sea el último. */

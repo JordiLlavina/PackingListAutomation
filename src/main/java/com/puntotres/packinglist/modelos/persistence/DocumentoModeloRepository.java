@@ -27,4 +27,7 @@ public interface DocumentoModeloRepository extends JpaRepository<DocumentoModelo
     List<DocumentoModelo> findByModeloIdOrderByIdAsc(Long modeloId);
 
     long countByModeloId(Long modeloId);
+
+    /** Si el modelo tiene algún documento: es historial del taller y el catálogo no puede borrarlo. */
+    boolean existsByModeloId(Long modeloId);
 }

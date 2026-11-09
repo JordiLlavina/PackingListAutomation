@@ -27,6 +27,9 @@ public interface ModificacionRepository extends JpaRepository<Modificacion, Long
 
     long countByModeloId(Long modeloId);
 
+    /** Si el modelo tiene alguna modificación: es historial del taller y el catálogo no puede borrarlo. */
+    boolean existsByModeloId(Long modeloId);
+
     long countByDireccionAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);
 
     long countByDireccionAndPrioridadIsNullAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);

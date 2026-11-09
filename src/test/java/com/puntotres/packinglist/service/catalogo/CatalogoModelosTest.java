@@ -186,7 +186,7 @@ class CatalogoModelosTest {
 
         ModelosQuitados quitados = catalogo.quitarModelosDeTemporada("AMI", esta);
 
-        assertEquals(new ModelosQuitados(1, 1), quitados);
+        assertEquals(new ModelosQuitados(1, 1, 0), quitados);
         assertTrue(catalogo.modelo("AMI", "ULL937").isEmpty(), "solo iba en esta: se borra");
         assertTrue(catalogo.articulo("AMI", "ULL937.AL0001").isEmpty());
         assertTrue(catalogo.modelo("AMI", "ULL938").isPresent(), "también va en otra: se queda");
