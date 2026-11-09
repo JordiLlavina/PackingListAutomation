@@ -3,18 +3,20 @@
 import { useNavigate } from 'react-router';
 import { Icono } from '../comun/iconos';
 import { useSesion } from '../comun/sesion';
+import { useBandeja } from '../comun/useBandeja';
 import RejillaModelos from './RejillaModelos';
 
 export default function Inicio() {
   const navegar = useNavigate();
   const { sesion } = useSesion();
-  // Las órdenes nuevas de despacho llegan en Task 14.
-  const nuevas = 0;
+  // Las órdenes de despacho sin abrir, de la consulta de la bandeja que lleva el marco.
+  const { resumen } = useBandeja();
+  const nuevas = resumen?.nuevas ?? 0;
 
   return (
     <>
       <h2 className="saludo">Hola, {sesion?.nombre}</h2>
-      <p className="sub">No tienes nada pendiente.</p>
+      <p className="sub">{nuevas ? `Tienes ${nuevas} ${nuevas === 1 ? 'orden nueva' : 'órdenes nuevas'} de despacho.` : 'No tienes nada pendiente.'}</p>
       <div className="losas">
         <button className="losa" type="button" onClick={() => navegar('/ordenes')}>
           <span className={nuevas ? 'badge' : 'badge cero'}>{nuevas}</span>

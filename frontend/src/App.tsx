@@ -10,6 +10,10 @@ import ShellDespacho from './despacho/Shell';
 import InicioDespacho from './despacho/Inicio';
 import ModelosDespacho from './despacho/Modelos';
 import Entrada from './entrada/Entrada';
+import Duda from './taller/Duda';
+import MisAvisos from './taller/MisAvisos';
+import Orden from './taller/Orden';
+import Ordenes from './taller/Ordenes';
 import ShellTaller, { type Pantalla } from './taller/Shell';
 import { BorradorProvider } from './taller/cambio/Borrador';
 import ElegirModelo from './taller/cambio/ElegirModelo';
@@ -62,8 +66,12 @@ const rutasTaller: RouteObject[] = [
     ),
     children: [
       { index: true, element: <InicioTaller />, ...pantalla({ titulo: 'Modelos · Puntotres', seccion: 'inicio', fab: true }) },
-      { path: 'ordenes', element: <PorLlegar />, ...pantalla({ titulo: 'Tengo que hacer', seccion: 'ordenes', fab: true }) },
-      { path: 'avisos', element: <PorLlegar />, ...pantalla({ titulo: 'Mis avisos', seccion: 'avisos', fab: true }) },
+      { path: 'ordenes', element: <Ordenes />, ...pantalla({ titulo: 'Tengo que hacer', seccion: 'ordenes', fab: true }) },
+      // El título lo pone la orden con el suyo. Sin escáner: taparía «Hecho».
+      { path: 'ordenes/:id', element: <Orden />, ...pantalla({ titulo: 'Orden', atras: '/ordenes', seccion: 'ordenes' }) },
+      { path: 'ordenes/:id/duda', element: <Duda modo="duda" />, ...pantalla({ titulo: 'Tengo una duda', atras: (p) => `/ordenes/${p.id}`, seccion: 'ordenes' }) },
+      { path: 'avisos', element: <MisAvisos />, ...pantalla({ titulo: 'Mis avisos', seccion: 'avisos', fab: true }) },
+      { path: 'avisos/:id/contestar', element: <Duda modo="contestar" />, ...pantalla({ titulo: 'Contestar a despacho', atras: '/avisos', seccion: 'avisos' }) },
       { path: 'modelos', element: <ModelosTaller />, ...pantalla({ titulo: 'Modelos', seccion: 'modelos', fab: true }) },
       { path: 'modelos/:id', element: <FichaModeloTaller />, ...pantalla({ titulo: 'Modelo', atras: '/modelos', seccion: 'modelos', fab: true }) },
       { path: 'cambio', children: rutasCambio },

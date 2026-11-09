@@ -314,3 +314,33 @@ img.foto { object-fit: cover; background: var(--line); }
 .quitar-foto { position: absolute; top: 6px; right: 6px; min-width: 64px; min-height: 64px; padding: 0 12px; border-radius: 14px; border: 0; background: rgba(22, 33, 58, .78); color: #fff; font-size: 1rem; font-weight: 700; }
 .error-envio { color: var(--alta); font-weight: 700; margin: 0; }
 .ficha svg.foto { padding: 18px; background: var(--bg); color: var(--fg); }
+
+/* «Tengo que hacer» y «Mis avisos»: lo que la maqueta no trae o pinta en
+   línea. La franja de un aviso va por su estado (azul enviado, ámbar visto,
+   verde hecho) con modificadores y no con el style de la maqueta; la tarjeta
+   de aviso no tiene alto mínimo; la respuesta de despacho va dentro, con su
+   nota de voz y «Contestar». En la orden: la línea gris de la ficha, las
+   miniaturas que se tocan para verlas en grande, las respuestas debajo y la
+   foto a pantalla completa con un «Cerrar» grande. */
+.orden.aviso { min-height: auto; }
+.orden.aviso-enviado .franja { background: var(--new); }
+.orden.aviso-visto .franja { background: var(--normal); }
+.orden.aviso-hecho .franja { background: var(--ok); }
+.orden.aviso-descartado .franja { background: var(--baja); }
+.respuesta { display: grid; gap: 10px; margin-top: 6px; padding: 12px; border-radius: 14px; background: var(--bg); color: var(--fg); }
+.respuesta .boton { justify-self: start; min-height: 64px; }
+.ficha .texto .meta { color: var(--muted); }
+.miniaturas .ampliar { display: block; width: 100%; padding: 0; border: 0; background: none; border-radius: 14px; }
+.hilo { display: grid; gap: 12px; }
+.mensaje { display: grid; gap: 8px; background: var(--surface); border-radius: 18px; padding: 16px; box-shadow: var(--shadow); }
+.mensaje .quien { color: var(--muted); font-size: .95rem; }
+.mensaje p { margin: 0; font-size: 1.2rem; line-height: 1.45; }
+.vacio.cerrada { padding: 20px; }
+.foto-completa { border: 0; margin: 0; padding: 16px; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; background: rgba(10, 14, 24, .96); }
+.foto-completa[open] { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 16px; justify-items: center; align-items: center; }
+.foto-completa::backdrop { background: rgba(10, 14, 24, .96); }
+.foto-completa img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px; }
+.foto-completa .boton { min-width: min(320px, 90vw); }
+/* La pastilla «Enviado» comparte clase con la pantalla .enviado de «He
+   cambiado algo» (también en la maqueta), que le metía su padding y su grid. */
+.pill.enviado { display: inline-flex; padding: 0 10px; gap: 0; text-align: left; }

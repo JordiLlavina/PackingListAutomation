@@ -6,6 +6,7 @@
 import { useState, type FormEvent } from 'react';
 import { ErrorApi } from '../comun/api';
 import { useSesion } from '../comun/sesion';
+import { toast } from '../comun/toast';
 
 const RECUERDO = 'modelos-entrada';
 const CIFRAS = 6;
@@ -27,16 +28,6 @@ function recordar(modo: Modo) {
   } catch {
     // Sin almacenamiento (ventana privada): la próxima vez saldrá el login.
   }
-}
-
-/** Mensaje flotante de la maqueta. Va al <body> y no al árbol de React: tiene que seguir a la vista cuando la entrada desaparece al entrar. */
-function toast(texto: string) {
-  const aviso = document.createElement('div');
-  aviso.className = 'toast';
-  aviso.setAttribute('role', 'status');
-  aviso.textContent = texto;
-  document.body.appendChild(aviso);
-  setTimeout(() => aviso.remove(), 2600);
 }
 
 function mensajeDe(error: unknown): string {
