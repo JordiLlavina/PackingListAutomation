@@ -32,9 +32,10 @@ import com.puntotres.packinglist.persistence.ResumenFoto;
  * Se sirven como {@link Resource} para que Spring conteste a las peticiones
  * con {@code Range} (206 y {@code Content-Range}): el {@code <audio>} de
  * Chrome pide la nota de voz a trozos y sin eso no deja saltar ni, a veces,
- * reproducirla. Van {@code inline} con su nombre y con {@code nosniff}: el
- * tipo es el que dijo el navegador al subirlo, y sin {@code nosniff} un
- * documento podría acabar interpretado como otra cosa.
+ * reproducirla. Van con su nombre y con {@code nosniff}, y el tipo es el que
+ * dijo el navegador al subirlo, así que solo se abren {@code inline} los
+ * tipos que el navegador enseña sin ejecutar nada (ver
+ * {@link #seAbreEnLinea}); lo demás se descarga.
  */
 @RestController
 @RequestMapping("/api/adjuntos")
@@ -59,12 +60,35 @@ public class AdjuntosController {
     public ResponseEntity<Resource> descargar(@PathVariable Long id) {
         Adjunto adjunto = adjuntos.conBytes(id).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No hay ningún adjunto con id " + id));
+        MediaType tipo = tipo(adjunto.getMime());
+        boolean enLinea = seAbreEnLinea(tipo);
         return ResponseEntity.ok()
-                .contentType(tipo(adjunto.getMime()))
+                .contentType(enLinea ? tipo : MediaType.APPLICATION_OCTET_STREAM)
                 .header("X-Content-Type-Options", "nosniff")
-                .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(adjunto.getNombre()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        contentDisposition(enLinea ? "inline" : "attachment", adjunto.getNombre()))
                 .header(HttpHeaders.CACHE_CONTROL, CACHE_ADJUNTO)
                 .body(new ByteArrayResource(adjunto.getBytes()));
+    }
+
+    /**
+     * Lo que el navegador enseña sin ejecutar nada: imágenes (menos SVG, que
+     * lleva scripts), audio, vídeo, PDF y texto plano. Lo demás (un
+     * {@code text/html}, un SVG...) se pintaría como una página de la
+     * aplicación, con acceso a su cookie XSRF, y {@code nosniff} no lo evita:
+     * se descarga como binario.
+     */
+    private static boolean seAbreEnLinea(MediaType tipo) {
+        if (tipo.isWildcardType() || tipo.isWildcardSubtype()) {
+            return false;
+        }
+        return switch (tipo.getType()) {
+            case "image" -> !tipo.getSubtype().equals("svg+xml");
+            case "audio", "video" -> true;
+            case "application" -> tipo.getSubtype().equals("pdf");
+            case "text" -> tipo.getSubtype().equals("plain");
+            default -> false;
+        };
     }
 
     /** Copia la foto al modelo de su modificación y contesta con todas las fotos del modelo. */
@@ -84,12 +108,12 @@ public class AdjuntosController {
     }
 
     /**
-     * {@code inline; filename="…"} y, si el nombre no es ASCII, además
-     * {@code filename*=UTF-8''…} (RFC 5987/6266): el {@code filename} lleva
-     * entonces una versión ASCII con {@code _} en lugar de lo demás, para los
-     * clientes que no entienden el otro.
+     * {@code inline; filename="…"} (o {@code attachment}) y, si el nombre no
+     * es ASCII, además {@code filename*=UTF-8''…} (RFC 5987/6266): el
+     * {@code filename} lleva entonces una versión ASCII con {@code _} en lugar
+     * de lo demás, para los clientes que no entienden el otro.
      */
-    private static String contentDisposition(String nombre) {
+    private static String contentDisposition(String como, String nombre) {
         StringBuilder ascii = new StringBuilder();
         boolean soloAscii = true;
         for (int i = 0; i < nombre.length(); i++) {
@@ -104,7 +128,7 @@ public class AdjuntosController {
                 ascii.append(letra);
             }
         }
-        String cabecera = "inline; filename=\"" + ascii + "\"";
+        String cabecera = como + "; filename=\"" + ascii + "\"";
         return soloAscii ? cabecera : cabecera + "; filename*=UTF-8''" + rfc5987(nombre);
     }
 

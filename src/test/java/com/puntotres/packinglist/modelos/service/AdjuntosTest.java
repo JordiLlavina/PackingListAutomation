@@ -57,6 +57,27 @@ class AdjuntosTest {
     private ApplicationEvents eventos;
 
     @Test
+    void unaNotaDeVozQueNoEsAudioSeRechaza() {
+        Long mensajeId = mensaje("AUDIO-MIME");
+        byte[] bytes = "<script>alert(1)</script>".getBytes(StandardCharsets.UTF_8);
+
+        for (String mime : new String[] {"text/html", "image/svg+xml", "application/octet-stream", null}) {
+            IllegalArgumentException noEsAudio = assertThrows(IllegalArgumentException.class,
+                    () -> adjuntos.guardar(mensajeId, new AdjuntoNuevo(TipoAdjunto.AUDIO, "nota.webm", mime, bytes,
+                            5)), String.valueOf(mime));
+            assertEquals("La nota de voz no es un fichero de audio", noEsAudio.getMessage());
+        }
+        assertTrue(adjuntos.deMensajes(List.of(mensajeId)).stream().noneMatch(r -> r.tipo() == TipoAdjunto.AUDIO),
+                "no se ha guardado ninguna");
+
+        // Chrome dice video/webm de una grabación solo de audio, y Safari audio/mp4.
+        assertEquals("video/webm;codecs=opus", adjuntos.guardar(mensajeId, new AdjuntoNuevo(TipoAdjunto.AUDIO,
+                "nota.webm", "video/webm;codecs=opus", bytes, 5)).getMime());
+        assertEquals("AUDIO/MP4", adjuntos.guardar(mensajeId, new AdjuntoNuevo(TipoAdjunto.AUDIO, "nota.m4a",
+                "AUDIO/MP4", bytes, 5)).getMime(), "el tipo se compara sin mirar mayúsculas y se guarda tal cual");
+    }
+
+    @Test
     void unAudioDeMasDeTresMinutosSeRechaza() {
         Long mensajeId = mensaje("AUDIO");
 

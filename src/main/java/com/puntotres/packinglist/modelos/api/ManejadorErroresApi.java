@@ -64,6 +64,8 @@ public class ManejadorErroresApi {
         return respuesta(HttpStatus.FORBIDDEN, "No tienes permiso para esto", error);
     }
 
+    // No corre con multipart: se pasa del límite al leer la petición, antes de elegir controlador, y Tomcat
+    // contesta 413 con el cuerpo vacío. El límite de verdad, con mensaje, es Adjuntos.MAX_BYTES (un 400).
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, String>> demasiadoGrande(MaxUploadSizeExceededException error) {
         return respuesta(HttpStatus.PAYLOAD_TOO_LARGE, "El fichero es demasiado grande", error);

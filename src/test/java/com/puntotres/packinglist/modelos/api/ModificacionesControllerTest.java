@@ -221,6 +221,53 @@ class ModificacionesControllerTest {
     }
 
     @Test
+    void unaNotaDeVozQueNoEsAudioNoEntra() throws Exception {
+        long modeloId = alta("T12-NOAUDIO");
+
+        mvc.perform(nueva(modeloId)
+                        .file(new MockMultipartFile("audio", "nota.html", "text/html",
+                                "<script>alert(1)</script>".getBytes()))
+                        .param("audioDuracionSeg", "5").param("tipoCambio", "PIEL")
+                        .with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("La nota de voz no es un fichero de audio"));
+        mvc.perform(get("/api/modificaciones").param("modelo", String.valueOf(modeloId))
+                        .with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    void unaParteVaciaNoCuentaYElNombreSeQuedaSinRuta() throws Exception {
+        long modeloId = alta("T12-VACIAS");
+        MockMultipartFile sinElegir = new MockMultipartFile("documentos", "", "application/octet-stream",
+                new byte[0]);
+        MockMultipartFile fotoSinElegir = new MockMultipartFile("fotos", "", "application/octet-stream",
+                new byte[0]);
+        MockMultipartFile audioSinElegir = new MockMultipartFile("audio", "", "application/octet-stream",
+                new byte[0]);
+
+        String creada = mvc.perform(nueva(modeloId).file(foto("C:\\fakepath\\foto.png", Color.RED))
+                        .file(fotoSinElegir).file(sinElegir).file(audioSinElegir).param("tipoCambio", "PIEL")
+                        .with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.fotos").value(1))
+                .andExpect(jsonPath("$.audios").value(0))
+                .andExpect(jsonPath("$.documentos").value(0))
+                .andReturn().getResponse().getContentAsString();
+        long id = JSON.readTree(creada).get("id").asLong();
+        mvc.perform(get("/api/modificaciones/" + id).with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$.mensajes[0].adjuntos", hasSize(1)))
+                .andExpect(jsonPath("$.mensajes[0].adjuntos[0].nombre").value("foto.jpg"));
+
+        mvc.perform(multipart("/api/modificaciones/" + id + "/mensajes")
+                        .file(foto("../../otra.png", Color.BLUE)).file(fotoSinElegir)
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.adjuntos", hasSize(1)))
+                .andExpect(jsonPath("$.adjuntos[0].nombre").value("otra.jpg"));
+    }
+
+    @Test
     void elAudioSeSirveConRangos() throws Exception {
         long modeloId = alta("T12-AUDIO");
         String creada = mvc.perform(nueva(modeloId).file(audio()).param("audioDuracionSeg", "5")
@@ -236,6 +283,9 @@ class ModificacionesControllerTest {
                 .andExpect(status().isPartialContent())
                 .andExpect(header().string(HttpHeaders.CONTENT_RANGE, "bytes 0-3/" + AUDIO.length))
                 .andExpect(header().string(HttpHeaders.ACCEPT_RANGES, "bytes"))
+                .andExpect(header().string(HttpHeaders.CONTENT_TYPE, "audio/webm;codecs=opus"))
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"nota.webm\""))
                 .andReturn().getResponse().getContentAsByteArray();
         assertArrayEquals(Arrays.copyOf(AUDIO, 4), trozo);
 
@@ -274,6 +324,31 @@ class ModificacionesControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_PDF))
                 .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename=\"_and_ \\\"1\\\".pdf\"; filename*=UTF-8''%C3%B1and%C3%BA%20%221%22.pdf"));
+
+        // Lo que el navegador pintaría como página o como imagen con scripts se descarga, nunca se abre aquí.
+        for (String peligroso : new String[] {"text/html", "image/svg+xml", "application/xhtml+xml"}) {
+            String conHtml = mvc.perform(nueva(modeloId)
+                            .file(new MockMultipartFile("documentos", "pagina.html", peligroso,
+                                    "<script>alert(1)</script>".getBytes()))
+                            .param("titulo", "Página").param("prioridad", "NORMAL")
+                            .with(comoUsuario(despacho())).with(csrf()))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            long htmlId = primerAdjunto(JSON.readTree(conHtml).get("id").asLong());
+            mvc.perform(get("/api/adjuntos/" + htmlId).with(comoUsuario(taller())))
+                    .andExpect(status().isOk())
+                    .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE))
+                    .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"pagina.html\""))
+                    .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+            mvc.perform(get("/api/adjuntos/" + htmlId).header(HttpHeaders.RANGE, "bytes=0-3")
+                            .with(comoUsuario(taller())))
+                    .andExpect(status().isPartialContent())
+                    .andExpect(header().string(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE))
+                    .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"pagina.html\""))
+                    .andExpect(header().string("X-Content-Type-Options", "nosniff"));
+        }
 
         mvc.perform(get("/api/adjuntos/987654321").with(comoUsuario(taller())))
                 .andExpect(status().isNotFound())

@@ -7,6 +7,7 @@ import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
@@ -32,7 +33,8 @@ import com.puntotres.packinglist.service.corte.ReductorImagen;
  * Una foto se guarda reducida a {@value ReductorImagen#LADO_MAXIMO} px y en
  * JPEG, como las del catálogo, aunque el navegador ya la mande reducida: así
  * la base de datos no depende de lo que haga cada navegador. Una nota de voz y
- * un documento se guardan tal cual llegan. Guardar una nota de voz publica
+ * un documento se guardan tal cual llegan, pero una nota de voz tiene que
+ * decir un tipo de audio. Guardar una nota de voz publica
  * {@link AdjuntoAudioGuardado} para que alguien la transcriba; aquí no se
  * transcribe nada.
  */
@@ -87,10 +89,13 @@ public class Adjuntos {
                 && nuevo.duracionSeg() > MAX_AUDIO_SEG) {
             throw new IllegalArgumentException("La nota de voz no puede pasar de 3 minutos");
         }
+        String mime = mime(nuevo.mime());
+        if (nuevo.tipo() == TipoAdjunto.AUDIO && !esAudio(mime)) {
+            throw new IllegalArgumentException("La nota de voz no es un fichero de audio");
+        }
         if (mensajeId == null || !mensajes.existsById(mensajeId)) {
             throw new NoSuchElementException("No hay ningún mensaje con id " + mensajeId);
         }
-        String mime = mime(nuevo.mime());
         if (nuevo.tipo() == TipoAdjunto.FOTO) {
             bytes = jpegReducido(bytes, nombre);
             nombre = conExtensionJpg(nombre);
@@ -151,6 +156,19 @@ public class Adjuntos {
         } catch (IOException enMemoria) {
             throw new UncheckedIOException("No se ha podido pasar a JPEG la foto " + nombre, enMemoria);
         }
+    }
+
+    /**
+     * Un tipo de audio, o {@code video/webm}, que es lo que dice el
+     * MediaRecorder de Chrome de algunas grabaciones solo de voz. Lo demás no
+     * se admite como nota de voz: se sirve en línea con el tipo que trajo, y
+     * un {@code text/html} se pintaría como una página de la aplicación.
+     */
+    private static boolean esAudio(String mime) {
+        String tipo = mime.toLowerCase(Locale.ROOT);
+        int puntoYComa = tipo.indexOf(';');
+        String sinParametros = (puntoYComa >= 0 ? tipo.substring(0, puntoYComa) : tipo).trim();
+        return sinParametros.startsWith("audio/") || sinParametros.equals("video/webm");
     }
 
     /** El mismo nombre con extensión {@code .jpg}, que es lo que de verdad se guarda. */

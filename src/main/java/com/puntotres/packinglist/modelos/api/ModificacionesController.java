@@ -87,7 +87,7 @@ public class ModificacionesController {
         if (modeloId == null) {
             throw new IllegalArgumentException("Falta el modelo");
         }
-        boolean conDocumentos = documentos != null && !documentos.isEmpty();
+        boolean conDocumentos = !conContenido(documentos).isEmpty();
         boolean esTaller = quien.rol() == Rol.TALLER;
         if (esTaller && conDocumentos) {
             throw new IllegalArgumentException("El taller no adjunta documentos");
@@ -189,9 +189,9 @@ public class ModificacionesController {
     private static List<AdjuntoNuevo> adjuntos(MultipartFile audio, String audioDuracionSeg,
                                                List<MultipartFile> fotos) throws IOException {
         List<AdjuntoNuevo> adjuntos = new ArrayList<>();
-        if (audio != null) {
-            adjuntos.add(new AdjuntoNuevo(TipoAdjunto.AUDIO, audio.getOriginalFilename(), audio.getContentType(),
-                    audio.getBytes(), duracion(audioDuracionSeg)));
+        if (audio != null && !audio.isEmpty()) {
+            adjuntos.add(new AdjuntoNuevo(TipoAdjunto.AUDIO, nombreBase(audio.getOriginalFilename()),
+                    audio.getContentType(), audio.getBytes(), duracion(audioDuracionSeg)));
         }
         adjuntos.addAll(convertir(fotos, TipoAdjunto.FOTO));
         return adjuntos;
@@ -199,11 +199,29 @@ public class ModificacionesController {
 
     private static List<AdjuntoNuevo> convertir(List<MultipartFile> ficheros, TipoAdjunto tipo) throws IOException {
         List<AdjuntoNuevo> nuevos = new ArrayList<>();
-        for (MultipartFile fichero : ficheros == null ? List.<MultipartFile>of() : ficheros) {
-            nuevos.add(new AdjuntoNuevo(tipo, fichero.getOriginalFilename(), fichero.getContentType(),
+        for (MultipartFile fichero : conContenido(ficheros)) {
+            nuevos.add(new AdjuntoNuevo(tipo, nombreBase(fichero.getOriginalFilename()), fichero.getContentType(),
                     fichero.getBytes(), null));
         }
         return nuevos;
+    }
+
+    /**
+     * Sin las partes vacías: un formulario HTML manda una parte de 0 bytes y
+     * sin nombre por cada campo de fichero que no se ha tocado, y eso no es
+     * un adjunto.
+     */
+    private static List<MultipartFile> conContenido(List<MultipartFile> ficheros) {
+        return ficheros == null ? List.of() : ficheros.stream().filter(f -> f != null && !f.isEmpty()).toList();
+    }
+
+    /** El nombre sin la ruta que mandan algunos navegadores ({@code C:\fakepath\x.jpg} → {@code x.jpg}). */
+    private static String nombreBase(String original) {
+        if (original == null) {
+            return null;
+        }
+        int barra = Math.max(original.lastIndexOf('/'), original.lastIndexOf('\\'));
+        return original.substring(barra + 1);
     }
 
     /** Los segundos de la nota de voz; sin ellos (o si no son un entero desde 0) no entra. */
