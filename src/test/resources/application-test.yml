@@ -44,3 +44,13 @@ modelos:
   # mitad de la suite mandaría pushes de las modificaciones de otros tests.
   recordatorios:
     activo: false
+    # Los plazos, fijados aquí y no heredados de application.yml: los tests de
+    # recordatorios cuentan días y horas contra estos números, así que afinar
+    # los del yml de verdad (cada cuánto se insiste al taller o al despacho)
+    # nunca pone la suite en rojo.
+    taller:
+      dias-por-prioridad: { ALTA: 1, NORMAL: 3, BAJA: 7 }
+    despacho:
+      sin-prioridad-horas: 24
+      sin-aplicar-dias: 7
+      respuesta-pendiente-horas: 24
