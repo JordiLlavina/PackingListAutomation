@@ -637,6 +637,26 @@ public record CandidataImagen(String clave, int ancho, int alto, String origen /
 
 ---
 
+### Task 26: Pantalla de administración de despacho (añadida en ejecución)
+
+> Añadida al ejecutar el plan: el spec (§9.3 «Administración») la pedía y ninguna tarea la construía; sin ella la tablet solo se da de alta con `curl`.
+
+**Files:**
+- Create: `frontend/src/despacho/Admin.tsx` (usuarios, dispositivos, código de alta), `frontend/src/comun/admin.ts` (tipos y llamadas a la API de Task 7; funciones puras `estadoDispositivo(d)` → «activo» / «revocado» / «sin usar» y `caducaEn(caduca, ahora)` → «caduca en 9 min», con test)
+- Modify: `frontend/src/App.tsx` (la ruta `/app/admin` deja de ser un hueco; solo ADMIN), `frontend/src/despacho/Shell.tsx` (la pestaña «Admin» solo para ADMIN, ya existe)
+- Modify: `CLAUDE.md` (quitar «la pantalla de administración no existe» de los pendientes y describir la pantalla en una línea), `docs/Modelos/modelos.puntotres.com - guia para el informatico.md` §7 paso 6 (el código lo genera despacho desde «Admin → Usuarios → Código de alta»)
+- Test: `frontend/src/comun/admin.test.ts`
+
+**Interfaces:**
+- Consumes (Task 7): `GET /api/usuarios` `[{id,nombre,login,rol,activo,ultimoAcceso}]`, `POST /api/usuarios {nombre,login,password,rol}`, `PATCH /api/usuarios/{id} {nombre?,rol?,activo?,password?}`, `POST /api/usuarios/{id}/codigo-alta` → `{codigo, caduca}`, `GET /api/dispositivos` `[{id,usuarioId,usuario,nombre,alta,ultimoUso,revocado}]`, `POST /api/dispositivos/{id}/revocar`.
+
+- [ ] **Step 1: Test Vitest** `admin.test.ts`: `estadoDispositivo` → «revocado» si `revocado`, «sin usar» si `ultimoUso` nulo, «activo» si no; `caducaEn` → «caduca en 9 min» / «caducado».
+- [ ] **Step 2: Pantalla** en el estilo de despacho (dos bloques apilados, tabla simple): **Usuarios** — tabla (nombre, login, rol, activo, último acceso), «Dar de alta un usuario» (nombre, login, contraseña, rol), por fila: cambiar rol, activar/desactivar, «Cambiar contraseña» (diálogo), y en los de rol TALLER el botón **«Código de alta para la tablet»** que enseña el código de 6 cifras a tamaño grande con la cuenta atrás de caducidad y el texto «Tecléalo en la tablet en «Soy del taller». Caduca en 10 minutos.»; **Dispositivos** — tabla (usuario, nombre del navegador, alta, último uso, estado) con «Revocar» (confirmación). Errores del servidor con su `mensaje`; vacíos («Todavía no hay dispositivos registrados»).
+- [ ] **Step 3: Verificar** con Chrome sin ventana: alta de un usuario TALLER, generar código, canjearlo en una ventana privada, verlo en Dispositivos, revocarlo → la tablet recibe 401 y vuelve a la entrada. `mvn -q test` en verde.
+- [ ] **Step 4: Commit** `modelos: pantalla de administración (usuarios, dispositivos y código de alta)`.
+
+---
+
 ## Self-review (hecho al escribir el plan)
 
 - **Cobertura del spec**: §6 → Tasks 1–2; §6.3 → 2–3; §7.1 → 9–10; §7.2 → 19; §7.3 → 11–15; §7.4 → 16; §7.5 → 18; §7.6 → 17 (+ polling en 14); §7.7 → 9 (QR) y 20; §7.8 → 21; §7.9 → 22–23; §7.10 → 5–7; §7.11 → regla global y Tasks 13, 16, 17; §8 → 6, 7, 9, 12, 17, 22; §9 → 8, 10, 13, 14, 15, 20, 21; §11 (tests) → cada test nombrado tiene su tarea; §12 piezas → nombres iguales salvo `Usuarios`/`Dispositivos` (igual), `Push` (igual), `ImagenesDePdf` (igual); §13 fases 2–8 → Tasks 1–3, 4–8, 9–10, 11–15, 16–17, 18–23, 24–25. Fase 0 y 1 son del usuario y del informático.
