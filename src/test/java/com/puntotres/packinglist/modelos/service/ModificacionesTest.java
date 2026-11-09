@@ -318,6 +318,50 @@ class ModificacionesTest {
     }
 
     @Test
+    void unaCerradaNoSeVuelveADescartar() {
+        Modificacion descartada = avisoConFoto("REDESCARTE");
+        modificaciones.descartar(descartada.getId(), "Duplicado", despacho());
+        IllegalArgumentException otraVez = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.descartar(descartada.getId(), "Otro motivo", despacho()));
+        assertEquals("La modificación ya está descartada", otraVez.getMessage());
+        assertEquals("Duplicado", modificaciones.detalle(descartada.getId()).motivoDescarte());
+
+        Modificacion hecha = avisoConFoto("REDESCARTE-H");
+        modificaciones.marcarHecha(hecha.getId(), despacho());
+        IllegalArgumentException yaHecha = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.descartar(hecha.getId(), "Tarde", despacho()));
+        assertEquals("La modificación ya está hecha", yaHecha.getMessage());
+        assertEquals(EstadoModificacion.HECHA, estado(hecha));
+    }
+
+    @Test
+    void unaCerradaNoEsperaRespuestaAunqueLaPidiera() {
+        int tallerAntes = modificaciones.resumen(taller()).conRespuesta();
+        Modificacion aviso = avisoConFoto("CERRADA-R");
+        modificaciones.responder(aviso.getId(), "¿Qué piel?", List.of(), despacho());
+        assertEquals(Rol.TALLER, modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
+        assertEquals(tallerAntes + 1, modificaciones.resumen(taller()).conRespuesta());
+
+        modificaciones.descartar(aviso.getId(), "Ya no hace falta", despacho());
+        assertTrue(recargar(aviso).isNecesitaRespuesta(), "descartar no apaga la marca");
+        assertNull(modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
+        assertEquals(tallerAntes, modificaciones.resumen(taller()).conRespuesta());
+
+        int despachoAntes = modificaciones.resumen(despacho()).conRespuesta();
+        Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
+                modelo("CERRADA-O"), null, "Cambiar asa", null, Prioridad.NORMAL, List.of()), despacho());
+        modificaciones.responder(orden.getId(), "¿Qué asa?", List.of(), taller());
+        assertEquals(Rol.DESPACHO, modificaciones.detalle(orden.getId()).resumen().respuestaPendienteDe());
+        assertEquals(despachoAntes + 1, modificaciones.resumen(despacho()).conRespuesta());
+
+        modificaciones.marcarHecha(orden.getId(), taller());
+        assertNull(modificaciones.detalle(orden.getId()).resumen().respuestaPendienteDe());
+        assertTrue(modificaciones.listar(new Modificaciones.Filtro(null, null, null, recargar(orden).getModeloId(),
+                null, null), despacho()).stream().allMatch(r -> r.respuestaPendienteDe() == null));
+        assertEquals(despachoAntes, modificaciones.resumen(despacho()).conRespuesta());
+    }
+
+    @Test
     void elResumenDeDespachoCuentaNuevasYSinPrioridad() {
         ResumenBandeja antes = modificaciones.resumen(despacho());
         ResumenBandeja tallerAntes = modificaciones.resumen(taller());

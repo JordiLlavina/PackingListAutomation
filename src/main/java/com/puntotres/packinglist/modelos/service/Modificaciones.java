@@ -2,6 +2,7 @@ package com.puntotres.packinglist.modelos.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.EnumSet;
@@ -30,6 +31,7 @@ import com.puntotres.packinglist.modelos.api.dto.MensajeVista;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionDetalle;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionResumen;
 import com.puntotres.packinglist.modelos.api.dto.ResumenBandeja;
+import com.puntotres.packinglist.modelos.persistence.Adjunto;
 import com.puntotres.packinglist.modelos.persistence.DestinoAplicacion;
 import com.puntotres.packinglist.modelos.persistence.Direccion;
 import com.puntotres.packinglist.modelos.persistence.EstadoModificacion;
@@ -48,6 +50,7 @@ import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
+import com.puntotres.packinglist.persistence.ResumenFoto;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
 
@@ -333,11 +336,22 @@ public class Modificaciones implements Modelos.FuenteEventos {
         modificacion.marcarHecha(idDe(quien), ahora);
     }
 
-    /** DESCARTADA con su motivo, que es obligatorio; no se borra nada. */
+    /**
+     * DESCARTADA con su motivo, que es obligatorio; no se borra nada. Una que
+     * ya está cerrada (HECHA o DESCARTADA) no se descarta: volver a hacerlo
+     * cambiaría en silencio el motivo, y una hecha ya no tiene nada que
+     * descartar.
+     */
     @Transactional
     public void descartar(Long id, String motivo, UsuarioActual quien) {
         exigirDespacho(quien);
         Modificacion modificacion = modificacionQueExiste(id);
+        if (modificacion.getEstado() == EstadoModificacion.DESCARTADA) {
+            throw new IllegalArgumentException("La modificación ya está descartada");
+        }
+        if (modificacion.getEstado() == EstadoModificacion.HECHA) {
+            throw new IllegalArgumentException("La modificación ya está hecha");
+        }
         if (vacio(motivo)) {
             throw new IllegalArgumentException("Hace falta el motivo");
         }
@@ -360,14 +374,48 @@ public class Modificaciones implements Modelos.FuenteEventos {
     }
 
     /**
+     * Copia la foto de un mensaje a la galería del modelo de su modificación
+     * y devuelve todas las fotos del modelo. La misma foto pasada dos veces
+     * no se duplica; otra que se llame igual (las de la cámara del móvil se
+     * llaman casi todas {@code image.jpg}) entra con {@code " (2)"}, porque
+     * {@link FotosCatalogo#guardar(Long, String, byte[])} con un nombre que ya
+     * está devuelve la que había y no guarda nada.
+     */
+    @Transactional
+    public List<ResumenFoto> fotoAGaleria(Long adjuntoId, UsuarioActual quien) {
+        exigirDespacho(quien);
+        Adjunto adjunto = adjuntos.conBytes(adjuntoId)
+                .orElseThrow(() -> new NoSuchElementException("No hay ningún adjunto con id " + adjuntoId));
+        if (adjunto.getTipo() != TipoAdjunto.FOTO) {
+            throw new IllegalArgumentException("Solo se puede pasar una foto a la galería");
+        }
+        Long modificacionId = mensajes.findById(adjunto.getMensajeId()).map(Mensaje::getModificacionId)
+                .orElseThrow(() -> new NoSuchElementException("No hay ningún mensaje con id "
+                        + adjunto.getMensajeId()));
+        Long modeloId = modificacionQueExiste(modificacionId).getModeloId();
+        List<ResumenFoto> delModelo = fotos.de(modeloId);
+        Set<String> usados = new HashSet<>();
+        for (ResumenFoto existente : delModelo) {
+            usados.add(existente.nombreFichero().toLowerCase(Locale.ROOT));
+            if (mismoNombreQuizaNumerado(existente.nombreFichero(), adjunto.getNombre())
+                    && fotos.conBytes(existente.id()).map(foto -> Arrays.equals(foto.getJpeg(), adjunto.getBytes()))
+                    .orElse(false)) {
+                return delModelo;
+            }
+        }
+        fotos.guardar(modeloId, Modelos.nombreLibre(adjunto.getNombre(), usados), adjunto.getBytes());
+        return fotos.de(modeloId);
+    }
+
+    /**
      * Los números de la bandeja de quien la mira.
      * <ul>
      * <li>TALLER: nuevas = órdenes NUEVAS; pendientes = órdenes NUEVA, VISTA o
-     * EN_CURSO; conRespuesta = avisos suyos con respuesta del despacho
-     * pendiente de contestar.</li>
+     * EN_CURSO; conRespuesta = avisos suyos abiertos con respuesta del
+     * despacho pendiente de contestar.</li>
      * <li>DESPACHO: nuevas = avisos NUEVOS; sinPrioridad = avisos abiertos sin
      * prioridad; pendientes = avisos NUEVA, VISTA o EN_CURSO; conRespuesta =
-     * órdenes con una duda del taller pendiente de contestar.</li>
+     * órdenes abiertas con una duda del taller pendiente de contestar.</li>
      * </ul>
      */
     @Transactional(readOnly = true)
@@ -464,8 +512,13 @@ public class Modificaciones implements Modelos.FuenteEventos {
         return mensaje;
     }
 
-    /** Cuántas de esas modificaciones esperan respuesta de ese lado; una consulta para todas. */
-    private int esperandoA(List<Modificacion> conRespuesta, Rol lado) {
+    /**
+     * Cuántas de esas modificaciones, de las abiertas, esperan respuesta de
+     * ese lado; una consulta para todas. Una cerrada no cuenta aunque tenga la
+     * marca encendida, igual que en {@code respuestaPendienteDe}.
+     */
+    private int esperandoA(List<Modificacion> candidatas, Rol lado) {
+        List<Modificacion> conRespuesta = candidatas.stream().filter(m -> !m.getEstado().cerrada()).toList();
         if (conRespuesta.isEmpty()) {
             return 0;
         }
@@ -594,7 +647,9 @@ public class Modificaciones implements Modelos.FuenteEventos {
                 }
             }
             Rol pendiente = null;
-            if (m.isNecesitaRespuesta() && !suyos.isEmpty()) {
+            // Una cerrada no espera a nadie, aunque la marca siga encendida
+            // (se puede escribir en una descartada sin reabrirla).
+            if (m.isNecesitaRespuesta() && !m.getEstado().cerrada() && !suyos.isEmpty()) {
                 Usuario autor = usuarios.get(suyos.get(suyos.size() - 1).getAutorId());
                 pendiente = autor == null ? null : ladoContrario(autor.getRol());
             }
@@ -713,6 +768,25 @@ public class Modificaciones implements Modelos.FuenteEventos {
 
     private static List<Long> ids(List<Modificacion> lista) {
         return lista.stream().map(Modificacion::getId).toList();
+    }
+
+    /**
+     * {@code existente} es {@code nombre} tal cual o con un {@code " (n)"}
+     * delante de la extensión (lo que pone {@link Modelos#nombreLibre}), sin
+     * mirar mayúsculas.
+     */
+    private static boolean mismoNombreQuizaNumerado(String existente, String nombre) {
+        String elExistente = existente.toLowerCase(Locale.ROOT);
+        String elNombre = nombre.toLowerCase(Locale.ROOT);
+        int punto = elNombre.lastIndexOf('.');
+        String base = punto > 0 ? elNombre.substring(0, punto) : elNombre;
+        String extension = punto > 0 ? elNombre.substring(punto) : "";
+        if (elExistente.length() < base.length() + extension.length() || !elExistente.startsWith(base)
+                || !elExistente.endsWith(extension)) {
+            return false;
+        }
+        String enMedio = elExistente.substring(base.length(), elExistente.length() - extension.length());
+        return enMedio.isEmpty() || enMedio.matches(" \\(\\d+\\)");
     }
 
     private static boolean contieneEn(String campo, String texto) {

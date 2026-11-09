@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.modelos.api;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -8,11 +9,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 
 /**
  * Los errores de la API de modelos, siempre como {@code {"mensaje": ...}}: la
@@ -32,6 +37,21 @@ public class ManejadorErroresApi {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> datoQueNoVale(IllegalArgumentException error) {
         return respuesta(HttpStatus.BAD_REQUEST, error.getMessage(), error);
+    }
+
+    /** Un parámetro de la URL que no se deja convertir: casi siempre un valor de un desplegable que no existe. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, String>> parametroQueNoVale(MethodArgumentTypeMismatchException error) {
+        return respuesta(HttpStatus.BAD_REQUEST, "Valor no válido: " + texto(error.getValue()), error);
+    }
+
+    /** Un cuerpo JSON que no se entiende o con un valor que no existe ({@code "prioridad": "URGENTE"}). */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<Map<String, String>> cuerpoQueNoVale(HttpMessageNotReadableException error) {
+        String mensaje = error.getCause() instanceof InvalidFormatException formato
+                ? "Valor no válido: " + texto(formato.getValue())
+                : "Valor no válido: no se entiende lo que se ha enviado";
+        return respuesta(HttpStatus.BAD_REQUEST, mensaje, error);
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -61,6 +81,12 @@ public class ManejadorErroresApi {
             LOG.warn("Error {} en la API de modelos: {}", estado.value(), texto, error);
         }
         return ResponseEntity.status(estado).body(Map.of("mensaje", texto));
+    }
+
+    /** El valor tal como llegó; un parámetro repetido llega como array. */
+    private static String texto(Object valor) {
+        return valor instanceof Object[] varios ? String.join(", ", Arrays.stream(varios).map(String::valueOf)
+                .toList()) : String.valueOf(valor);
     }
 
     private static String textoPorDefecto(HttpStatusCode estado) {
