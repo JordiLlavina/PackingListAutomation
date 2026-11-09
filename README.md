@@ -244,7 +244,7 @@ La app de modelos y modificaciones (bloque `modelos` del yml) lee las suyas, tod
 
 - `MODELOS_URL_PUBLICA` — dirección pública con la que se llega a la app (la del QR de cada modelo).
 - `MODELOS_ADMIN_PASSWORD` — contraseña del administrador.
-- `MODELOS_VAPID_PUBLIC` / `MODELOS_VAPID_PRIVATE` — claves VAPID del Web Push; sin las dos no hay avisos al móvil.
+- `MODELOS_VAPID_PUBLIC` / `MODELOS_VAPID_PRIVATE` — claves VAPID del Web Push; sin las dos no hay avisos al móvil. Se generan una vez por instalación (cambiarlas deja sin avisos a todos los navegadores suscritos hasta que los vuelvan a activar) con `mvn -q test-compile exec:java -Dskip.frontend=true -Dexec.classpathScope=test -Dexec.mainClass=com.puntotres.packinglist.modelos.GenerarClavesVapid`, que escribe las dos líneas listas para copiar.
 - `MODELOS_VAPID_ASUNTO` — el `mailto:` que acompaña a las claves VAPID.
 - `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` — transcripción de las notas de voz (la región por defecto es `westeurope`).
 

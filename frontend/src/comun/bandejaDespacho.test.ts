@@ -96,6 +96,7 @@ function resumen(extra: Partial<ModificacionResumen>): ModificacionResumen {
     audios: 1,
     documentos: 0,
     duracionAudioSeg: 12,
+    ultimoMensajeDe: 'TALLER',
     ...extra,
   };
 }

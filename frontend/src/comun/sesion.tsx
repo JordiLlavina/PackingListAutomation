@@ -4,6 +4,7 @@
 // dispositivo; despacho entra con usuario y contraseña.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api, SESION_CADUCADA } from './api';
+import { desactivarPush } from './push';
 
 export type Sesion = { id: number; nombre: string; rol: 'TALLER' | 'DESPACHO' | 'ADMIN'; dispositivo: boolean };
 
@@ -54,6 +55,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   const salir = useCallback(async () => {
+    // Antes de cerrar la sesión (la baja la necesita): en un PC compartido, los avisos no siguen llegando a quien sale.
+    await desactivarPush();
     try {
       await api<void>('/api/sesion', { method: 'DELETE' });
     } finally {

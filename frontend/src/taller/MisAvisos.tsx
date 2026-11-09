@@ -1,15 +1,15 @@
 // «Mis avisos»: lo que el taller ha mandado a despacho y en qué punto está
-// (enviado, visto, hecho), el último primero. Si despacho ha contestado y le
-// toca al taller, la respuesta sale dentro de la tarjeta con su nota de voz y
-// un botón para contestar.
+// (enviado, visto, hecho), el último primero. Si lo último que se ha dicho en
+// un aviso es de despacho, sale dentro de la tarjeta con su nota de voz y un
+// botón para contestar; también en un aviso ya cerrado, que es donde despacho
+// explica por qué lo ha descartado.
 //
 // Son todos los avisos del taller y no solo los de quien mira: hay una sola
 // cuenta de taller (la tablet), así que la API ya los da todos.
 //
 // La lista no trae los mensajes. Para no pedir el detalle de cada tarjeta,
-// solo se pide el de los avisos con una respuesta de despacho pendiente
-// (respuestaPendienteDe = TALLER), que son pocos: en esos el último mensaje
-// es de despacho, y es el que se enseña. De la nota de voz del aviso, la
+// solo se pide el de los avisos cuyo último mensaje es de despacho
+// (ultimoMensajeDe = DESPACHO), que son pocos. De la nota de voz del aviso, la
 // lista ya dice cuánto dura (duracionAudioSeg).
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -28,11 +28,11 @@ import {
 import { hace } from '../comun/tiempo';
 import { useBandeja } from '../comun/useBandeja';
 
-/** El último mensaje de cada aviso que espera respuesta del taller, si es de despacho. */
+/** El último mensaje de cada aviso cuyo último mensaje es de despacho (también en los cerrados). */
 type Respuestas = Record<number, MensajeVista>;
 
 async function respuestasDe(avisos: ModificacionResumen[]): Promise<Respuestas> {
-  const esperando = avisos.filter((a) => a.respuestaPendienteDe === 'TALLER');
+  const esperando = avisos.filter((a) => a.ultimoMensajeDe === 'DESPACHO');
   const detalles = await Promise.allSettled(esperando.map((a) => api<ModificacionDetalle>(`/api/modificaciones/${a.id}`)));
   const respuestas: Respuestas = {};
   for (const d of detalles) {

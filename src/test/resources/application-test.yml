@@ -29,3 +29,13 @@ spring:
 modelos:
   azure-speech:
     clave: ""
+  # Ni el resumen de Claude aunque la máquina tenga ANTHROPIC_API_KEY: ningún
+  # contexto de test puede construir el resumidor de verdad
+  # (TranscripcionConfig).
+  resumen-ia:
+    activo: false
+  # Ni Web Push aunque la máquina tenga MODELOS_VAPID_*: los avisos al móvil
+  # quedan apagados (EnviadorPushDesactivado); PushTest pone uno falso.
+  push:
+    vapid-public: ""
+    vapid-private: ""

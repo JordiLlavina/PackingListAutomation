@@ -2,8 +2,10 @@
 // pestañas, quién ha entrado y «Salir»; debajo, la pantalla. La pestaña Admin
 // solo la ve el rol ADMIN. El marco lleva también la consulta de la bandeja
 // (useBandeja, la misma del taller): la pepita de «Bandeja» y los contadores
-// de la bandeja leen de ella, y las acciones la vuelven a pedir.
+// de la bandeja leen de ella, y las acciones la vuelven a pedir. Encima de la
+// pantalla, mientras no se hayan activado, la barra para activar los avisos.
 import { Link, Outlet, useLocation } from 'react-router';
+import ActivarAvisos from '../comun/ActivarAvisos';
 import { Icono } from '../comun/iconos';
 import { numeroBandejaDespacho } from '../comun/modificaciones';
 import { useSesion } from '../comun/sesion';
@@ -50,6 +52,7 @@ function Marco() {
         </div>
       </header>
       <main>
+        <ActivarAvisos compacta motivo="Para enterarte cuando el taller avise de un cambio" />
         <Outlet />
       </main>
     </div>

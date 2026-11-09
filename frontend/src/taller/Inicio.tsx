@@ -1,6 +1,8 @@
 // Inicio del taller: el saludo, las dos cosas que se vienen a hacer (mirar lo
-// que pide despacho y avisar de un cambio) y, debajo, los modelos.
+// que pide despacho y avisar de un cambio) y, debajo, los modelos. Arriba, la
+// primera vez, la tarjeta para activar los avisos al móvil.
 import { useNavigate } from 'react-router';
+import ActivarAvisos from '../comun/ActivarAvisos';
 import { Icono } from '../comun/iconos';
 import { useSesion } from '../comun/sesion';
 import { useBandeja } from '../comun/useBandeja';
@@ -17,6 +19,7 @@ export default function Inicio() {
     <>
       <h2 className="saludo">Hola, {sesion?.nombre}</h2>
       <p className="sub">{nuevas ? `Tienes ${nuevas} ${nuevas === 1 ? 'orden nueva' : 'órdenes nuevas'} de despacho.` : 'No tienes nada pendiente.'}</p>
+      <ActivarAvisos motivo="Para que suene cuando despacho mande una orden" />
       <div className="losas">
         <button className="losa" type="button" onClick={() => navegar('/ordenes')}>
           <span className={nuevas ? 'badge' : 'badge cero'}>{nuevas}</span>

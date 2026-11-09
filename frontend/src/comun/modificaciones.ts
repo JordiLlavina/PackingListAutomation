@@ -49,6 +49,8 @@ export type ModificacionResumen = {
   documentos: number;
   /** Cuánto dura la nota de voz del primer mensaje (el cuerpo); null si no lleva. */
   duracionAudioSeg: number | null;
+  /** De qué lado es el último mensaje (TALLER o DESPACHO), también en una cerrada; null si no hay ninguno. */
+  ultimoMensajeDe: 'TALLER' | 'DESPACHO' | null;
 };
 
 /** Un adjunto de un mensaje, sin sus bytes (van en adjuntoUrl). */

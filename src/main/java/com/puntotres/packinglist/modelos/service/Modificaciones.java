@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -106,11 +107,12 @@ public class Modificaciones implements Modelos.FuenteEventos {
     private final CatalogoModelos catalogo;
     private final FotosCatalogo fotos;
     private final ModelosProperties props;
+    private final ApplicationEventPublisher eventos;
 
     public Modificaciones(ModificacionRepository repositorio, ModificacionDestinoRepository destinos,
                           MensajeRepository mensajes, Adjuntos adjuntos, UsuarioRepository usuarios,
                           ModeloRepository modelos, CatalogoModelos catalogo, FotosCatalogo fotos,
-                          ModelosProperties props) {
+                          ModelosProperties props, ApplicationEventPublisher eventos) {
         this.repositorio = repositorio;
         this.destinos = destinos;
         this.mensajes = mensajes;
@@ -120,6 +122,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
         this.catalogo = catalogo;
         this.fotos = fotos;
         this.props = props;
+        this.eventos = eventos;
     }
 
     /** Lo que manda el taller: el modelo, el tipo de cambio (clave del yml) y sus fotos y notas de voz. */
@@ -160,7 +163,8 @@ public class Modificaciones implements Modelos.FuenteEventos {
             destinos.save(new ModificacionDestino(modificacion.getId(), destino));
         }
         guardarMensaje(modificacion.getId(), "", nuevos, quien, ahora);
-        // Aquí se engancha el push al despacho (tarea 17).
+        // El push al despacho sale cuando se confirma la transacción (Push).
+        eventos.publishEvent(new ModificacionCreada(modificacion.getId(), Direccion.TALLER_A_DESPACHO, idDe(quien)));
         return modificacion;
     }
 
@@ -186,7 +190,8 @@ public class Modificaciones implements Modelos.FuenteEventos {
                 tipoCambio, orden.prioridad(), titulo, idDe(quien), ahora));
         guardarMensaje(modificacion.getId(), vacio(orden.texto()) ? "" : orden.texto().trim(),
                 sinNulos(orden.adjuntos()), quien, ahora);
-        // Aquí se engancha el push al taller (tarea 17).
+        // El push al taller sale cuando se confirma la transacción (Push).
+        eventos.publishEvent(new ModificacionCreada(modificacion.getId(), Direccion.DESPACHO_A_TALLER, idDe(quien)));
         return modificacion;
     }
 
@@ -387,7 +392,8 @@ public class Modificaciones implements Modelos.FuenteEventos {
         }
         Mensaje mensaje = guardarMensaje(id, limpio, nuevos, quien, LocalDateTime.now());
         modificacion.pedirRespuesta();
-        // Aquí se engancha el push de la respuesta al otro lado (tarea 17).
+        // El push al otro lado sale cuando se confirma la transacción (Push), también en una cerrada.
+        eventos.publishEvent(new MensajeRespondido(id, quien == null ? null : quien.rol()));
         return mensaje;
     }
 
@@ -664,6 +670,10 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     }
                 }
             }
+            // De qué lado es el último mensaje: el taller enseña la última palabra del despacho
+            // también en un aviso cerrado (por qué se descartó).
+            Usuario autorUltimo = suyos.isEmpty() ? null : usuarios.get(suyos.get(suyos.size() - 1).getAutorId());
+            Rol ultimoMensajeDe = autorUltimo == null ? null : ladoDe(autorUltimo.getRol());
             Rol pendiente = null;
             // Una cerrada no espera a nadie, aunque la marca siga encendida
             // (se puede escribir en una descartada sin reabrirla).
@@ -688,7 +698,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     m.getDireccion(), m.getTipoCambio(), tipoCambioTexto(m.getTipoCambio()), m.getPrioridad(),
                     m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
                     m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()), pendiente, vencida, estados,
-                    numeroFotos, audios, documentos, duracionAudio);
+                    numeroFotos, audios, documentos, duracionAudio, ultimoMensajeDe);
         }
 
         private String nombre(Long usuarioId) {
@@ -754,6 +764,14 @@ public class Modificaciones implements Modelos.FuenteEventos {
             return false;
         }
         return m.esAviso() ? quien.esDespacho() : quien.rol() == Rol.TALLER;
+    }
+
+    /** TALLER o DESPACHO: un ADMIN habla por el despacho. */
+    private static Rol ladoDe(Rol rol) {
+        if (rol == null) {
+            return null;
+        }
+        return rol.esDespacho() ? Rol.DESPACHO : Rol.TALLER;
     }
 
     private static Rol ladoContrario(Rol autor) {

@@ -343,13 +343,18 @@ class ModificacionesTest {
     void unaCerradaNoEsperaRespuestaAunqueLaPidiera() {
         int tallerAntes = modificaciones.resumen(taller()).conRespuesta();
         Modificacion aviso = avisoConFoto("CERRADA-R");
+        assertEquals(Rol.TALLER, modificaciones.detalle(aviso.getId()).resumen().ultimoMensajeDe(),
+                "el cuerpo del aviso es el primer mensaje, del taller");
         modificaciones.responder(aviso.getId(), "¿Qué piel?", List.of(), despacho());
         assertEquals(Rol.TALLER, modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
+        assertEquals(Rol.DESPACHO, modificaciones.detalle(aviso.getId()).resumen().ultimoMensajeDe());
         assertEquals(tallerAntes + 1, modificaciones.resumen(taller()).conRespuesta());
 
         modificaciones.descartar(aviso.getId(), "Ya no hace falta", despacho());
         assertTrue(recargar(aviso).isNecesitaRespuesta(), "descartar no apaga la marca");
         assertNull(modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
+        assertEquals(Rol.DESPACHO, modificaciones.detalle(aviso.getId()).resumen().ultimoMensajeDe(),
+                "en una cerrada se sigue sabiendo quién habló el último: el taller enseña la respuesta");
         assertEquals(tallerAntes, modificaciones.resumen(taller()).conRespuesta());
 
         int despachoAntes = modificaciones.resumen(despacho()).conRespuesta();

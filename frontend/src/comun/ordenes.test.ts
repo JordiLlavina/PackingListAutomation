@@ -37,6 +37,7 @@ function orden(estado: EstadoModificacion, prioridad: Prioridad | null, creadaEn
     audios: 0,
     documentos: 0,
     duracionAudioSeg: null,
+    ultimoMensajeDe: null,
     ...extra,
   };
 }
