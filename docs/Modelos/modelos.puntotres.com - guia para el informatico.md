@@ -161,10 +161,13 @@ del navegador). Pasos, una vez por dispositivo:
    «Sin restricciones», para que las notificaciones lleguen con la pantalla
    apagada.
 5. Volumen de notificaciones activo (la orden nueva suena y vibra).
-6. La primera vez, la app pide un **código de alta de 6 cifras** (vale 10
-   minutos) que genera el administrador de la aplicación (Jordi); después ya no
-   vuelve a pedir nada en esa tablet durante un año. Si se pierde o se cambia
-   la tablet, se le revoca el alta y se da de alta la nueva.
+6. La primera vez, en la tablet se toca **«Soy del taller»** y se teclea un
+   **código de alta de 6 cifras** (vale 10 minutos). Lo genera el
+   administrador de la aplicación (Jordi) desde un PC de despacho, en la
+   pestaña **«Admin» → Usuarios → «Código de alta para la tablet»** en la fila
+   del usuario del taller; después ya no vuelve a pedir nada en esa tablet
+   durante un año. Si se pierde o se cambia la tablet, se revoca en
+   «Admin» → Dispositivos → «Revocar» y se da de alta la nueva con otro código.
 7. Recomendable: un soporte y el cargador fijos en el puesto de Bachir, y
    bloqueo de pantalla sencillo (la app no guarda contraseñas, pero la tablet
    abre la app sin preguntar).

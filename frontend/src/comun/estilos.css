@@ -516,3 +516,30 @@ a.boton { text-decoration: none; color: var(--fg); }
 /* Escáner: el vídeo llena el recuadro y el marco queda por encima. */
 .escaner { width: 100%; }
 .escaner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- Administración (Task 26): usuarios, dispositivos y código de alta ----------
+   Dos bloques apilados con una tabla sencilla cada uno: cabecera gris, filetes
+   finos entre filas y los botones de cada fila a la medida de la tabla. Lo
+   inactivo o revocado, en gris. El código de alta, grande y espaciado para
+   leerlo de un vistazo y teclearlo en la tablet. */
+.admin { display: grid; gap: 32px; max-width: 1100px; }
+.admin section { display: grid; gap: 4px; }
+.admin .fila-titulo { margin-top: 0; }
+.admin > section > .ayuda, .admin > section > .error { margin: 0; }
+.solo-lector { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.marco-tabla { overflow-x: auto; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); }
+.tabla-admin { width: 100%; border-collapse: collapse; }
+.tabla-admin th { text-align: left; font-weight: 700; font-size: .9em; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tabla-admin td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tabla-admin tbody tr:last-child td { border-bottom: 0; }
+.tabla-admin tr.apagado td { color: var(--muted); }
+.tabla-admin .acciones-fila { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.tabla-admin .boton { min-height: 34px; padding: 0 10px; font-size: .9em; border-radius: 10px; border-width: 1px; white-space: nowrap; }
+.tabla-admin select { font: inherit; color: var(--fg); background: var(--surface); min-height: 34px; padding: 0 6px; border: 1px solid var(--line); border-radius: 8px; }
+.tabla-admin select:disabled, .tabla-admin .boton:disabled { opacity: .5; cursor: not-allowed; }
+.estado-dispositivo[data-estado="activo"] { color: var(--ok); font-weight: 700; }
+.estado-dispositivo[data-estado="revocado"] { color: var(--alta); }
+.codigo-alta { margin: 4px 0; font-size: 3rem; font-weight: 700; letter-spacing: .25em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.codigo-alta[data-caducado] { color: var(--muted); text-decoration: line-through; }
+.admin .dialogo p { margin: 0; }
+.admin .cuenta-atras { font-weight: 700; }

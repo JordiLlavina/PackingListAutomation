@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { useSesion, type Sesion } from './comun/sesion';
+import AdminDespacho from './despacho/Admin';
 import ShellDespacho from './despacho/Shell';
 import BandejaDespacho from './despacho/Bandeja';
 import EtiquetasPatrones from './despacho/EtiquetasPatrones';
@@ -27,15 +28,6 @@ import Revisar from './taller/cambio/Revisar';
 import FichaModeloTaller from './taller/FichaModelo';
 import InicioTaller from './taller/Inicio';
 import ModelosTaller from './taller/Modelos';
-
-/** Hueco de una pantalla que todavía no está hecha: la ruta ya existe para que los enlaces no reboten al inicio. */
-function PorLlegar() {
-  return (
-    <div className="vacio">
-      <b>Esta pantalla llega en una próxima entrega</b>
-    </div>
-  );
-}
 
 function pantalla(datos: Pantalla): { handle: Pantalla } {
   return { handle: datos };
@@ -95,7 +87,8 @@ function rutasDespacho(esAdmin: boolean): RouteObject[] {
         { path: 'bandeja/:id?', element: <BandejaDespacho /> },
         // Opcional: con el id se abre su ficha a la derecha sin volver a montar la lista.
         { path: 'modelos/:id?', element: <ModelosDespacho /> },
-        ...(esAdmin ? [{ path: 'admin', element: <PorLlegar /> }] : []),
+        // Solo el admin: a cualquier otro rol la dirección le devuelve a la bandeja.
+        { path: 'admin', element: esAdmin ? <AdminDespacho /> : <Navigate to="/bandeja" replace /> },
         { path: '*', element: <Navigate to="/" replace /> },
       ],
     },
