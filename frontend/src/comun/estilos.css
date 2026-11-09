@@ -389,6 +389,8 @@ a.boton { text-decoration: none; color: var(--fg); }
 .despacho .pill { height: 1.75em; font-size: .8em; }
 .pill.en-curso { background: color-mix(in oklab, var(--normal) 22%, var(--surface)); color: var(--fg); }
 .pill.descartada { background: var(--line); color: var(--muted); }
+/* Fuera de plazo (los recordatorios): ámbar de aviso, con letra oscura para que se lea. */
+.pill.vencida { background: var(--normal); color: #16213a; }
 
 /* El chip «IA»: lo que ha escrito la IA (un título, un resumen) se dice. */
 .chip-ia { display: inline-flex; align-items: center; margin-left: .45em; padding: 0 .4em; height: 1.45em; border-radius: 5px; border: 1px solid var(--new);

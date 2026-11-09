@@ -4,6 +4,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Arranque de Spring Boot. Todavía no expone nada (sin web): sirve para
@@ -13,6 +14,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 // Sin el usuario por defecto de Spring Security (y su contraseña en el log): los usuarios son los de la app de modelos.
 @SpringBootApplication(exclude = UserDetailsServiceAutoConfiguration.class)
 @ConfigurationPropertiesScan
+// Las tareas programadas: los recordatorios anti-olvido de la app de modelos, cada hora.
+@EnableScheduling
 public class PackingListApplication {
 
     public static void main(String[] args) {

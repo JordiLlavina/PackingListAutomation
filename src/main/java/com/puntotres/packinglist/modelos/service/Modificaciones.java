@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.modelos.service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -108,11 +109,14 @@ public class Modificaciones implements Modelos.FuenteEventos {
     private final FotosCatalogo fotos;
     private final ModelosProperties props;
     private final ApplicationEventPublisher eventos;
+    private final Recordatorios recordatorios;
+    private final Clock reloj;
 
     public Modificaciones(ModificacionRepository repositorio, ModificacionDestinoRepository destinos,
                           MensajeRepository mensajes, Adjuntos adjuntos, UsuarioRepository usuarios,
                           ModeloRepository modelos, CatalogoModelos catalogo, FotosCatalogo fotos,
-                          ModelosProperties props, ApplicationEventPublisher eventos) {
+                          ModelosProperties props, ApplicationEventPublisher eventos, Recordatorios recordatorios,
+                          Clock reloj) {
         this.repositorio = repositorio;
         this.destinos = destinos;
         this.mensajes = mensajes;
@@ -123,6 +127,8 @@ public class Modificaciones implements Modelos.FuenteEventos {
         this.fotos = fotos;
         this.props = props;
         this.eventos = eventos;
+        this.recordatorios = recordatorios;
+        this.reloj = reloj;
     }
 
     /** Lo que manda el taller: el modelo, el tipo de cambio (clave del yml) y sus fotos y notas de voz. */
@@ -436,10 +442,12 @@ public class Modificaciones implements Modelos.FuenteEventos {
      * <ul>
      * <li>TALLER: nuevas = órdenes NUEVAS; pendientes = órdenes NUEVA, VISTA o
      * EN_CURSO; conRespuesta = avisos suyos abiertos con respuesta del
-     * despacho pendiente de contestar.</li>
+     * despacho pendiente de contestar; vencidas = órdenes abiertas que van
+     * tarde ({@link Recordatorios#vencida}).</li>
      * <li>DESPACHO: nuevas = avisos NUEVOS; sinPrioridad = avisos abiertos sin
      * prioridad; pendientes = avisos NUEVA, VISTA o EN_CURSO; conRespuesta =
-     * órdenes abiertas con una duda del taller pendiente de contestar.</li>
+     * órdenes abiertas con una duda del taller pendiente de contestar;
+     * vencidas = avisos abiertos que van tarde.</li>
      * </ul>
      */
     @Transactional(readOnly = true)
@@ -447,9 +455,9 @@ public class Modificaciones implements Modelos.FuenteEventos {
         if (quien == null || quien.rol() == null) {
             return new ResumenBandeja(0, 0, 0, 0, 0);
         }
-        int vencidas = 0; // Las vencidas llegan con los recordatorios (tarea 18).
         if (quien.esDespacho()) {
             Direccion avisos = Direccion.TALLER_A_DESPACHO;
+            int vencidas = vencidas(avisos);
             int nuevas = (int) repositorio.countByDireccionAndEstadoIn(avisos, EnumSet.of(EstadoModificacion.NUEVA));
             int sinPrioridad = (int) repositorio.countByDireccionAndPrioridadIsNullAndEstadoIn(avisos, ABIERTAS);
             int pendientes = (int) repositorio.countByDireccionAndEstadoIn(avisos, ABIERTAS);
@@ -458,6 +466,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
             return new ResumenBandeja(nuevas, pendientes, vencidas, conRespuesta, sinPrioridad);
         }
         Direccion ordenes = Direccion.DESPACHO_A_TALLER;
+        int vencidas = vencidas(ordenes);
         int nuevas = (int) repositorio.countByDireccionAndEstadoIn(ordenes, EnumSet.of(EstadoModificacion.NUEVA));
         int pendientes = (int) repositorio.countByDireccionAndEstadoIn(ordenes, ABIERTAS);
         int conRespuesta = esperandoA(repositorio.findByDireccionAndNecesitaRespuestaTrueAndCreadaPor(
@@ -534,6 +543,14 @@ public class Modificaciones implements Modelos.FuenteEventos {
             adjuntos.guardar(mensaje.getId(), nuevo);
         }
         return mensaje;
+    }
+
+    /** Cuántas abiertas de esa dirección van tarde ({@link Recordatorios#vencida}), a la hora del reloj. */
+    private int vencidas(Direccion direccion) {
+        LocalDateTime ahora = LocalDateTime.now(reloj);
+        return (int) repositorio.findByDireccionAndEstadoIn(direccion, ABIERTAS).stream()
+                .filter(m -> recordatorios.vencida(m, ahora))
+                .count();
     }
 
     /**
@@ -691,7 +708,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     .findFirst()
                     .map(ResumenAdjunto::duracionSeg)
                     .orElse(null);
-            boolean vencida = false; // Las vencidas llegan con los recordatorios (tarea 18).
+            boolean vencida = recordatorios.vencida(m, LocalDateTime.now(reloj));
             return new ModificacionResumen(m.getId(), m.getModeloId(),
                     modelo == null ? null : modelo.nombreVisible(), modelo == null ? null : modelo.getNombre(),
                     modelo == null ? null : modelo.getCliente(), fotosPrincipales.get(m.getModeloId()),

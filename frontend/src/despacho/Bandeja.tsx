@@ -79,6 +79,7 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
                 })}
               </span>
             )}
+            {m.vencida && <span className="pill vencida">Vencida</span>}
             {m.respuestaPendienteDe === 'DESPACHO' && <span className="etiqueta espera">Te toca responder</span>}
           </span>
         </span>
@@ -167,7 +168,7 @@ export default function Bandeja() {
     ? [
         { clase: 'nuevo', numero: resumen.nuevas, texto: 'nuevas', title: 'Avisos del taller que nadie ha abierto todavía' },
         { clase: '', numero: resumen.pendientes, texto: 'pendientes', title: 'Avisos del taller sin acabar (nuevos, vistos o en curso)' },
-        { clase: 'vencido', numero: resumen.vencidas, texto: 'vencidas', title: 'Fuera de plazo' },
+        { clase: 'vencido', numero: resumen.vencidas, texto: 'vencidas', title: 'Avisos del taller fuera de plazo: sin prioridad o sin aplicar' },
         { clase: 'con-respuesta', numero: resumen.conRespuesta, texto: 'con respuesta', title: 'Órdenes con una duda del taller por contestar' },
       ]
     : [];

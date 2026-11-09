@@ -39,3 +39,8 @@ modelos:
   push:
     vapid-public: ""
     vapid-private: ""
+  # Ni la revisión de los recordatorios de cada hora: RecordatoriosTest llama a
+  # revisar(ahora) con la hora que le conviene, y una revisión programada a
+  # mitad de la suite mandaría pushes de las modificaciones de otros tests.
+  recordatorios:
+    activo: false

@@ -29,6 +29,7 @@ function Tarjeta({ orden }: { orden: ModificacionResumen }) {
         </span>
         <span className="meta">
           <span className={`pill ${estado.pill}`}>{estado.texto}</span>
+          {orden.vencida && <span className="pill vencida">Vencida</span>}
           {hace(orden.creadaEn)}
           {orden.creadaPor && ` · de ${orden.creadaPor}`}
         </span>
@@ -54,8 +55,8 @@ export default function Ordenes() {
       .catch((e: unknown) => esta === peticion.current && setError(e instanceof ErrorApi ? e.message : 'No se han podido cargar las órdenes'));
   }, []);
 
-  // Al entrar y cada vez que la bandeja dice que algo ha cambiado.
-  const cambio = resumen ? `${resumen.nuevas}·${resumen.pendientes}` : '';
+  // Al entrar y cada vez que la bandeja dice que algo ha cambiado (también cuando una orden pasa a vencida).
+  const cambio = resumen ? `${resumen.nuevas}·${resumen.pendientes}·${resumen.vencidas}` : '';
   useEffect(cargar, [cargar, cambio]);
 
   if (error && !ordenes) {
