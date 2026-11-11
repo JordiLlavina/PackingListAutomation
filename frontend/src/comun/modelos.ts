@@ -46,7 +46,22 @@ export type Evento = {
   quien: string;
   modificacionId: number | null;
   audioAdjuntoId: number | null;
+  /** Cómo está hoy la modificación del evento; null si el evento no es una modificación. */
+  estado: 'NUEVA' | 'VISTA' | 'EN_CURSO' | 'HECHA' | 'DESCARTADA' | null;
 };
+
+/**
+ * El punto de un evento en el historial: el color dice si una modificación ya
+ * está hecha, sigue abierta o se descartó; los cambios de etapa y de nombre
+ * tienen el suyo. El texto es lo que se lee al pasar por encima (y el lector de pantalla).
+ */
+export function puntoEvento(e: Pick<Evento, 'tipo' | 'estado'>): { clase: string; texto: string | null } {
+  if (e.tipo === 'ETAPA') return { clase: 'etapa-p', texto: 'Cambio de etapa' };
+  if (e.tipo !== 'MODIFICACION' || e.estado === null) return { clase: '', texto: null };
+  if (e.estado === 'HECHA') return { clase: 'hecha-p', texto: 'Hecha' };
+  if (e.estado === 'DESCARTADA') return { clase: 'descartada-p', texto: 'Descartada' };
+  return { clase: 'abierta-p', texto: 'Sin hacer' };
+}
 
 export type ModeloFicha = {
   modelo: ModeloResumen;
@@ -93,14 +108,36 @@ export function fotoUrl(id: number): string {
   return `/api/fotos/${id}`;
 }
 
+/** Los filtros de la rejilla del taller: texto libre, cliente y etapa; vacío = sin ese filtro. */
+export type FiltroRejilla = { texto: string; cliente: string; etapa: Etapa | '' };
+
 /**
- * El filtro de la rejilla del taller, el de la maqueta: `TODOS` deja pasar
- * todos; cualquier otro valor es la clave de un cliente o una etapa, y pasan
- * los modelos de ese cliente o en esa etapa.
+ * Para buscar: en mayúsculas, sin acentos y solo letras y cifras, así
+ * «ull027al0103» encuentra «ULL027.AL0103» y «bolso» encuentra «BOLSO».
  */
-export function filtrarRejilla(modelos: ModeloResumen[], filtro: string): ModeloResumen[] {
-  if (filtro === 'TODOS') return modelos;
-  return modelos.filter((m) => m.cliente === filtro || m.etapa === filtro);
+function paraBuscar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+/**
+ * El filtro de la rejilla del taller, como el de despacho: el texto se busca
+ * DENTRO de la referencia (el código o el nombre de prototipo, también el
+ * prototipo de un modelo que ya tiene código) y del nombre, así «77» o «770»
+ * encuentran «ULL770»; y además, si se eligen, el cliente y la etapa.
+ */
+export function filtrarRejilla(modelos: ModeloResumen[], filtro: FiltroRejilla): ModeloResumen[] {
+  const buscado = paraBuscar(filtro.texto);
+  return modelos.filter(
+    (m) =>
+      (filtro.cliente === '' || m.cliente === filtro.cliente) &&
+      (filtro.etapa === '' || m.etapa === filtro.etapa) &&
+      (buscado === '' ||
+        [m.referencia, m.codigo, m.nombrePrototipo, m.nombre].some((campo) => campo !== null && paraBuscar(campo).includes(buscado))),
+  );
 }
 
 function cuenta(n: number, uno: string, varios: string): string {

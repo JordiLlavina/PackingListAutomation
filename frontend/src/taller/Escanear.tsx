@@ -1,5 +1,5 @@
 // Escanear la etiqueta de un patrón: la cámara trasera a pantalla y, al leer el
-// QR, la ficha del modelo — o, si se llega desde «He cambiado algo»
+// QR, la ficha del modelo — o, si se llega desde «Crear Modificación»
 // (?para=cambio), el modelo queda elegido en el borrador y se sigue al tipo.
 // Detecta con el BarcodeDetector del navegador si lo hay; si no, con zxing, que
 // solo se descarga entonces.

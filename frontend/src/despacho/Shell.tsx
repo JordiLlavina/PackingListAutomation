@@ -16,7 +16,10 @@ type Pestana = { ruta: string; texto: string; activa: (camino: string) => boolea
 const PESTANAS: Pestana[] = [
   // La bandeja es el inicio de despacho: también queda marcada en «/».
   { ruta: '/bandeja', texto: 'Bandeja', activa: (c) => c === '/' || c.startsWith('/bandeja'), pepita: true },
-  { ruta: '/modelos', texto: 'Modelos', activa: (c) => c.startsWith('/modelos') },
+  // La cola del taller: el orden en que hará las órdenes.
+  { ruta: '/cola', texto: 'Cola', activa: (c) => c.startsWith('/cola') },
+  // Una modificación de solo lectura se abre desde la ficha de un modelo: sigue marcada «Modelos».
+  { ruta: '/modelos', texto: 'Modelos', activa: (c) => c.startsWith('/modelos') || c.startsWith('/modificaciones') },
   { ruta: '/admin', texto: 'Admin', activa: (c) => c.startsWith('/admin'), soloAdmin: true },
 ];
 

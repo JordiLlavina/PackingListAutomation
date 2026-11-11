@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -32,7 +33,6 @@ import com.puntotres.packinglist.modelos.persistence.Direccion;
 import com.puntotres.packinglist.modelos.persistence.EstadoModificacion;
 import com.puntotres.packinglist.modelos.persistence.Mensaje;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
@@ -43,11 +43,12 @@ import com.puntotres.packinglist.modelos.service.Modificaciones;
 
 /**
  * Las modificaciones en la app: crear, listar, abrir, el ciclo (vista,
- * prioridad, título, destinos, hecha, descartada) y los mensajes.
+ * urgente, título, destinos, hecha, descartada), los mensajes y la cola de
+ * órdenes del taller ({@code /api/modificaciones/cola}).
  *
  * <b>La dirección la decide el rol de quien la crea, nunca lo que mande</b>:
- * lo que crea el taller es siempre un aviso para el despacho (su título y su
- * prioridad se ignoran: la prioridad la pone el despacho) y lo que crea el
+ * lo que crea el taller es siempre un aviso para el despacho (su título, la
+ * marca de urgente y la posición en la cola se ignoran) y lo que crea el
  * despacho, una orden para el taller. Las reglas del ciclo y quién puede
  * qué dentro de él son de {@link Modificaciones}; aquí solo se pasa del
  * multipart a {@link AdjuntoNuevo} y se contesta con el resumen que ve la
@@ -69,8 +70,12 @@ public class ModificacionesController {
         this.modificaciones = modificaciones;
     }
 
-    /** La prioridad que pone el despacho. */
-    public record CambioPrioridad(Prioridad prioridad) {
+    /** Marcar o quitar la marca de urgente. */
+    public record CambioUrgente(Boolean urgente) {
+    }
+
+    /** La cola entera en su nuevo orden, de la primera a la última. */
+    public record OrdenCola(List<Long> ids) {
     }
 
     /** Si el aviso aplica en un destino y si ya está hecho ahí. */
@@ -90,7 +95,8 @@ public class ModificacionesController {
                                                     @RequestParam(required = false) String tipoCambio,
                                                     @RequestParam(required = false) String titulo,
                                                     @RequestParam(required = false) String texto,
-                                                    @RequestParam(required = false) Prioridad prioridad,
+                                                    @RequestParam(required = false) Boolean urgente,
+                                                    @RequestParam(required = false) Long antesDe,
                                                     @RequestParam(required = false) MultipartFile audio,
                                                     @RequestParam(required = false) String audioDuracionSeg,
                                                     @RequestParam(name = "fotos", required = false)
@@ -121,7 +127,7 @@ public class ModificacionesController {
             // Primero la orden: sus adjuntos topan en 15 MB (Adjuntos), así que un documento mayor falla aquí
             // con ese mensaje, antes de llegar a la copia al modelo (tope de 50 MB) y sin dejar nada a medias.
             creada = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, tipoCambio,
-                    titulo, texto, prioridad, adjuntos), quien);
+                    titulo, texto, Boolean.TRUE.equals(urgente), antesDe, adjuntos), quien);
             if (Boolean.TRUE.equals(guardarEnModelo)) {
                 copiarAlModelo(modeloId, losDocumentos, quien, guardados, avisos);
             }
@@ -159,13 +165,30 @@ public class ModificacionesController {
     public List<ModificacionResumen> listar(@RequestParam(required = false) Direccion direccion,
                                             @RequestParam(name = "estado", required = false)
                                             Set<EstadoModificacion> estados,
-                                            @RequestParam(required = false) Prioridad prioridad,
                                             @RequestParam(required = false) Long modelo,
                                             @RequestParam(required = false) String cliente,
                                             @RequestParam(required = false) String q,
                                             @AuthenticationPrincipal UsuarioActual quien) {
-        return modificaciones.listar(new Modificaciones.Filtro(direccion, estados, prioridad, modelo, cliente, q),
+        return modificaciones.listar(new Modificaciones.Filtro(direccion, estados, modelo, cliente, q),
                 quien);
+    }
+
+    /** La cola de órdenes del taller, de la primera a la última (la leen los dos lados). */
+    @GetMapping("/cola")
+    public List<ModificacionResumen> cola() {
+        return modificaciones.cola();
+    }
+
+    /**
+     * Reordena la cola. Lleva la cola entera: si ya no es la que había (alguien
+     * ha creado o cerrado una orden mientras tanto) es un 409 y no se toca nada.
+     */
+    @PutMapping("/cola")
+    @PreAuthorize(DESPACHO)
+    public List<ModificacionResumen> reordenarCola(@RequestBody OrdenCola orden,
+                                                   @AuthenticationPrincipal UsuarioActual quien) {
+        modificaciones.reordenarCola(orden.ids(), quien);
+        return modificaciones.cola();
     }
 
     @GetMapping("/{id}")
@@ -179,11 +202,15 @@ public class ModificacionesController {
         return resumen(id);
     }
 
-    @PostMapping("/{id}/prioridad")
+    /** Marca urgente una orden (y la sube la primera de la cola) o le quita la marca. */
+    @PostMapping("/{id}/urgente")
     @PreAuthorize(DESPACHO)
-    public ModificacionResumen ponerPrioridad(@PathVariable Long id, @RequestBody CambioPrioridad cambio,
-                                              @AuthenticationPrincipal UsuarioActual quien) {
-        modificaciones.ponerPrioridad(id, cambio.prioridad(), quien);
+    public ModificacionResumen marcarUrgente(@PathVariable Long id, @RequestBody CambioUrgente cambio,
+                                             @AuthenticationPrincipal UsuarioActual quien) {
+        if (cambio.urgente() == null) {
+            throw new IllegalArgumentException("Falta decir si es urgente");
+        }
+        modificaciones.marcarUrgente(id, cambio.urgente(), quien);
         return resumen(id);
     }
 

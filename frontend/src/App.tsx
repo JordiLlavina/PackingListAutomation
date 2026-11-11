@@ -11,6 +11,8 @@ import ShellDespacho from './despacho/Shell';
 import BandejaDespacho from './despacho/Bandeja';
 import EtiquetasPatrones from './despacho/EtiquetasPatrones';
 import ModelosDespacho from './despacho/Modelos';
+import ColaDespacho from './despacho/Cola';
+import VerModificacion from './despacho/VerModificacion';
 import Entrada from './entrada/Entrada';
 import Duda from './taller/Duda';
 import MisAvisos from './taller/MisAvisos';
@@ -34,7 +36,7 @@ function pantalla(datos: Pantalla): { handle: Pantalla } {
 }
 
 /**
- * «He cambiado algo», paso a paso: cada paso es su ruta (atrás, recargar y el
+ * «Crear Modificación», paso a paso: cada paso es su ruta (atrás, recargar y el
  * título de la cabecera funcionan solos) y el borrador va en un contexto por
  * encima de todas, así que salir por la barra de abajo no lo pierde. Sin
  * escáner flotante: taparía los botones de abajo y aquí no hace falta.
@@ -42,7 +44,7 @@ function pantalla(datos: Pantalla): { handle: Pantalla } {
 const rutasCambio: RouteObject[] = [
   { index: true, element: <ElegirModelo />, ...pantalla({ titulo: '¿Qué modelo?', atras: '/', seccion: 'inicio' }) },
   // El título lo pone el paso con la referencia y el nombre del modelo.
-  { path: 'tipo', element: <QueHasCambiado />, ...pantalla({ titulo: 'He cambiado algo', atras: '/cambio', seccion: 'inicio' }) },
+  { path: 'tipo', element: <QueHasCambiado />, ...pantalla({ titulo: 'Crear Modificación', atras: '/cambio', seccion: 'inicio' }) },
   { path: 'fotos', element: <Fotos />, ...pantalla({ titulo: 'Fotos del cambio', atras: '/cambio/tipo', seccion: 'inicio' }) },
   { path: 'voz', element: <Grabar />, ...pantalla({ titulo: 'Nota de voz', atras: '/cambio/fotos', seccion: 'inicio' }) },
   { path: 'revisar', element: <Revisar />, ...pantalla({ titulo: 'Revisar y enviar', atras: '/cambio/voz', seccion: 'inicio' }) },
@@ -60,7 +62,7 @@ const rutasTaller: RouteObject[] = [
     ),
     children: [
       { index: true, element: <InicioTaller />, ...pantalla({ titulo: 'Modelos · Puntotres', seccion: 'inicio', fab: true }) },
-      { path: 'ordenes', element: <Ordenes />, ...pantalla({ titulo: 'Tengo que hacer', seccion: 'ordenes', fab: true }) },
+      { path: 'ordenes', element: <Ordenes />, ...pantalla({ titulo: 'Bandeja de Entrada', seccion: 'ordenes', fab: true }) },
       // El título lo pone la orden con el suyo. Sin escáner: taparía «Hecho».
       { path: 'ordenes/:id', element: <Orden />, ...pantalla({ titulo: 'Orden', atras: '/ordenes', seccion: 'ordenes' }) },
       { path: 'ordenes/:id/duda', element: <Duda modo="duda" />, ...pantalla({ titulo: 'Tengo una duda', atras: (p) => `/ordenes/${p.id}`, seccion: 'ordenes' }) },
@@ -85,8 +87,12 @@ function rutasDespacho(esAdmin: boolean): RouteObject[] {
         { index: true, element: <Navigate to="/bandeja" replace /> },
         // Con el id se abre su detalle a la derecha sin volver a montar la lista; «nueva» abre el alta de una orden.
         { path: 'bandeja/:id?', element: <BandejaDespacho /> },
+        // La cola del taller: en qué orden hará las órdenes, y cambiarlo.
+        { path: 'cola', element: <ColaDespacho /> },
         // Opcional: con el id se abre su ficha a la derecha sin volver a montar la lista.
         { path: 'modelos/:id?', element: <ModelosDespacho /> },
+        // Una modificación de solo lectura, desde el historial de un modelo.
+        { path: 'modificaciones/:id', element: <VerModificacion /> },
         // Solo el admin: a cualquier otro rol la dirección le devuelve a la bandeja.
         { path: 'admin', element: esAdmin ? <AdminDespacho /> : <Navigate to="/bandeja" replace /> },
         { path: '*', element: <Navigate to="/" replace /> },

@@ -34,10 +34,8 @@ class ModelosPropertiesTest {
         assertTrue(modelos.tipoCambio("NO_EXISTE").isEmpty());
         assertTrue(modelos.tipoCambio(null).isEmpty());
         assertEquals(List.of("ICSUITE", "EXCEL_ESCANDALLOS"), modelos.destinosAplicacion());
-        assertEquals(1, modelos.recordatorios().taller().diasPorPrioridad().get("ALTA"));
-        assertEquals(3, modelos.recordatorios().taller().diasPorPrioridad().get("NORMAL"));
-        assertEquals(7, modelos.recordatorios().taller().diasPorPrioridad().get("BAJA"));
-        assertEquals(24, modelos.recordatorios().despacho().sinPrioridadHoras());
+        assertEquals(-1, modelos.recordatorios().taller().resumenColaHora());
+        assertEquals(1, modelos.recordatorios().taller().urgenteDias());
         assertEquals(7, modelos.recordatorios().despacho().sinAplicarDias());
         assertEquals(24, modelos.recordatorios().despacho().respuestaPendienteHoras());
     }

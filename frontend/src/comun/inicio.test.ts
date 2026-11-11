@@ -4,9 +4,8 @@ import { fraseInicio, tituloVisible, type ResumenBandeja } from './modificacione
 const resumen = (nuevas: number, pendientes: number): ResumenBandeja => ({
   nuevas,
   pendientes,
-  vencidas: 0,
+  urgentes: 0,
   conRespuesta: 0,
-  sinPrioridad: 0,
 });
 
 describe('fraseInicio', () => {

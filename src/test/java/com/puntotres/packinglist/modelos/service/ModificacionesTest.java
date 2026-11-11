@@ -35,11 +35,11 @@ import com.puntotres.packinglist.modelos.persistence.EstadoTranscripcion;
 import com.puntotres.packinglist.modelos.persistence.Mensaje;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
+import com.puntotres.packinglist.persistence.Etapa;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
 import com.puntotres.packinglist.persistence.TipoArticulo;
@@ -97,7 +97,7 @@ class ModificacionesTest {
     }
 
     @Test
-    void unAvisoConAudioNaceNuevoSinPrioridadYConLosDosDestinos() {
+    void unAvisoConAudioNaceNuevoFueraDeLaColaYConLosDosDestinos() {
         Long modeloId = modelo("AUDIO");
 
         Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "PIEL",
@@ -106,7 +106,9 @@ class ModificacionesTest {
         ModificacionDetalle detalle = modificaciones.detalle(aviso.getId());
         ModificacionResumen resumen = detalle.resumen();
         assertEquals(EstadoModificacion.NUEVA, resumen.estado());
-        assertNull(resumen.prioridad());
+        assertFalse(resumen.urgente());
+        assertNull(resumen.posicionCola(), "un aviso del taller no entra en la cola");
+        assertEquals(Etapa.PRODUCCION, resumen.etapa(), "la etapa del modelo, para filtrar");
         assertEquals(Direccion.TALLER_A_DESPACHO, resumen.direccion());
         assertEquals("PIEL", resumen.tipoCambio());
         assertEquals("Piel / material", resumen.tipoCambioTexto());
@@ -117,7 +119,6 @@ class ModificacionesTest {
         assertNotNull(resumen.creadaEn());
         assertNull(resumen.vistaEn());
         assertNull(resumen.respuestaPendienteDe());
-        assertFalse(resumen.vencida());
         assertEquals(0, resumen.fotos());
         assertEquals(1, resumen.audios());
         assertEquals(30, resumen.duracionAudioSeg(), "cuánto dura la nota de voz del primer mensaje");
@@ -150,6 +151,7 @@ class ModificacionesTest {
         assertEquals("Prueba Taller (taller)", evento.quien());
         assertEquals(aviso.getId(), evento.modificacionId());
         assertEquals(nota.id(), evento.audioAdjuntoId());
+        assertEquals("NUEVA", evento.estado(), "el punto del historial dice si la modificación sigue abierta");
     }
 
     @Test
@@ -211,19 +213,17 @@ class ModificacionesTest {
 
         IllegalArgumentException sinTitulo = assertThrows(IllegalArgumentException.class,
                 () -> modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null, " ",
-                        "texto", Prioridad.ALTA, List.of()), despacho()));
+                        "texto", List.of()), despacho()));
         assertEquals("Falta el título", sinTitulo.getMessage());
-        IllegalArgumentException sinPrioridad = assertThrows(IllegalArgumentException.class,
-                () -> modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
-                        "Cambiar asa", "texto", null, List.of()), despacho()));
-        assertEquals("Falta la prioridad", sinPrioridad.getMessage());
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId,
-                "HERRAJES", "Cambiar asa", "Asa de 2 cm", Prioridad.ALTA, List.of()), despacho());
+                "HERRAJES", "Cambiar asa", "Asa de 2 cm", List.of()), despacho());
         ModificacionDetalle detalle = modificaciones.detalle(orden.getId());
         assertEquals(EstadoModificacion.NUEVA, detalle.resumen().estado());
         assertEquals(Direccion.DESPACHO_A_TALLER, detalle.resumen().direccion());
-        assertEquals(Prioridad.ALTA, detalle.resumen().prioridad());
+        assertFalse(detalle.resumen().urgente());
+        assertEquals(modificaciones.cola().size(), detalle.resumen().posicionCola(),
+                "una orden nueva entra la última de la cola");
         assertEquals("Cambiar asa", detalle.resumen().titulo());
         assertTrue(detalle.resumen().destinos().isEmpty(), "una orden no tiene destinos");
         assertNull(detalle.resumen().duracionAudioSeg(), "sin nota de voz no hay duración");
@@ -241,6 +241,7 @@ class ModificacionesTest {
         assertEquals(EstadoModificacion.HECHA, hecha.estado());
         assertEquals("Prueba Taller", hecha.hechaPor());
         assertNotNull(hecha.hechaEn());
+        assertNull(hecha.posicionCola(), "una hecha sale de la cola");
 
         Evento evento = modelos.ficha(modeloId).lineaTiempo().stream()
                 .filter(e -> "MODIFICACION".equals(e.tipo()))
@@ -249,6 +250,7 @@ class ModificacionesTest {
         assertEquals("Orden: Cambiar asa", evento.texto());
         assertEquals("Prueba Despacho (despacho)", evento.quien());
         assertNull(evento.audioAdjuntoId());
+        assertEquals("HECHA", evento.estado(), "el punto del historial dice si la modificación ya está hecha");
     }
 
     @Test
@@ -280,7 +282,7 @@ class ModificacionesTest {
     }
 
     @Test
-    void unaDescartadaNoSeMarcaHechaNiCambiaDePrioridadPeroAdmiteMensajes() {
+    void unaDescartadaNoSeMarcaHechaPeroAdmiteMensajes() {
         Modificacion aviso = avisoConFoto("DESCARTE");
 
         assertThrows(AccessDeniedException.class, () -> modificaciones.descartar(aviso.getId(), "no", taller()));
@@ -293,9 +295,9 @@ class ModificacionesTest {
         assertEquals(EstadoModificacion.DESCARTADA, descartada.resumen().estado());
         assertEquals("Duplicado del de ayer", descartada.motivoDescarte());
 
-        IllegalArgumentException prioridad = assertThrows(IllegalArgumentException.class,
-                () -> modificaciones.ponerPrioridad(aviso.getId(), Prioridad.ALTA, despacho()));
-        assertEquals("La modificación está descartada", prioridad.getMessage());
+        IllegalArgumentException urgente = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.marcarUrgente(aviso.getId(), true, despacho()));
+        assertEquals("Solo una orden para el taller puede ser urgente", urgente.getMessage());
         IllegalArgumentException hecha = assertThrows(IllegalArgumentException.class,
                 () -> modificaciones.marcarHecha(aviso.getId(), despacho()));
         assertEquals("La modificación está descartada", hecha.getMessage());
@@ -307,17 +309,20 @@ class ModificacionesTest {
         modificaciones.responder(aviso.getId(), "Era el mismo cambio que el de ayer", List.of(), despacho());
         ModificacionDetalle conRespuesta = modificaciones.detalle(aviso.getId());
         assertEquals(EstadoModificacion.DESCARTADA, conRespuesta.resumen().estado());
-        assertNull(conRespuesta.resumen().prioridad());
         assertEquals(2, conRespuesta.mensajes().size());
 
-        // Y una hecha tampoco cambia de prioridad.
         Modificacion otra = avisoConFoto("HECHA");
         modificaciones.marcarHecha(otra.getId(), despacho());
         assertTrue(modificaciones.detalle(otra.getId()).resumen().destinos().stream()
                 .allMatch(d -> d.hechoEn() != null), "el atajo marca hechos todos los destinos que aplican");
-        IllegalArgumentException yaHecha = assertThrows(IllegalArgumentException.class,
-                () -> modificaciones.ponerPrioridad(otra.getId(), Prioridad.BAJA, despacho()));
-        assertEquals("La modificación ya está hecha", yaHecha.getMessage());
+
+        // Una orden cerrada ya no está en la cola: no se marca urgente.
+        Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
+                modelo("DESCARTE-O"), null, "Cambiar asa", null, List.of()), despacho());
+        modificaciones.descartar(orden.getId(), "Ya no hace falta", despacho());
+        IllegalArgumentException cerrada = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.marcarUrgente(orden.getId(), true, despacho()));
+        assertEquals("La orden ya está cerrada", cerrada.getMessage());
         assertThrows(AccessDeniedException.class, () -> modificaciones.marcarHecha(avisoConFoto("HECHA-T").getId(),
                 taller()));
     }
@@ -359,42 +364,43 @@ class ModificacionesTest {
 
         int despachoAntes = modificaciones.resumen(despacho()).conRespuesta();
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
-                modelo("CERRADA-O"), null, "Cambiar asa", null, Prioridad.NORMAL, List.of()), despacho());
+                modelo("CERRADA-O"), null, "Cambiar asa", null, List.of()), despacho());
         modificaciones.responder(orden.getId(), "¿Qué asa?", List.of(), taller());
         assertEquals(Rol.DESPACHO, modificaciones.detalle(orden.getId()).resumen().respuestaPendienteDe());
         assertEquals(despachoAntes + 1, modificaciones.resumen(despacho()).conRespuesta());
 
         modificaciones.marcarHecha(orden.getId(), taller());
         assertNull(modificaciones.detalle(orden.getId()).resumen().respuestaPendienteDe());
-        assertTrue(modificaciones.listar(new Modificaciones.Filtro(null, null, null, recargar(orden).getModeloId(),
+        assertTrue(modificaciones.listar(new Modificaciones.Filtro(null, null, recargar(orden).getModeloId(),
                 null, null), despacho()).stream().allMatch(r -> r.respuestaPendienteDe() == null));
         assertEquals(despachoAntes, modificaciones.resumen(despacho()).conRespuesta());
     }
 
     @Test
-    void elResumenDeDespachoCuentaNuevasYSinPrioridad() {
+    void elResumenCuentaNuevasPendientesYUrgentes() {
         ResumenBandeja antes = modificaciones.resumen(despacho());
         ResumenBandeja tallerAntes = modificaciones.resumen(taller());
 
-        Modificacion primero = avisoConFoto("BANDEJA-1");
+        avisoConFoto("BANDEJA-1");
         avisoConFoto("BANDEJA-2");
-        modificaciones.ponerPrioridad(primero.getId(), Prioridad.NORMAL, despacho());
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
-                modelo("BANDEJA-O"), null, "Revisar costura", null, Prioridad.BAJA, List.of()), despacho());
+                modelo("BANDEJA-O"), null, "Revisar costura", null, List.of()), despacho());
+        modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modelo("BANDEJA-U"), null,
+                "Coser el asa", null, true, null, List.of()), despacho());
 
         ResumenBandeja despues = modificaciones.resumen(despacho());
         assertEquals(antes.nuevas() + 2, despues.nuevas());
-        assertEquals(antes.sinPrioridad() + 1, despues.sinPrioridad());
         assertEquals(antes.pendientes() + 2, despues.pendientes());
-        assertEquals(0, despues.vencidas());
+        assertEquals(antes.urgentes() + 1, despues.urgentes(), "el despacho ve las órdenes urgentes abiertas");
 
         ResumenBandeja tallerDespues = modificaciones.resumen(taller());
-        assertEquals(tallerAntes.nuevas() + 1, tallerDespues.nuevas());
-        assertEquals(tallerAntes.pendientes() + 1, tallerDespues.pendientes());
+        assertEquals(tallerAntes.nuevas() + 2, tallerDespues.nuevas());
+        assertEquals(tallerAntes.pendientes() + 2, tallerDespues.pendientes());
+        assertEquals(tallerAntes.urgentes() + 1, tallerDespues.urgentes(), "y el taller también");
 
         modificaciones.marcarVista(orden.getId(), taller());
-        assertEquals(tallerAntes.nuevas(), modificaciones.resumen(taller()).nuevas());
-        assertEquals(tallerAntes.pendientes() + 1, modificaciones.resumen(taller()).pendientes());
+        assertEquals(tallerAntes.nuevas() + 1, modificaciones.resumen(taller()).nuevas());
+        assertEquals(tallerAntes.pendientes() + 2, modificaciones.resumen(taller()).pendientes());
 
         modificaciones.responder(orden.getId(), "¿Qué costura?", List.of(), taller());
         assertEquals(antes.conRespuesta() + 1, modificaciones.resumen(despacho()).conRespuesta());
@@ -421,42 +427,91 @@ class ModificacionesTest {
         assertEquals(List.of(otra.getId()), ids(modificaciones.listar(filtroTexto("t11gato"), despacho())));
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
-                "Cambiar T11TOPO", null, Prioridad.NORMAL, List.of()), despacho());
+                "Cambiar T11TOPO", null, List.of()), despacho());
         assertEquals(List.of(orden.getId()), ids(modificaciones.listar(new Modificaciones.Filtro(null, null, null,
-                null, null, "t11topo"), taller())));
+                null, "t11topo"), taller())));
         assertTrue(modificaciones.listar(new Modificaciones.Filtro(Direccion.TALLER_A_DESPACHO, null, null, null,
-                null, "t11topo"), taller()).isEmpty(), "la dirección también filtra");
+                "t11topo"), taller()).isEmpty(), "la dirección también filtra");
     }
 
     @Test
-    void laListaVaNuevasPrimeroLuegoSinPrioridadYPorPrioridadYCerradasAlFinal() {
+    void losAvisosVanNuevosPrimeroYElMasAntiguoAntesYLasCerradasAlFinal() {
         Long modeloId = modelo("ORDENLISTA");
-        Modificacion vistaBaja = aviso(modeloId);
-        Modificacion vistaAlta = aviso(modeloId);
-        Modificacion vistaSinPrioridad = aviso(modeloId);
+        Modificacion vistaVieja = aviso(modeloId);
+        Modificacion vistaNueva = aviso(modeloId);
         Modificacion hecha = aviso(modeloId);
         Modificacion nueva = aviso(modeloId);
-        modificaciones.ponerPrioridad(vistaBaja.getId(), Prioridad.BAJA, despacho());
-        modificaciones.ponerPrioridad(vistaAlta.getId(), Prioridad.ALTA, despacho());
-        for (Modificacion m : List.of(vistaBaja, vistaAlta, vistaSinPrioridad, hecha)) {
+        for (Modificacion m : List.of(vistaVieja, vistaNueva, hecha)) {
             modificaciones.marcarVista(m.getId(), despacho());
         }
         modificaciones.marcarHecha(hecha.getId(), despacho());
 
-        List<Long> orden = ids(modificaciones.listar(new Modificaciones.Filtro(null, null, null, modeloId, null,
-                null), despacho()));
-        assertEquals(List.of(nueva.getId(), vistaSinPrioridad.getId(), vistaAlta.getId(), vistaBaja.getId(),
-                hecha.getId()), orden);
+        List<Long> orden = ids(modificaciones.listar(new Modificaciones.Filtro(null, null, modeloId, null, null),
+                despacho()));
+        assertEquals(List.of(nueva.getId(), vistaVieja.getId(), vistaNueva.getId(), hecha.getId()), orden);
 
-        List<Long> soloAbiertas = ids(modificaciones.listar(new Modificaciones.Filtro(Direccion.TALLER_A_DESPACHO,
-                Set.of(EstadoModificacion.VISTA), null, modeloId, null, null), despacho()));
-        assertEquals(List.of(vistaSinPrioridad.getId(), vistaAlta.getId(), vistaBaja.getId()), soloAbiertas);
+        List<Long> soloVistas = ids(modificaciones.listar(new Modificaciones.Filtro(Direccion.TALLER_A_DESPACHO,
+                Set.of(EstadoModificacion.VISTA), modeloId, null, null), despacho()));
+        assertEquals(List.of(vistaVieja.getId(), vistaNueva.getId()), soloVistas);
 
-        List<Long> alta = ids(modificaciones.listar(new Modificaciones.Filtro(null, null, Prioridad.ALTA, modeloId,
-                null, null), despacho()));
-        assertEquals(List.of(vistaAlta.getId()), alta);
-        assertTrue(modificaciones.listar(new Modificaciones.Filtro(null, null, null, modeloId, "APC", null),
+        assertTrue(modificaciones.listar(new Modificaciones.Filtro(null, null, modeloId, "APC", null),
                 despacho()).isEmpty(), "el modelo es de AMI");
+    }
+
+    @Test
+    void laColaPoneLasOrdenesUnaDetrasDeOtraYSeReordena() {
+        Long modeloId = modelo("COLA");
+        Modificacion a = orden(modeloId, "A", null);
+        Modificacion b = orden(modeloId, "B", null);
+        Modificacion c = orden(modeloId, "C", null);
+        assertEquals(List.of(a.getId(), b.getId(), c.getId()), deEste(ids(modificaciones.cola()), a, b, c),
+                "cada orden nueva va al final");
+
+        Modificacion d = orden(modeloId, "D", b.getId());
+        assertEquals(List.of(a.getId(), d.getId(), b.getId(), c.getId()),
+                deEste(ids(modificaciones.cola()), a, b, c, d), "delante de la que se dice");
+        assertEquals(List.of(a.getId(), d.getId(), b.getId(), c.getId()),
+                ids(modificaciones.listar(new Modificaciones.Filtro(Direccion.DESPACHO_A_TALLER, null, modeloId,
+                        null, null), taller())), "la bandeja del taller va en el orden de la cola");
+
+        modificaciones.marcarUrgente(c.getId(), true, despacho());
+        ModificacionResumen urgente = modificaciones.detalle(c.getId()).resumen();
+        assertTrue(urgente.urgente());
+        assertEquals(1, urgente.posicionCola(), "marcarla urgente la sube la primera");
+        modificaciones.marcarUrgente(c.getId(), false, despacho());
+        assertEquals(1, modificaciones.detalle(c.getId()).resumen().posicionCola(), "quitar la marca no la mueve");
+
+        // Reordenar va con la cola entera: A pasa la última.
+        List<Long> nueva = new java.util.ArrayList<>(ids(modificaciones.cola()));
+        nueva.remove(a.getId());
+        nueva.add(a.getId());
+        modificaciones.reordenarCola(nueva, despacho());
+        assertEquals(nueva, ids(modificaciones.cola()));
+        assertEquals(nueva.size(), modificaciones.detalle(a.getId()).resumen().posicionCola());
+
+        List<Long> sinUna = nueva.subList(1, nueva.size());
+        assertThrows(ColaTaller.ColaCambiada.class, () -> modificaciones.reordenarCola(sinUna, despacho()),
+                "una cola que no es la que hay no se reordena");
+        assertEquals(nueva, ids(modificaciones.cola()), "y no se toca nada");
+        assertThrows(AccessDeniedException.class, () -> modificaciones.reordenarCola(nueva, taller()));
+
+        modificaciones.marcarHecha(d.getId(), taller());
+        assertFalse(ids(modificaciones.cola()).contains(d.getId()), "una hecha sale de la cola");
+        IllegalArgumentException yaNoEsta = assertThrows(IllegalArgumentException.class,
+                () -> orden(modeloId, "E", d.getId()));
+        assertTrue(yaNoEsta.getMessage().contains("ya no está en la cola"), yaNoEsta.getMessage());
+    }
+
+    private Modificacion orden(Long modeloId, String titulo, Long antesDe) {
+        return modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null, titulo, null,
+                false, antesDe, List.of()), despacho());
+    }
+
+    /** Solo las de este test, en el orden en que salen (la cola es la de toda la suite). */
+    private static List<Long> deEste(List<Long> cola, Modificacion... suyas) {
+        Set<Long> ids = java.util.Arrays.stream(suyas).map(Modificacion::getId).collect(
+                java.util.stream.Collectors.toSet());
+        return cola.stream().filter(ids::contains).toList();
     }
 
     private Modificacion avisoConFoto(String codigo) {
@@ -494,7 +549,7 @@ class ModificacionesTest {
     }
 
     private static Modificaciones.Filtro filtroTexto(String texto) {
-        return new Modificaciones.Filtro(Direccion.TALLER_A_DESPACHO, null, null, null, null, texto);
+        return new Modificaciones.Filtro(Direccion.TALLER_A_DESPACHO, null, null, null, texto);
     }
 
     private static List<Long> ids(List<ModificacionResumen> resumenes) {

@@ -1,26 +1,38 @@
-// «Tengo que hacer»: las órdenes que despacho manda al taller, en el orden de
-// la maqueta (las nuevas primero, luego por prioridad, la más antigua antes) y
-// las hechas debajo. La lista se vuelve a pedir cuando cambian los números de
+// «Bandeja de Entrada»: las órdenes que despacho manda al taller, en el orden de
+// la cola que pone el despacho (la primera es la siguiente que toca, y se
+// destaca) y las hechas debajo. La lista se vuelve a pedir cuando cambian los números de
 // la bandeja, así que una orden que llega con la pantalla abierta aparece sola.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
-import { estaCerrada, estadoOrden, fotoDelModelo, ordenarOrdenes, type ModificacionResumen } from '../comun/modificaciones';
+import { estaCerrada, estadoOrden, fotoDelModelo, ordenarOrdenes, puesto, type ModificacionResumen } from '../comun/modificaciones';
 import { hace } from '../comun/tiempo';
 import { useBandeja } from '../comun/useBandeja';
 
-function Tarjeta({ orden }: { orden: ModificacionResumen }) {
+function Tarjeta({ orden, siguiente = false }: { orden: ModificacionResumen; siguiente?: boolean }) {
   const navegar = useNavigate();
   const estado = estadoOrden(orden.estado);
+  const cerrada = estaCerrada(orden.estado);
   // La clase de la maqueta (nueva, vista, hecha): las cerradas se ven más apagadas.
-  const clases = `orden ${estaCerrada(orden.estado) ? 'hecha' : estado.pill}`;
+  const clases = `orden ${cerrada ? 'hecha' : estado.pill}${siguiente ? ' siguiente' : ''}`;
   return (
-    <button className={clases} type="button" data-p={orden.prioridad ?? undefined} onClick={() => navegar(`/ordenes/${orden.id}`)}>
+    <button
+      className={clases}
+      type="button"
+      data-urgente={orden.urgente && !cerrada ? 'true' : undefined}
+      onClick={() => navegar(`/ordenes/${orden.id}`)}
+    >
       <span className="franja" />
+      {!cerrada && orden.posicionCola !== null && (
+        <span className="puesto" aria-label={`${puesto(orden.posicionCola)} de la cola`}>
+          {puesto(orden.posicionCola)}
+        </span>
+      )}
       <FotoModelo modelo={fotoDelModelo(orden)} />
       <span className="cuerpo">
+        {siguiente && <span className="la-siguiente">La siguiente</span>}
         <span className="tit">{orden.titulo ?? orden.tipoCambioTexto}</span>
         <span className="meta">
           <span>
@@ -29,7 +41,7 @@ function Tarjeta({ orden }: { orden: ModificacionResumen }) {
         </span>
         <span className="meta">
           <span className={`pill ${estado.pill}`}>{estado.texto}</span>
-          {orden.vencida && <span className="pill vencida">Vencida</span>}
+          {orden.urgente && !cerrada && <span className="pill urgente">Urgente</span>}
           {hace(orden.creadaEn)}
           {orden.creadaPor && ` · de ${orden.creadaPor}`}
         </span>
@@ -55,8 +67,8 @@ export default function Ordenes() {
       .catch((e: unknown) => esta === peticion.current && setError(e instanceof ErrorApi ? e.message : 'No se han podido cargar las órdenes'));
   }, []);
 
-  // Al entrar y cada vez que la bandeja dice que algo ha cambiado (también cuando una orden pasa a vencida).
-  const cambio = resumen ? `${resumen.nuevas}·${resumen.pendientes}·${resumen.vencidas}` : '';
+  // Al entrar y cada vez que la bandeja dice que algo ha cambiado (también cuando una orden pasa a urgente).
+  const cambio = resumen ? `${resumen.nuevas}·${resumen.pendientes}·${resumen.urgentes}` : '';
   useEffect(cargar, [cargar, cambio]);
 
   if (error && !ordenes) {
@@ -74,12 +86,12 @@ export default function Ordenes() {
 
   return (
     <>
-      <h2 className="saludo">Tengo que hacer</h2>
-      <p className="sub">Las nuevas primero, luego por prioridad. La franja roja es prioridad alta.</p>
+      <h2 className="saludo">Bandeja de Entrada</h2>
+      <p className="sub">En el orden que ha puesto despacho: la primera es la siguiente. La franja roja es urgente.</p>
       {pendientes.length > 0 ? (
         <div className="lista">
-          {pendientes.map((o) => (
-            <Tarjeta key={o.id} orden={o} />
+          {pendientes.map((o, i) => (
+            <Tarjeta key={o.id} orden={o} siguiente={i === 0} />
           ))}
         </div>
       ) : (

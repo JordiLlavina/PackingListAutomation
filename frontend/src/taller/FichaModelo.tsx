@@ -59,7 +59,7 @@ export default function FichaModelo() {
       </div>
       <div className="acciones" style={{ margin: 0 }}>
         <button className="boton marca ancho" type="button" onClick={() => navegar(`/cambio?modelo=${m.id}`)}>
-          <Icono nombre="mic" /> He cambiado algo en este modelo
+          <Icono nombre="mic" /> Crear Modificación de este modelo
         </button>
       </div>
       {ficha.documentos.length > 0 && (

@@ -290,8 +290,8 @@ class ModelosTest {
         Modelo modelo = modelos.darDeAlta(new Modelos.AltaManual("AMI", null, "T9-FUENTES", null, null, null,
                 null), despacho());
         Evento futuro = new Evento(LocalDateTime.now().plusDays(1), "MODIFICACION", "Cambio de piel", "Taller",
-                7L, null);
-        Evento antiguo = new Evento(LocalDateTime.now().minusYears(1), "MODIFICACION", "Forro", "Taller", 8L, 9L);
+                7L, null, "NUEVA");
+        Evento antiguo = new Evento(LocalDateTime.now().minusYears(1), "MODIFICACION", "Forro", "Taller", 8L, 9L, "HECHA");
         Modelos.FuenteEventos fuente = modeloId -> modeloId.equals(modelo.getId()) ? List.of(antiguo, futuro)
                 : List.of();
         Modelos conFuente = new Modelos(repositorioModelos, catalogo, fotos, temporadas, clientes, cambiosEtapa,

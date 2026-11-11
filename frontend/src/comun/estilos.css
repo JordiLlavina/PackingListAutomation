@@ -20,7 +20,7 @@
   --ok: #1d8a4c;          /* hecho / enviar */
   --ok-ink: #ffffff;
   --new: #2456d1;         /* nuevo, sin leer */
-  --alta: #c4372b;        /* prioridad alta */
+  --alta: #c4372b;        /* urgente */
   --normal: #d29a1c;
   --baja: #7c8699;
   --shadow: 0 1px 2px rgba(22,33,58,.08), 0 6px 18px rgba(22,33,58,.06);
@@ -71,6 +71,11 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
 .chip { height: 48px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: 1rem; }
 .chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+/* Los filtros de la rejilla de modelos del taller, todo seguido: el texto, el cliente y los chips de etapa, del alto de un chip. */
+.filtros-rejilla { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filtros-rejilla .buscar, .filtros-rejilla .cliente { font: inherit; font-size: 1rem; color: var(--fg); background: var(--surface); height: 48px; padding: 0 16px; border: 1px solid var(--line); border-radius: 999px; }
+.filtros-rejilla .buscar { flex: 1 1 260px; min-width: 0; }
+.filtros-rejilla .buscar:focus-visible, .filtros-rejilla .cliente:focus-visible { outline: 3px solid var(--new); outline-offset: 2px; }
 .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 .tarjeta-modelo { border: 0; padding: 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; text-align: left; display: flex; flex-direction: column; }
 .tarjeta-modelo .foto { aspect-ratio: 1; width: 100%; display: block; }
@@ -133,10 +138,9 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .ficha .texto { display: grid; gap: 4px; min-width: 0; }
 .ficha .texto b { font-size: 1.25rem; }
 .lista { display: grid; gap: 14px; }
-.orden { border: 0; text-align: left; padding: 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); display: grid; grid-template-columns: 8px 110px 1fr; overflow: hidden; min-height: 110px; }
+.orden { position: relative; border: 0; text-align: left; padding: 0; background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); display: grid; grid-template-columns: 8px 110px 1fr; overflow: hidden; min-height: 110px; }
 .orden .franja { background: var(--baja); }
-.orden[data-p="ALTA"] .franja { background: var(--alta); }
-.orden[data-p="NORMAL"] .franja { background: var(--normal); }
+.orden[data-urgente] .franja { background: var(--alta); }
 .orden .foto { width: 110px; height: 100%; min-height: 110px; }
 .orden .cuerpo { padding: 12px 14px; display: grid; gap: 4px; align-content: center; min-width: 0; }
 .orden .tit { font-weight: 700; font-size: 1.15rem; }
@@ -163,6 +167,17 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .evento { display: grid; grid-template-columns: 28px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .evento .punto { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); margin: 6px auto 0; }
 .evento .punto.etapa-p { background: var(--new); }
+/* El punto de una modificación dice cómo está hoy: hecha en verde, sin hacer en ámbar, descartada en gris (y su leyenda). */
+.punto.hecha-p { background: var(--ok); }
+.punto.abierta-p { background: var(--normal); }
+.punto.descartada-p { background: var(--line); box-shadow: inset 0 0 0 2px var(--muted); }
+.leyenda-historial { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 4px; color: var(--muted); font-size: .9rem; }
+.leyenda-historial .punto { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 8px; }
+.leyenda-historial .punto:first-child { margin-left: 0; }
+/* En despacho, una modificación del historial lleva a su vista de solo lectura. */
+.evento.clicable { cursor: pointer; border-radius: 8px; }
+.evento.clicable:hover { background: color-mix(in oklab, var(--new) 6%, var(--surface)); }
+.evento .ver-modificacion { display: inline-block; margin-top: 4px; font-size: .9rem; }
 .evento .cuando { color: var(--muted); font-size: .9rem; }
 .evento .que { font-weight: 700; }
 .evento .quien { color: var(--muted); font-size: .95rem; }
@@ -215,12 +230,11 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .paneles { display: grid; grid-template-columns: 440px 1fr; gap: 20px; align-items: start; }
 @media (max-width: 900px) { .paneles { grid-template-columns: 1fr; } }
 
-/* Fila de la bandeja: 72 px, la franja de prioridad pegada al borde izquierdo. */
+/* Fila de la bandeja: 72 px, la franja pegada al borde izquierdo (roja si es urgente). */
 .fila-bandeja { position: relative; min-height: 72px; display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center;
   padding: 8px 12px 8px 18px; background: var(--surface); border: 0; border-bottom: 1px solid var(--line); text-align: left; width: 100%; }
 .fila-bandeja::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--baja); }
-.fila-bandeja[data-p="ALTA"]::before { background: var(--alta); }
-.fila-bandeja[data-p="NORMAL"]::before { background: var(--normal); }
+.fila-bandeja[data-urgente]::before { background: var(--alta); }
 .fila-bandeja[aria-current="true"] { background: color-mix(in oklab, var(--accent) 10%, var(--surface)); }
 
 /* ---------- Modelos (Task 10): lo que la maqueta no trae ---------- */
@@ -253,6 +267,9 @@ img.foto { object-fit: cover; background: var(--line); }
 .campo textarea { padding: 12px 16px; resize: vertical; }
 .campo select:focus-visible, .campo textarea:focus-visible { outline: 3px solid var(--new); outline-offset: 2px; }
 .botones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+/* Una modificación de solo lectura (desde el historial de un modelo): la barra de arriba, separada del detalle. */
+.ver-modificacion-sola > .botones { margin-bottom: 14px; }
+.ver-modificacion-sola > .botones .ayuda { margin: 0; }
 
 /* Los dos paneles de modelos: con un modelo elegido, en pantalla estrecha
    solo se ve su ficha, con «Volver a la lista» encima. */
@@ -325,7 +342,7 @@ img.foto { object-fit: cover; background: var(--line); }
 .dialogo { border: 0; border-radius: 18px; padding: 24px; background: var(--surface); color: var(--fg); box-shadow: var(--shadow); width: min(92vw, 480px); }
 .dialogo::backdrop { background: rgba(22, 33, 58, .45); }
 
-/* «He cambiado algo»: lo que la maqueta no trae. Cada miniatura del paso de
+/* «Crear Modificación»: lo que la maqueta no trae. Cada miniatura del paso de
    fotos lleva su botón de quitar (objetivo de 64 px, encima de la foto); el
    error del envío va en rojo debajo de «Volver a intentar»; el selector de
    ficheros escondido se queda dentro de su recuadro de cámara. */
@@ -335,7 +352,7 @@ img.foto { object-fit: cover; background: var(--line); }
 .error-envio { color: var(--alta); font-weight: 700; margin: 0; }
 .ficha svg.foto { padding: 18px; background: var(--bg); color: var(--fg); }
 
-/* «Tengo que hacer» y «Mis avisos»: lo que la maqueta no trae o pinta en
+/* «Bandeja de Entrada» y «Mis avisos»: lo que la maqueta no trae o pinta en
    línea. La franja de un aviso va por su estado (azul enviado, ámbar visto,
    verde hecho) con modificadores y no con el style de la maqueta; la tarjeta
    de aviso no tiene alto mínimo; la respuesta de despacho va dentro, con su
@@ -384,16 +401,16 @@ a.boton { text-decoration: none; color: var(--fg); }
 .dato { display: inline-flex; align-items: baseline; gap: .35em; white-space: nowrap; line-height: 1.3; padding: .25em .7em; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: .9em; }
 .dato b { color: var(--fg); font-size: 1.15em; font-variant-numeric: tabular-nums; }
 .dato.nuevo:not(.cero) b { color: var(--new); }
-.dato.vencido:not(.cero) b, .dato.con-respuesta:not(.cero) b { color: var(--alta); }
+.dato.urgente:not(.cero) b, .dato.con-respuesta:not(.cero) b { color: var(--alta); }
 .dato.cero { opacity: .65; }
 
 /* La lista: filas de 72 px (.fila-bandeja, de arriba) con foto, título, línea
-   gris y etiquetas; la pastilla de estado a la derecha. Sin prioridad, la
-   franja es azul: un aviso que nadie ha mirado todavía. */
+   gris y etiquetas; la pastilla de estado a la derecha. Un aviso que nadie
+   ha mirado todavía lleva la franja azul. */
 .lista-bandeja { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
 .lista-bandeja li:last-child .fila-bandeja { border-bottom: 0; }
 .fila-bandeja { font-size: 1em; }
-.fila-bandeja[data-p="SIN"]::before { background: var(--new); }
+.fila-bandeja[data-nueva]::before { background: var(--new); }
 .fila-bandeja .foto { width: 56px; height: 56px; border-radius: 10px; display: block; }
 .fila-bandeja .cuerpo { display: grid; gap: 2px; min-width: 0; }
 .fila-bandeja .tit { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -409,8 +426,8 @@ a.boton { text-decoration: none; color: var(--fg); }
 .despacho .pill { height: 1.75em; font-size: .8em; }
 .pill.en-curso { background: color-mix(in oklab, var(--normal) 22%, var(--surface)); color: var(--fg); }
 .pill.descartada { background: var(--line); color: var(--muted); }
-/* Fuera de plazo (los recordatorios): ámbar de aviso, con letra oscura para que se lea. */
-.pill.vencida { background: var(--normal); color: #16213a; }
+/* Urgente (la marca que pone el despacho a una orden; sustituye a «Vencida»): el rojo de la franja. */
+.pill.urgente { background: color-mix(in oklab, var(--alta) 14%, var(--surface)); color: var(--alta); }
 
 /* El chip «IA»: lo que ha escrito la IA (un título, un resumen) se dice. */
 .chip-ia { display: inline-flex; align-items: center; margin-left: .45em; padding: 0 .4em; height: 1.45em; border-radius: 5px; border: 1px solid var(--new);
@@ -447,22 +464,13 @@ a.boton { text-decoration: none; color: var(--fg); }
 .despacho .doc { min-height: 48px; font-size: 1em; border-width: 1px; border-radius: 10px; text-decoration: none; color: var(--fg); }
 .despacho .doc svg { width: 24px; height: 24px; }
 
-/* Panel de acciones: prioridad (tres botones con su color), destinos (una
+/* Panel de acciones: la cola y la marca de urgente de una orden, destinos (una
    fila cada uno), los botones de cerrar y el estado de una orden. */
 .acciones-detalle { display: grid; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
 .acciones-detalle fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
 .acciones-detalle legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
 .acciones-detalle .ayuda { margin: 0; font-size: .9em; }
-.prioridades { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.prioridad { min-height: 2.6em; border-radius: 10px; border: 2px solid var(--line); background: var(--surface); font-weight: 700; font-size: .95em; display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
-.prioridad::before { content: ""; width: .7em; height: .7em; border-radius: 50%; background: var(--baja); }
-.prioridad[data-p="ALTA"]::before { background: var(--alta); }
-.prioridad[data-p="NORMAL"]::before { background: var(--normal); }
-.prioridad[aria-pressed="true"] { color: #fff; border-color: var(--baja); background: var(--baja); }
-.prioridad[aria-pressed="true"]::before { background: currentColor; }
-.prioridad[data-p="ALTA"][aria-pressed="true"] { background: var(--alta); border-color: var(--alta); }
-.prioridad[data-p="NORMAL"][aria-pressed="true"] { background: var(--normal); border-color: var(--normal); color: #16213a; }
-.prioridad[disabled], .acciones-detalle .chip[disabled] { opacity: .45; cursor: not-allowed; }
+.acciones-detalle .chip[disabled] { opacity: .45; cursor: not-allowed; }
 .destino { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .destino:first-of-type { border-top: 0; }
 .destino .nombre { font-weight: 700; grid-column: 1 / -1; }
@@ -499,7 +507,6 @@ a.boton { text-decoration: none; color: var(--fg); }
 .buscador-modelos .lista-modelos { max-height: 360px; overflow: auto; box-shadow: none; border: 1px solid var(--line); }
 .nueva-orden fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
 .nueva-orden legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
-.nueva-orden .prioridades { max-width: 360px; }
 
 /* «Activar los avisos» (push): tarjeta en el Inicio del taller, barra fina en despacho. */
 .activar-avisos { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-bottom: 20px; padding: 16px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); border-left: 6px solid var(--accent); }
@@ -546,3 +553,50 @@ a.boton { text-decoration: none; color: var(--fg); }
 .codigo-alta[data-caducado] { color: var(--muted); text-decoration: line-through; }
 .admin .dialogo p { margin: 0; }
 .admin .cuenta-atras { font-weight: 700; }
+
+/* ---------- Cola del taller ---------- */
+
+/* El puesto de una orden en la Bandeja de Entrada del taller, encima de la foto; la primera se destaca. */
+.orden .puesto { position: absolute; top: 8px; left: 16px; z-index: 1; min-width: 2.2em; height: 1.9em; padding: 0 .45em; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; background: var(--fg); color: var(--surface); font-weight: 700; font-size: .95rem; font-variant-numeric: tabular-nums; }
+.orden.siguiente { outline: 3px solid var(--new); outline-offset: 2px; }
+.orden .la-siguiente { color: var(--new); font-weight: 700; font-size: .9rem; text-transform: uppercase; letter-spacing: .04em; }
+
+/* El puesto y la marca de urgente en el detalle de una orden (despacho). */
+.puesto-detalle { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.urgente-chip[aria-pressed="true"] { background: var(--alta); border-color: var(--alta); color: #fff; }
+.lugar-cola { display: grid; gap: 8px; }
+.lugar-cola select { font: inherit; padding: .5em .6em; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg); max-width: 100%; }
+
+/* La pantalla de la cola en despacho: una columna, una fila por orden. */
+.pantalla-cola { display: grid; gap: 14px; max-width: 1100px; }
+.cabecera-cola { display: flex; gap: 16px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+.cabecera-cola h2 { margin: 0 0 4px; }
+.pantalla-cola .chips { margin-bottom: 0; }
+.sentido-cola { margin-left: auto; }
+.aviso-cola { margin: 0; padding: .7em 1em; border-radius: 10px; background: color-mix(in oklab, var(--normal) 22%, var(--surface)); display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.lista-cola { list-style: none; margin: 0; padding: 0; background: var(--surface); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.lista-cola[aria-busy="true"] { opacity: .75; }
+.fila-cola { position: relative; display: grid; grid-template-columns: 3.2em auto 56px 1fr auto; gap: 12px; align-items: center; padding: 8px 12px 8px 18px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.fila-cola:last-child { border-bottom: 0; }
+.fila-cola::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 6px; background: var(--baja); }
+.fila-cola[data-urgente]::before { background: var(--alta); }
+.fila-cola[draggable="true"] { cursor: grab; }
+.fila-cola.arrastrando { opacity: .45; }
+.fila-cola.encima { box-shadow: inset 0 3px 0 var(--new), inset 0 -3px 0 var(--new); }
+.puesto-cola { font-weight: 700; font-size: 1.25em; font-variant-numeric: tabular-nums; text-align: right; }
+.fila-cola .asa { color: var(--muted); letter-spacing: -.2em; user-select: none; }
+.fila-cola:not([draggable="true"]) .asa { display: none; }
+.fila-cola .foto { width: 56px; height: 56px; border-radius: 10px; display: block; }
+.fila-cola .cuerpo { display: grid; gap: 2px; min-width: 0; }
+.fila-cola .tit { font-weight: 700; color: var(--fg); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fila-cola .tit:hover { text-decoration: underline; }
+.fila-cola .meta { color: var(--muted); font-size: .9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mandos-cola { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.mandos-cola .flecha { min-width: 2.4em; justify-content: center; }
+.mandos-cola .chip[disabled] { opacity: .4; cursor: not-allowed; }
+@media (max-width: 900px) {
+  .fila-cola { grid-template-columns: 2.6em 56px 1fr; }
+  .fila-cola .asa { display: none; }
+  .mandos-cola { grid-column: 1 / -1; justify-content: flex-start; }
+}

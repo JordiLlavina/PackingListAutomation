@@ -1,14 +1,19 @@
 // El detalle de una modificación en despacho, en el panel de la derecha de la
 // bandeja: la cabecera (foto, modelo, tipo, estado, quién y cuándo), el hilo
 // de mensajes con sus notas de voz (y lo que se transcribió), fotos y
-// documentos, y al lado el panel de acciones: en un aviso del taller la
-// prioridad, los destinos donde hay que aplicarlo, «Marcar hecha» y
-// «Descartar»; en una orden, su prioridad y en qué punto la tiene el taller.
+// documentos, y al lado el panel de acciones: en un aviso del taller los
+// destinos donde hay que aplicarlo, «Marcar hecha» y «Descartar»; en una
+// orden, su puesto en la cola del taller, la marca de urgente y en qué punto
+// la tiene el taller.
 // Debajo del hilo, «Responder». Abrir un aviso NUEVO lo da por visto. Tras
 // cada acción se vuelve a pedir el detalle y se avisa a la bandeja (lista y
 // números). Mientras alguna nota de voz se está transcribiendo, el detalle se
 // vuelve a pedir solo cada pocos segundos; una que falló se puede reintentar,
 // y el título que puso la IA se corrige con el lápiz.
+//
+// Con `soloLectura` (desde el historial de un modelo, /app/modificaciones/12)
+// se ve todo igual pero no se toca nada: ni título, ni urgente, ni destinos,
+// ni «Responder», ni pasar fotos a la galería; y abrirla no la da por vista.
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
@@ -27,23 +32,18 @@ import {
   estadoModificacion,
   fotoDelModelo,
   hayTranscripcionPendiente,
+  marcaDestino,
+  puesto,
   tituloEditable,
   tituloVisible,
   type AdjuntoVista,
   type DestinoEstado,
   type MensajeVista,
   type ModificacionDetalle,
-  type Prioridad,
   type Rol,
 } from '../comun/modificaciones';
 import { hace, mmss } from '../comun/tiempo';
 import { toast } from '../comun/toast';
-
-const PRIORIDADES: [Prioridad, string][] = [
-  ['ALTA', 'Alta'],
-  ['NORMAL', 'Normal'],
-  ['BAJA', 'Baja'],
-];
 
 const ROL_TEXTO: Record<Rol, string> = { TALLER: 'taller', DESPACHO: 'despacho', ADMIN: 'admin' };
 
@@ -63,7 +63,7 @@ type Reintento = { reintentando: number | null; onReintentar: (adjuntoId: number
  * reproductor. Si falló el resumen de la IA, la transcripción sigue HECHA y el
  * motivo sale aparte.
  */
-function Transcripcion({ audio, reintentando, onReintentar }: { audio: AdjuntoVista } & Reintento) {
+function Transcripcion({ audio, reintentando, onReintentar, soloLectura }: { audio: AdjuntoVista; soloLectura?: boolean } & Reintento) {
   let estado = null;
   switch (audio.estadoTranscripcion) {
     case 'HECHA':
@@ -84,9 +84,11 @@ function Transcripcion({ audio, reintentando, onReintentar }: { audio: AdjuntoVi
       estado = (
         <span className="estado-transcripcion">
           <span className="etiqueta fallo">falló: {audio.error ?? 'sin motivo'}</span>
+          {!soloLectura && (
           <button className="chip" type="button" disabled={reintentando !== null} onClick={() => onReintentar(audio.id)}>
             {reintentando === audio.id ? 'Reintentando…' : 'Reintentar'}
           </button>
+          )}
         </span>
       );
       break;
@@ -112,7 +114,8 @@ function Mensaje({
   onAGaleria,
   reintentando,
   onReintentar,
-}: { m: MensajeVista; pasando: number | null; onAGaleria: (id: number) => void } & Reintento) {
+  soloLectura,
+}: { m: MensajeVista; pasando: number | null; onAGaleria: (id: number) => void; soloLectura?: boolean } & Reintento) {
   const audios = m.adjuntos.filter((a) => a.tipo === 'AUDIO');
   const fotos = m.adjuntos.filter((a) => a.tipo === 'FOTO');
   const documentos = m.adjuntos.filter((a) => a.tipo === 'DOCUMENTO');
@@ -126,7 +129,7 @@ function Mensaje({
       {audios.map((a) => (
         <div key={a.id} className="nota-voz">
           <Audio compacto adjuntoId={a.id} duracionSeg={a.duracionSeg ?? 0} />
-          <Transcripcion audio={a} reintentando={reintentando} onReintentar={onReintentar} />
+          <Transcripcion audio={a} reintentando={reintentando} onReintentar={onReintentar} soloLectura={soloLectura} />
         </div>
       ))}
       {fotos.length > 0 && (
@@ -136,9 +139,11 @@ function Mensaje({
               <a href={adjuntoUrl(f.id)} target="_blank" rel="noopener" aria-label={`Abrir la foto ${i + 1} en otra pestaña`}>
                 <img src={adjuntoUrl(f.id)} alt="" loading="lazy" />
               </a>
-              <button className="chip" type="button" disabled={pasando !== null} onClick={() => onAGaleria(f.id)}>
-                {pasando === f.id ? 'Guardando…' : 'Pasar a la galería del modelo'}
-              </button>
+              {!soloLectura && (
+                <button className="chip" type="button" disabled={pasando !== null} onClick={() => onAGaleria(f.id)}>
+                  {pasando === f.id ? 'Guardando…' : 'Pasar a la galería del modelo'}
+                </button>
+              )}
             </figure>
           ))}
         </div>
@@ -262,7 +267,7 @@ function Responder({ id, onEnviado }: { id: number; onEnviado: () => Promise<voi
   );
 }
 
-export default function Modificacion({ id, onCambiado }: { id: number; onCambiado: () => void }) {
+export default function Modificacion({ id, onCambiado, soloLectura = false }: { id: number; onCambiado: () => void; soloLectura?: boolean }) {
   const [detalle, setDetalle] = useState<ModificacionDetalle | null>(null);
   const [modelo, setModelo] = useState<ModeloResumen | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +301,7 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
         if (esta !== peticion.current) return;
         setDetalle(d);
         const r = d.resumen;
-        if (r.estado === 'NUEVA' && r.direccion === 'TALLER_A_DESPACHO' && !vistaPedida.current) {
+        if (!soloLectura && r.estado === 'NUEVA' && r.direccion === 'TALLER_A_DESPACHO' && !vistaPedida.current) {
           vistaPedida.current = true;
           api(`/api/modificaciones/${id}/vista`, { method: 'POST' })
             .then(() => {
@@ -312,7 +317,7 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
       .catch((e: unknown) => {
         if (esta === peticion.current) setError(mensaje(e, 'No se ha podido cargar'));
       });
-  }, [id]);
+  }, [id, soloLectura]);
 
   useEffect(() => {
     void cargar();
@@ -477,7 +482,7 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
                   IA
                 </span>
               )}
-              {tituloEditable(r) && (
+              {!soloLectura && tituloEditable(r) && (
                 <button
                   className="editar-titulo"
                   type="button"
@@ -515,6 +520,7 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
             {modelo && <Etapa etapa={modelo.etapa} />}
             {r.tipoCambioTexto && <span className="etiqueta">{r.tipoCambioTexto}</span>}
             <span className={`pill ${estado.pill}`}>{estado.texto}</span>
+            {r.urgente && !cerrada && <span className="pill urgente">Urgente</span>}
             <span>
               {hace(r.creadaEn)}
               {r.creadaPor && ` · de ${r.creadaPor}`}
@@ -534,9 +540,10 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
               onAGaleria={(adj) => void aGaleria(adj)}
               reintentando={reintentando}
               onReintentar={(adj) => void reintentar(adj)}
+              soloLectura={soloLectura}
             />
           ))}
-          <Responder id={r.id} onEnviado={trasCambiar} />
+          {!soloLectura && <Responder id={r.id} onEnviado={trasCambiar} />}
         </div>
 
         <aside className="acciones-detalle" aria-label="Acciones">
@@ -563,26 +570,27 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
             </div>
           )}
 
-          {/* La prioridad se cambia en avisos y órdenes mientras no estén cerradas; en una orden cerrada solo se dice. */}
-          {(esAviso || !cerrada) && (
+          {/* Una orden abierta va en la cola del taller: su puesto, y la marca de urgente (que la sube la primera). */}
+          {!esAviso && !cerrada && (
             <fieldset>
-              <legend>Prioridad</legend>
-              <div className="prioridades">
-                {PRIORIDADES.map(([p, texto]) => (
-                  <button
-                    key={p}
-                    className="prioridad"
-                    type="button"
-                    data-p={p}
-                    aria-pressed={r.prioridad === p}
-                    disabled={cerrada || ocupado}
-                    onClick={() => void accion('/prioridad', { prioridad: p }, 'No se ha podido poner la prioridad')}
-                  >
-                    {texto}
-                  </button>
-                ))}
-              </div>
-              {r.prioridad === null && !cerrada && <p className="ayuda">Todavía sin prioridad.</p>}
+              <legend>Cola del taller</legend>
+              <span className="puesto-detalle">
+                {r.posicionCola !== null ? <b>{puesto(r.posicionCola)} de la cola</b> : <b>Fuera de la cola</b>}
+                <Link to="/cola">Ver la cola</Link>
+              </span>
+              {!soloLectura && (
+                <button
+                  className="chip urgente-chip"
+                  type="button"
+                  aria-pressed={r.urgente}
+                  disabled={ocupado}
+                  onClick={() =>
+                    void accion('/urgente', { urgente: !r.urgente }, 'No se ha podido cambiar la marca de urgente', r.urgente ? 'Ya no es urgente' : 'Urgente: ahora es la primera de la cola')
+                  }
+                >
+                  {r.urgente ? 'Urgente · quitar' : 'Marcar urgente'}
+                </button>
+              )}
             </fieldset>
           )}
 
@@ -590,7 +598,24 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
             <>
               <fieldset>
                 <legend>Aplicar en</legend>
-                {r.destinos.map((d) => (
+                {soloLectura && r.destinos.map((d) => {
+                  const marca = marcaDestino(d);
+                  return (
+                    <div key={d.destino} className="destino">
+                      <span className="nombre">{d.texto}</span>
+                      <span className="marca-destino" data-d={marca.estado}>
+                        {marca.estado === 'hecho' ? '✓ Aplicado' : marca.estado === 'no-aplica' ? 'No aplica' : 'Por aplicar'}
+                      </span>
+                      {d.hechoEn && (
+                        <span className="meta">
+                          {d.hechoPor ? `por ${d.hechoPor} · ` : ''}
+                          {hace(d.hechoEn)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+                {!soloLectura && r.destinos.map((d) => (
                   <div key={d.destino} className="destino">
                     <span className="nombre">{d.texto}</span>
                     <label className="casilla">
@@ -624,12 +649,11 @@ export default function Modificacion({ id, onCambiado }: { id: number; onCambiad
           ) : (
             <fieldset>
               <legend>En el taller</legend>
-              {cerrada && r.prioridad && <span>Prioridad {PRIORIDADES.find(([p]) => p === r.prioridad)?.[1].toLowerCase()}</span>}
               <span className="meta">{r.vistaEn ? `La vio ${hace(r.vistaEn)}` : 'Todavía no la ha abierto'}</span>
             </fieldset>
           )}
 
-          {!cerrada && (
+          {!soloLectura && !cerrada && (
             <div className="botones">
               <button className="boton ok" type="button" disabled={ocupado} onClick={() => void accion('/hecha', undefined, 'No se ha podido marcar como hecha', 'Marcada como hecha')}>
                 <Icono nombre="check" /> Marcar hecha

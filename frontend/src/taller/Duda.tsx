@@ -1,6 +1,6 @@
 // «Tengo una duda» sobre una orden y «Contestar a despacho» en un aviso: la
 // misma pantalla con otra cabecera. Se graba una nota de voz con la grabadora
-// de «He cambiado algo» y se manda como un mensaje más de la modificación
+// de «Crear Modificación» y se manda como un mensaje más de la modificación
 // (POST /mensajes), que deja la pelota en el otro lado. Si el envío falla, la
 // nota se queda y sale un botón grande de volver a intentar, como en Revisar.
 import { useCallback, useEffect, useRef, useState } from 'react';

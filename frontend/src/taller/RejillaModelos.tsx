@@ -1,26 +1,34 @@
-// La rejilla de modelos del taller, la de la maqueta: chips de filtro (todos,
-// cada cliente, y las etapas que interesan en el taller) y una tarjeta por
-// modelo con su foto. Carga ella misma la lista, así Inicio y Modelos solo
-// tienen que ponerla. El filtro va en la dirección (?filtro=AMI) para que al
-// volver de una ficha siga elegido.
+// La rejilla de modelos del taller: arriba los filtros, como en despacho (un
+// campo de texto que busca dentro de la referencia y del nombre, el cliente
+// en un desplegable y los chips de etapa), y una tarjeta por modelo con su
+// foto. Carga ella misma la lista, así Inicio y Modelos solo tienen que
+// ponerla, y filtra en el navegador (son pocos y ya están todos). Los filtros
+// van en la dirección (?q=770&cliente=AMI&etapa=SMS) para que al volver de
+// una ficha sigan puestos.
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
-import { filtrarRejilla, type ModeloResumen } from '../comun/modelos';
+import { ETAPAS, filtrarRejilla, type Etapa as TipoEtapa, type ModeloResumen } from '../comun/modelos';
 
-const CHIPS_ETAPA: [string, string][] = [
+// Los de despacho, con «Todos» delante.
+const CHIPS_ETAPA: [TipoEtapa | '', string][] = [
+  ['', 'Todos'],
   ['PROTOTIPO', 'Prototipos'],
   ['SMS', 'Muestras'],
   ['PRODUCCION', 'Producción'],
+  ['INACTIVO', 'Inactivos'],
 ];
 
 export default function RejillaModelos({ onElegir }: { onElegir: (id: number, modelo: ModeloResumen) => void }) {
   const [modelos, setModelos] = useState<ModeloResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
-  const filtro = params.get('filtro') ?? 'TODOS';
+  const texto = params.get('q') ?? '';
+  const cliente = params.get('cliente') ?? '';
+  const etapaParam = params.get('etapa') ?? '';
+  const etapa: TipoEtapa | '' = (ETAPAS as string[]).includes(etapaParam) ? (etapaParam as TipoEtapa) : '';
 
   const cargar = useCallback(() => {
     setError(null);
@@ -52,21 +60,46 @@ export default function RejillaModelos({ onElegir }: { onElegir: (id: number, mo
   }
 
   const clientes = [...new Set(modelos.map((m) => m.cliente))].sort();
-  const chips: [string, string][] = [['TODOS', 'Todos'], ...clientes.map((c): [string, string] => [c, c]), ...CHIPS_ETAPA];
-  const elegir = (clave: string) => setParams(clave === 'TODOS' ? {} : { filtro: clave }, { replace: true });
-  const lista = filtrarRejilla(modelos, filtro);
+  // Cambia un filtro y deja los demás; uno vacío no se escribe en la dirección.
+  const poner = (clave: 'q' | 'cliente' | 'etapa', valor: string) =>
+    setParams(
+      (antes) => {
+        const despues = new URLSearchParams(antes);
+        if (valor) despues.set(clave, valor);
+        else despues.delete(clave);
+        return despues;
+      },
+      { replace: true },
+    );
+  const lista = filtrarRejilla(modelos, { texto, cliente, etapa });
 
   return (
     <>
-      <div className="chips">
-        {chips.map(([clave, texto]) => (
-          <button key={clave} className="chip" type="button" aria-pressed={filtro === clave} onClick={() => elegir(clave)}>
-            {texto}
+      <div className="filtros-rejilla">
+        <input
+          type="search"
+          className="buscar"
+          value={texto}
+          placeholder="Buscar referencia o nombre"
+          aria-label="Buscar por referencia o nombre"
+          onChange={(e) => poner('q', e.target.value)}
+        />
+        <select className="cliente" value={cliente} aria-label="Cliente" onChange={(e) => poner('cliente', e.target.value)}>
+          <option value="">Todos los clientes</option>
+          {clientes.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        {CHIPS_ETAPA.map(([clave, txt]) => (
+          <button key={clave || 'todos'} className="chip" type="button" aria-pressed={etapa === clave} onClick={() => poner('etapa', clave)}>
+            {txt}
           </button>
         ))}
       </div>
       {lista.length === 0 ? (
-        <p className="ayuda">Ningún modelo con este filtro.</p>
+        <p className="ayuda">Ningún modelo con estos filtros.</p>
       ) : (
         <div className="rejilla">
           {lista.map((m) => (

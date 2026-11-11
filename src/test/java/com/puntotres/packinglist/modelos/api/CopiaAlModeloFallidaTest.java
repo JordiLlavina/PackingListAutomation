@@ -63,7 +63,7 @@ class CopiaAlModeloFallidaTest {
                         .file(new MockMultipartFile("documentos", "x.pdf", MediaType.APPLICATION_PDF_VALUE,
                                 "%PDF-1.4 de prueba".getBytes()))
                         .param("modeloId", String.valueOf(modeloId))
-                        .param("titulo", "Nuevo patrón").param("prioridad", "NORMAL")
+                        .param("titulo", "Nuevo patrón")
                         .param("guardarEnModelo", "true")
                         .with(comoUsuario(despacho)).with(csrf()))
                 .andExpect(status().isCreated())

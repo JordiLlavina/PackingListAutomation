@@ -26,15 +26,13 @@ export default function Inicio() {
           <span className={nuevas ? 'badge' : 'badge cero'}>{nuevas}</span>
           <Icono nombre="bandeja" />
           <span>
-            <span className="t">Tengo que hacer</span>
-            <br />
-            <span className="m">Órdenes de despacho</span>
+            <span className="t">Bandeja de Entrada</span>
           </span>
         </button>
         <button className="losa primaria" type="button" onClick={() => navegar('/cambio')}>
           <Icono nombre="mic" />
           <span>
-            <span className="t">He cambiado algo</span>
+            <span className="t">Crear Modificación</span>
             <br />
             <span className="m">Avisar con fotos y voz</span>
           </span>

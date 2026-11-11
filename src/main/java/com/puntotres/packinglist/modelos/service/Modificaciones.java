@@ -1,6 +1,5 @@
 package com.puntotres.packinglist.modelos.service;
 
-import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +42,6 @@ import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionDestino;
 import com.puntotres.packinglist.modelos.persistence.ModificacionDestinoRepository;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.ResumenAdjunto;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
@@ -66,11 +64,14 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
  * <ul>
  * <li>Un aviso necesita al menos una foto o una nota de voz, y nace con un
  * destino por cada uno de {@code modelos.destinos-aplicacion}, todos
- * aplicando. Una orden necesita título y prioridad, y no tiene destinos.</li>
+ * aplicando. Una orden necesita título, no tiene destinos y entra en la cola
+ * del taller ({@link ColaTaller}): al final o delante de la que se diga.</li>
+ * <li>Solo una orden abierta se marca urgente, y marcarla la sube la primera
+ * de la cola; quitarle la marca no la mueve.</li>
  * <li>Un aviso pasa solo a EN_CURSO al marcar el primer destino hecho y a
  * HECHA cuando están hechos todos los que aplican (también si ya no aplica
  * ninguno). Desmarcar un destino de un aviso HECHO lo devuelve a EN_CURSO.</li>
- * <li>Una DESCARTADA no cambia de prioridad, ni de destinos, ni se marca
+ * <li>Una DESCARTADA no cambia de destinos, ni se marca
  * hecha, pero sigue admitiendo mensajes: se puede explicar por qué se
  * descartó.</li>
  * <li>Cada respuesta enciende {@code necesita_respuesta} y deja la pelota en
@@ -109,14 +110,12 @@ public class Modificaciones implements Modelos.FuenteEventos {
     private final FotosCatalogo fotos;
     private final ModelosProperties props;
     private final ApplicationEventPublisher eventos;
-    private final Recordatorios recordatorios;
-    private final Clock reloj;
+    private final ColaTaller cola;
 
     public Modificaciones(ModificacionRepository repositorio, ModificacionDestinoRepository destinos,
                           MensajeRepository mensajes, Adjuntos adjuntos, UsuarioRepository usuarios,
                           ModeloRepository modelos, CatalogoModelos catalogo, FotosCatalogo fotos,
-                          ModelosProperties props, ApplicationEventPublisher eventos, Recordatorios recordatorios,
-                          Clock reloj) {
+                          ModelosProperties props, ApplicationEventPublisher eventos, ColaTaller cola) {
         this.repositorio = repositorio;
         this.destinos = destinos;
         this.mensajes = mensajes;
@@ -127,17 +126,27 @@ public class Modificaciones implements Modelos.FuenteEventos {
         this.fotos = fotos;
         this.props = props;
         this.eventos = eventos;
-        this.recordatorios = recordatorios;
-        this.reloj = reloj;
+        this.cola = cola;
     }
 
     /** Lo que manda el taller: el modelo, el tipo de cambio (clave del yml) y sus fotos y notas de voz. */
     public record AvisoTaller(Long modeloId, String tipoCambio, List<AdjuntoNuevo> adjuntos) {
     }
 
-    /** Lo que manda el despacho; el tipo de cambio es opcional, el título y la prioridad no. */
-    public record OrdenDespacho(Long modeloId, String tipoCambio, String titulo, String texto, Prioridad prioridad,
-                                List<AdjuntoNuevo> adjuntos) {
+    /**
+     * Lo que manda el despacho; el tipo de cambio es opcional, el título no.
+     *
+     * @param urgente marcada urgente desde que nace
+     * @param antesDe la orden de la cola delante de la que va; null, al final
+     */
+    public record OrdenDespacho(Long modeloId, String tipoCambio, String titulo, String texto, boolean urgente,
+                                Long antesDe, List<AdjuntoNuevo> adjuntos) {
+
+        /** Ni urgente, y al final de la cola. */
+        public OrdenDespacho(Long modeloId, String tipoCambio, String titulo, String texto,
+                             List<AdjuntoNuevo> adjuntos) {
+            this(modeloId, tipoCambio, titulo, texto, false, null, adjuntos);
+        }
     }
 
     /**
@@ -147,8 +156,8 @@ public class Modificaciones implements Modelos.FuenteEventos {
      * @param texto   busca, sin mirar mayúsculas, en el título, el texto de los
      *                mensajes, las transcripciones y los resúmenes de la IA
      */
-    public record Filtro(Direccion direccion, Set<EstadoModificacion> estados, Prioridad prioridad, Long modeloId,
-                         String cliente, String texto) {
+    public record Filtro(Direccion direccion, Set<EstadoModificacion> estados, Long modeloId, String cliente,
+                         String texto) {
     }
 
     @Transactional
@@ -164,7 +173,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
         }
         LocalDateTime ahora = LocalDateTime.now();
         Modificacion modificacion = repositorio.save(new Modificacion(aviso.modeloId(), Direccion.TALLER_A_DESPACHO,
-                tipoCambio, null, null, idDe(quien), ahora));
+                tipoCambio, null, idDe(quien), ahora));
         for (DestinoAplicacion destino : destinosDelYml()) {
             destinos.save(new ModificacionDestino(modificacion.getId(), destino));
         }
@@ -187,13 +196,13 @@ public class Modificaciones implements Modelos.FuenteEventos {
         if (titulo.length() > LARGO_TITULO) {
             throw new IllegalArgumentException("El título no puede pasar de " + LARGO_TITULO + " caracteres");
         }
-        if (orden.prioridad() == null) {
-            throw new IllegalArgumentException("Falta la prioridad");
-        }
         String tipoCambio = tipoCambioDelYml(orden.tipoCambio(), false);
         LocalDateTime ahora = LocalDateTime.now();
-        Modificacion modificacion = repositorio.save(new Modificacion(orden.modeloId(), Direccion.DESPACHO_A_TALLER,
-                tipoCambio, orden.prioridad(), titulo, idDe(quien), ahora));
+        Modificacion nueva = new Modificacion(orden.modeloId(), Direccion.DESPACHO_A_TALLER, tipoCambio, titulo,
+                idDe(quien), ahora);
+        nueva.marcarUrgente(orden.urgente());
+        Modificacion modificacion = repositorio.save(nueva);
+        cola.colocar(modificacion, orden.antesDe());
         guardarMensaje(modificacion.getId(), vacio(orden.texto()) ? "" : orden.texto().trim(),
                 sinNulos(orden.adjuntos()), quien, ahora);
         // El push al taller sale cuando se confirma la transacción (Push).
@@ -202,15 +211,15 @@ public class Modificaciones implements Modelos.FuenteEventos {
     }
 
     /**
-     * Las que pasan el filtro, en el orden de la bandeja: las NUEVAS primero;
-     * luego las que no tienen prioridad (los avisos que el despacho aún no ha
-     * mirado); luego ALTA, NORMAL y BAJA; y a igualdad, la más antigua
-     * primero. Las cerradas (HECHA, DESCARTADA) van al final, salvo que el
-     * filtro pida estados concretos: entonces se ordenan como las demás.
+     * Las que pasan el filtro, en el orden de la bandeja: las órdenes abiertas
+     * en el orden de la cola del taller; los avisos, los NUEVOS primero y a
+     * igualdad el más antiguo. Las cerradas (HECHA, DESCARTADA) van al final,
+     * salvo que el filtro pida estados concretos: entonces se ordenan como las
+     * demás (por antigüedad).
      */
     @Transactional(readOnly = true)
     public List<ModificacionResumen> listar(Filtro filtro, UsuarioActual quien) {
-        Filtro f = filtro == null ? new Filtro(null, null, null, null, null, null) : filtro;
+        Filtro f = filtro == null ? new Filtro(null, null, null, null, null) : filtro;
         boolean conEstados = f.estados() != null && !f.estados().isEmpty();
         List<Modificacion> candidatos;
         if (f.direccion() != null) {
@@ -220,7 +229,6 @@ public class Modificaciones implements Modelos.FuenteEventos {
             candidatos = conEstados ? repositorio.findByEstadoIn(f.estados()) : repositorio.findAll();
         }
         List<Modificacion> filtrados = candidatos.stream()
-                .filter(m -> f.prioridad() == null || f.prioridad() == m.getPrioridad())
                 .filter(m -> f.modeloId() == null || f.modeloId().equals(m.getModeloId()))
                 .toList();
         Contexto contexto = contexto(filtrados);
@@ -229,7 +237,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
         return filtrados.stream()
                 .filter(m -> cliente == null || cliente.equalsIgnoreCase(contexto.clienteDe(m)))
                 .filter(m -> texto == null || contexto.contiene(m, texto))
-                .sorted(ordenDeBandeja(!conEstados))
+                .sorted(ordenDeBandeja(!conEstados, contexto.posiciones))
                 .map(contexto::resumen)
                 .toList();
     }
@@ -263,18 +271,41 @@ public class Modificaciones implements Modelos.FuenteEventos {
         }
     }
 
+    /**
+     * Marca o quita la marca de urgente de una orden abierta para el taller.
+     * Marcarla la sube la primera de la cola (luego se puede mover como
+     * cualquier otra); quitarla la deja donde está.
+     */
     @Transactional
-    public void ponerPrioridad(Long id, Prioridad p, UsuarioActual quien) {
+    public void marcarUrgente(Long id, boolean urgente, UsuarioActual quien) {
         exigirDespacho(quien);
         Modificacion modificacion = modificacionQueExiste(id);
-        if (p == null) {
-            throw new IllegalArgumentException("Falta la prioridad");
+        if (modificacion.esAviso()) {
+            throw new IllegalArgumentException("Solo una orden para el taller puede ser urgente");
         }
-        exigirNoDescartada(modificacion);
-        if (modificacion.getEstado() == EstadoModificacion.HECHA) {
-            throw new IllegalArgumentException("La modificación ya está hecha");
+        if (!ColaTaller.enLaCola(modificacion)) {
+            throw new IllegalArgumentException("La orden ya está cerrada");
         }
-        modificacion.ponerPrioridad(p);
+        boolean antes = modificacion.isUrgente();
+        modificacion.marcarUrgente(urgente);
+        if (urgente && !antes) {
+            cola.alPrincipio(modificacion);
+        }
+    }
+
+    /** La cola del taller, de la primera a la última, como la ve la bandeja. */
+    @Transactional(readOnly = true)
+    public List<ModificacionResumen> cola() {
+        List<Modificacion> lista = cola.cola();
+        Contexto contexto = contexto(lista);
+        return lista.stream().map(contexto::resumen).toList();
+    }
+
+    /** Deja la cola en ese orden (tiene que ser la cola entera: {@link ColaTaller#reordenar}). */
+    @Transactional
+    public void reordenarCola(List<Long> ids, UsuarioActual quien) {
+        exigirDespacho(quien);
+        cola.reordenar(ids);
     }
 
     /**
@@ -442,36 +473,33 @@ public class Modificaciones implements Modelos.FuenteEventos {
      * <ul>
      * <li>TALLER: nuevas = órdenes NUEVAS; pendientes = órdenes NUEVA, VISTA o
      * EN_CURSO; conRespuesta = avisos suyos abiertos con respuesta del
-     * despacho pendiente de contestar; vencidas = órdenes abiertas que van
-     * tarde ({@link Recordatorios#vencida}).</li>
-     * <li>DESPACHO: nuevas = avisos NUEVOS; sinPrioridad = avisos abiertos sin
-     * prioridad; pendientes = avisos NUEVA, VISTA o EN_CURSO; conRespuesta =
-     * órdenes abiertas con una duda del taller pendiente de contestar;
-     * vencidas = avisos abiertos que van tarde.</li>
+     * despacho pendiente de contestar.</li>
+     * <li>DESPACHO: nuevas = avisos NUEVOS; pendientes = avisos NUEVA, VISTA o
+     * EN_CURSO; conRespuesta = órdenes abiertas con una duda del taller
+     * pendiente de contestar.</li>
      * </ul>
+     * En los dos, urgentes = órdenes para el taller abiertas y urgentes.
      */
     @Transactional(readOnly = true)
     public ResumenBandeja resumen(UsuarioActual quien) {
         if (quien == null || quien.rol() == null) {
-            return new ResumenBandeja(0, 0, 0, 0, 0);
-        }
-        if (quien.esDespacho()) {
-            Direccion avisos = Direccion.TALLER_A_DESPACHO;
-            int vencidas = vencidas(avisos);
-            int nuevas = (int) repositorio.countByDireccionAndEstadoIn(avisos, EnumSet.of(EstadoModificacion.NUEVA));
-            int sinPrioridad = (int) repositorio.countByDireccionAndPrioridadIsNullAndEstadoIn(avisos, ABIERTAS);
-            int pendientes = (int) repositorio.countByDireccionAndEstadoIn(avisos, ABIERTAS);
-            int conRespuesta = esperandoA(repositorio.findByDireccionAndNecesitaRespuestaTrue(
-                    Direccion.DESPACHO_A_TALLER), Rol.DESPACHO);
-            return new ResumenBandeja(nuevas, pendientes, vencidas, conRespuesta, sinPrioridad);
+            return new ResumenBandeja(0, 0, 0, 0);
         }
         Direccion ordenes = Direccion.DESPACHO_A_TALLER;
-        int vencidas = vencidas(ordenes);
+        int urgentes = (int) repositorio.countByDireccionAndUrgenteTrueAndEstadoIn(ordenes, ABIERTAS);
+        if (quien.esDespacho()) {
+            Direccion avisos = Direccion.TALLER_A_DESPACHO;
+            int nuevas = (int) repositorio.countByDireccionAndEstadoIn(avisos, EnumSet.of(EstadoModificacion.NUEVA));
+            int pendientes = (int) repositorio.countByDireccionAndEstadoIn(avisos, ABIERTAS);
+            int conRespuesta = esperandoA(repositorio.findByDireccionAndNecesitaRespuestaTrue(ordenes),
+                    Rol.DESPACHO);
+            return new ResumenBandeja(nuevas, pendientes, urgentes, conRespuesta);
+        }
         int nuevas = (int) repositorio.countByDireccionAndEstadoIn(ordenes, EnumSet.of(EstadoModificacion.NUEVA));
         int pendientes = (int) repositorio.countByDireccionAndEstadoIn(ordenes, ABIERTAS);
         int conRespuesta = esperandoA(repositorio.findByDireccionAndNecesitaRespuestaTrueAndCreadaPor(
                 Direccion.TALLER_A_DESPACHO, quien.id()), Rol.TALLER);
-        return new ResumenBandeja(nuevas, pendientes, vencidas, conRespuesta, 0);
+        return new ResumenBandeja(nuevas, pendientes, urgentes, conRespuesta);
     }
 
     /**
@@ -524,7 +552,8 @@ public class Modificaciones implements Modelos.FuenteEventos {
             String quien = creador == null ? NADIE : creador.getNombre() + lado;
             Mensaje primero = primeros.get(m.getId());
             eventos.add(new Evento(m.getCreadaEn(), "MODIFICACION", textoDeEvento(m), quien, m.getId(),
-                    primero == null ? null : primerAudio.get(primero.getId())));
+                    primero == null ? null : primerAudio.get(primero.getId()),
+                    m.getEstado() == null ? null : m.getEstado().name()));
         }
         return eventos;
     }
@@ -543,14 +572,6 @@ public class Modificaciones implements Modelos.FuenteEventos {
             adjuntos.guardar(mensaje.getId(), nuevo);
         }
         return mensaje;
-    }
-
-    /** Cuántas abiertas de esa dirección van tarde ({@link Recordatorios#vencida}), a la hora del reloj. */
-    private int vencidas(Direccion direccion) {
-        LocalDateTime ahora = LocalDateTime.now(reloj);
-        return (int) repositorio.findByDireccionAndEstadoIn(direccion, ABIERTAS).stream()
-                .filter(m -> recordatorios.vencida(m, ahora))
-                .count();
     }
 
     /**
@@ -576,11 +597,14 @@ public class Modificaciones implements Modelos.FuenteEventos {
                 .count();
     }
 
-    /** NUEVA primero, sin prioridad, por prioridad, la más antigua primero; las cerradas al final si se pide. */
-    private static Comparator<Modificacion> ordenDeBandeja(boolean cerradasAlFinal) {
+    /**
+     * Las cerradas al final si se pide; las órdenes de la cola por su puesto;
+     * lo demás, NUEVA primero y la más antigua primero.
+     */
+    private static Comparator<Modificacion> ordenDeBandeja(boolean cerradasAlFinal, Map<Long, Integer> posiciones) {
         return Comparator.comparingInt((Modificacion m) -> cerradasAlFinal && m.getEstado().cerrada() ? 1 : 0)
+                .thenComparingInt(m -> posiciones.getOrDefault(m.getId(), Integer.MAX_VALUE))
                 .thenComparingInt(m -> m.getEstado() == EstadoModificacion.NUEVA ? 0 : 1)
-                .thenComparingInt(m -> m.getPrioridad() == null ? -1 : m.getPrioridad().ordinal())
                 .thenComparing(Modificacion::getCreadaEn, Comparator.nullsLast(Comparator.naturalOrder()))
                 .thenComparing(Modificacion::getId);
     }
@@ -588,7 +612,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
     /** Todo lo que hace falta para pintar esas modificaciones, con una consulta por tabla. */
     private Contexto contexto(List<Modificacion> lista) {
         if (lista.isEmpty()) {
-            return new Contexto(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
+            return new Contexto(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of());
         }
         Set<Long> modeloIds = lista.stream().map(Modificacion::getModeloId).collect(Collectors.toSet());
         Map<Long, Modelo> porId = new HashMap<>();
@@ -615,8 +639,10 @@ public class Modificaciones implements Modelos.FuenteEventos {
         });
         todos.forEach(mensaje -> usuarioIds.add(mensaje.getAutorId()));
         todosLosDestinos.forEach(destino -> usuarioIds.add(destino.getHechoPor()));
+        // El puesto en la cola solo hace falta si hay alguna orden de la cola entre ellas.
+        Map<Long, Integer> posiciones = lista.stream().anyMatch(ColaTaller::enLaCola) ? cola.posiciones() : Map.of();
         return new Contexto(porId, principales, mensajesPorModificacion, adjuntosPorMensaje, destinosPorModificacion,
-                usuariosPorId(usuarioIds));
+                usuariosPorId(usuarioIds), posiciones);
     }
 
     /** Las piezas de una lista ya cargadas, por id. */
@@ -628,17 +654,20 @@ public class Modificaciones implements Modelos.FuenteEventos {
         private final Map<Long, List<ResumenAdjunto>> adjuntosPorMensaje;
         private final Map<Long, List<ModificacionDestino>> destinosPorModificacion;
         private final Map<Long, Usuario> usuarios;
+        private final Map<Long, Integer> posiciones;
 
         private Contexto(Map<Long, Modelo> modelosPorId, Map<Long, Long> fotosPrincipales,
                          Map<Long, List<Mensaje>> mensajesPorModificacion,
                          Map<Long, List<ResumenAdjunto>> adjuntosPorMensaje,
-                         Map<Long, List<ModificacionDestino>> destinosPorModificacion, Map<Long, Usuario> usuarios) {
+                         Map<Long, List<ModificacionDestino>> destinosPorModificacion, Map<Long, Usuario> usuarios,
+                         Map<Long, Integer> posiciones) {
             this.modelosPorId = modelosPorId;
             this.fotosPrincipales = fotosPrincipales;
             this.mensajesPorModificacion = mensajesPorModificacion;
             this.adjuntosPorMensaje = adjuntosPorMensaje;
             this.destinosPorModificacion = destinosPorModificacion;
             this.usuarios = usuarios;
+            this.posiciones = posiciones;
         }
 
         List<Mensaje> mensajesDe(Modificacion m) {
@@ -708,13 +737,13 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     .findFirst()
                     .map(ResumenAdjunto::duracionSeg)
                     .orElse(null);
-            boolean vencida = recordatorios.vencida(m, LocalDateTime.now(reloj));
             return new ModificacionResumen(m.getId(), m.getModeloId(),
                     modelo == null ? null : modelo.nombreVisible(), modelo == null ? null : modelo.getNombre(),
                     modelo == null ? null : modelo.getCliente(), fotosPrincipales.get(m.getModeloId()),
-                    m.getDireccion(), m.getTipoCambio(), tipoCambioTexto(m.getTipoCambio()), m.getPrioridad(),
-                    m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
-                    m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()), pendiente, vencida, estados,
+                    m.getDireccion(), m.getTipoCambio(), tipoCambioTexto(m.getTipoCambio()), m.isUrgente(),
+                    posiciones.get(m.getId()), m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
+                    m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()), pendiente,
+                    modelo == null ? null : modelo.getEtapa(), estados,
                     numeroFotos, audios, documentos, duracionAudio, ultimoMensajeDe);
         }
 

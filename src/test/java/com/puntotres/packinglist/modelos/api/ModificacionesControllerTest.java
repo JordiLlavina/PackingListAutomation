@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -161,22 +162,23 @@ class ModificacionesControllerTest {
     }
 
     @Test
-    void elTallerNoPuedeCrearOrdenesNiPonerPrioridad() throws Exception {
+    void elTallerNoPuedeCrearOrdenesNiTocarLaCola() throws Exception {
         long modeloId = alta("T12-ROL");
 
         String creada = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.BLUE))
                         .param("tipoCambio", "FORRO").param("titulo", "Orden del taller")
-                        .param("prioridad", "ALTA")
+                        .param("urgente", "true")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.direccion").value("TALLER_A_DESPACHO"))
                 .andExpect(jsonPath("$.modificacion.titulo").value(nullValue()))
-                .andExpect(jsonPath("$.modificacion.prioridad").value(nullValue()))
+                .andExpect(jsonPath("$.modificacion.urgente").value(false))
+                .andExpect(jsonPath("$.modificacion.posicionCola").value(nullValue()))
                 .andReturn().getResponse().getContentAsString();
         long id = JSON.readTree(creada).get("modificacion").get("id").asLong();
 
-        mvc.perform(post("/api/modificaciones/" + id + "/prioridad").with(comoUsuario(taller())).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"prioridad\":\"ALTA\"}"))
+        mvc.perform(put("/api/modificaciones/cola").with(comoUsuario(taller())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"ids\":[]}"))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/modificaciones/" + id + "/destinos/ICSUITE").with(comoUsuario(taller()))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON)
@@ -188,19 +190,24 @@ class ModificacionesControllerTest {
         mvc.perform(post("/api/modificaciones/" + id + "/hecha").with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isForbidden());
 
-        mvc.perform(post("/api/modificaciones/" + id + "/prioridad").with(comoUsuario(despacho())).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"prioridad\":\"ALTA\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.prioridad").value("ALTA"));
+        mvc.perform(post("/api/modificaciones/" + id + "/urgente").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"urgente\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("Solo una orden para el taller puede ser urgente"));
 
         // El despacho, con los mismos campos, crea una orden: también la decide el rol.
-        mvc.perform(nueva(modeloId).param("titulo", "Cambiar el forro").param("texto", "Ante marrón")
-                        .param("prioridad", "NORMAL")
+        String orden = mvc.perform(nueva(modeloId).param("titulo", "Cambiar el forro").param("texto", "Ante marrón")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.direccion").value("DESPACHO_A_TALLER"))
                 .andExpect(jsonPath("$.modificacion.titulo").value("Cambiar el forro"))
-                .andExpect(jsonPath("$.modificacion.prioridad").value("NORMAL"));
+                .andExpect(jsonPath("$.modificacion.urgente").value(false))
+                .andExpect(jsonPath("$.modificacion.etapa").value("PROTOTIPO"))
+                .andReturn().getResponse().getContentAsString();
+        long ordenId = JSON.readTree(orden).get("modificacion").get("id").asLong();
+        mvc.perform(post("/api/modificaciones/" + ordenId + "/urgente").with(comoUsuario(taller())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"urgente\":true}"))
+                .andExpect(status().isForbidden());
 
         mvc.perform(post("/api/modificaciones/" + id + "/descartar").with(comoUsuario(despacho())).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"motivo\":\"Repetido\"}"))
@@ -226,7 +233,7 @@ class ModificacionesControllerTest {
                 .andExpect(jsonPath("$", hasSize(0)));
 
         mvc.perform(nueva(modeloId).file(documento("plano.pdf")).param("titulo", "Nuevo patrón")
-                        .param("prioridad", "BAJA").param("guardarEnModelo", "true")
+                        .param("guardarEnModelo", "true")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.documentos").value(1))
@@ -349,7 +356,7 @@ class ModificacionesControllerTest {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "private, max-age=86400"));
 
         String orden = mvc.perform(nueva(modeloId).file(documento("ñandú \"1\".pdf")).param("titulo", "Plano")
-                        .param("prioridad", "NORMAL")
+                        
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -365,7 +372,7 @@ class ModificacionesControllerTest {
             String conHtml = mvc.perform(nueva(modeloId)
                             .file(new MockMultipartFile("documentos", "pagina.html", peligroso,
                                     "<script>alert(1)</script>".getBytes()))
-                            .param("titulo", "Página").param("prioridad", "NORMAL")
+                            .param("titulo", "Página")
                             .with(comoUsuario(despacho())).with(csrf()))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
@@ -433,10 +440,59 @@ class ModificacionesControllerTest {
     }
 
     @Test
+    void laColaSeLeeSeReordenaYUnaColaViejaEs409() throws Exception {
+        long modeloId = alta("T12-COLA");
+        long primera = crearOrden(modeloId, "Primera", null);
+        long segunda = crearOrden(modeloId, "Segunda", primera);
+
+        List<Long> cola = idsDeLaCola();
+        assertEquals(cola.indexOf(primera) - 1, cola.indexOf(segunda), "antesDe la pone delante");
+
+        List<Long> alReves = new java.util.ArrayList<>(cola);
+        java.util.Collections.reverse(alReves);
+        mvc.perform(put("/api/modificaciones/cola").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsString(
+                                java.util.Map.of("ids", alReves))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(alReves.get(0)))
+                .andExpect(jsonPath("$[0].posicionCola").value(1));
+        assertEquals(alReves, idsDeLaCola(), "el taller la lee igual");
+
+        mvc.perform(put("/api/modificaciones/cola").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(JSON.writeValueAsString(
+                                java.util.Map.of("ids", alReves.subList(1, alReves.size())))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensaje").value(startsWith("La cola ha cambiado")));
+
+        mvc.perform(post("/api/modificaciones/" + segunda + "/urgente").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"urgente\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.urgente").value(true))
+                .andExpect(jsonPath("$.posicionCola").value(1));
+    }
+
+    private long crearOrden(long modeloId, String titulo, Long antesDe) throws Exception {
+        var peticion = nueva(modeloId).param("titulo", titulo);
+        if (antesDe != null) {
+            peticion = peticion.param("antesDe", String.valueOf(antesDe));
+        }
+        String creada = mvc.perform(peticion.with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return JSON.readTree(creada).get("modificacion").get("id").asLong();
+    }
+
+    private List<Long> idsDeLaCola() throws Exception {
+        String cuerpo = mvc.perform(get("/api/modificaciones/cola").with(comoUsuario(taller())))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Long> ids = new java.util.ArrayList<>();
+        JSON.readTree(cuerpo).forEach(m -> ids.add(m.get("id").asLong()));
+        return ids;
+    }
+
+    @Test
     void unValorQueNoExisteEs400ConMensaje() throws Exception {
-        mvc.perform(get("/api/modificaciones").param("prioridad", "URGENTE").with(comoUsuario(despacho())))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensaje").value("Valor no válido: URGENTE"));
         mvc.perform(get("/api/modificaciones").param("estado", "ABIERTA").with(comoUsuario(despacho())))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("Valor no válido: ABIERTA"));
@@ -444,10 +500,6 @@ class ModificacionesControllerTest {
                         .contentType(MediaType.APPLICATION_JSON).content("{\"aplica\":true,\"hecho\":true}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("Valor no válido: CORREO"));
-        mvc.perform(post("/api/modificaciones/1/prioridad").with(comoUsuario(despacho())).with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"prioridad\":\"URGENTE\"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensaje").value("Valor no válido: URGENTE"));
         mvc.perform(get("/api/modificaciones/987654321").with(comoUsuario(despacho())))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.mensaje").value("No hay ninguna modificación con id 987654321"));
@@ -460,7 +512,7 @@ class ModificacionesControllerTest {
                 PdfDePrueba.fichaTecnica());
 
         String creada = mvc.perform(nueva(modeloId).file(ficha).param("titulo", "Nuevo patrón")
-                        .param("prioridad", "NORMAL").param("guardarEnModelo", "true")
+                        .param("guardarEnModelo", "true")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.documentos").value(1))
@@ -494,7 +546,7 @@ class ModificacionesControllerTest {
         MockMultipartFile ficha = new MockMultipartFile("documentos", "ficha.pdf", MediaType.APPLICATION_PDF_VALUE,
                 PdfDePrueba.fichaTecnica());
 
-        mvc.perform(nueva(modeloId).file(ficha).param("titulo", "Nuevo patrón").param("prioridad", "NORMAL")
+        mvc.perform(nueva(modeloId).file(ficha).param("titulo", "Nuevo patrón")
                         .param("guardarEnModelo", "false")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isCreated())
@@ -519,7 +571,7 @@ class ModificacionesControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("El fichero foto.jpg pesa más de 15 MB"));
         mvc.perform(nueva(modeloId).file(enorme("documentos", "ficha.pdf", MediaType.APPLICATION_PDF_VALUE))
-                        .param("titulo", "Nuevo patrón").param("prioridad", "NORMAL")
+                        .param("titulo", "Nuevo patrón")
                         .param("guardarEnModelo", "true").with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("El fichero ficha.pdf pesa más de 15 MB"));

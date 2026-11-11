@@ -4,10 +4,9 @@
 // del servidor), que es como las lee hace(). Y lo poco que se calcula con ellas
 // en el navegador, en funciones puras para poder probarlas.
 
-import type { Subida } from './modelos';
+import type { Etapa, Subida } from './modelos';
 import { mmss } from './tiempo';
 
-export type Prioridad = 'ALTA' | 'NORMAL' | 'BAJA';
 export type EstadoModificacion = 'NUEVA' | 'VISTA' | 'EN_CURSO' | 'HECHA' | 'DESCARTADA';
 export type Direccion = 'DESPACHO_A_TALLER' | 'TALLER_A_DESPACHO';
 export type Rol = 'TALLER' | 'DESPACHO' | 'ADMIN';
@@ -30,8 +29,10 @@ export type ModificacionResumen = {
   direccion: Direccion;
   tipoCambio: string | null;
   tipoCambioTexto: string | null;
-  /** Null en un aviso que despacho aún no ha mirado. */
-  prioridad: Prioridad | null;
+  /** La ha marcado urgente el despacho (solo órdenes para el taller). */
+  urgente: boolean;
+  /** Su puesto en la cola del taller, desde 1; null si no está (un aviso, o ya cerrada). */
+  posicionCola: number | null;
   estado: EstadoModificacion;
   titulo: string | null;
   tituloDeIa: boolean;
@@ -43,7 +44,8 @@ export type ModificacionResumen = {
   hechaPor: string | null;
   /** El lado que tiene que contestar; null si nadie. */
   respuestaPendienteDe: Rol | null;
-  vencida: boolean;
+  /** La etapa del modelo, para filtrar; null si el modelo ya no está. */
+  etapa: Etapa | null;
   destinos: DestinoEstado[];
   fotos: number;
   audios: number;
@@ -90,13 +92,15 @@ export type ModificacionDetalle = {
   mensajes: MensajeVista[];
 };
 
-/** Los números de la bandeja (GET /api/bandeja/resumen). En el taller: nuevas = órdenes sin abrir, pendientes = órdenes abiertas, conRespuesta = avisos suyos con una respuesta de despacho por leer. */
+/**
+ * Los números de la bandeja (GET /api/bandeja/resumen). En el taller: nuevas = órdenes sin abrir, pendientes = órdenes abiertas,
+ * conRespuesta = avisos suyos con una respuesta de despacho por leer. En los dos lados, urgentes = órdenes abiertas marcadas urgentes.
+ */
 export type ResumenBandeja = {
   nuevas: number;
   pendientes: number;
-  vencidas: number;
+  urgentes: number;
   conRespuesta: number;
-  sinPrioridad: number;
 };
 
 export function adjuntoUrl(id: number): string {
@@ -107,29 +111,22 @@ export function estaCerrada(estado: EstadoModificacion): boolean {
   return estado === 'HECHA' || estado === 'DESCARTADA';
 }
 
-const RANGO_PRIORIDAD: Record<Prioridad, number> = { ALTA: 0, NORMAL: 1, BAJA: 2 };
-
-function rangoPrioridad(p: Prioridad | null): number {
-  return p === null ? 3 : RANGO_PRIORIDAD[p];
-}
-
 function instante(fechaIso: string | null): number {
   return fechaIso ? new Date(fechaIso).getTime() : 0;
 }
 
 /**
- * «Tengo que hacer», en el orden de la maqueta: las nuevas primero, luego por
- * prioridad (ALTA, NORMAL, BAJA y sin prioridad al final) y, a igualdad, la
- * más antigua primero, que es la que lleva más tiempo esperando. Las cerradas
- * (hechas o descartadas) van aparte, la última que se cerró primero.
+ * «Bandeja de Entrada», en el orden de la cola que pone el despacho (la
+ * primera es la siguiente que hay que hacer) y, sin puesto, la más antigua
+ * primero. Las cerradas (hechas o descartadas) van aparte, la última que se
+ * cerró primero.
  */
 export function ordenarOrdenes(lista: ModificacionResumen[]): { pendientes: ModificacionResumen[]; hechas: ModificacionResumen[] } {
   const pendientes = lista
     .filter((o) => !estaCerrada(o.estado))
     .sort(
       (a, b) =>
-        Number(b.estado === 'NUEVA') - Number(a.estado === 'NUEVA') ||
-        rangoPrioridad(a.prioridad) - rangoPrioridad(b.prioridad) ||
+        (a.posicionCola ?? Number.MAX_SAFE_INTEGER) - (b.posicionCola ?? Number.MAX_SAFE_INTEGER) ||
         instante(a.creadaEn) - instante(b.creadaEn),
     );
   const hechas = lista
@@ -143,7 +140,7 @@ export function ordenarAvisos(lista: ModificacionResumen[]): ModificacionResumen
   return [...lista].sort((a, b) => instante(b.creadaEn) - instante(a.creadaEn));
 }
 
-/** La pastilla de una orden en «Tengo que hacer». */
+/** La pastilla de una orden en «Bandeja de Entrada». */
 export function estadoOrden(estado: EstadoModificacion): { texto: string; pill: string } {
   switch (estado) {
     case 'NUEVA':
@@ -288,4 +285,80 @@ export function fraseInicio(resumen: ResumenBandeja | null): string {
  */
 export function tituloVisible(m: Pick<ModificacionResumen, 'titulo' | 'tipoCambioTexto' | 'modeloReferencia'>): string {
   return m.titulo ?? `${m.tipoCambioTexto ?? 'Cambio'} · ${m.modeloReferencia}`;
+}
+
+/** «1ª», «12ª»: el puesto en la cola como se dice. */
+export function puesto(n: number): string {
+  return `${n}ª`;
+}
+
+/** Cómo se mueve una orden en la cola con los botones. */
+export type Movimiento = 'primera' | 'arriba' | 'abajo' | 'ultima';
+
+/**
+ * La cola (los ids, de la primera a la última) con esa orden movida; la
+ * misma lista si no está o ya no se puede mover hacia allí. No toca la que
+ * recibe.
+ */
+export function moverEnCola(ids: number[], id: number, movimiento: Movimiento): number[] {
+  const i = ids.indexOf(id);
+  if (i < 0) return ids;
+  const destino = { primera: 0, arriba: i - 1, abajo: i + 1, ultima: ids.length - 1 }[movimiento];
+  if (destino < 0 || destino >= ids.length || destino === i) return ids;
+  const nueva = ids.filter((x) => x !== id);
+  nueva.splice(destino, 0, id);
+  return nueva;
+}
+
+/**
+ * Lo que deja arrastrar una orden y soltarla sobre otra: queda delante de
+ * ella si venía de más abajo y detrás si venía de más arriba, que es donde
+ * se ve el hueco al arrastrar. La misma lista si alguna no está.
+ */
+export function soltarSobre(ids: number[], arrastrada: number, sobre: number): number[] {
+  const desde = ids.indexOf(arrastrada);
+  const hasta = ids.indexOf(sobre);
+  if (desde < 0 || hasta < 0 || desde === hasta) return ids;
+  const nueva = ids.filter((x) => x !== arrastrada);
+  nueva.splice(hasta, 0, arrastrada);
+  return nueva;
+}
+
+/** Los filtros de la cola del despacho, como los de los modelos; vacío = sin ese filtro. */
+export type FiltroCola = { texto: string; cliente: string; etapa: Etapa | '' };
+
+/** Con algún filtro puesto la vista es parcial y no se deja cambiar el orden. */
+export function colaFiltrada(filtro: FiltroCola): boolean {
+  return filtro.texto.trim() !== '' || filtro.cliente !== '' || filtro.etapa !== '';
+}
+
+function paraBuscar(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+}
+
+/** Las órdenes de la cola que pasan el filtro: el texto, dentro de la referencia, el nombre del modelo o el título. */
+export function filtrarCola(cola: ModificacionResumen[], filtro: FiltroCola): ModificacionResumen[] {
+  const buscado = paraBuscar(filtro.texto);
+  return cola.filter(
+    (m) =>
+      (filtro.cliente === '' || m.cliente === filtro.cliente) &&
+      (filtro.etapa === '' || m.etapa === filtro.etapa) &&
+      (buscado === '' || [m.modeloReferencia, m.modeloNombre, m.titulo].some((c) => c !== null && paraBuscar(c).includes(buscado))),
+  );
+}
+
+/** Dónde puede ir una orden nueva: «Al final» (sin antesDe), «La primera» y «Antes de la 2ª · ULL770 · Cambiar el forro»… */
+export function opcionesPosicion(cola: ModificacionResumen[]): { valor: string; texto: string }[] {
+  if (cola.length === 0) return [{ valor: '', texto: 'La primera (la cola está vacía)' }];
+  return [
+    { valor: '', texto: `Al final (${puesto(cola.length + 1)})` },
+    ...cola.map((m, i) => ({
+      valor: String(m.id),
+      texto: i === 0 ? `La primera, antes de ${m.modeloReferencia} · ${tituloVisible(m)}` : `Antes de la ${puesto(i + 1)} · ${m.modeloReferencia} · ${tituloVisible(m)}`,
+    })),
+  ];
 }

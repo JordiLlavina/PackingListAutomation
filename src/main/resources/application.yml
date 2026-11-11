@@ -283,11 +283,11 @@ modelos:
 
   # Reglas anti-olvido (tarea programada cada hora).
   recordatorios:
-    taller:                        # órdenes despacho->taller no hechas
-      dias-por-prioridad: { ALTA: 1, NORMAL: 3, BAJA: 7 }   # cada N días, push de nuevo
+    taller:                        # la cola de órdenes despacho->taller (nada caduca)
+      resumen-cola-hora: 8         # cada día desde esta hora: «Tienes N órdenes; la siguiente…» (-1 lo apaga)
+      urgente-dias: 1              # una orden urgente sin hacer se recuerda cada N días (0 lo apaga)
     despacho:
-      sin-prioridad-horas: 24      # aviso de taller sin prioridad puesta
-      sin-aplicar-dias: 7          # aviso de taller sin aplicar del todo, cada 7 días
+      sin-aplicar-dias: 7          # aviso de taller sin aplicar del todo, cada 7 días desde que se crea
       respuesta-pendiente-horas: 24
 
   # Web Push con VAPID; sin las dos claves no hay avisos al móvil.

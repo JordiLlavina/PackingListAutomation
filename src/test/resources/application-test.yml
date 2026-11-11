@@ -48,9 +48,12 @@ modelos:
     # recordatorios cuentan días y horas contra estos números, así que afinar
     # los del yml de verdad (cada cuánto se insiste al taller o al despacho)
     # nunca pone la suite en rojo.
+    # El resumen diario de la cola, apagado: la base es la de toda la suite y
+    # saldría en cada revisar(ahora) con las órdenes de otros tests.
+    # RecordatoriosTest lo prueba llamando a resumenDeLaCola con su hora.
     taller:
-      dias-por-prioridad: { ALTA: 1, NORMAL: 3, BAJA: 7 }
+      resumen-cola-hora: -1
+      urgente-dias: 1
     despacho:
-      sin-prioridad-horas: 24
       sin-aplicar-dias: 7
       respuesta-pendiente-horas: 24

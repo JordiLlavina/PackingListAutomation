@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.modelos.service;
 
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,7 +30,6 @@ import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionDestino;
 import com.puntotres.packinglist.modelos.persistence.ModificacionDestinoRepository;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
@@ -42,13 +42,14 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  * {@code modelos.recordatorios} de application.yml:
  *
  * <ul>
- * <li>Una orden del despacho al taller sin hacer: al TALLER, a los N días de
- * crearla según su prioridad ({@code dias-por-prioridad}; sin prioridad, la
- * de NORMAL) y otra vez cada N días.</li>
- * <li>Un aviso del taller sin prioridad: al DESPACHO, a las
- * {@code sin-prioridad-horas} de crearlo y otra vez cada tanto.</li>
- * <li>Un aviso del taller con prioridad y sin aplicar del todo: al DESPACHO,
- * cada {@code sin-aplicar-dias}, diciendo qué destinos faltan.</li>
+ * <li>La cola del taller ({@link ColaTaller}), una vez al día: al TALLER, a
+ * partir de la hora {@code resumen-cola-hora}, cuántas órdenes tiene y cuál es
+ * la siguiente. Nada caduca: las órdenes no urgentes no tienen recordatorio
+ * propio, las recuerda este resumen.</li>
+ * <li>Una orden urgente sin hacer: al TALLER, a los {@code urgente-dias} de
+ * crearla y otra vez cada tantos días.</li>
+ * <li>Un aviso del taller sin aplicar del todo: al DESPACHO, cada
+ * {@code sin-aplicar-dias} desde que se creó, diciendo qué destinos faltan.</li>
  * <li>Una pregunta sin contestar ({@code necesita_respuesta}): al lado que
  * tiene que contestar (el contrario del autor del último mensaje; un ADMIN
  * habla por el despacho), a las {@code respuesta-pendiente-horas} de ese
@@ -61,9 +62,8 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  * el plazo. Un plazo de 0 o sin configurar apaga su regla: avisar cada hora
  * sería ruido, no un recordatorio.
  *
- * Usa los repositorios y {@link Push}, nunca {@link Modificaciones}: esa
- * clase pregunta aquí si una modificación está vencida, y depender de ella
- * sería un ciclo.
+ * Usa los repositorios, {@link ColaTaller} y {@link Push}, nunca
+ * {@link Modificaciones}, que no necesita nada de aquí.
  */
 @Service
 public class Recordatorios {
@@ -80,13 +80,15 @@ public class Recordatorios {
     private final ModeloRepository modelos;
     private final AvisoEnviadoRepository enviados;
     private final Push push;
+    private final ColaTaller cola;
     private final ModelosProperties props;
     private final Clock reloj;
     private final boolean activo;
 
     public Recordatorios(ModificacionRepository modificaciones, MensajeRepository mensajes,
                          ModificacionDestinoRepository destinos, UsuarioRepository usuarios, ModeloRepository modelos,
-                         AvisoEnviadoRepository enviados, Push push, ModelosProperties props, Clock reloj,
+                         AvisoEnviadoRepository enviados, Push push, ColaTaller cola, ModelosProperties props,
+                         Clock reloj,
                          @Value("${modelos.recordatorios.activo:true}") boolean activo) {
         this.modificaciones = modificaciones;
         this.mensajes = mensajes;
@@ -95,6 +97,7 @@ public class Recordatorios {
         this.modelos = modelos;
         this.enviados = enviados;
         this.push = push;
+        this.cola = cola;
         this.props = props;
         this.reloj = reloj;
         this.activo = activo;
@@ -122,15 +125,27 @@ public class Recordatorios {
 
     /**
      * Manda los recordatorios que tocan a esa hora y devuelve cuántos ha
-     * mandado (uno por modificación y regla, vaya a cuantas personas vaya).
+     * mandado (uno por modificación y regla, vaya a cuantas personas vaya, y
+     * uno por el resumen de la cola).
      */
     public int revisar(LocalDateTime ahora) {
+        int mandados = 0;
+        ModelosProperties.Recordatorios reglas = props.recordatorios();
+        Integer hora = reglas == null || reglas.taller() == null ? null : reglas.taller().resumenColaHora();
+        if (hora != null && hora >= 0) {
+            try {
+                if (resumenDeLaCola(ahora, hora)) {
+                    mandados++;
+                }
+            } catch (RuntimeException fallo) {
+                LOG.warn("No se ha podido mandar el resumen de la cola", fallo);
+            }
+        }
         List<Modificacion> abiertas = modificaciones.findByEstadoIn(ABIERTAS);
         if (abiertas.isEmpty()) {
-            return 0;
+            return mandados;
         }
         Contexto contexto = contexto(abiertas);
-        int mandados = 0;
         for (Modificacion m : abiertas) {
             for (Pendiente pendiente : pendientes(m, contexto.ultimoMensaje.get(m.getId()), contexto)) {
                 if (!pendiente.toca(ahora) || contexto.repetido(m.getId(), pendiente, ahora)) {
@@ -150,17 +165,44 @@ public class Recordatorios {
     }
 
     /**
-     * Si la modificación va tarde: una orden sin hacer, un aviso sin
-     * prioridad o un aviso sin aplicar, pasado su plazo desde que se creó.
-     * Mira solo la regla, no lo que ya se haya mandado: la marca «vencida»
-     * sigue mientras siga tarde. Las preguntas sin contestar no cuentan.
+     * El resumen del día de la cola al taller: si ya es la hora (o más) y hoy
+     * no se ha mandado, «Tienes N órdenes por hacer» con la siguiente. Sin
+     * órdenes en la cola no se manda nada. Se apunta en {@code aviso_enviado}
+     * con la orden que iba primera; de un día a otro se mira por la fecha, no
+     * por 24 horas, para que salga cada mañana a la misma hora. Los sábados y
+     * los domingos no sale (decisión del usuario): el taller no trabaja.
+     *
+     * @return si se ha mandado
      */
-    public boolean vencida(Modificacion m, LocalDateTime ahora) {
-        if (m == null || ahora == null) {
+    boolean resumenDeLaCola(LocalDateTime ahora, int hora) {
+        if (ahora.getHour() < hora || ahora.getDayOfWeek() == DayOfWeek.SATURDAY
+                || ahora.getDayOfWeek() == DayOfWeek.SUNDAY) {
             return false;
         }
-        Pendiente regla = reglaPrincipal(m);
-        return regla != null && regla.toca(ahora);
+        LocalDateTime hoy = ahora.toLocalDate().atStartOfDay();
+        if (enviados.existsByTipoAndEnviadoEnGreaterThanEqualAndEnviadoEnLessThan(AvisoEnviado.Tipo.RESUMEN_COLA, hoy,
+                hoy.plusDays(1))) {
+            return false;
+        }
+        List<Modificacion> laCola = cola.cola();
+        if (laCola.isEmpty()) {
+            return false;
+        }
+        Set<Long> quienes = push.destinatarios(Rol.TALLER);
+        if (quienes.isEmpty()) {
+            return false;
+        }
+        Modificacion primera = laCola.get(0);
+        Modelo modelo = modelos.findById(primera.getModeloId()).orElse(null);
+        String referencia = modelo == null ? "" : Objects.toString(modelo.nombreVisible(), "");
+        int n = laCola.size();
+        String titulo = "Tienes " + n + (n == 1 ? " orden por hacer" : " órdenes por hacer");
+        String cuerpo = "La siguiente: " + juntar(referencia, queEs(primera));
+        push.avisarA(Rol.TALLER, new Push.Aviso(titulo, cuerpo, "/app/ordenes", primera.getId(), "resumen-cola"));
+        enviados.saveAll(quienes.stream()
+                .map(id -> new AvisoEnviado(primera.getId(), id, AvisoEnviado.Tipo.RESUMEN_COLA, ahora))
+                .toList());
+        return true;
     }
 
     /** Lo que se le podría recordar a esa modificación, toque ya o no. */
@@ -177,7 +219,7 @@ public class Recordatorios {
         return lista;
     }
 
-    /** La orden sin hacer, el aviso sin prioridad o el aviso sin aplicar; null si no hay o está cerrada. */
+    /** La orden urgente sin hacer o el aviso sin aplicar; null si no hay o está cerrada. */
     private Pendiente reglaPrincipal(Modificacion m) {
         if (m.getEstado() == null || m.getEstado().cerrada() || m.getCreadaEn() == null) {
             return null;
@@ -187,18 +229,15 @@ public class Recordatorios {
             return null;
         }
         if (!m.esAviso()) {
-            Prioridad prioridad = m.getPrioridad() == null ? Prioridad.NORMAL : m.getPrioridad();
-            Integer dias = reglas.taller() == null || reglas.taller().diasPorPrioridad() == null ? null
-                    : reglas.taller().diasPorPrioridad().get(prioridad.name());
-            return Pendiente.de(AvisoEnviado.Tipo.RECORDATORIO, Rol.TALLER, Duration.ofDays(entero(dias)),
-                    m.getCreadaEn());
+            // Las no urgentes ya las recuerda el resumen diario de la cola.
+            if (!m.isUrgente() || reglas.taller() == null) {
+                return null;
+            }
+            return Pendiente.de(AvisoEnviado.Tipo.RECORDATORIO, Rol.TALLER,
+                    Duration.ofDays(reglas.taller().urgenteDias()), m.getCreadaEn());
         }
         if (reglas.despacho() == null) {
             return null;
-        }
-        if (m.getPrioridad() == null) {
-            return Pendiente.de(AvisoEnviado.Tipo.SIN_PRIORIDAD, Rol.DESPACHO,
-                    Duration.ofHours(reglas.despacho().sinPrioridadHoras()), m.getCreadaEn());
         }
         return Pendiente.de(AvisoEnviado.Tipo.RECORDATORIO, Rol.DESPACHO,
                 Duration.ofDays(reglas.despacho().sinAplicarDias()), m.getCreadaEn());
@@ -244,17 +283,14 @@ public class Recordatorios {
         return switch (pendiente.tipo()) {
             case RECORDATORIO -> {
                 if (!m.esAviso()) {
-                    long dias = Duration.between(m.getCreadaEn(), ahora).toDays();
-                    String hace = "Desde hace " + dias + (dias == 1 ? " día" : " días");
-                    yield new Push.Aviso("Pendiente: " + queEs, juntar(hace, referencia), ordenes, m.getId(), tag);
+                    Integer puesto = contexto.posiciones.get(m.getId());
+                    String enLaCola = puesto == null ? null : "Nº " + puesto + " de la cola";
+                    yield new Push.Aviso("Urgente: " + queEs, juntar(enLaCola, referencia), ordenes, m.getId(), tag);
                 }
                 yield new Push.Aviso("Por aplicar: " + queEs,
                         juntar(destinosPendientes(contexto.destinos.getOrDefault(m.getId(), List.of())), referencia),
                         bandeja, m.getId(), tag);
             }
-            case SIN_PRIORIDAD -> new Push.Aviso("Aviso sin prioridad: " + queEs,
-                    juntar(referencia, "de " + nombre(contexto.usuarios.get(m.getCreadaPor()))), bandeja, m.getId(),
-                    tag);
             case RESPUESTA -> {
                 Mensaje ultimo = contexto.ultimoMensaje.get(m.getId());
                 String autor = nombre(ultimo == null ? null : contexto.usuarios.get(ultimo.getAutorId()));
@@ -263,6 +299,9 @@ public class Recordatorios {
                 yield new Push.Aviso("Respuesta pendiente: " + queEs,
                         juntar(autor + " espera respuesta", referencia), url, m.getId(), tag);
             }
+            // Ya no hay regla que los mande (ver AvisoEnviado.Tipo); el switch tiene que cubrirlos.
+            case SIN_PRIORIDAD, RESUMEN_COLA -> throw new IllegalStateException("No es un recordatorio de una "
+                    + "modificación: " + pendiente.tipo());
         };
     }
 
@@ -295,10 +334,6 @@ public class Recordatorios {
             return primero;
         }
         return primero == null || primero.isBlank() ? segundo : primero + " · " + segundo;
-    }
-
-    private static int entero(Integer valor) {
-        return valor == null ? 0 : valor;
     }
 
     /**
@@ -352,7 +387,10 @@ public class Recordatorios {
         for (AvisoEnviadoRepository.Ultimo ultimo : enviados.ultimosDe(ids)) {
             ultimosEnvios.put(clave(ultimo.getModificacionId(), ultimo.getTipo()), ultimo.getEnviadoEn());
         }
-        return new Contexto(porModelo, ultimos, porDestino, porUsuario, ultimosEnvios);
+        // El puesto en la cola solo lo dice el recordatorio de una urgente.
+        Map<Long, Integer> posiciones = abiertas.stream().anyMatch(m -> !m.esAviso() && m.isUrgente())
+                ? cola.posiciones() : Map.of();
+        return new Contexto(porModelo, ultimos, porDestino, porUsuario, ultimosEnvios, posiciones);
     }
 
     private static String clave(Long modificacionId, AvisoEnviado.Tipo tipo) {
@@ -361,7 +399,7 @@ public class Recordatorios {
 
     private record Contexto(Map<Long, Modelo> modelos, Map<Long, Mensaje> ultimoMensaje,
                             Map<Long, List<ModificacionDestino>> destinos, Map<Long, Usuario> usuarios,
-                            Map<String, LocalDateTime> ultimosEnvios) {
+                            Map<String, LocalDateTime> ultimosEnvios, Map<Long, Integer> posiciones) {
 
         /** Ya se mandó uno de ese tipo dentro del plazo. */
         boolean repetido(Long modificacionId, Pendiente pendiente, LocalDateTime ahora) {

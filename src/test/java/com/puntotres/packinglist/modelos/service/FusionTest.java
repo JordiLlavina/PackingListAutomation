@@ -35,7 +35,6 @@ import com.puntotres.packinglist.modelos.persistence.MensajeRepository;
 import com.puntotres.packinglist.modelos.persistence.ModeloCodigoHistoricoRepository;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
@@ -179,7 +178,7 @@ class FusionTest {
         fotos.guardar(proto.getId(), "a.jpg", JPEG);
         fotos.guardar(proto.getId(), "b.jpg", JPEG);
         modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(proto.getId(), null, "T19 cambio",
-                "texto", Prioridad.NORMAL, List.of()), despacho());
+                "texto", List.of()), despacho());
 
         Modelo importado = importado("T19-FUSION.AL0001");
         catalogo.guardarCampoModelo("AMI", "T19-FUSION", CatalogoModelos.CampoModelo.NOMBRE, "Bolso T19");

@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
+import com.puntotres.packinglist.modelos.service.ColaTaller;
 import com.puntotres.packinglist.modelos.service.FusionPendiente;
 
 /**
@@ -52,13 +53,19 @@ public class ManejadorErroresApi {
                 .body(Map.of("mensaje", pendiente.getMessage(), "fusion", pendiente.fusion()));
     }
 
+    /** Reordenar una cola que ya no es la que se veía: un 409 para que la pantalla la vuelva a cargar. */
+    @ExceptionHandler(ColaTaller.ColaCambiada.class)
+    public ResponseEntity<Map<String, String>> colaCambiada(ColaTaller.ColaCambiada error) {
+        return respuesta(HttpStatus.CONFLICT, error.getMessage(), error);
+    }
+
     /** Un parámetro de la URL que no se deja convertir: casi siempre un valor de un desplegable que no existe. */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> parametroQueNoVale(MethodArgumentTypeMismatchException error) {
         return respuesta(HttpStatus.BAD_REQUEST, "Valor no válido: " + texto(error.getValue()), error);
     }
 
-    /** Un cuerpo JSON que no se entiende o con un valor que no existe ({@code "prioridad": "URGENTE"}). */
+    /** Un cuerpo JSON que no se entiende o con un valor que no existe ({@code "destino": "OTRO"}). */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> cuerpoQueNoVale(HttpMessageNotReadableException error) {
         String mensaje = error.getCause() instanceof InvalidFormatException formato

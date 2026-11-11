@@ -398,7 +398,7 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
           <input type="file" multiple accept="image/*" disabled={subiendo} onChange={(e) => void subirFotos(e)} />
         </label>
         <label className="boton subir" aria-disabled={subiendoDocumento}>
-          <Icono nombre="pdf" /> {subiendoDocumento ? 'Subiendo documento…' : 'Subir PDF / documento'}
+          <Icono nombre="pdf" /> {subiendoDocumento ? 'Subiendo documento…' : 'Subir Doc. (+fotos)'}
           <input
             type="file"
             accept=".pdf,application/pdf,image/*,.doc,.docx,.xlsx"
@@ -437,7 +437,7 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
         <h2>Documentos</h2>
       </div>
       {ficha.documentos.length === 0 ? (
-        <p className="ayuda">Este modelo aún no tiene documentos. Súbelos con «Subir PDF / documento».</p>
+        <p className="ayuda">Este modelo aún no tiene documentos. Súbelos con «Subir Doc. (+fotos)».</p>
       ) : (
         <ul className="lista-documentos">
           {ficha.documentos.map((d) => (
@@ -463,7 +463,7 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
       <div className="fila-titulo">
         <h2>Historial</h2>
       </div>
-      <Historial eventos={ficha.lineaTiempo} />
+      <Historial eventos={ficha.lineaTiempo} enlace={(modificacionId) => `/modificaciones/${modificacionId}`} />
 
       {subidaPdf && (
         <ElegirImagenesPdf

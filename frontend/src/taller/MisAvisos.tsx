@@ -127,7 +127,7 @@ export default function MisAvisos() {
       ) : (
         <div className="vacio">
           <b>Todavía no has mandado nada</b>
-          <span>Cuando avises de un cambio con «He cambiado algo», lo verás aquí.</span>
+          <span>Cuando avises de un cambio con «Crear Modificación», lo verás aquí.</span>
         </div>
       )}
     </>

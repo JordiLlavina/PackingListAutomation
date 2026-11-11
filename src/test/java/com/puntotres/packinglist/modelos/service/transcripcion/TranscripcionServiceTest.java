@@ -39,7 +39,6 @@ import com.puntotres.packinglist.modelos.persistence.Adjunto;
 import com.puntotres.packinglist.modelos.persistence.EstadoTranscripcion;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
@@ -252,7 +251,7 @@ class TranscripcionServiceTest {
         resumidor.resumen = new ResumenIa("Forro nuevo", "Cambiar el forro.", "FORRO", List.of(), List.of());
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
-                modelo("ORDEN"), "FORRO", "Forro de ante", null, Prioridad.NORMAL, List.of(audio())), despacho());
+                modelo("ORDEN"), "FORRO", "Forro de ante", null, List.of(audio())), despacho());
         esperarALaCola();
 
         Modificacion recargada = repositorio.findById(orden.getId()).orElseThrow();

@@ -26,12 +26,20 @@ public class AvisoEnviado {
 
     /** Qué se ha recordado. */
     public enum Tipo {
-        /** Una orden sin hacer (al taller) o un aviso sin aplicar del todo (al despacho). */
+        /** Una orden urgente sin hacer (al taller) o un aviso sin aplicar del todo (al despacho). */
         RECORDATORIO,
-        /** Un aviso del taller al que el despacho no ha puesto prioridad. */
+        /**
+         * Un aviso del taller sin prioridad. Ya no se manda (desde la V6 no hay
+         * prioridades); se conserva para leer las filas que ya están en la base.
+         */
         SIN_PRIORIDAD,
         /** Una pregunta sin contestar. */
-        RESPUESTA
+        RESPUESTA,
+        /**
+         * El resumen del día de la cola al taller (cuántas órdenes tiene y cuál
+         * es la siguiente); va apuntado a la orden que iba primera.
+         */
+        RESUMEN_COLA
     }
 
     @Id

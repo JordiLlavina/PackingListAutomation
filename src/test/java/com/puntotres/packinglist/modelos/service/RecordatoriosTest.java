@@ -26,7 +26,6 @@ import com.puntotres.packinglist.modelos.api.dto.ModificacionResumen;
 import com.puntotres.packinglist.modelos.persistence.Mensaje;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
@@ -103,10 +102,12 @@ class RecordatoriosTest {
     }
 
     @Test
-    void unaOrdenAltaRecibeRecordatorioALas24hYNoDos() throws IOException {
-        Modificacion orden = orden("ALTA", Prioridad.ALTA);
+    void unaOrdenUrgenteRecibeRecordatorioCadaDiaYUnaNormalNinguno() throws IOException {
+        Modificacion orden = orden("URGENTE", true);
+        Modificacion normal = orden("NORMAL", false);
         LocalDateTime creada = LocalDateTime.of(2001, 3, 1, 8, 0);
         alPasado(orden, creada);
+        alPasado(normal, creada);
 
         recordatorios.revisar(creada.plusHours(23));
         assertTrue(recibidos(orden, taller).isEmpty(), "antes de las 24 h no se recuerda nada");
@@ -116,8 +117,9 @@ class RecordatoriosTest {
         assertEquals(1, primero.size(), "a las 25 h, un recordatorio al taller");
         JsonNode carga = primero.get(0);
         String referencia = referencia(orden);
-        assertEquals("Pendiente: Cambiar el forro", carga.get("titulo").asText());
-        assertEquals("Desde hace 1 día · " + referencia, carga.get("cuerpo").asText());
+        assertEquals("Urgente: Cambiar el forro", carga.get("titulo").asText());
+        assertEquals("Nº " + resumenDe(orden).posicionCola() + " de la cola · " + referencia,
+                carga.get("cuerpo").asText());
         assertEquals("/app/ordenes/" + orden.getId(), carga.get("url").asText());
         assertEquals("recordatorio-" + orden.getId(), carga.get("tag").asText());
         assertTrue(recibidos(orden, despacho).isEmpty(), "la orden se le recuerda al taller, no al despacho");
@@ -128,54 +130,73 @@ class RecordatoriosTest {
         recordatorios.revisar(creada.plusHours(49));
         List<JsonNode> segundo = recibidos(orden, taller);
         assertEquals(2, segundo.size(), "a las 49 h, el segundo");
-        assertEquals("Desde hace 2 días · " + referencia, segundo.get(1).get("cuerpo").asText());
         assertEquals(2, jdbc.queryForObject("select count(*) from aviso_enviado where modificacion_id = ?"
                 + " and tipo = 'RECORDATORIO' and usuario_id = ?", Integer.class, orden.getId(), taller.getId()),
                 "cada envío se apunta, una fila por destinatario");
+
+        recordatorios.revisar(creada.plusDays(30));
+        assertTrue(recibidos(normal, taller).isEmpty() && recibidos(normal, despacho).isEmpty(),
+                "una orden que no es urgente no caduca ni tiene recordatorio propio: la recuerda el resumen diario");
     }
 
     @Test
-    void unAvisoSinPrioridadAvisaADespachoALas24h() throws IOException {
-        Modificacion aviso = aviso("SIN-PRIORIDAD");
+    void unAvisoSinAplicarAvisaAlDespachoCadaSieteDias() throws IOException {
+        Modificacion aviso = aviso("SIN-APLICAR");
         LocalDateTime creada = LocalDateTime.of(2002, 3, 1, 8, 0);
         alPasado(aviso, creada);
-        Modificacion recargado = repositorioModificaciones.findById(aviso.getId()).orElseThrow();
 
-        recordatorios.revisar(creada.plusHours(23));
-        assertTrue(recibidos(aviso, despacho).isEmpty());
-        assertFalse(recordatorios.vencida(recargado, creada.plusHours(23)));
-
-        recordatorios.revisar(creada.plusHours(25));
-        List<JsonNode> recibido = recibidos(aviso, despacho);
-        assertEquals(1, recibido.size(), "a las 25 h, al despacho");
-        JsonNode carga = recibido.get(0);
-        assertEquals("Aviso sin prioridad: Piel / material", carga.get("titulo").asText());
-        assertEquals(referencia(aviso) + " · de " + taller.getNombre(), carga.get("cuerpo").asText());
-        assertEquals("/app/bandeja/" + aviso.getId(), carga.get("url").asText());
-        assertTrue(recibidos(aviso, taller).isEmpty());
-        assertTrue(recordatorios.vencida(recargado, creada.plusHours(25)));
-
-        recordatorios.revisar(creada.plusHours(30));
-        assertEquals(1, recibidos(aviso, despacho).size(), "dentro de las 24 h no se repite");
-        recordatorios.revisar(creada.plusHours(49));
-        assertEquals(2, recibidos(aviso, despacho).size(), "y pasadas, sí");
-
-        // Con prioridad puesta deja de ser «sin prioridad» y pasa a «por aplicar», cada 7 días.
-        modificaciones.ponerPrioridad(aviso.getId(), Prioridad.NORMAL, actual(despacho));
-        enviador.envios.clear();
         recordatorios.revisar(creada.plusDays(6));
-        assertTrue(recibidos(aviso, despacho).isEmpty());
+        assertTrue(recibidos(aviso, despacho).isEmpty(), "ni a las 24 h: los avisos ya no llevan prioridad");
+
         recordatorios.revisar(creada.plusDays(7).plusHours(1));
         List<JsonNode> porAplicar = recibidos(aviso, despacho);
         assertEquals(1, porAplicar.size());
         assertEquals("Por aplicar: Piel / material", porAplicar.get(0).get("titulo").asText());
         assertEquals("ICSUITE / Excel de escandallos pendientes · " + referencia(aviso),
                 porAplicar.get(0).get("cuerpo").asText());
+        assertEquals("/app/bandeja/" + aviso.getId(), porAplicar.get(0).get("url").asText());
+        assertTrue(recibidos(aviso, taller).isEmpty());
+
+        recordatorios.revisar(creada.plusDays(10));
+        assertEquals(1, recibidos(aviso, despacho).size(), "dentro de los 7 días no se repite");
+        recordatorios.revisar(creada.plusDays(14).plusHours(2));
+        assertEquals(2, recibidos(aviso, despacho).size(), "y pasados, sí");
+    }
+
+    @Test
+    void elResumenDeLaColaSaleUnaVezAlDiaDesdeSuHora() throws IOException {
+        orden("RESUMEN", false);
+        // Un día propio de este test (un lunes): el resumen se apunta por día, sea cual sea la orden.
+        LocalDateTime dia = LocalDateTime.of(1985, 6, 3, 0, 0);
+        assertEquals(java.time.DayOfWeek.MONDAY, dia.getDayOfWeek());
+
+        assertFalse(recordatorios.resumenDeLaCola(dia.plusHours(7), 8), "antes de su hora, no");
+        assertTrue(recordatorios.resumenDeLaCola(dia.plusHours(8).plusMinutes(30), 8));
+        List<ModificacionResumen> cola = modificaciones.cola();
+        List<JsonNode> resumenes = resumenesDeLaCola();
+        assertEquals(1, resumenes.size());
+        JsonNode carga = resumenes.get(0);
+        assertEquals("Tienes " + cola.size() + (cola.size() == 1 ? " orden por hacer" : " órdenes por hacer"),
+                carga.get("titulo").asText());
+        ModificacionResumen primera = cola.get(0);
+        assertEquals("La siguiente: " + primera.modeloReferencia() + " · " + primera.titulo(),
+                carga.get("cuerpo").asText());
+        assertEquals("/app/ordenes", carga.get("url").asText());
+        assertEquals(primera.id(), carga.get("modificacionId").asLong());
+
+        assertFalse(recordatorios.resumenDeLaCola(dia.plusHours(15), 8), "una sola vez al día");
+        assertTrue(recordatorios.resumenDeLaCola(dia.plusDays(1).plusHours(9), 8), "y al día siguiente, otra");
+        assertEquals(2, resumenesDeLaCola().size());
+
+        assertFalse(recordatorios.resumenDeLaCola(dia.plusDays(5).plusHours(9), 8), "el sábado no sale");
+        assertFalse(recordatorios.resumenDeLaCola(dia.plusDays(6).plusHours(9), 8), "ni el domingo");
+        assertTrue(recordatorios.resumenDeLaCola(dia.plusDays(7).plusHours(9), 8), "el lunes vuelve");
+        assertEquals(3, resumenesDeLaCola().size());
     }
 
     @Test
     void unaHechaNoRecibeNada() throws IOException {
-        Modificacion orden = orden("HECHA", Prioridad.ALTA);
+        Modificacion orden = orden("HECHA", true);
         modificaciones.responder(orden.getId(), "¿Qué forro?", List.of(), actual(taller));
         modificaciones.marcarHecha(orden.getId(), actual(taller));
         Modificacion aviso = aviso("HECHO");
@@ -194,32 +215,12 @@ class RecordatoriosTest {
         for (Modificacion m : List.of(orden, aviso, descartado)) {
             assertTrue(recibidos(m, taller).isEmpty() && recibidos(m, despacho).isEmpty(),
                     "lo cerrado no insiste: " + m.getId());
-            assertFalse(recordatorios.vencida(repositorioModificaciones.findById(m.getId()).orElseThrow(),
-                    creada.plusDays(30)));
         }
     }
 
     @Test
-    void vencidaCuentaEnElResumen() {
-        Modificacion orden = orden("VENCIDA", Prioridad.ALTA);
-        // El año más viejo de esta clase: a estas horas nada más de la base está vencido.
-        LocalDateTime creada = LocalDateTime.of(1990, 3, 1, 8, 0);
-        alPasado(orden, creada);
-
-        reloj.fijar(creada.plusHours(23));
-        assertEquals(0, modificaciones.resumen(actual(taller)).vencidas());
-        assertFalse(resumenDe(orden).vencida());
-
-        reloj.fijar(creada.plusHours(25));
-        assertEquals(1, modificaciones.resumen(actual(taller)).vencidas(), "la orden del taller ya está vencida");
-        assertTrue(resumenDe(orden).vencida(), "y la ficha lo dice");
-        assertEquals(0, modificaciones.resumen(actual(despacho)).vencidas(),
-                "al despacho le cuentan sus avisos, no las órdenes del taller");
-    }
-
-    @Test
     void unaRespuestaPendienteAvisaAlLadoQueDebeResponder() throws IOException {
-        Modificacion orden = orden("RESPUESTA", Prioridad.BAJA);
+        Modificacion orden = orden("RESPUESTA", false);
         Mensaje pregunta = modificaciones.responder(orden.getId(), "¿Qué forro?", List.of(), actual(taller));
         LocalDateTime creada = LocalDateTime.of(2004, 3, 1, 8, 0);
         alPasado(orden, creada);
@@ -254,6 +255,18 @@ class RecordatoriosTest {
         assertEquals(1, respuestas(orden, despacho).size());
     }
 
+    /** Los resúmenes de la cola que le han llegado al taller, en orden. */
+    private List<JsonNode> resumenesDeLaCola() throws IOException {
+        List<JsonNode> lista = new ArrayList<>();
+        for (EnviadorFalso.Envio envio : enviador.envios) {
+            JsonNode carga = json.readTree(envio.payload());
+            if (taller.getId().equals(envio.usuarioId()) && carga.get("titulo").asText().startsWith("Tienes ")) {
+                lista.add(carga);
+            }
+        }
+        return lista;
+    }
+
     private List<JsonNode> respuestas(Modificacion m, Usuario usuario) throws IOException {
         List<JsonNode> lista = new ArrayList<>();
         for (JsonNode carga : recibidos(m, usuario)) {
@@ -280,9 +293,9 @@ class RecordatoriosTest {
         return modificaciones.detalle(m.getId()).resumen();
     }
 
-    private Modificacion orden(String que, Prioridad prioridad) {
+    private Modificacion orden(String que, boolean urgente) {
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modelo(que), null,
-                "Cambiar el forro", "", prioridad, List.of()), actual(despacho));
+                "Cambiar el forro", "", urgente, null, List.of()), actual(despacho));
         esperarALaCola();
         enviador.envios.clear();
         return orden;

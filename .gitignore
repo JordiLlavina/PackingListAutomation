@@ -21,9 +21,11 @@ Thumbs.db
 
 # Base de datos embebida: lo que el programa ha aprendido de cada referencia
 # y la tabla de taras. Es dato del almacen de cada maquina, no del proyecto.
-# (datos-antes-flyway/ es la copia apartada al pasar a Flyway.)
+# (datos-antes-flyway/ es la copia apartada al pasar a Flyway, y
+# datos-antes-de-modelos/ la copia de antes de la V4 de la app de modelos.)
 datos/
 datos-antes-flyway/
+datos-antes-de-modelos/
 
 # Excel lock files (created while a workbook is open)
 .~lock.*#

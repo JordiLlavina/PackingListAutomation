@@ -72,9 +72,8 @@ function mismoResumen(a: ResumenBandeja, b: ResumenBandeja): boolean {
   return (
     a.nuevas === b.nuevas &&
     a.pendientes === b.pendientes &&
-    a.vencidas === b.vencidas &&
-    a.conRespuesta === b.conRespuesta &&
-    a.sinPrioridad === b.sinPrioridad
+    a.urgentes === b.urgentes &&
+    a.conRespuesta === b.conRespuesta
   );
 }
 

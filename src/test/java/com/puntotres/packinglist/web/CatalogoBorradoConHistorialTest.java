@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.puntotres.packinglist.modelos.ComoUsuario;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
@@ -116,7 +115,7 @@ class CatalogoBorradoConHistorialTest {
     private Modificacion orden(Long modeloId) {
         Usuario despacho = ComoUsuario.usuarioDePrueba(usuarios, Rol.DESPACHO);
         return modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
-                        "Cambiar asa", "Asa de 2 cm", Prioridad.NORMAL, List.of()),
+                        "Cambiar asa", "Asa de 2 cm", List.of()),
                 new UsuarioActual(despacho.getId(), despacho.getNombre(), despacho.getRol(), null));
     }
 }

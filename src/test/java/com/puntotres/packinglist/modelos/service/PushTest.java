@@ -26,7 +26,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.SuscripcionPush;
 import com.puntotres.packinglist.modelos.persistence.SuscripcionPushRepository;
@@ -103,7 +102,7 @@ class PushTest {
         Long modeloId = modelo("ORDEN");
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
-                "Cambiar el forro", "", Prioridad.ALTA, List.of()), actual(despacho));
+                "Cambiar el forro", "", List.of()), actual(despacho));
         esperarALaCola();
 
         List<EnviadorFalso.Envio> deLaOrden = enviosDe(orden.getId(), taller, despacho, admin, tallerDesactivado);
@@ -142,8 +141,7 @@ class PushTest {
         enviador.caducados.add(caducado);
 
         Modificacion orden = assertDoesNotThrow(() -> modificaciones.crearOrdenParaTaller(
-                new Modificaciones.OrdenDespacho(modelo("CADUCADA"), null, "Coser el asa", "", Prioridad.NORMAL,
-                        List.of()), actual(despacho)));
+                new Modificaciones.OrdenDespacho(modelo("CADUCADA"), null, "Coser el asa", "", List.of()), actual(despacho)));
         esperarALaCola();
 
         assertTrue(repositorioModificaciones.findById(orden.getId()).isPresent(),
@@ -162,7 +160,7 @@ class PushTest {
         enviador.fallidos.add(fallido);
 
         modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modelo("FALLO"), null, "Coser el asa",
-                "", Prioridad.NORMAL, List.of()), actual(despacho));
+                "", List.of()), actual(despacho));
         esperarALaCola();
 
         assertTrue(existe(fallido), "solo se borra la que el servidor de push da por caducada");

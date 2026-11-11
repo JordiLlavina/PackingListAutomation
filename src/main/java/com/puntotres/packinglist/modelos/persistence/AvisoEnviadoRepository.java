@@ -26,4 +26,8 @@ public interface AvisoEnviadoRepository extends JpaRepository<AvisoEnviado, Long
             select a.modificacionId as modificacionId, a.tipo as tipo, max(a.enviadoEn) as enviadoEn
             from AvisoEnviado a where a.modificacionId in :ids group by a.modificacionId, a.tipo""")
     List<Ultimo> ultimosDe(@Param("ids") Collection<Long> modificacionIds);
+
+    /** Si ya se mandó alguno de ese tipo entre esas dos horas (desde incluida, hasta no). */
+    boolean existsByTipoAndEnviadoEnGreaterThanEqualAndEnviadoEnLessThan(AvisoEnviado.Tipo tipo,
+                                                                         LocalDateTime desde, LocalDateTime hasta);
 }

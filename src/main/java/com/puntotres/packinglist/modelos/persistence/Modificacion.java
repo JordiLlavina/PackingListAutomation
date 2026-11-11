@@ -41,10 +41,17 @@ public class Modificacion {
     @Column(name = "tipo_cambio", length = 40)
     private String tipoCambio;
 
-    /** Null en un aviso del taller hasta que el despacho la pone. */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "prioridad", length = 20)
-    private Prioridad prioridad;
+    /**
+     * El puesto en la cola de órdenes del taller ({@code ColaTaller}): menor va
+     * antes. Nulo en los avisos del taller, que no entran en la cola. Una orden
+     * que se cierra lo conserva, pero ya no cuenta: la cola son las abiertas.
+     */
+    @Column(name = "posicion_cola")
+    private Integer posicionCola;
+
+    /** La ha marcado urgente el despacho (solo en las órdenes para el taller). */
+    @Column(name = "urgente", nullable = false)
+    private boolean urgente;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", length = 20, nullable = false)
@@ -84,12 +91,11 @@ public class Modificacion {
     }
 
     /** Nace NUEVA, sin ver, sin hacer y sin esperar respuesta. */
-    public Modificacion(Long modeloId, Direccion direccion, String tipoCambio, Prioridad prioridad, String titulo,
+    public Modificacion(Long modeloId, Direccion direccion, String tipoCambio, String titulo,
                         Long creadaPor, LocalDateTime creadaEn) {
         this.modeloId = modeloId;
         this.direccion = direccion;
         this.tipoCambio = tipoCambio;
-        this.prioridad = prioridad;
         this.titulo = titulo;
         this.creadaPor = creadaPor;
         this.creadaEn = creadaEn;
@@ -122,8 +128,12 @@ public class Modificacion {
         return tipoCambio;
     }
 
-    public Prioridad getPrioridad() {
-        return prioridad;
+    public Integer getPosicionCola() {
+        return posicionCola;
+    }
+
+    public boolean isUrgente() {
+        return urgente;
     }
 
     public EstadoModificacion getEstado() {
@@ -176,8 +186,12 @@ public class Modificacion {
         }
     }
 
-    public void ponerPrioridad(Prioridad prioridad) {
-        this.prioridad = prioridad;
+    public void ponerPosicionCola(Integer posicion) {
+        this.posicionCola = posicion;
+    }
+
+    public void marcarUrgente(boolean urgente) {
+        this.urgente = urgente;
     }
 
     /** EN_CURSO, olvidando quién la dio por hecha si lo estaba. */

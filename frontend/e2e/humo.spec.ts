@@ -65,7 +65,7 @@ test('Bachir avisa de un cambio con una foto y despacho lo ve en la bandeja', as
   await tablet.getByRole('button', { name: 'OK', exact: true }).click();
   await expect(tablet.getByText('Hola, Bachir')).toBeVisible();
 
-  await tablet.getByRole('button', { name: /He cambiado algo/ }).click();
+  await tablet.getByRole('button', { name: /Crear Modificación/ }).click();
   await tablet.getByRole('button', { name: new RegExp(PROTOTIPO) }).click();
   await tablet.getByRole('button', { name: 'Herrajes' }).click();
 

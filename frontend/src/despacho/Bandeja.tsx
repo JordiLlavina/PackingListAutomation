@@ -14,10 +14,12 @@ import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
 import type { Cliente } from '../comun/modelos';
 import {
+  estaCerrada,
   estadoModificacion,
   estadosDelFiltro,
   fotoDelModelo,
   marcaDestino,
+  puesto,
   tituloVisible,
   type FiltroEstado,
   type ModificacionResumen,
@@ -55,7 +57,14 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
   const esAviso = m.direccion === 'TALLER_A_DESPACHO';
   return (
     <li>
-      <button className="fila-bandeja" type="button" data-p={m.prioridad ?? 'SIN'} aria-current={elegida ? 'true' : undefined} onClick={onAbrir}>
+      <button
+        className="fila-bandeja"
+        type="button"
+        data-urgente={m.urgente && !estaCerrada(m.estado) ? 'true' : undefined}
+        data-nueva={esAviso && m.estado === 'NUEVA' ? 'true' : undefined}
+        aria-current={elegida ? 'true' : undefined}
+        onClick={onAbrir}
+      >
         <FotoModelo modelo={fotoDelModelo(m)} />
         <span className="cuerpo">
           <span className="tit">
@@ -63,6 +72,7 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
             {m.tituloDeIa && <span className="chip-ia">IA</span>}
           </span>
           <span className="meta">
+            {!esAviso && m.posicionCola !== null && !estaCerrada(m.estado) && <b>{puesto(m.posicionCola)} · </b>}
             {m.modeloReferencia} · {hace(m.creadaEn)}
             {m.creadaPor && ` · de ${m.creadaPor}`}
           </span>
@@ -80,7 +90,7 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
                 })}
               </span>
             )}
-            {m.vencida && <span className="pill vencida">Vencida</span>}
+            {m.urgente && !estaCerrada(m.estado) && <span className="pill urgente">Urgente</span>}
             {m.respuestaPendienteDe === 'DESPACHO' && <span className="etiqueta espera">Te toca responder</span>}
           </span>
         </span>
@@ -125,7 +135,7 @@ export default function Bandeja() {
   useEffect(() => setLista(null), [pestana]);
 
   // Cuando cambian los números de la bandeja hay algo nuevo que enseñar.
-  const cambio = resumen ? `${resumen.nuevas}|${resumen.pendientes}|${resumen.vencidas}|${resumen.conRespuesta}|${resumen.sinPrioridad}` : '';
+  const cambio = resumen ? `${resumen.nuevas}|${resumen.pendientes}|${resumen.urgentes}|${resumen.conRespuesta}` : '';
   useEffect(() => {
     const p = new URLSearchParams();
     p.set('direccion', pestana === 'taller' ? 'TALLER_A_DESPACHO' : 'DESPACHO_A_TALLER');
@@ -169,7 +179,7 @@ export default function Bandeja() {
     ? [
         { clase: 'nuevo', numero: resumen.nuevas, texto: 'nuevas', title: 'Avisos del taller que nadie ha abierto todavía' },
         { clase: '', numero: resumen.pendientes, texto: 'pendientes', title: 'Avisos del taller sin acabar (nuevos, vistos o en curso)' },
-        { clase: 'vencido', numero: resumen.vencidas, texto: 'vencidas', title: 'Avisos del taller fuera de plazo: sin prioridad o sin aplicar' },
+        { clase: 'urgente', numero: resumen.urgentes, texto: 'urgentes', title: 'Órdenes para el taller marcadas urgentes y sin hacer' },
         { clase: 'con-respuesta', numero: resumen.conRespuesta, texto: 'con respuesta', title: 'Órdenes con una duda del taller por contestar' },
       ]
     : [];

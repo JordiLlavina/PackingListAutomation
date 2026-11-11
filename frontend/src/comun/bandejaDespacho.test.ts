@@ -24,9 +24,9 @@ describe('textoVoz', () => {
 });
 
 describe('numeroBandejaDespacho', () => {
-  it('suma los avisos nuevos y las órdenes con respuesta, no las pendientes ni las vencidas', () => {
-    expect(numeroBandejaDespacho({ nuevas: 2, pendientes: 7, vencidas: 1, conRespuesta: 3, sinPrioridad: 2 })).toBe(5);
-    expect(numeroBandejaDespacho({ nuevas: 0, pendientes: 4, vencidas: 0, conRespuesta: 0, sinPrioridad: 0 })).toBe(0);
+  it('suma los avisos nuevos y las órdenes con respuesta, no las pendientes ni las urgentes', () => {
+    expect(numeroBandejaDespacho({ nuevas: 2, pendientes: 7, urgentes: 1, conRespuesta: 3 })).toBe(5);
+    expect(numeroBandejaDespacho({ nuevas: 0, pendientes: 4, urgentes: 0, conRespuesta: 0 })).toBe(0);
   });
 
   it('es cero mientras no se sabe', () => {
@@ -80,7 +80,8 @@ function resumen(extra: Partial<ModificacionResumen>): ModificacionResumen {
     direccion: 'TALLER_A_DESPACHO',
     tipoCambio: 'COSTURA',
     tipoCambioTexto: 'Costura / construcción',
-    prioridad: null,
+    urgente: false,
+    posicionCola: null,
     estado: 'VISTA',
     titulo: null,
     tituloDeIa: false,
@@ -90,7 +91,7 @@ function resumen(extra: Partial<ModificacionResumen>): ModificacionResumen {
     hechaEn: null,
     hechaPor: null,
     respuestaPendienteDe: null,
-    vencida: false,
+    etapa: 'PRODUCCION',
     destinos: [],
     fotos: 0,
     audios: 1,

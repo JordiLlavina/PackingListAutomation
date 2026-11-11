@@ -10,6 +10,7 @@ import {
   filtrarRejilla,
   fotoUrl,
   prototiposCandidatos,
+  puntoEvento,
   tamanoTexto,
   textoFotosAnadidas,
   textoFusion,
@@ -45,21 +46,49 @@ const modelos = [
 const ids = (lista: ModeloResumen[]) => lista.map((m) => m.id);
 
 describe('filtrarRejilla', () => {
-  it('TODOS devuelve todos los modelos', () => {
-    expect(ids(filtrarRejilla(modelos, 'TODOS'))).toEqual([1, 2, 3, 4, 5]);
+  const sin = { texto: '', cliente: '', etapa: '' } as const;
+
+  it('sin filtros devuelve todos los modelos', () => {
+    expect(ids(filtrarRejilla(modelos, sin))).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it('una clave de cliente devuelve solo los de ese cliente', () => {
-    expect(ids(filtrarRejilla(modelos, 'APC'))).toEqual([3, 4]);
+  it('el cliente devuelve solo los de ese cliente', () => {
+    expect(ids(filtrarRejilla(modelos, { ...sin, cliente: 'APC' }))).toEqual([3, 4]);
   });
 
-  it('una etapa devuelve solo los de esa etapa', () => {
-    expect(ids(filtrarRejilla(modelos, 'PRODUCCION'))).toEqual([1, 3]);
-    expect(ids(filtrarRejilla(modelos, 'SMS'))).toEqual([4]);
+  it('la etapa devuelve solo los de esa etapa, también los inactivos', () => {
+    expect(ids(filtrarRejilla(modelos, { ...sin, etapa: 'PRODUCCION' }))).toEqual([1, 3]);
+    expect(ids(filtrarRejilla(modelos, { ...sin, etapa: 'SMS' }))).toEqual([4]);
+    expect(ids(filtrarRejilla(modelos, { ...sin, etapa: 'INACTIVO' }))).toEqual([5]);
   });
 
-  it('un filtro que no es ni cliente ni etapa no devuelve ninguno', () => {
-    expect(filtrarRejilla(modelos, 'XYZ')).toEqual([]);
+  it('cliente y etapa se suman', () => {
+    expect(ids(filtrarRejilla(modelos, { ...sin, cliente: 'AMI', etapa: 'PRODUCCION' }))).toEqual([1]);
+  });
+
+  it('el texto se busca dentro de la referencia: «77» y «770» encuentran ULL770', () => {
+    const lista = [{ ...modelo(7, 'AMI', 'PRODUCCION'), codigo: 'ULL770', referencia: 'ULL770' }, ...modelos];
+    expect(ids(filtrarRejilla(lista, { ...sin, texto: '770' }))).toEqual([7]);
+    expect(ids(filtrarRejilla(lista, { ...sin, texto: '77' }))).toEqual([7]);
+  });
+
+  it('el texto se busca también en el nombre, sin mirar mayúsculas ni acentos', () => {
+    const lista = [{ ...modelo(8, 'APC', 'SMS'), nombre: 'PORTE-MONNAIE NEIGE' }, ...modelos];
+    expect(ids(filtrarRejilla(lista, { ...sin, texto: 'néige' }))).toEqual([8]);
+  });
+
+  it('el texto no mira puntos ni espacios: «ull027al0103» encuentra ULL027.AL0103', () => {
+    const lista = [{ ...modelo(9, 'AMI', 'PRODUCCION'), codigo: 'ULL027.AL0103', referencia: 'ULL027.AL0103' }];
+    expect(ids(filtrarRejilla(lista, { ...sin, texto: 'ull027al0103' }))).toEqual([9]);
+  });
+
+  it('un modelo que ya tiene código se encuentra también por su nombre de prototipo', () => {
+    const lista = [{ ...modelo(10, 'AMI', 'PRODUCCION'), nombrePrototipo: 'PROTO A' }];
+    expect(ids(filtrarRejilla(lista, { ...sin, texto: 'proto a' }))).toEqual([10]);
+  });
+
+  it('un texto que no está en ningún modelo no devuelve ninguno', () => {
+    expect(filtrarRejilla(modelos, { ...sin, texto: 'XYZ' })).toEqual([]);
   });
 });
 
@@ -145,5 +174,20 @@ describe('documentos e imágenes de un PDF', () => {
   it('el aviso de las fotos añadidas va en singular o plural', () => {
     expect(textoFotosAnadidas(1)).toBe('1 foto añadida al modelo');
     expect(textoFotosAnadidas(3)).toBe('3 fotos añadidas al modelo');
+  });
+});
+
+describe('puntoEvento', () => {
+  it('el color del punto dice cómo está la modificación', () => {
+    expect(puntoEvento({ tipo: 'MODIFICACION', estado: 'HECHA' })).toEqual({ clase: 'hecha-p', texto: 'Hecha' });
+    expect(puntoEvento({ tipo: 'MODIFICACION', estado: 'DESCARTADA' })).toEqual({ clase: 'descartada-p', texto: 'Descartada' });
+    for (const estado of ['NUEVA', 'VISTA', 'EN_CURSO'] as const) {
+      expect(puntoEvento({ tipo: 'MODIFICACION', estado })).toEqual({ clase: 'abierta-p', texto: 'Sin hacer' });
+    }
+  });
+
+  it('los cambios de etapa van en azul y los de nombre con el punto de siempre', () => {
+    expect(puntoEvento({ tipo: 'ETAPA', estado: null }).clase).toBe('etapa-p');
+    expect(puntoEvento({ tipo: 'CODIGO', estado: null })).toEqual({ clase: '', texto: null });
   });
 });

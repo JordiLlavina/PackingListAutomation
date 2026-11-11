@@ -1,7 +1,6 @@
 package com.puntotres.packinglist.modelos;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -50,18 +49,19 @@ public record ModelosProperties(
     public record Recordatorios(Taller taller, Despacho despacho) {
 
         /**
-         * @param diasPorPrioridad cada cuántos días se vuelve a avisar al taller
-         *                         de una orden no hecha, según su prioridad
+         * @param resumenColaHora hora (0-23) desde la que sale cada día el resumen
+         *                        de la cola al taller; negativa o sin poner, no sale
+         * @param urgenteDias     cada cuántos días se recuerda al taller una orden
+         *                        urgente sin hacer; 0 lo apaga
          */
-        public record Taller(Map<String, Integer> diasPorPrioridad) {
+        public record Taller(Integer resumenColaHora, int urgenteDias) {
         }
 
         /**
-         * @param sinPrioridadHoras       horas hasta avisar de un aviso del taller sin prioridad
          * @param sinAplicarDias          cada cuántos días se recuerda un aviso sin aplicar del todo
          * @param respuestaPendienteHoras horas hasta avisar de una respuesta pendiente
          */
-        public record Despacho(int sinPrioridadHoras, int sinAplicarDias, int respuestaPendienteHoras) {
+        public record Despacho(int sinAplicarDias, int respuestaPendienteHoras) {
         }
     }
 

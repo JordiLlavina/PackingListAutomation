@@ -10,7 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 /**
  * Las modificaciones. Los filtros de la lista que no son la dirección y el
- * estado (prioridad, modelo, cliente, texto) los aplica el servicio en Java
+ * estado (modelo, cliente, texto) los aplica el servicio en Java
  * sobre estos candidatos: son cientos, no millones, y el texto busca además en
  * mensajes y transcripciones, que viven en otras tablas.
  */
@@ -32,7 +32,7 @@ public interface ModificacionRepository extends JpaRepository<Modificacion, Long
 
     long countByDireccionAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);
 
-    long countByDireccionAndPrioridadIsNullAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);
+    long countByDireccionAndUrgenteTrueAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);
 
     List<Modificacion> findByDireccionAndNecesitaRespuestaTrue(Direccion direccion);
 

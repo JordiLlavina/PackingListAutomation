@@ -3,7 +3,7 @@
 // scroll; la barra inferior con los cuatro destinos, y el botón flotante de
 // escanear en las pantallas de consulta. Cada ruta dice en su `handle` cómo
 // se pinta el marco (ver Pantalla). El marco también lleva la consulta de la
-// bandeja (useBandeja), que comparten la pepita de «Tengo que hacer», la losa
+// bandeja (useBandeja), que comparten la pepita de «Bandeja de Entrada», la losa
 // de Inicio y las listas.
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Outlet, useMatches, useNavigate, type Params } from 'react-router';
@@ -34,7 +34,7 @@ export type Pantalla = {
 
 const DESTINOS: { seccion: Seccion; ruta: string; texto: string; icono: NombreIcono }[] = [
   { seccion: 'inicio', ruta: '/', texto: 'Inicio', icono: 'casa' },
-  { seccion: 'ordenes', ruta: '/ordenes', texto: 'Tengo que hacer', icono: 'bandeja' },
+  { seccion: 'ordenes', ruta: '/ordenes', texto: 'Bandeja de Entrada', icono: 'bandeja' },
   { seccion: 'avisos', ruta: '/avisos', texto: 'Mis avisos', icono: 'lista' },
   { seccion: 'modelos', ruta: '/modelos', texto: 'Modelos', icono: 'rejilla' },
 ];

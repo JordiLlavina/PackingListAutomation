@@ -608,11 +608,11 @@ public class Modelos {
             String texto = "Pasa a " + cambio.getA().texto()
                     + (vacio(cambio.getMotivo()) ? "" : " · " + cambio.getMotivo());
             eventos.add(new Evento(cambio.getFecha(), "ETAPA", texto,
-                    nombres.getOrDefault(cambio.getUsuarioId(), NADIE), null, null));
+                    nombres.getOrDefault(cambio.getUsuarioId(), NADIE), null, null, null));
         }
         for (ModeloCodigoHistorico apunte : historico) {
             eventos.add(new Evento(apunte.getDesde(), "CODIGO", textoDeCodigo(modelo, apunte.getCodigo()), NADIE,
-                    null, null));
+                    null, null, null));
         }
         for (FuenteEventos fuente : fuentes) {
             eventos.addAll(fuente.eventosDe(modelo.getId()));

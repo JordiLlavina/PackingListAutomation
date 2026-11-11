@@ -1,4 +1,4 @@
-// Lo que decide el recorrido de «He cambiado algo» sin mirar la pantalla:
+// Lo que decide el recorrido de «Crear Modificación» sin mirar la pantalla:
 // cuándo se puede mandar a despacho, qué falta si no, y en qué paso de la
 // barra de progreso se está. Funciones puras, para poder probarlas.
 

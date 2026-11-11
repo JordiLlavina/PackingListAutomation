@@ -5,8 +5,8 @@ import java.util.List;
 
 import com.puntotres.packinglist.modelos.persistence.Direccion;
 import com.puntotres.packinglist.modelos.persistence.EstadoModificacion;
-import com.puntotres.packinglist.modelos.persistence.Prioridad;
 import com.puntotres.packinglist.modelos.persistence.Rol;
+import com.puntotres.packinglist.persistence.Etapa;
 
 /**
  * Una modificación tal como sale en una bandeja o en la cabecera de su
@@ -17,7 +17,9 @@ import com.puntotres.packinglist.modelos.persistence.Rol;
  * @param tipoCambioTexto      el texto del tipo de cambio en el yml; la clave si ya no está
  * @param creadaPor            el nombre de quien la creó; null si no la creó una persona
  * @param respuestaPendienteDe el lado que tiene que contestar; null si nadie
- * @param vencida              se le ha pasado el plazo a quien tiene que actuar
+ * @param urgente              el despacho la ha marcado urgente (solo órdenes para el taller)
+ * @param posicionCola         su puesto en la cola del taller, desde 1; null si no está (un aviso o una cerrada)
+ * @param etapa                la etapa de su modelo; null si el modelo ya no está
  * @param destinos             dónde se aplica; vacío en las órdenes para el taller
  * @param fotos                fotos de todos sus mensajes (y lo mismo audios y documentos)
  * @param duracionAudioSeg     cuánto dura la primera nota de voz del primer mensaje; null si no tiene
@@ -26,9 +28,10 @@ import com.puntotres.packinglist.modelos.persistence.Rol;
  */
 public record ModificacionResumen(Long id, Long modeloId, String modeloReferencia, String modeloNombre,
                                   String cliente, Long fotoPrincipalId, Direccion direccion, String tipoCambio,
-                                  String tipoCambioTexto, Prioridad prioridad, EstadoModificacion estado,
+                                  String tipoCambioTexto, boolean urgente, Integer posicionCola,
+                                  EstadoModificacion estado,
                                   String titulo, boolean tituloDeIa, LocalDateTime creadaEn, String creadaPor,
                                   LocalDateTime vistaEn, LocalDateTime hechaEn, String hechaPor,
-                                  Rol respuestaPendienteDe, boolean vencida, List<DestinoEstado> destinos, int fotos,
+                                  Rol respuestaPendienteDe, Etapa etapa, List<DestinoEstado> destinos, int fotos,
                                   int audios, int documentos, Integer duracionAudioSeg, Rol ultimoMensajeDe) {
 }

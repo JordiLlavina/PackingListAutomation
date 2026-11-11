@@ -1,4 +1,4 @@
-// La grabadora de la maqueta, la misma en «He cambiado algo» y en «Tengo una
+// La grabadora de la maqueta, la misma en «Crear Modificación» y en «Tengo una
 // duda»: el botón redondo de 160 px que graba y para, el contador y la onda
 // que dicen que está escuchando. useGrabadora lleva el micrófono (pedir
 // permiso, parar al tope o si se va solo, soltarlo al salir de la pantalla) y

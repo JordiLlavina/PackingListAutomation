@@ -1,9 +1,10 @@
 // Una orden nueva para el taller, en el panel de la derecha de la bandeja:
 // el modelo (buscador con foto; viene elegido desde «Nueva orden para este
-// modelo»), título, texto, prioridad (obligatoria), tipo de cambio, nota de
+// modelo»), título, texto, su sitio en la cola del taller (al final, la
+// primera o delante de cualquiera) y si es urgente, tipo de cambio, nota de
 // voz, fotos y documentos, con la casilla «Guardar también en el modelo».
-// Lo que el servidor exige (modelo, título, prioridad) se dice antes de
-// mandar, con sus mismas palabras; lo demás lo contesta él.
+// Lo que el servidor exige (modelo, título) se dice antes de mandar, con sus
+// mismas palabras; lo demás lo contesta él.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
@@ -14,17 +15,11 @@ import { extensionAudio, type Grabacion } from '../comun/grabador';
 import { Icono } from '../comun/iconos';
 import { reducirImagen } from '../comun/imagen';
 import type { ModeloFicha, ModeloResumen, Subida } from '../comun/modelos';
-import type { ModificacionCreada, ModificacionResumen, Prioridad } from '../comun/modificaciones';
+import { opcionesPosicion, type ModificacionCreada, type ModificacionResumen } from '../comun/modificaciones';
 import { mmss } from '../comun/tiempo';
 import { toast } from '../comun/toast';
 import { useTiposCambio } from '../taller/cambio/tipos';
 import ElegirImagenesPdf from './ElegirImagenesPdf';
-
-const PRIORIDADES: [Prioridad, string][] = [
-  ['ALTA', 'Alta'],
-  ['NORMAL', 'Normal'],
-  ['BAJA', 'Baja'],
-];
 
 /** Cuántos modelos se enseñan al buscar: con más, mejor afinar la búsqueda. */
 const MAXIMO_RESULTADOS = 12;
@@ -50,7 +45,10 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
   const [resultados, setResultados] = useState<ModeloResumen[] | null>(null);
   const [titulo, setTitulo] = useState('');
   const [texto, setTexto] = useState('');
-  const [prioridad, setPrioridad] = useState<Prioridad | null>(null);
+  const [cola, setCola] = useState<ModificacionResumen[] | null>(null);
+  /** El id de la orden delante de la que va; vacío, al final. */
+  const [antesDe, setAntesDe] = useState('');
+  const [urgente, setUrgente] = useState(false);
   const [tipo, setTipo] = useState('');
   const [nota, setNota] = useState<Nota | null>(null);
   const [fotos, setFotos] = useState<File[]>([]);
@@ -73,6 +71,24 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
       vigente = false;
     };
   }, [modeloInicial]);
+
+  // La cola, para elegir dónde va la orden nueva.
+  useEffect(() => {
+    let vigente = true;
+    api<ModificacionResumen[]>('/api/modificaciones/cola')
+      .then((c) => vigente && setCola(c))
+      .catch(() => vigente && setCola([]));
+    return () => {
+      vigente = false;
+    };
+  }, []);
+
+  /** Urgente la pone la primera (se puede cambiar después en el desplegable). */
+  const marcarUrgente = (marcada: boolean) => {
+    setUrgente(marcada);
+    const primera = cola?.[0];
+    if (marcada && primera) setAntesDe(String(primera.id));
+  };
 
   // Se busca cuando se deja de teclear, no con cada letra.
   useEffect(() => {
@@ -120,14 +136,14 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
     if (enviando || grabadora.grabando) return;
     if (!modelo) return setError('Elige el modelo');
     if (!titulo.trim()) return setError('Falta el título');
-    if (!prioridad) return setError('Falta la prioridad');
     setEnviando(true);
     setError(null);
     const datos = new FormData();
     datos.append('modeloId', String(modelo.id));
     datos.append('titulo', titulo.trim());
     datos.append('texto', texto.trim());
-    datos.append('prioridad', prioridad);
+    if (antesDe) datos.append('antesDe', antesDe);
+    if (urgente) datos.append('urgente', 'true');
     if (tipo) datos.append('tipoCambio', tipo);
     if (nota) {
       datos.append('audio', nota.blob, `nota-de-voz.${extensionAudio(nota.blob.type)}`);
@@ -231,15 +247,19 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
         <textarea rows={4} value={texto} onChange={(e) => setTexto(e.target.value)} />
       </label>
 
-      <fieldset>
-        <legend>Prioridad</legend>
-        <div className="prioridades">
-          {PRIORIDADES.map(([p, txt]) => (
-            <button key={p} className="prioridad" type="button" data-p={p} aria-pressed={prioridad === p} onClick={() => setPrioridad(p)}>
-              {txt}
-            </button>
+      <fieldset className="lugar-cola">
+        <legend>Lugar en la cola del taller</legend>
+        <select aria-label="Lugar en la cola" value={antesDe} disabled={cola === null} onChange={(e) => setAntesDe(e.target.value)}>
+          {(cola === null ? [{ valor: '', texto: 'Cargando la cola…' }] : opcionesPosicion(cola)).map((o) => (
+            <option key={o.valor} value={o.valor}>
+              {o.texto}
+            </option>
           ))}
-        </div>
+        </select>
+        <label className="casilla-linea">
+          <input type="checkbox" checked={urgente} onChange={(e) => marcarUrgente(e.target.checked)} />
+          Urgente <span className="ayuda">(la pone la primera; puedes cambiarlo arriba)</span>
+        </label>
       </fieldset>
 
       <label className="campo">

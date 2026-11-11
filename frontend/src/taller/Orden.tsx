@@ -12,7 +12,9 @@ import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
 import {
   adjuntoUrl,
+  estaCerrada,
   fotoDelModelo,
+  puesto,
   type AdjuntoVista,
   type MensajeVista,
   type ModificacionDetalle,
@@ -25,7 +27,6 @@ import { useTitulo } from './Shell';
 
 const CONFIRMAR_MS = 6000;
 
-const PRIORIDAD_TEXTO = { ALTA: 'alta', NORMAL: 'normal', BAJA: 'baja' } as const;
 
 /** Una foto a pantalla completa, con un «Cerrar» grande (Esc también la cierra). */
 function FotoCompleta({ adjuntoId, onCerrar }: { adjuntoId: number; onCerrar: () => void }) {
@@ -179,7 +180,13 @@ export default function Orden() {
           <span className="meta">
             {hace(r.creadaEn)}
             {r.creadaPor && ` · de ${r.creadaPor}`}
-            {r.prioridad && ` · prioridad ${PRIORIDAD_TEXTO[r.prioridad]}`}
+            {!estaCerrada(r.estado) && r.posicionCola !== null && ` · ${puesto(r.posicionCola)} de la cola`}
+            {r.urgente && !estaCerrada(r.estado) && (
+              <>
+                {' '}
+                <span className="pill urgente">Urgente</span>
+              </>
+            )}
           </span>
         </div>
       </div>
