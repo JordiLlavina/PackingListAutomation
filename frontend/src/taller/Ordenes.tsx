@@ -1,15 +1,18 @@
 // «Bandeja de Entrada»: las órdenes que despacho manda al taller, en el orden de
 // la cola que pone el despacho (la primera es la siguiente que toca, y se
-// destaca) y las hechas debajo. La lista se vuelve a pedir cuando cambian los números de
-// la bandeja, así que una orden que llega con la pantalla abierta aparece sola.
+// destaca) y las hechas debajo, con los mismos filtros que la rejilla de
+// modelos (texto, cliente y etapa; petición del usuario). La lista se vuelve a
+// pedir cuando cambian los números de la bandeja, así que una orden que llega
+// con la pantalla abierta aparece sola.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
-import { estaCerrada, estadoOrden, fotoDelModelo, ordenarOrdenes, puesto, type ModificacionResumen } from '../comun/modificaciones';
+import { colaFiltrada, estaCerrada, estadoOrden, filtrarCola, fotoDelModelo, ordenarOrdenes, puesto, type ModificacionResumen } from '../comun/modificaciones';
 import { hace } from '../comun/tiempo';
 import { useBandeja } from '../comun/useBandeja';
+import FiltrosModelos, { useFiltrosEnDireccion } from './FiltrosModelos';
 
 function Tarjeta({ orden, siguiente = false }: { orden: ModificacionResumen; siguiente?: boolean }) {
   const navegar = useNavigate();
@@ -54,6 +57,7 @@ export default function Ordenes() {
   const { resumen } = useBandeja();
   const [ordenes, setOrdenes] = useState<ModificacionResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { filtros, poner } = useFiltrosEnDireccion();
 
   const peticion = useRef(0);
   const cargar = useCallback(() => {
@@ -82,18 +86,26 @@ export default function Ordenes() {
     );
   }
   if (!ordenes) return null;
-  const { pendientes, hechas } = ordenarOrdenes(ordenes);
+  const clientes = [...new Set(ordenes.map((o) => o.cliente))].sort();
+  const filtrando = colaFiltrada(filtros);
+  // El filtro busca en la referencia, el nombre del modelo y el título de la orden (el mismo que la cola de despacho).
+  const { pendientes, hechas } = ordenarOrdenes(filtrarCola(ordenes, filtros));
+  // «La siguiente» es la primera de la cola entera: con un filtro puesto, la primera que se ve puede no serlo.
+  const siguienteId = ordenarOrdenes(ordenes).pendientes[0]?.id;
 
   return (
     <>
       <h2 className="saludo">Bandeja de Entrada</h2>
       <p className="sub">En el orden que ha puesto despacho: la primera es la siguiente. La franja roja es urgente.</p>
+      <FiltrosModelos filtros={filtros} clientes={clientes} placeholder="Buscar referencia, nombre u orden" onCambiar={poner} />
       {pendientes.length > 0 ? (
         <div className="lista">
-          {pendientes.map((o, i) => (
-            <Tarjeta key={o.id} orden={o} siguiente={i === 0} />
+          {pendientes.map((o) => (
+            <Tarjeta key={o.id} orden={o} siguiente={o.id === siguienteId} />
           ))}
         </div>
+      ) : filtrando ? (
+        <p className="ayuda">Ninguna orden pendiente con estos filtros.</p>
       ) : (
         <div className="vacio">
           <Icono nombre="ok" />
