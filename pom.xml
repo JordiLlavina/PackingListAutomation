@@ -20,6 +20,13 @@
 
     <properties>
         <java.version>17</java.version>
+        <!-- La PWA de modelos (frontend/) se construye con cada build de
+             Maven. -Dskip.frontend=true se la salta para iterar rápido en el
+             backend: los tests de Java no dependen de ella. -->
+        <skip.frontend>false</skip.frontend>
+        <!-- Lo que arranca mvn exec:java: la prueba manual de siempre, salvo
+             que se pida otra clase con -Dexec.mainClass (GenerarClavesVapid). -->
+        <exec.mainClass>com.puntotres.packinglist.Main</exec.mainClass>
     </properties>
 
     <!-- Openize.HEIC no está en Maven Central: lo publica Aspose en su repositorio. -->
@@ -51,6 +58,13 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
+        <!-- Spring Security: usuarios de la app de modelos (contraseñas con
+             BCrypt) y, más adelante, la cadena de filtros que la protege. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+
         <!-- Lo que el programa tiene que recordar entre ejecuciones: qué cartón
              y cuántas unidades por caja lleva cada referencia, y la tabla de
              taras. H2 en fichero para que sobreviva al reinicio sin instalar
@@ -78,6 +92,15 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.4.1</version>
+        </dependency>
+
+        <!-- Apache PDFBox: de un PDF subido a un modelo saca las imágenes
+             incrustadas y pinta cada página, para que el despacho elija cuáles
+             son fotos del modelo (ImagenesDePdf). No la gestiona Boot. -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.8</version>
         </dependency>
 
         <!-- Barcode4J: generación de códigos de barras Code 128 para las
@@ -143,15 +166,141 @@
             <version>2.49.0</version>
         </dependency>
 
+        <!-- Web Push con VAPID: los avisos al móvil de la app de modelos
+             (órdenes nuevas al taller, avisos y respuestas al despacho).
+             Se usa su PushService síncrono (Apache HttpAsyncClient): el
+             cliente asíncrono de Netty (async-http-client) y la línea de
+             órdenes (jcommander) sobran. -->
+        <dependency>
+            <groupId>nl.martijndwars</groupId>
+            <artifactId>web-push</artifactId>
+            <version>5.1.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.asynchttpclient</groupId>
+                    <artifactId>async-http-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.beust</groupId>
+                    <artifactId>jcommander</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- BouncyCastle: web-push lo necesita para cifrar cada mensaje con las
+             claves de la suscripción y firmar con VAPID, pero no lo trae (lo
+             declara como provided). La versión para Java 18+ (vale en el 17). -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- Para probar la app de modelos con MockMvc: entrar como un usuario
+             concreto (authentication) y mandar el token CSRF (csrf). -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
+        <!-- Declarar <resources> sustituye entero el bloque del parent de
+             Spring Boot, así que sus dos entradas van copiadas tal cual
+             (application*.yml con filtrado, el resto sin él). La tercera mete
+             el build de la PWA en static/app, de donde la sirve SpaController
+             en /app. Si frontend/dist no existe (-Dskip.frontend=true sin
+             haber construido nunca la PWA), Maven se la salta sin error. -->
+        <resources>
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>**/application*.yml</include>
+                    <include>**/application*.yaml</include>
+                    <include>**/application*.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>${basedir}/src/main/resources</directory>
+                <excludes>
+                    <exclude>**/application*.yml</exclude>
+                    <exclude>**/application*.yaml</exclude>
+                    <exclude>**/application*.properties</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>${basedir}/frontend/dist</directory>
+                <targetPath>static/app</targetPath>
+            </resource>
+        </resources>
         <plugins>
+            <!-- La PWA de modelos (React + Vite, en frontend/): sin Node
+                 instalado en la máquina. El plugin se baja su propio Node a
+                 frontend/node/ la primera vez (no entra en el repo), instala
+                 las dependencias exactas del package-lock.json (npm ci),
+                 construye en generate-resources, antes de que Maven copie los
+                 recursos, y pasa los tests de Vitest con los de Java en la
+                 fase test (-DskipTests también se los salta). -->
+            <plugin>
+                <groupId>com.github.eirslett</groupId>
+                <artifactId>frontend-maven-plugin</artifactId>
+                <version>2.0.2</version>
+                <configuration>
+                    <installDirectory>frontend</installDirectory>
+                    <workingDirectory>frontend</workingDirectory>
+                    <skip>${skip.frontend}</skip>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>install-node-and-npm</id>
+                        <goals>
+                            <goal>install-node-and-npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <nodeVersion>v22.12.0</nodeVersion>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-ci</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <arguments>ci</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-run-build</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <arguments>run build</arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>npm-test</id>
+                        <goals>
+                            <goal>npm</goal>
+                        </goals>
+                        <phase>test</phase>
+                        <configuration>
+                            <arguments>test</arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -179,9 +328,122 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.5.0</version>
                 <configuration>
-                    <mainClass>com.puntotres.packinglist.Main</mainClass>
+                    <mainClass>${exec.mainClass}</mainClass>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- mvn verify -Pe2e: el recorrido de humo de la PWA de modelos con
+             Playwright (frontend/e2e/). Arranca la aplicación de verdad en
+             el puerto 8089 con la base en memoria (nunca la de ./datos), pasa
+             Chromium sin ventana por las pantallas y la para al acabar,
+             también si el recorrido falla. La primera vez se baja Chromium
+             (unos 150 MB, a la caché de Playwright del usuario). Sin el
+             perfil, el build de siempre no cambia. -->
+        <profile>
+            <id>e2e</id>
+            <properties>
+                <e2e.port>8089</e2e.port>
+                <!-- Para que comprobar-e2e sepa si -DskipTests se ha
+                     saltado el recorrido (la línea de comandos manda). -->
+                <skipTests>false</skipTests>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>arrancar-para-e2e</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>start</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- Esperar a que la aplicación conteste
+                                         (Flyway incluido): hasta 3 minutos. -->
+                                    <wait>1000</wait>
+                                    <maxAttempts>180</maxAttempts>
+                                    <!-- Lo de las variables de entorno de la
+                                         máquina se apaga a propósito: el
+                                         recorrido no llama a Azure, ni a
+                                         Claude, ni manda avisos al móvil. -->
+                                    <arguments>
+                                        <argument>--server.port=${e2e.port}</argument>
+                                        <argument>--spring.datasource.url=jdbc:h2:mem:e2e;DB_CLOSE_DELAY=-1</argument>
+                                        <argument>--modelos.admin-password=prueba</argument>
+                                        <argument>--modelos.recordatorios.activo=false</argument>
+                                        <argument>--modelos.resumen-ia.activo=false</argument>
+                                        <argument>--modelos.azure-speech.clave=</argument>
+                                        <argument>--modelos.push.vapid-public=</argument>
+                                        <argument>--modelos.push.vapid-private=</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>parar-tras-e2e</id>
+                                <phase>post-integration-test</phase>
+                                <goals>
+                                    <goal>stop</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.github.eirslett</groupId>
+                        <artifactId>frontend-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>playwright-install-chromium</id>
+                                <phase>pre-integration-test</phase>
+                                <goals>
+                                    <goal>npx</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>playwright install chromium</arguments>
+                                </configuration>
+                            </execution>
+                            <!-- El recorrido NO para el build aunque falle
+                                 (testFailureIgnore): si lo parase aquí, Maven
+                                 no llegaría a post-integration-test y el jar
+                                 se quedaría arrancado con el puerto. Lo que
+                                 decide es la comprobación de verify, ya con la
+                                 aplicación parada, como hace failsafe. -->
+                            <execution>
+                                <id>npm-run-e2e</id>
+                                <phase>integration-test</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>run e2e</arguments>
+                                    <testFailureIgnore>true</testFailureIgnore>
+                                    <environmentVariables>
+                                        <E2E_BASE_URL>http://localhost:${e2e.port}</E2E_BASE_URL>
+                                    </environmentVariables>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>comprobar-e2e</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>npm</goal>
+                                </goals>
+                                <configuration>
+                                    <arguments>run e2e:comprobar</arguments>
+                                    <environmentVariables>
+                                        <E2E_INICIO_BUILD>${maven.build.timestamp}</E2E_INICIO_BUILD>
+                                        <E2E_SIN_TESTS>${skipTests}</E2E_SIN_TESTS>
+                                    </environmentVariables>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

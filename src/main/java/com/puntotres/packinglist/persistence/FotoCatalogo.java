@@ -1,6 +1,8 @@
 package com.puntotres.packinglist.persistence;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,16 +27,19 @@ import jakarta.persistence.Table;
 @Table(name = "foto_modelo")
 public class FotoCatalogo {
 
+    /** Lo que cabe en {@code foto_modelo.nombre_fichero}. */
+    private static final int LARGO_NOMBRE = 255;
+
+    /** Hasta dónde un punto final se lee como extensión ({@code .jpeg} sí; {@code .algo muy largo} no). */
+    private static final int LARGO_EXTENSION = 10;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "cliente", length = 60, nullable = false)
-    private String cliente;
-
-    @Column(name = "codigo_modelo", length = 80, nullable = false)
-    private String codigoModelo;
+    @Column(name = "modelo_id", nullable = false)
+    private Long modeloId;
 
     @Column(name = "nombre_fichero", length = 255, nullable = false)
     private String nombreFichero;
@@ -56,9 +61,8 @@ public class FotoCatalogo {
         // Constructor para JPA.
     }
 
-    public FotoCatalogo(String cliente, String codigoModelo, String nombreFichero, int orden, byte[] jpeg) {
-        this.cliente = cliente;
-        this.codigoModelo = codigoModelo;
+    public FotoCatalogo(Long modeloId, String nombreFichero, int orden, byte[] jpeg) {
+        this.modeloId = modeloId;
         this.nombreFichero = nombreFichero;
         this.orden = orden;
         this.jpeg = jpeg;
@@ -70,12 +74,8 @@ public class FotoCatalogo {
         return id;
     }
 
-    public String getCliente() {
-        return cliente;
-    }
-
-    public String getCodigoModelo() {
-        return codigoModelo;
+    public Long getModeloId() {
+        return modeloId;
     }
 
     public String getNombreFichero() {
@@ -99,7 +99,43 @@ public class FotoCatalogo {
         this.fechaActualizacion = LocalDateTime.now();
     }
 
+    /**
+     * Pasa a otro modelo al juntar dos: con el nombre libre que le toca allí,
+     * detrás de las fotos que ya tenía y siendo la principal solo si se le dice.
+     */
+    public void moverA(Long modeloId, String nombreFichero, int orden, boolean principal) {
+        this.modeloId = modeloId;
+        this.nombreFichero = nombreFichero;
+        this.orden = orden;
+        this.principal = principal;
+        this.fechaActualizacion = LocalDateTime.now();
+    }
+
+    /**
+     * El nombre tal cual si está libre entre {@code usados} (en minúsculas);
+     * si no, con {@code " (2)"}, {@code " (3)"}... delante de la extensión.
+     * Una foto se identifica por su nombre dentro del modelo, así que dos con
+     * el mismo nombre en un modelo serían una. Sin mirar mayúsculas
+     * ({@code IMAGE.JPG} e {@code image.jpg} son el mismo fichero para quien
+     * los descarga en Windows) y cortando el nombre, nunca la extensión, para
+     * que quepa en la columna.
+     */
+    public static String nombreLibre(String nombre, Set<String> usados) {
+        int punto = nombre.lastIndexOf('.');
+        boolean conExtension = punto > 0 && nombre.length() - punto <= LARGO_EXTENSION;
+        String base = conExtension ? nombre.substring(0, punto) : nombre;
+        String extension = conExtension ? nombre.substring(punto) : "";
+        for (int numero = 1; ; numero++) {
+            String sufijo = numero == 1 ? "" : " (" + numero + ")";
+            int cabe = LARGO_NOMBRE - sufijo.length() - extension.length();
+            String candidato = base.substring(0, Math.min(base.length(), cabe)) + sufijo + extension;
+            if (!usados.contains(candidato.toLowerCase(Locale.ROOT))) {
+                return candidato;
+            }
+        }
+    }
+
     public ResumenFoto resumen() {
-        return new ResumenFoto(id, codigoModelo, nombreFichero, principal, orden);
+        return new ResumenFoto(id, modeloId, nombreFichero, principal, orden);
     }
 }

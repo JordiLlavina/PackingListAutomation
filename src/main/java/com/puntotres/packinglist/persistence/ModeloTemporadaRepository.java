@@ -7,13 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /** Acceso a los vínculos modelo ↔ temporada. */
 public interface ModeloTemporadaRepository extends JpaRepository<ModeloTemporada, ModeloTemporadaId> {
 
-    List<ModeloTemporada> findByClienteAndTemporadaId(String cliente, Long temporadaId);
+    List<ModeloTemporada> findByTemporadaId(Long temporadaId);
 
-    List<ModeloTemporada> findByClienteAndCodigoModelo(String cliente, String codigoModelo);
-
-    List<ModeloTemporada> findByCliente(String cliente);
+    List<ModeloTemporada> findByModeloId(Long modeloId);
 
     void deleteByTemporadaId(Long temporadaId);
 
-    void deleteByClienteAndCodigoModelo(String cliente, String codigoModelo);
+    void deleteByModeloId(Long modeloId);
 }

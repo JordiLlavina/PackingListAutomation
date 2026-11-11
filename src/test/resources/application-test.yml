@@ -21,3 +21,39 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+
+# Sin Azure Speech en los tests aunque la máquina tenga AZURE_SPEECH_KEY: las
+# notas de voz de los tests quedan NO_APLICA y nunca se llama a Azure ni, por
+# tanto, al resumen de Claude (que solo corre tras una transcripción hecha).
+# TranscripcionServiceTest pone sus propios falsos.
+modelos:
+  azure-speech:
+    clave: ""
+  # Ni el resumen de Claude aunque la máquina tenga ANTHROPIC_API_KEY: ningún
+  # contexto de test puede construir el resumidor de verdad
+  # (TranscripcionConfig).
+  resumen-ia:
+    activo: false
+  # Ni Web Push aunque la máquina tenga MODELOS_VAPID_*: los avisos al móvil
+  # quedan apagados (EnviadorPushDesactivado); PushTest pone uno falso.
+  push:
+    vapid-public: ""
+    vapid-private: ""
+  # Ni la revisión de los recordatorios de cada hora: RecordatoriosTest llama a
+  # revisar(ahora) con la hora que le conviene, y una revisión programada a
+  # mitad de la suite mandaría pushes de las modificaciones de otros tests.
+  recordatorios:
+    activo: false
+    # Los plazos, fijados aquí y no heredados de application.yml: los tests de
+    # recordatorios cuentan días y horas contra estos números, así que afinar
+    # los del yml de verdad (cada cuánto se insiste al taller o al despacho)
+    # nunca pone la suite en rojo.
+    # El resumen diario de la cola, apagado: la base es la de toda la suite y
+    # saldría en cada revisar(ahora) con las órdenes de otros tests.
+    # RecordatoriosTest lo prueba llamando a resumenDeLaCola con su hora.
+    taller:
+      resumen-cola-hora: -1
+      urgente-dias: 1
+    despacho:
+      sin-aplicar-dias: 7
+      respuesta-pendiente-horas: 24

@@ -161,7 +161,7 @@ class MemoriaPielesTest {
         memoria.recordar("AMI", "AL0931", "ULL931.AL0931", "Nappa", "Tela", List.of("Ante"));
 
         Articulo articulo = catalogo.articulo("AMI", "ULL931.AL0931").orElseThrow();
-        assertEquals("ULL931", articulo.getCodigoModelo());
+        assertEquals("ULL931", catalogo.modelo(articulo.getModeloId()).orElseThrow().getCodigo());
         assertEquals("TELA", articulo.getForro());
     }
 

@@ -9,6 +9,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -201,7 +202,8 @@ public class ImportacionFotosTemporada {
     }
 
     private Set<String> modelos(String cliente) {
-        return catalogo.modelosDe(cliente).stream().map(Modelo::getCodigo).collect(Collectors.toSet());
+        return catalogo.modelosDe(cliente).stream().map(Modelo::getCodigo).filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private Function<String, ReferenciaCorte> partir(String cliente) {

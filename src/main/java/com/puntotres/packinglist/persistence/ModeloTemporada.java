@@ -10,7 +10,8 @@ import jakarta.persistence.Table;
  * Un modelo que ha ido en una temporada. Es la relación N:M entre
  * {@link Modelo} y {@link TemporadaGuardada}: una fila por pareja. Se rellena
  * sola al guardar el excel de una temporada; sirve para filtrar el catálogo,
- * que con tres temporadas tiene cientos de artículos.
+ * que con tres temporadas tiene cientos de artículos. Cuelga del id del
+ * modelo, no de su código: un prototipo puede no tenerlo todavía.
  */
 @Entity
 @Table(name = "modelo_temporada")
@@ -18,12 +19,8 @@ import jakarta.persistence.Table;
 public class ModeloTemporada {
 
     @Id
-    @Column(name = "cliente", length = 60)
-    private String cliente;
-
-    @Id
-    @Column(name = "codigo_modelo", length = 80)
-    private String codigoModelo;
+    @Column(name = "modelo_id")
+    private Long modeloId;
 
     @Id
     @Column(name = "temporada_id")
@@ -33,18 +30,13 @@ public class ModeloTemporada {
         // Constructor para JPA.
     }
 
-    public ModeloTemporada(String cliente, String codigoModelo, Long temporadaId) {
-        this.cliente = cliente;
-        this.codigoModelo = codigoModelo;
+    public ModeloTemporada(Long modeloId, Long temporadaId) {
+        this.modeloId = modeloId;
         this.temporadaId = temporadaId;
     }
 
-    public String getCliente() {
-        return cliente;
-    }
-
-    public String getCodigoModelo() {
-        return codigoModelo;
+    public Long getModeloId() {
+        return modeloId;
     }
 
     public Long getTemporadaId() {

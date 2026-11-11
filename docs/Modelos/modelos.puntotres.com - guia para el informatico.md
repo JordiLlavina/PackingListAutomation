@@ -1,6 +1,7 @@
 # modelos.puntotres.com — guía para el informático
 
-Fecha: 2026-11-08. Para quien administra la red y el servidor de Puntotres.
+Fecha: 2026-11-08 (revisada el 2026-11-09, con la aplicación ya programada).
+Para quien administra la red y el servidor de Puntotres.
 Lo que se pide aquí es **solo para la red local**; la salida a internet es otro
 proyecto y se describe al final para que lo que se haga hoy no estorbe mañana.
 
@@ -106,7 +107,10 @@ server {
         proxy_http_version 1.1;
         proxy_set_header   Host              $host;
         proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        # $remote_addr y no $proxy_add_x_forwarded_for: la aplicación limita los
+        # intentos de alta de una tablet por IP, y con el otro un cliente podría
+        # mandar su propia cabecera X-Forwarded-For y hacerse pasar por otra IP.
+        proxy_set_header   X-Forwarded-For   $remote_addr;
         proxy_set_header   X-Forwarded-Proto $scheme;
         proxy_set_header   X-Forwarded-Host  $host;
         proxy_request_buffering off;   # las subidas grandes van pasando, no se guardan enteras en disco antes
@@ -123,6 +127,10 @@ hagáis vosotros): la aplicación leerá las cabeceras `X-Forwarded-*` para comp
 bien sus URLs (`server.forward-headers-strategy: framework`) y, cuando nginx esté
 en marcha, escuchará **solo en `127.0.0.1:8080`** (`server.address`), de modo que
 el 8080 deje de estar expuesto a la red aunque el cortafuegos lo dejara pasar.
+Las dos líneas ya están escritas, comentadas, en el bloque `server` del
+`application.yml` del programa (`#forward-headers-strategy: framework` y
+`#address: 127.0.0.1`); el día de activarlas basta con ponerlas en el
+`application.yml` que hay junto al jar en `/opt/packinglist`, sin recompilar.
 Avisadnos cuando el nginx esté para activar las dos cosas.
 
 ## 6. Cortafuegos
@@ -153,8 +161,13 @@ del navegador). Pasos, una vez por dispositivo:
    «Sin restricciones», para que las notificaciones lleguen con la pantalla
    apagada.
 5. Volumen de notificaciones activo (la orden nueva suena y vibra).
-6. La primera vez, la app pide un **código de alta de 6 cifras** que genera
-   despacho; después ya no vuelve a pedir nada en esa tablet.
+6. La primera vez, en la tablet se toca **«Soy del taller»** y se teclea un
+   **código de alta de 6 cifras** (vale 10 minutos). Lo genera el
+   administrador de la aplicación (Jordi) desde un PC de despacho, en la
+   pestaña **«Admin» → Usuarios → «Código de alta para la tablet»** en la fila
+   del usuario del taller; después ya no vuelve a pedir nada en esa tablet
+   durante un año. Si se pierde o se cambia la tablet, se revoca en
+   «Admin» → Dispositivos → «Revocar» y se da de alta la nueva con otro código.
 7. Recomendable: un soporte y el cargador fijos en el puesto de Bachir, y
    bloqueo de pantalla sencillo (la app no guarda contraseñas, pero la tablet
    abre la app sin preguntar).
@@ -175,6 +188,14 @@ AZURE_SPEECH_KEY=<clave del recurso "Speech" creado en el tenant de Puntotres>
 AZURE_SPEECH_REGION=westeurope
 ```
 
+Opcional: `MODELOS_VAPID_ASUNTO` (por defecto `mailto:modelos@puntotres.com`),
+el contacto que los servidores de push ven en cada aviso. `MODELOS_URL_PUBLICA`
+sí es imprescindible: sin ella los QR de las etiquetas se imprimirían con
+`http://localhost:8080` y no llevarían a ningún sitio. Las claves VAPID se
+generan **una sola vez** (cambiarlas deja sin avisos a todas las tablets y PCs
+hasta que vuelvan a activarlos); Jordi las saca con la herramienta del
+proyecto y os las pasa (ver el README).
+
 Lo de Azure: un recurso **«Speech service»** (Azure AI Speech) en la suscripción
 de la empresa, región Oeste de Europa, nivel estándar (pago por minuto, muy
 poco a este volumen). Lo puede crear el administrador de Microsoft; nos hace
@@ -189,6 +210,11 @@ Igual que hoy, lo único que hay que salvar es `/opt/packinglist/datos`. Con la
 nueva parte **crece**: audios (~200 KB por nota) y fotos (~300 KB cada una) van
 dentro de la base de datos. Cientos de MB al año, no más; la copia diaria debe
 seguir incluyéndola, y que alguna vez se haya **probado a restaurar**.
+
+**Antes del primer arranque con esta versión, copia de `datos` aparte**: la
+migración de la app de modelos (V4) rehace la tabla `modelo` y H2 confirma
+cada cambio de esquema según lo hace, así que si algo falla a medias no se
+vuelve atrás solo.
 
 ## 10. Comprobación final
 
@@ -211,3 +237,20 @@ en Entra ID, redirecciones a `https://modelos.puntotres.com/login/oauth2/code/az
 PostgreSQL en vez de la base embebida; copias fuera de la máquina; DNS público
 del nombre. Lo que se monta hoy (nombre, certificado, nginx) **se reutiliza tal
 cual**.
+
+## 12. Para desarrollar sin HTTPS (lo hace Jordi, no informática)
+
+Mientras no estén el nombre, el certificado y el nginx, la aplicación se puede
+probar desde la tablet contra el PC de desarrollo en la misma WiFi, sin HTTPS:
+
+1. En el PC: `mvn spring-boot:run` (con `MODELOS_ADMIN_PASSWORD` la primera vez)
+   y el cortafuegos de Windows dejando entrar el 8080 desde la red local.
+2. En el Chrome **de la tablet**: `chrome://flags/#unsafely-treat-insecure-origin-as-secure`,
+   activarlo, escribir `http://<ip-del-pc>:8080` y reiniciar Chrome. Con eso
+   Chrome trata esa dirección como segura y da cámara, micrófono, notificaciones
+   e instalación.
+3. Abrir `http://<ip-del-pc>:8080/app/`.
+
+Es solo para probar: vale para ese navegador y esa dirección, y hay que quitarlo
+cuando la tablet pase a `https://modelos.puntotres.com`. En el propio PC no hace
+falta nada, porque `localhost` ya cuenta como seguro.

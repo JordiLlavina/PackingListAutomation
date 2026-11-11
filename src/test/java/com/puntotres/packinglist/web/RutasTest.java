@@ -47,7 +47,7 @@ class RutasTest {
         // "Empezar" dentro sería un segundo sitio que pulsar para lo mismo.
         String html = mvc.perform(get("/menu")).andReturn().getResponse().getContentAsString();
         for (String ruta : java.util.List.of("/packing-list", "/etiquetas-articulo",
-                "/documentos-corte", "/info-embalaje", "/clickup")) {
+                "/documentos-corte", "/info-embalaje", "/clickup", "/app/")) {
             org.junit.jupiter.api.Assertions.assertTrue(
                     html.contains("<a class=\"tarjeta menu-tarjeta\" href=\"" + ruta + "\">"), ruta);
         }

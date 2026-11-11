@@ -21,9 +21,11 @@ Thumbs.db
 
 # Base de datos embebida: lo que el programa ha aprendido de cada referencia
 # y la tabla de taras. Es dato del almacen de cada maquina, no del proyecto.
-# (datos-antes-flyway/ es la copia apartada al pasar a Flyway.)
+# (datos-antes-flyway/ es la copia apartada al pasar a Flyway, y
+# datos-antes-de-modelos/ la copia de antes de la V4 de la app de modelos.)
 datos/
 datos-antes-flyway/
+datos-antes-de-modelos/
 
 # Excel lock files (created while a workbook is open)
 .~lock.*#
@@ -36,3 +38,16 @@ docs/Envios DHL/address-book-*.csv
 # Fotos reales de temporada para probar los Documentos del Corte: no entran en el repo
 docs/Documentos de Corte/APC SPRING 27/
 docs/Documentos de Corte/AMI SS27/
+
+# Espacio de trabajo de los planes ejecutados con subagentes (ledger, briefs, informes): borrador local
+.superpowers/
+
+# PWA de modelos: el Node que se baja frontend-maven-plugin, las dependencias
+# de npm y el build (Maven lo copia a target/classes/static/app)
+frontend/node/
+frontend/node_modules/
+frontend/dist/
+# Lo que deja el recorrido de humo de Playwright (mvn verify -Pe2e): trazas
+# de los fallos y el informe JSON que comprueba Maven
+frontend/test-results/
+frontend/playwright-report/

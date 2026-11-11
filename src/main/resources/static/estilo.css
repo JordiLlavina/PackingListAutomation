@@ -1477,6 +1477,14 @@ main.catalogo { max-width: 100rem; }
     display: inline-block; padding: 0.05rem 0.5rem; margin: 0 0.2rem 0.2rem 0; border-radius: 999px;
     background: var(--acento-suave-ini); color: var(--acento); font-size: 0.8rem;
 }
+/* El chip de etapa del modelo: verde producción, ámbar muestras (SMS), azul prototipo, gris inactivo. */
+.etapa-modelo {
+    display: block; width: fit-content; margin-top: 0.2rem; padding: 0.05rem 0.5rem; border-radius: 999px;
+    font-size: 0.75rem; font-weight: 600; border: 1px solid var(--borde); color: var(--texto-suave); background: var(--entrada);
+}
+.etapa-modelo[data-etapa="PRODUCCION"] { color: #1f6b3c; background: var(--ok-fondo); border-color: var(--ok-borde); }
+.etapa-modelo[data-etapa="SMS"] { color: #8a6500; background: var(--aviso-fondo); border-color: var(--aviso-borde); }
+.etapa-modelo[data-etapa="PROTOTIPO"] { color: #1a4fa0; background: #eaf2fe; border-color: #7fa8e6; }
 .tabla-catalogo td.c-acciones { white-space: nowrap; }
 .tabla-catalogo .en-linea { display: inline; }
 .tabla-catalogo .en-linea button, .tabla-catalogo .alternar-colores { margin: 0 0.2rem 0 0; }

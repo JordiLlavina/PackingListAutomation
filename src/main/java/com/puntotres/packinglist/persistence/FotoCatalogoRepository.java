@@ -17,18 +17,15 @@ public interface FotoCatalogoRepository extends JpaRepository<FotoCatalogo, Long
 
     @Query("""
             select new com.puntotres.packinglist.persistence.ResumenFoto(
-                f.id, f.codigoModelo, f.nombreFichero, f.principal, f.orden)
+                f.id, f.modeloId, f.nombreFichero, f.principal, f.orden)
             from FotoCatalogo f
-            where f.cliente = :cliente and f.codigoModelo in :modelos
-            order by f.codigoModelo, f.orden, f.id""")
-    List<ResumenFoto> resumenes(@Param("cliente") String cliente, @Param("modelos") Collection<String> modelos);
+            where f.modeloId in :modelos
+            order by f.modeloId, f.orden, f.id""")
+    List<ResumenFoto> resumenes(@Param("modelos") Collection<Long> modelos);
 
-    Optional<FotoCatalogo> findByClienteAndCodigoModeloAndNombreFichero(String cliente, String codigoModelo,
-                                                                        String nombreFichero);
+    Optional<FotoCatalogo> findByModeloIdAndNombreFichero(Long modeloId, String nombreFichero);
 
-    List<FotoCatalogo> findByClienteAndCodigoModeloOrderByOrdenAscIdAsc(String cliente, String codigoModelo);
+    List<FotoCatalogo> findByModeloIdOrderByOrdenAscIdAsc(Long modeloId);
 
-    long countByClienteAndCodigoModelo(String cliente, String codigoModelo);
-
-    void deleteByClienteAndCodigoModelo(String cliente, String codigoModelo);
+    long countByModeloId(Long modeloId);
 }

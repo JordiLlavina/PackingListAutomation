@@ -11,9 +11,9 @@
      subir. Son formularios normales porque cambian la forma de la celda. -->
 <th:block th:fragment="celdaFoto(fila, cliente, temporadaId)">
     <details class="galeria">
-        <summary th:title="|Fotos de ${fila.codigoModelo} (${fila.numeroFotos})|">
+        <summary th:title="|Fotos de ${fila.nombreVisible} (${fila.numeroFotos})|">
             <img th:if="${fila.fotoPrincipalId != null}" class="miniatura"
-                 th:src="@{/catalogo/foto/{id}(id=${fila.fotoPrincipalId})}" th:alt="|Foto de ${fila.codigoModelo}|">
+                 th:src="@{/catalogo/foto/{id}(id=${fila.fotoPrincipalId})}" th:alt="|Foto de ${fila.nombreVisible}|">
             <span th:if="${fila.fotoPrincipalId == null}" class="sin-foto">sin foto</span>
         </summary>
         <div class="galeria-cuerpo">
@@ -22,7 +22,7 @@
                     <img th:src="@{/catalogo/foto/{id}(id=${foto.id})}" th:alt="${foto.nombreFichero}">
                     <span class="nombre-foto" th:text="${foto.nombreFichero}" th:title="${foto.nombreFichero}"></span>
                     <span>
-                        <form th:action="@{/catalogo/foto/principal}" method="post" th:unless="${foto.principal}">
+                        <form th:action="@{/catalogo/foto/principal}" method="post" th:if="${!foto.principal and fila.tieneCodigo}">
                             <input type="hidden" name="cliente" th:value="${cliente}">
                             <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
                             <input type="hidden" name="id" th:value="${foto.id}">
@@ -40,7 +40,7 @@
                 </div>
                 <p class="ayuda" th:if="${#lists.isEmpty(fila.fotos)}">Este modelo no tiene fotos.</p>
             </div>
-            <form th:action="@{/catalogo/foto/subir}" method="post" enctype="multipart/form-data" class="galeria-subir">
+            <form th:if="${fila.tieneCodigo}" th:action="@{/catalogo/foto/subir}" method="post" enctype="multipart/form-data" class="galeria-subir">
                 <input type="hidden" name="cliente" th:value="${cliente}">
                 <input type="hidden" name="codigo" th:value="${fila.codigoModelo}">
                 <input type="hidden" name="temporada" th:value="${temporadaId}">
@@ -51,18 +51,30 @@
     </details>
 </th:block>
 
+<!-- El valor de la columna Modelo: su código o, si todavía no lo tiene, su
+     nombre de prototipo, con el chip de etapa debajo. -->
+<th:block th:fragment="celdaModelo(fila)">
+    <span th:text="${fila.nombreVisible}"></span>
+    <span class="etapa-modelo" th:attr="data-etapa=${fila.etapa}" th:text="${fila.etapaTexto}"></span>
+</th:block>
+
+<!-- Un prototipo sin código no se puede editar aquí (las celdas van por
+     cliente + código): se ve el valor, sin casilla. -->
 <th:block th:fragment="celdaNombre(fila)">
-    <input type="text" class="celda" th:value="${fila.nombre}" data-url="/catalogo/modelo/celda" data-campo="NOMBRE"
-           th:attr="data-codigo=${fila.codigoModelo}, aria-label=|Nombre de ${fila.codigoModelo}|">
+    <input th:if="${fila.tieneCodigo}" type="text" class="celda" th:value="${fila.nombre}"
+           data-url="/catalogo/modelo/celda" data-campo="NOMBRE"
+           th:attr="data-codigo=${fila.codigoModelo}, aria-label=|Nombre de ${fila.nombreVisible}|">
+    <span th:unless="${fila.tieneCodigo}" th:text="${fila.nombre}" title="Se edita en la app de modelos"></span>
     <span class="estado-celda" aria-live="polite"></span>
 </th:block>
 
 <th:block th:fragment="celdaTipo(fila, tipos)">
-    <select class="celda" data-url="/catalogo/modelo/celda" data-campo="TIPO"
-            th:attr="data-codigo=${fila.codigoModelo}, aria-label=|Tipo de ${fila.codigoModelo}|"
+    <select th:if="${fila.tieneCodigo}" class="celda" data-url="/catalogo/modelo/celda" data-campo="TIPO"
+            th:attr="data-codigo=${fila.codigoModelo}, aria-label=|Tipo de ${fila.nombreVisible}|"
             title="Informativo: el packing y el corte siguen la regla del prefijo UBL">
         <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}" th:selected="${t.name() == fila.tipo}"></option>
     </select>
+    <span th:unless="${fila.tieneCodigo}" th:text="${fila.tipo}" title="Se edita en la app de modelos"></span>
     <span class="estado-celda" aria-live="polite"></span>
 </th:block>
 

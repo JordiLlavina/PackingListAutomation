@@ -10,14 +10,30 @@ import com.puntotres.packinglist.persistence.ResumenFoto;
  * con sus colores. Las cuatro casillas de combinación y de color de
  * combinación van siempre, vacías incluidas, para que la tabla tenga las
  * mismas columnas en todas las filas.
+ *
+ * El modelo se identifica por su id: un prototipo todavía no tiene código
+ * ({@code codigoModelo} es null) y se conoce por su {@code nombreVisible}. Las
+ * acciones que siguen yendo por código (borrar, fotos, nuevo artículo) solo se
+ * ofrecen cuando lo hay. {@code etapa} es el nombre del enum {@code Etapa}.
  */
-public record FilaCatalogoVista(String codigoModelo, String nombre, String tipo, List<String> temporadas,
+public record FilaCatalogoVista(Long modeloId, String codigoModelo, String nombreVisible, String etapa,
+                                String nombre, String tipo, List<String> temporadas,
                                 List<ResumenFoto> fotos, Long fotoPrincipalId, List<ArticuloVista> articulos) {
 
     public FilaCatalogoVista {
         temporadas = List.copyOf(temporadas);
         fotos = List.copyOf(fotos);
         articulos = List.copyOf(articulos);
+    }
+
+    /** Lo que dice el chip de etapa: «Producción», «Prototipo»... */
+    public String etapaTexto() {
+        return com.puntotres.packinglist.persistence.Etapa.valueOf(etapa).texto();
+    }
+
+    /** Si tiene el código del cliente: sin él no se puede editar, borrar ni subirle fotos desde aquí. */
+    public boolean tieneCodigo() {
+        return codigoModelo != null;
     }
 
     public int numeroFotos() {

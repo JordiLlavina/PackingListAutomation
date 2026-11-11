@@ -1,8 +1,8 @@
 # Modelos y modificaciones: la app del taller — diseño
 
-Fecha: 2026-11-08. Estado: **diseño acordado con el usuario, pendiente de plan**
-(el plan se escribe con la skill de planes en
-`docs/superpowers/plans/2026-11-xx-modelos-y-modificaciones.md`). Se apoya en
+Fecha: 2026-11-08. Estado: **implementado en la rama `modelos-y-modificaciones` (noviembre de 2026)**;
+plan en
+`docs/superpowers/plans/2026-11-08-modelos-y-modificaciones.md` (sus desvíos de este texto, como quitar Tailwind, están al principio del plan; lo que quedó fuera, al final de la sección de esta app en `CLAUDE.md`). Se apoya en
 [2026-11-01-catalogo-modelos-design.md](2026-11-01-catalogo-modelos-design.md)
 (el catálogo es la base) y adelanta decisiones del diseño aparcado
 `TO DO/2026-09-19-login-microsoft-y-actividad-design.md` (usuarios), sin
