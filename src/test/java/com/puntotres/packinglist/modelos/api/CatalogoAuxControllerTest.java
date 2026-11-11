@@ -78,10 +78,12 @@ class CatalogoAuxControllerTest {
     void tallerLeeLosTiposDeCambioPeroNoCreaTemporadas() throws Exception {
         mvc.perform(get("/api/tipos-cambio").with(comoUsuario(usuarioDePrueba(usuarios, Rol.TALLER))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(7)))
-                .andExpect(jsonPath("$[0].clave").value("PIEL"))
-                .andExpect(jsonPath("$[0].texto").value("Piel / material"))
-                .andExpect(jsonPath("$[0].icono").value("piel"));
+                .andExpect(jsonPath("$", hasSize(8)))
+                .andExpect(jsonPath("$[0].clave").value("MEDIDAS_PATRONES"))
+                .andExpect(jsonPath("$[0].texto").value("Medidas / Patrones"))
+                .andExpect(jsonPath("$[0].icono").value("medidas"))
+                .andExpect(jsonPath("$[3].clave").value("CONSUMO_PIEL"))
+                .andExpect(jsonPath("$[7].texto").value("Otros"));
 
         mvc.perform(post("/api/temporadas").with(comoUsuario(usuarioDePrueba(usuarios, Rol.TALLER))).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

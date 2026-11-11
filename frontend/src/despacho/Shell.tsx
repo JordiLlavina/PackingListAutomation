@@ -18,6 +18,8 @@ const PESTANAS: Pestana[] = [
   { ruta: '/bandeja', texto: 'Bandeja', activa: (c) => c === '/' || c.startsWith('/bandeja'), pepita: true },
   // La cola del taller: el orden en que hará las órdenes.
   { ruta: '/cola', texto: 'Cola', activa: (c) => c.startsWith('/cola') },
+  // Cuánto lleva cada cosa sin hacerse: información, no alertas.
+  { ruta: '/reportes', texto: 'Reportes', activa: (c) => c.startsWith('/reportes') },
   // Una modificación de solo lectura se abre desde la ficha de un modelo: sigue marcada «Modelos».
   { ruta: '/modelos', texto: 'Modelos', activa: (c) => c.startsWith('/modelos') || c.startsWith('/modificaciones') },
   { ruta: '/admin', texto: 'Admin', activa: (c) => c.startsWith('/admin'), soloAdmin: true },

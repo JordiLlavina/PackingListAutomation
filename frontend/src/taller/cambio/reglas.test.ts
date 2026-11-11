@@ -19,16 +19,16 @@ const foto = { blob: new Blob(['x']), url: 'blob:foto' };
 const audio = { blob: new Blob(['y']), duracionSeg: 12, url: 'blob:audio' };
 
 function borrador(cambios: Partial<EstadoBorrador> = {}): EstadoBorrador {
-  return { modelo, tipo: 'COSTURA', fotos: [], audio: null, ...cambios };
+  return { modelo, tipos: ['CONSTRUCCION'], fotos: [], audio: null, ...cambios };
 }
 
 describe('motivoNoEnviar', () => {
   it('sin modelo pide el modelo, antes que nada', () => {
-    expect(motivoNoEnviar(borrador({ modelo: null, tipo: null }))).toBe('Elige el modelo');
+    expect(motivoNoEnviar(borrador({ modelo: null, tipos: [] }))).toBe('Elige el modelo');
   });
 
-  it('sin tipo pide qué se ha cambiado', () => {
-    expect(motivoNoEnviar(borrador({ tipo: null }))).toBe('Di qué has cambiado');
+  it('sin ninguna razón marcada pide qué se ha cambiado', () => {
+    expect(motivoNoEnviar(borrador({ tipos: [] }))).toBe('Di qué has cambiado');
   });
 
   it('sin foto ni voz pide una de las dos', () => {

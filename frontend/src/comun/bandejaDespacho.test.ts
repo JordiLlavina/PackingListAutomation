@@ -82,6 +82,7 @@ function resumen(extra: Partial<ModificacionResumen>): ModificacionResumen {
     tipoCambioTexto: 'Costura / construcción',
     urgente: false,
     posicionCola: null,
+    fechaObjetivo: null,
     estado: 'VISTA',
     titulo: null,
     tituloDeIa: false,

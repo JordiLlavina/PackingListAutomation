@@ -67,7 +67,8 @@ test('Bachir avisa de un cambio con una foto y despacho lo ve en la bandeja', as
 
   await tablet.getByRole('button', { name: /Crear Modificación/ }).click();
   await tablet.getByRole('button', { name: new RegExp(PROTOTIPO) }).click();
-  await tablet.getByRole('button', { name: 'Herrajes' }).click();
+  await tablet.getByRole('button', { name: 'Fornituras' }).click();
+  await tablet.getByRole('button', { name: 'Siguiente', exact: true }).click();
 
   await tablet.locator('input[type=file]').setInputFiles(FOTO);
   const siguienteConFoto = tablet.getByRole('button', { name: 'Siguiente (1)' });

@@ -1,9 +1,14 @@
 // La tarjeta «Activar los avisos»: sale mientras el navegador no ha dicho ni
 // sí ni no a las notificaciones y el servidor tiene push (claves VAPID). Con
 // el permiso dado desaparece (y la suscripción se vuelve a mandar en silencio,
-// ver push.ts); con el permiso negado queda una línea que lo dice, porque
-// desde la app ya no se puede volver a preguntar. «Ahora no» se recuerda en
-// este navegador.
+// ver push.ts). «Ahora no» se recuerda en este navegador.
+//
+// Si el aparato NO admite los avisos (el permiso está negado, o el navegador
+// no tiene push: un iPhone con la web sin instalar, un navegador viejo) queda
+// una línea fija que lo dice y cómo arreglarlo, sin «Entendido» (decisión del
+// usuario): una tablet del taller que no suena es un problema que hay que
+// arreglar, no un aviso que se cierra. Solo si el servidor tiene push: sin
+// claves no hay nada que arreglar en la tablet.
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
 import { Icono } from './iconos';
@@ -36,7 +41,6 @@ export default function ActivarAvisos({ motivo, compacta = false }: { motivo: st
   const renovada = useRef(false);
 
   useEffect(() => {
-    if (estado === 'no-soportado') return;
     let vivo = true;
     api<ClavePublica>('/api/push/clave-publica')
       .then((r) => vivo && setConfigurado(r.configurado))
@@ -56,23 +60,26 @@ export default function ActivarAvisos({ motivo, compacta = false }: { motivo: st
     }
   }, [configurado, estado]);
 
-  if (!configurado || estado === 'no-soportado' || estado === 'activo' || descartada) return null;
+  if (!configurado || estado === 'activo') return null;
+
+  if (estado === 'denegado' || estado === 'no-soportado') {
+    return (
+      <p className={compacta ? 'avisos-bloqueados compacta' : 'avisos-bloqueados'} role="status">
+        <Icono nombre="campana" />
+        <b>Este aparato no recibe los avisos.</b>
+        {estado === 'denegado'
+          ? 'Las notificaciones están bloqueadas en el navegador: hay que permitirlas en los ajustes del sitio.'
+          : 'Este navegador no admite notificaciones: usa Chrome e instala la app desde su menú.'}
+      </p>
+    );
+  }
+
+  if (descartada) return null;
 
   const ahoraNo = () => {
     guardarDescartada();
     setDescartada(true);
   };
-
-  if (estado === 'denegado') {
-    return (
-      <p className={compacta ? 'avisos-bloqueados compacta' : 'avisos-bloqueados'}>
-        <Icono nombre="campana" /> Los avisos están bloqueados en el navegador
-        <button className="enlace" type="button" onClick={ahoraNo}>
-          Entendido
-        </button>
-      </p>
-    );
-  }
 
   const activar = async () => {
     setOcupado(true);

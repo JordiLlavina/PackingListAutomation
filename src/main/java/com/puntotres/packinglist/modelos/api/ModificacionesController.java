@@ -2,6 +2,7 @@ package com.puntotres.packinglist.modelos.api;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -9,10 +10,12 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,6 +62,7 @@ import com.puntotres.packinglist.modelos.service.Modificaciones;
 public class ModificacionesController {
 
     private static final String DESPACHO = "hasAnyRole('DESPACHO','ADMIN')";
+    private static final String TALLER = "hasRole('TALLER')";
 
     private static final Logger LOG = LoggerFactory.getLogger(ModificacionesController.class);
 
@@ -76,6 +80,10 @@ public class ModificacionesController {
 
     /** La cola entera en su nuevo orden, de la primera a la última. */
     public record OrdenCola(List<Long> ids) {
+    }
+
+    /** La fecha objetivo de una orden; null la quita. */
+    public record CambioFechaObjetivo(LocalDate fecha) {
     }
 
     /** Si el aviso aplica en un destino y si ya está hecho ahí. */
@@ -97,6 +105,9 @@ public class ModificacionesController {
                                                     @RequestParam(required = false) String texto,
                                                     @RequestParam(required = false) Boolean urgente,
                                                     @RequestParam(required = false) Long antesDe,
+                                                    @RequestParam(required = false)
+                                                    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+                                                    LocalDate fechaObjetivo,
                                                     @RequestParam(required = false) MultipartFile audio,
                                                     @RequestParam(required = false) String audioDuracionSeg,
                                                     @RequestParam(name = "fotos", required = false)
@@ -127,7 +138,7 @@ public class ModificacionesController {
             // Primero la orden: sus adjuntos topan en 15 MB (Adjuntos), así que un documento mayor falla aquí
             // con ese mensaje, antes de llegar a la copia al modelo (tope de 50 MB) y sin dejar nada a medias.
             creada = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, tipoCambio,
-                    titulo, texto, Boolean.TRUE.equals(urgente), antesDe, adjuntos), quien);
+                    titulo, texto, Boolean.TRUE.equals(urgente), antesDe, fechaObjetivo, adjuntos), quien);
             if (Boolean.TRUE.equals(guardarEnModelo)) {
                 copiarAlModelo(modeloId, losDocumentos, quien, guardados, avisos);
             }
@@ -196,6 +207,35 @@ public class ModificacionesController {
         return modificaciones.detalle(id);
     }
 
+    /**
+     * El taller corrige un aviso suyo (razones, fotos que añade o quita, nota
+     * de voz nueva). Es un POST multipart y no un PATCH porque Tomcat solo
+     * lee las partes de un POST.
+     *
+     * @param quitar ids de adjuntos del cuerpo que se quitan
+     */
+    @PostMapping("/{id}/aviso")
+    @PreAuthorize(TALLER)
+    public ModificacionResumen editarAviso(@PathVariable Long id,
+                                           @RequestParam(required = false) String tipoCambio,
+                                           @RequestParam(required = false) MultipartFile audio,
+                                           @RequestParam(required = false) String audioDuracionSeg,
+                                           @RequestParam(name = "fotos", required = false) List<MultipartFile> fotos,
+                                           @RequestParam(name = "quitar", required = false) List<Long> quitar,
+                                           @AuthenticationPrincipal UsuarioActual quien) throws IOException {
+        modificaciones.editarAviso(id, new Modificaciones.EdicionAviso(tipoCambio, adjuntos(audio, audioDuracionSeg,
+                fotos), quitar), quien);
+        return resumen(id);
+    }
+
+    /** El taller borra un aviso suyo que el despacho no ha empezado a aplicar. */
+    @DeleteMapping("/{id}")
+    @PreAuthorize(TALLER)
+    public ResponseEntity<Void> borrarAviso(@PathVariable Long id, @AuthenticationPrincipal UsuarioActual quien) {
+        modificaciones.borrarAviso(id, quien);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/vista")
     public ModificacionResumen marcarVista(@PathVariable Long id, @AuthenticationPrincipal UsuarioActual quien) {
         modificaciones.marcarVista(id, quien);
@@ -211,6 +251,15 @@ public class ModificacionesController {
             throw new IllegalArgumentException("Falta decir si es urgente");
         }
         modificaciones.marcarUrgente(id, cambio.urgente(), quien);
+        return resumen(id);
+    }
+
+    /** Pone o quita la fecha objetivo de una orden abierta para el taller. */
+    @PatchMapping("/{id}/fecha-objetivo")
+    @PreAuthorize(DESPACHO)
+    public ModificacionResumen cambiarFechaObjetivo(@PathVariable Long id, @RequestBody CambioFechaObjetivo cambio,
+                                                    @AuthenticationPrincipal UsuarioActual quien) {
+        modificaciones.cambiarFechaObjetivo(id, cambio.fecha(), quien);
         return resumen(id);
     }
 

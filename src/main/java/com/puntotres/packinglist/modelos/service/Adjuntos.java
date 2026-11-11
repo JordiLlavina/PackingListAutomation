@@ -124,6 +124,14 @@ public class Adjuntos {
         return adjunto;
     }
 
+    /** Borra un adjunto (el taller quita una foto o la nota de voz de su aviso); uno que no existe no es un fallo. */
+    @Transactional
+    public void borrar(Long id) {
+        if (id != null && repositorio.existsById(id)) {
+            repositorio.deleteById(id);
+        }
+    }
+
     /** El adjunto con sus bytes, para servirlo. */
     @Transactional(readOnly = true)
     public Optional<Adjunto> conBytes(Long id) {

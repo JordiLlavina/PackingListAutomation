@@ -269,14 +269,17 @@ modelos:
   admin-password: ${MODELOS_ADMIN_PASSWORD:}
 
   # Los botones de la cara del taller, en este orden.
+  # Las razones de un cambio, en este orden (decisión del usuario, noviembre de 2026).
+  # Una modificación puede llevar varias: se guardan juntas, separadas por comas.
   tipos-cambio:
-    - { clave: PIEL, texto: "Piel / material", icono: piel }
-    - { clave: FORRO, texto: "Forro", icono: forro }
-    - { clave: HERRAJES, texto: "Herrajes", icono: herraje }
-    - { clave: COSTURA, texto: "Costura / construcción", icono: costura }
-    - { clave: MEDIDAS, texto: "Medidas", icono: medidas }
-    - { clave: PATRON, texto: "Patrón", icono: patron }
-    - { clave: OTRO, texto: "Otro", icono: otro }
+    - { clave: MEDIDAS_PATRONES, texto: "Medidas / Patrones", icono: medidas }
+    - { clave: CONSTRUCCION, texto: "Construcción", icono: costura }
+    - { clave: MANO_OBRA, texto: "Mano de obra", icono: mano }
+    - { clave: CONSUMO_PIEL, texto: "Consumo piel", icono: piel }
+    - { clave: REFUERZOS, texto: "Refuerzos", icono: refuerzo }
+    - { clave: FORNITURAS, texto: "Fornituras", icono: herraje }
+    - { clave: TROQUELES, texto: "Cambio de troqueles", icono: troquel }
+    - { clave: OTROS, texto: "Otros", icono: otro }
 
   # Dónde aplica un cambio el despacho.
   destinos-aplicacion: [ICSUITE, EXCEL_ESCANDALLOS]

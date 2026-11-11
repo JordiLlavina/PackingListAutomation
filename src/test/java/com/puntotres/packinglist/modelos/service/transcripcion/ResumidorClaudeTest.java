@@ -22,8 +22,8 @@ import com.puntotres.packinglist.modelos.ModelosProperties;
 class ResumidorClaudeTest {
 
     private static final ModelosProperties PROPS = new ModelosProperties(null, null,
-            List.of(new ModelosProperties.TipoCambio("PIEL", "Piel / material", "piel"),
-                    new ModelosProperties.TipoCambio("COSTURA", "Costura / construcción", "costura")),
+            List.of(new ModelosProperties.TipoCambio("CONSUMO_PIEL", "Consumo piel", "piel"),
+                    new ModelosProperties.TipoCambio("CONSTRUCCION", "Construcción", "costura")),
             List.of(), null, null, null);
 
     @Test
@@ -31,12 +31,12 @@ class ResumidorClaudeTest {
         ResumenIa resumen = ResumidorClaude.parsear("""
                 {"titulo": "Costura del asa reforzada",
                  "resumen": "Se ha doblado la costura del asa porque se abría.",
-                 "tipoCambioSugerido": "COSTURA",
+                 "tipoCambioSugerido": "CONSTRUCCION",
                  "materiales": ["hilo encerado 0,8", "piel de vaca"],
                  "dudas": ["No se entiende si es el asa larga o la corta"]}""");
 
         assertEquals(new ResumenIa("Costura del asa reforzada", "Se ha doblado la costura del asa porque se abría.",
-                "COSTURA", List.of("hilo encerado 0,8", "piel de vaca"),
+                "CONSTRUCCION", List.of("hilo encerado 0,8", "piel de vaca"),
                 List.of("No se entiende si es el asa larga o la corta")), resumen);
     }
 
@@ -60,7 +60,7 @@ class ResumidorClaudeTest {
     @Test
     void laPeticionVaAOpusConRazonamientoAdaptativoEsfuerzoBajoYEsquema() {
         MessageCreateParams peticion = new ResumidorClaude(PROPS, Map.of("ANTHROPIC_API_KEY", "x")::get)
-                .peticionPara("He reforzado el asa", "Costura / construcción", "T16-ASA · Bolso T16");
+                .peticionPara("He reforzado el asa", "Construcción", "T16-ASA · Bolso T16");
 
         assertEquals("claude-opus-5-5", peticion.model().asString());
         assertTrue(peticion.thinking().orElseThrow().isAdaptive());
@@ -70,11 +70,11 @@ class ResumidorClaudeTest {
         String sistema = peticion.system().orElseThrow().asString();
         assertTrue(sistema.startsWith("Eres el asistente de despacho de un taller de marroquinería (Puntotres)."),
                 sistema);
-        assertTrue(sistema.contains("PIEL, COSTURA"), "los tipos de cambio salen del yml: " + sistema);
+        assertTrue(sistema.contains("CONSUMO_PIEL, CONSTRUCCION"), "los tipos de cambio salen del yml: " + sistema);
         String usuario = peticion.messages().get(0).content().asString();
         assertTrue(usuario.contains("He reforzado el asa"), usuario);
         assertTrue(usuario.contains("T16-ASA · Bolso T16"), usuario);
-        assertTrue(usuario.contains("Costura / construcción"), usuario);
+        assertTrue(usuario.contains("Construcción"), usuario);
     }
 
     @Test

@@ -5,7 +5,7 @@
 // en el navegador, en funciones puras para poder probarlas.
 
 import type { Etapa, Subida } from './modelos';
-import { mmss } from './tiempo';
+import { diaYMes, diasDesde, diasHasta, mmss } from './tiempo';
 
 export type EstadoModificacion = 'NUEVA' | 'VISTA' | 'EN_CURSO' | 'HECHA' | 'DESCARTADA';
 export type Direccion = 'DESPACHO_A_TALLER' | 'TALLER_A_DESPACHO';
@@ -33,6 +33,8 @@ export type ModificacionResumen = {
   urgente: boolean;
   /** Su puesto en la cola del taller, desde 1; null si no está (un aviso, o ya cerrada). */
   posicionCola: number | null;
+  /** Para qué día debería estar hecha (`2026-11-20`); null si el despacho no lo dijo. Solo órdenes para el taller. */
+  fechaObjetivo: string | null;
   estado: EstadoModificacion;
   titulo: string | null;
   tituloDeIa: boolean;
@@ -262,23 +264,6 @@ export function destinosEditables(estado: EstadoModificacion): boolean {
 }
 
 /**
- * La frase del inicio del taller, debajo del saludo: las órdenes nuevas si
- * las hay; si no, las que siguen abiertas (vistas o empezadas), que también
- * son trabajo por hacer; y solo sin ninguna, «No tienes nada pendiente».
- */
-export function fraseInicio(resumen: ResumenBandeja | null): string {
-  const nuevas = resumen?.nuevas ?? 0;
-  const pendientes = resumen?.pendientes ?? 0;
-  if (nuevas > 0) {
-    return `Tienes ${nuevas} ${nuevas === 1 ? 'orden nueva' : 'órdenes nuevas'} de despacho.`;
-  }
-  if (pendientes > 0) {
-    return `Tienes ${pendientes} ${pendientes === 1 ? 'orden' : 'órdenes'} por hacer.`;
-  }
-  return 'No tienes nada pendiente.';
-}
-
-/**
  * El título que se enseña de una modificación: el suyo o, sin él (un aviso
  * cuya nota de voz todavía no ha resumido la IA), el tipo de cambio y el
  * modelo, «Piel · ULL027». La misma regla en las dos caras: nunca «Sin título».
@@ -361,4 +346,156 @@ export function opcionesPosicion(cola: ModificacionResumen[]): { valor: string; 
       texto: i === 0 ? `La primera, antes de ${m.modeloReferencia} · ${tituloVisible(m)}` : `Antes de la ${puesto(i + 1)} · ${m.modeloReferencia} · ${tituloVisible(m)}`,
     })),
   ];
+}
+
+/** «1º», «12º»: el puesto como posición (masculino, «el 2º puesto»); puesto() es la orden («la 2ª»). */
+export function puestoOrdinal(n: number): string {
+  return n === 1 ? 'primer' : `${n}º`;
+}
+
+/**
+ * La etiqueta que ve el taller cuando el despacho ha movido una orden en la
+ * cola: «Prioridad cambiada al 2º puesto». Sutil a propósito (decisión del
+ * usuario): sin sonido ni vibración, y se va en el siguiente refresco.
+ */
+export function textoCambioPuesto(n: number): string {
+  return `Prioridad cambiada al ${puestoOrdinal(n)} puesto`;
+}
+
+/** Los puestos de la cola por id de orden, tal como se guardan para comparar en la siguiente carga. */
+export function puestosDe(cola: ModificacionResumen[]): Record<string, number> {
+  const puestos: Record<string, number> = {};
+  for (const m of cola) {
+    if (!estaCerrada(m.estado) && m.posicionCola !== null) puestos[String(m.id)] = m.posicionCola;
+  }
+  return puestos;
+}
+
+/**
+ * Las órdenes cuyo puesto ha cambiado desde la última vez que se vio la
+ * cola, y solo si el cambio toca a los tres primeros (de donde venía o a
+ * donde va): mover la 9ª a la 7ª no le dice nada al taller. Una orden que
+ * no se había visto nunca no cuenta: ya sale como nueva.
+ */
+export function cambiosDePuesto(anteriores: Record<string, number>, cola: ModificacionResumen[]): Map<number, number> {
+  const cambios = new Map<number, number>();
+  for (const [id, ahora] of Object.entries(puestosDe(cola))) {
+    const antes = anteriores[id];
+    if (antes !== undefined && antes !== ahora && (antes <= 3 || ahora <= 3)) cambios.set(Number(id), ahora);
+  }
+  return cambios;
+}
+
+/** Las órdenes abiertas del modelo que ya están en la cola: al crear otra se avisa de que existen. */
+export function ordenesAbiertasDe(cola: ModificacionResumen[], modeloId: number): ModificacionResumen[] {
+  return cola.filter((m) => m.modeloId === modeloId && !estaCerrada(m.estado));
+}
+
+/** Cuántos días faltan para la fecha objetivo a partir de los cuales la etiqueta empieza a teñirse. */
+export const DIAS_AVISO_FECHA = 5;
+/** Cuántos días después de la fecha objetivo la etiqueta llega al negro. */
+export const DIAS_HASTA_NEGRO = 7;
+
+export type EstiloFecha = {
+  /** El texto de la etiqueta: «Fecha: 11 noviembre». */
+  texto: string;
+  /** Lo que dice al pasar el ratón: «faltan 3 días», «es hoy», «pasó hace 2 días». */
+  detalle: string;
+  fondo: string;
+  tinta: string;
+  dias: number;
+};
+
+/**
+ * La etiqueta de la fecha objetivo y su color (decisión del usuario): gris
+ * como «Vista» mientras falten más de 5 días; desde 5 días, cada vez más
+ * roja; el rojo de «Urgente» el mismo día; y pasado el día, cada vez más
+ * oscura hasta el negro a los 7 días. Los colores salen de los tokens de la
+ * hoja con color-mix, así siguen al modo oscuro.
+ */
+export function estiloFechaObjetivo(fechaIso: string, hoy: Date = new Date()): EstiloFecha {
+  const dias = diasHasta(fechaIso, hoy);
+  const texto = `Fecha: ${diaYMes(fechaIso, hoy)}`;
+  if (dias > DIAS_AVISO_FECHA) {
+    return { texto, detalle: `faltan ${dias} días`, fondo: 'var(--line)', tinta: 'var(--fg)', dias };
+  }
+  if (dias > 0) {
+    const parte = Math.round(((DIAS_AVISO_FECHA + 1 - dias) / (DIAS_AVISO_FECHA + 1)) * 100);
+    return {
+      texto,
+      detalle: dias === 1 ? 'es mañana' : `faltan ${dias} días`,
+      fondo: `color-mix(in oklab, var(--alta) ${parte}%, var(--line))`,
+      tinta: parte >= 50 ? '#fff' : 'var(--fg)',
+      dias,
+    };
+  }
+  if (dias === 0) {
+    return { texto, detalle: 'es hoy', fondo: 'var(--alta)', tinta: '#fff', dias };
+  }
+  const pasados = Math.min(DIAS_HASTA_NEGRO, -dias);
+  const negro = Math.round((pasados / DIAS_HASTA_NEGRO) * 100);
+  return {
+    texto,
+    detalle: pasados === 1 && dias === -1 ? 'pasó ayer' : `pasó hace ${-dias} días`,
+    fondo: `color-mix(in oklab, #000 ${negro}%, var(--alta))`,
+    tinta: '#fff',
+    dias,
+  };
+}
+
+/** Una orden con cuántos días lleva abierta (desde que se creó). */
+export type OrdenConDias = { orden: ModificacionResumen; dias: number };
+
+export type InformeCola = {
+  /** La primera de la cola (la siguiente que hará el taller) y cuántos días lleva sin hacerse; null con la cola vacía. */
+  primera: OrdenConDias | null;
+  /** Las urgentes, en el orden de la cola, con sus días. */
+  urgentes: OrdenConDias[];
+  /** Las que ya han pasado su fecha objetivo, la más pasada primero, con los días que llevan pasadas. */
+  fechaPasada: { orden: ModificacionResumen; diasPasados: number }[];
+  /** Las abiertas, para el total. */
+  abiertas: number;
+};
+
+/**
+ * Lo que dice la pantalla de reportes del despacho: no es una alerta (una
+ * orden puede llevar días porque de verdad cuesta hacerla), es información
+ * secundaria para quien la quiera mirar (decisión del usuario).
+ */
+export function informeCola(cola: ModificacionResumen[], ahora: Date = new Date()): InformeCola {
+  const abiertas = ordenarOrdenes(cola).pendientes;
+  const conDias = (orden: ModificacionResumen): OrdenConDias => ({ orden, dias: diasDesde(orden.creadaEn, ahora) });
+  const fechaPasada = abiertas
+    .filter((m) => m.fechaObjetivo !== null && diasHasta(m.fechaObjetivo, ahora) < 0)
+    .map((orden) => ({ orden, diasPasados: -diasHasta(orden.fechaObjetivo!, ahora) }))
+    .sort((a, b) => b.diasPasados - a.diasPasados);
+  return {
+    primera: abiertas.length > 0 ? conDias(abiertas[0]!) : null,
+    urgentes: abiertas.filter((m) => m.urgente).map(conDias),
+    fechaPasada,
+    abiertas: abiertas.length,
+  };
+}
+
+/**
+ * El taller puede corregir y borrar un aviso suyo mientras despacho no haya
+ * empezado a aplicarlo: enviado (NUEVA) o visto (VISTA). La misma regla que el
+ * servidor (Modificaciones.avisoQueElTallerPuedeTocar).
+ */
+export function avisoEditable(estado: EstadoModificacion): boolean {
+  return estado === 'NUEVA' || estado === 'VISTA';
+}
+
+/** Por qué ya no se puede tocar un aviso, para decirlo en su pantalla; null si se puede. */
+export function motivoNoEditable(estado: EstadoModificacion): string | null {
+  switch (estado) {
+    case 'EN_CURSO':
+      return 'Despacho ya está aplicando este aviso: ya no se puede cambiar ni borrar.';
+    case 'HECHA':
+      return 'Este aviso ya está hecho: ya no se puede cambiar ni borrar.';
+    case 'DESCARTADA':
+      return 'Despacho descartó este aviso: ya no se puede cambiar ni borrar.';
+    default:
+      return null;
+  }
 }

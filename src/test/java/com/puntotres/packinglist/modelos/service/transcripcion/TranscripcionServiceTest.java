@@ -220,7 +220,7 @@ class TranscripcionServiceTest {
     @Test
     void unaTranscripcionBuenaPoneElTituloMarcadoComoDeLaIa() {
         transcriptor.texto = "  He reforzado la costura del asa porque se abría  ";
-        resumidor.resumen = new ResumenIa("Costura del asa reforzada", "Se dobla la costura del asa.", "COSTURA",
+        resumidor.resumen = new ResumenIa("Costura del asa reforzada", "Se dobla la costura del asa.", "CONSTRUCCION",
                 List.of("hilo encerado"), List.of("No dice si es el asa larga"));
 
         Modificacion aviso = avisoConVoz("BUENA");
@@ -232,7 +232,7 @@ class TranscripcionServiceTest {
         assertNull(nota.getError());
         assertNotNull(nota.getResumenIa());
         assertTrue(nota.getResumenIa().startsWith("Se dobla la costura del asa."), nota.getResumenIa());
-        assertTrue(nota.getResumenIa().contains("Tipo de cambio sugerido: Costura / construcción"),
+        assertTrue(nota.getResumenIa().contains("Tipo de cambio sugerido: Construcción"),
                 nota.getResumenIa());
         assertTrue(nota.getResumenIa().contains("Materiales: hilo encerado"), nota.getResumenIa());
         assertTrue(nota.getResumenIa().contains("Dudas: No dice si es el asa larga"), nota.getResumenIa());
@@ -241,17 +241,17 @@ class TranscripcionServiceTest {
         assertEquals("Costura del asa reforzada", recargada.getTitulo());
         assertTrue(recargada.isTituloDeIa());
 
-        assertEquals(List.of(List.of("He reforzado la costura del asa porque se abría", "Piel / material",
+        assertEquals(List.of(List.of("He reforzado la costura del asa porque se abría", "Consumo piel",
                 "T16-BUENA · Bolso T16")), resumidor.llamadas());
     }
 
     @Test
     void elTituloDeLaIaNoPisaUnTituloQueYaHay() {
         transcriptor.texto = "Cambia el forro";
-        resumidor.resumen = new ResumenIa("Forro nuevo", "Cambiar el forro.", "FORRO", List.of(), List.of());
+        resumidor.resumen = new ResumenIa("Forro nuevo", "Cambiar el forro.", "REFUERZOS", List.of(), List.of());
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
-                modelo("ORDEN"), "FORRO", "Forro de ante", null, List.of(audio())), despacho());
+                modelo("ORDEN"), "REFUERZOS", "Forro de ante", null, List.of(audio())), despacho());
         esperarALaCola();
 
         Modificacion recargada = repositorio.findById(orden.getId()).orElseThrow();
@@ -324,7 +324,7 @@ class TranscripcionServiceTest {
 
     @Test
     void soloSeRetranscribeUnaNotaDeVoz() throws Exception {
-        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("FOTO"), "PIEL",
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("FOTO"), "CONSUMO_PIEL",
                 List.of(new AdjuntoNuevo(TipoAdjunto.FOTO, "foto.png", "image/png", png(), null))), taller());
         Long fotoId = modificaciones.detalle(aviso.getId()).mensajes().get(0).adjuntos().get(0).id();
 
@@ -382,7 +382,7 @@ class TranscripcionServiceTest {
     }
 
     private Modificacion avisoConVoz(String codigo) {
-        return modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo(codigo), "PIEL",
+        return modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo(codigo), "CONSUMO_PIEL",
                 List.of(audio())), taller());
     }
 

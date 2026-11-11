@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.modelos.api.dto;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -19,6 +20,7 @@ import com.puntotres.packinglist.persistence.Etapa;
  * @param respuestaPendienteDe el lado que tiene que contestar; null si nadie
  * @param urgente              el despacho la ha marcado urgente (solo órdenes para el taller)
  * @param posicionCola         su puesto en la cola del taller, desde 1; null si no está (un aviso o una cerrada)
+ * @param fechaObjetivo        para qué día debería estar hecha (solo órdenes para el taller); null si no se dijo
  * @param etapa                la etapa de su modelo; null si el modelo ya no está
  * @param destinos             dónde se aplica; vacío en las órdenes para el taller
  * @param fotos                fotos de todos sus mensajes (y lo mismo audios y documentos)
@@ -29,7 +31,7 @@ import com.puntotres.packinglist.persistence.Etapa;
 public record ModificacionResumen(Long id, Long modeloId, String modeloReferencia, String modeloNombre,
                                   String cliente, Long fotoPrincipalId, Direccion direccion, String tipoCambio,
                                   String tipoCambioTexto, boolean urgente, Integer posicionCola,
-                                  EstadoModificacion estado,
+                                  LocalDate fechaObjetivo, EstadoModificacion estado,
                                   String titulo, boolean tituloDeIa, LocalDateTime creadaEn, String creadaPor,
                                   LocalDateTime vistaEn, LocalDateTime hechaEn, String hechaPor,
                                   Rol respuestaPendienteDe, Etapa etapa, List<DestinoEstado> destinos, int fotos,

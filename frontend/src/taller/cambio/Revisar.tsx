@@ -1,4 +1,4 @@
-// «¿Está bien?»: el modelo, el tipo de cambio, la nota de voz y las fotos,
+// «¿Está bien?»: el modelo, las razones del cambio, la nota de voz y las fotos,
 // antes de mandarlo a despacho. Si el envío falla (la WiFi del taller), todo
 // se queda como estaba, con lo que ha dicho el servidor y un botón grande de
 // volver a intentar: no se pierde nada de lo grabado.
@@ -23,7 +23,7 @@ function nombreFoto(blob: Blob, indice: number): string {
 export default function Revisar() {
   const navegar = useNavigate();
   const borrador = useBorrador();
-  const { modelo, tipo, fotos, audio } = borrador;
+  const { modelo, tipos: marcados, fotos, audio } = borrador;
   const { tipos } = useTiposCambio();
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +31,8 @@ export default function Revisar() {
   if (!modelo) return <Navigate to="/cambio" replace />;
 
   const motivo = motivoNoEnviar(borrador);
-  const tipoCambio = tipos?.find((t) => t.clave === tipo);
+  // En el orden del yml, que es como las guarda el servidor.
+  const razones = (tipos ?? []).filter((t) => marcados.includes(t.clave));
 
   const enviar = async () => {
     if (motivo || enviando) return;
@@ -39,7 +40,7 @@ export default function Revisar() {
     setError(null);
     const datos = new FormData();
     datos.append('modeloId', String(modelo.id));
-    datos.append('tipoCambio', tipo ?? '');
+    datos.append('tipoCambio', marcados.join(','));
     if (audio) {
       datos.append('audio', audio.blob, `nota-de-voz.${extensionAudio(audio.blob.type)}`);
       datos.append('audioDuracionSeg', String(audio.duracionSeg));
@@ -71,12 +72,12 @@ export default function Revisar() {
             <Etapa etapa={modelo.etapa} />
           </div>
         </div>
-        {tipo && (
-          <div className="ficha">
-            <Icono nombre={tipoCambio?.icono ?? 'otro'} className="foto" />
+        {marcados.length > 0 && (
+          <div className="ficha razones">
+            <Icono nombre={razones[0]?.icono ?? 'otro'} className="foto" />
             <div className="texto">
-              <b>{tipoCambio?.texto ?? tipo}</b>
-              <span>Tipo de cambio</span>
+              <b>{razones.length > 0 ? razones.map((t) => t.texto).join(' · ') : marcados.join(' · ')}</b>
+              <span>{marcados.length === 1 ? 'Razón del cambio' : 'Razones del cambio'}</span>
             </div>
           </div>
         )}

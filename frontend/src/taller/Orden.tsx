@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
+import FechaObjetivo from '../comun/FechaObjetivo';
 import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
 import {
@@ -185,6 +186,12 @@ export default function Orden() {
               <>
                 {' '}
                 <span className="pill urgente">Urgente</span>
+              </>
+            )}
+            {!estaCerrada(r.estado) && r.fechaObjetivo && (
+              <>
+                {' '}
+                <FechaObjetivo fecha={r.fechaObjetivo} />
               </>
             )}
           </span>

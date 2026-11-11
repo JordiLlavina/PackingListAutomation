@@ -2,6 +2,7 @@ package com.puntotres.packinglist.modelos.service.transcripcion;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -225,9 +226,7 @@ public class TranscripcionService {
         String tipoCambio = "";
         String modelo = "";
         if (modificacion != null) {
-            String clave = modificacion.getTipoCambio();
-            tipoCambio = props.tipoCambio(clave).map(ModelosProperties.TipoCambio::texto)
-                    .orElse(clave == null ? "" : clave);
+            tipoCambio = Objects.toString(props.textoTiposCambio(modificacion.getTipoCambio()), "");
             modelo = modelos.findById(modificacion.getModeloId()).map(TranscripcionService::nombreDe).orElse("");
         }
         return new Nota(adjunto.getBytes(), adjunto.getMime(), tipoCambio, modelo);

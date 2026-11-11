@@ -85,3 +85,16 @@ algún momento, así que la etiqueta «vencida» y los plazos por prioridad sobr
 
 Varias colas (por técnico), cola para los avisos del taller, deshacer un
 reordenado.
+
+## Añadido tras probarla (11 de noviembre de 2026)
+
+Decisiones del usuario sobre cómo dar valor a los avisos, una vez vista la cola en marcha:
+
+- **El taller ve, sin ruido, que la cola ha cambiado**: cuando el despacho mueve una orden entre los tres primeros puestos, su tarjeta en la Bandeja de Entrada lleva la etiqueta «Prioridad cambiada al 2º puesto» y un marco suave del mismo color; sin sonido ni vibración, y los dos desaparecen en el siguiente refresco. Mover una orden fuera de los tres primeros no se dice.
+- **Lo atascado va a Reportes, no a avisos**: una pestaña de despacho dice cuántos días lleva sin hacerse la primera de la cola, lo mismo de cada urgente, y qué órdenes han pasado su fecha objetivo. Es información secundaria: una orden puede llevar días porque de verdad cuesta.
+- **Cuando el taller marca una orden hecha, el despacho recibe un push** (es quien la traslada a ICSUITE y al escandallo).
+- **Si la tablet no admite los avisos se dice siempre**, con el motivo y cómo arreglarlo.
+- **Al crear una orden se avisa si el modelo ya tiene órdenes abiertas** en la cola.
+- **Tras «Hecho» el taller vuelve a la Bandeja de Entrada**, donde ya se ve cuál es la siguiente; no se le abre la siguiente orden encima.
+- **Fecha objetivo, opcional**, como etiqueta «Fecha: 11 noviembre» (descripción, no imperativo): gris mientras falten más de 5 días, cada vez más roja al acercarse, el rojo de «Urgente» el mismo día y, pasado el día, más oscura cada día hasta el negro a los 7. En la bandeja y la cola del despacho, en el detalle de la orden y en la Bandeja de Entrada del taller.
+- Descartado: avisar de lo que lleva días sin abrirse (se verá en su momento), el detector de silencio del taller, saltar órdenes bloqueadas por una duda.

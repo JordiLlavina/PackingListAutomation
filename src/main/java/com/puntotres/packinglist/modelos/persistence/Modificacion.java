@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.modelos.persistence;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Column;
@@ -37,8 +38,12 @@ public class Modificacion {
     @Column(name = "direccion", length = 20, nullable = false)
     private Direccion direccion;
 
-    /** Clave de {@code modelos.tipos-cambio} del yml; puede faltar en una orden. */
-    @Column(name = "tipo_cambio", length = 40)
+    /**
+     * Claves de {@code modelos.tipos-cambio} del yml, una o varias separadas por
+     * comas ({@code CONSUMO_PIEL,FORNITURAS}; {@code ModelosProperties.clavesDe}
+     * las separa), en el orden del yml; puede faltar en una orden.
+     */
+    @Column(name = "tipo_cambio", length = 200)
     private String tipoCambio;
 
     /**
@@ -52,6 +57,14 @@ public class Modificacion {
     /** La ha marcado urgente el despacho (solo en las órdenes para el taller). */
     @Column(name = "urgente", nullable = false)
     private boolean urgente;
+
+    /**
+     * Para qué día debería estar hecha (solo en las órdenes para el taller;
+     * opcional). No caduca nada: es la etiqueta de fecha que el taller ve
+     * cambiar de color según se acerca o se pasa el día.
+     */
+    @Column(name = "fecha_objetivo")
+    private LocalDate fechaObjetivo;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", length = 20, nullable = false)
@@ -136,6 +149,10 @@ public class Modificacion {
         return urgente;
     }
 
+    public LocalDate getFechaObjetivo() {
+        return fechaObjetivo;
+    }
+
     public EstadoModificacion getEstado() {
         return estado;
     }
@@ -186,12 +203,40 @@ public class Modificacion {
         }
     }
 
+    /** Las razones nuevas (claves separadas por comas), cuando el taller corrige su aviso. */
+    public void cambiarTipoCambio(String tipoCambio) {
+        this.tipoCambio = tipoCambio;
+    }
+
+    /**
+     * Vuelve a NUEVA y sin ver: el taller ha cambiado lo que decía el aviso y
+     * el despacho tiene que volver a mirarlo. Solo tiene sentido en una
+     * NUEVA o VISTA (nadie ha aplicado nada todavía).
+     */
+    public void volverANueva() {
+        estado = EstadoModificacion.NUEVA;
+        vistaEn = null;
+    }
+
+    /** Suelta el título que puso la IA, para que la nota de voz nueva le ponga el suyo. */
+    public void quitarTituloDeIa() {
+        if (tituloDeIa) {
+            titulo = null;
+            tituloDeIa = false;
+        }
+    }
+
     public void ponerPosicionCola(Integer posicion) {
         this.posicionCola = posicion;
     }
 
     public void marcarUrgente(boolean urgente) {
         this.urgente = urgente;
+    }
+
+    /** La fecha objetivo, o null para quitarla. */
+    public void ponerFechaObjetivo(LocalDate fecha) {
+        this.fechaObjetivo = fecha;
     }
 
     /** EN_CURSO, olvidando quién la dio por hecha si lo estaba. */

@@ -39,7 +39,7 @@ const DESTINOS: { seccion: Seccion; ruta: string; texto: string; icono: NombreIc
   { seccion: 'modelos', ruta: '/modelos', texto: 'Modelos', icono: 'rejilla' },
 ];
 
-const PANTALLA_POR_DEFECTO: Pantalla = { titulo: 'Modelos · Puntotres', seccion: 'inicio' };
+const PANTALLA_POR_DEFECTO: Pantalla = { titulo: 'Inicio · Puntotres', seccion: 'inicio' };
 
 /**
  * El título que una pantalla pone en la cabecera cuando el de su ruta no basta

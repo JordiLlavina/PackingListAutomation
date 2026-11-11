@@ -2,7 +2,9 @@
 // (enviado, visto, hecho), el último primero. Si lo último que se ha dicho en
 // un aviso es de despacho, sale dentro de la tarjeta con su nota de voz y un
 // botón para contestar; también en un aviso ya cerrado, que es donde despacho
-// explica por qué lo ha descartado.
+// explica por qué lo ha descartado. Tocar la tarjeta abre el aviso
+// (/avisos/:id), donde se corrige o se borra mientras despacho no lo haya
+// empezado a aplicar.
 //
 // Son todos los avisos del taller y no solo los de quien mira: hay una sola
 // cuenta de taller (la tablet), así que la API ya los da todos.
@@ -17,6 +19,7 @@ import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
 import FotoModelo from '../comun/FotoModelo';
 import {
+  avisoEditable,
   estadoAviso,
   fotoDelModelo,
   ordenarAvisos,
@@ -47,8 +50,21 @@ function Tarjeta({ aviso, respuesta }: { aviso: ModificacionResumen; respuesta: 
   const navegar = useNavigate();
   const estado = estadoAviso(aviso.estado);
   const audioRespuesta = respuesta?.adjuntos.find((a) => a.tipo === 'AUDIO');
+  const abrir = () => navegar(`/avisos/${aviso.id}`);
   return (
-    <div className={`orden aviso ${estado.franja}`}>
+    <div
+      className={`orden aviso abrible ${estado.franja}`}
+      role="link"
+      tabIndex={0}
+      aria-label={`Abrir el aviso ${aviso.tipoCambioTexto ?? 'Cambio'} · ${aviso.modeloReferencia}`}
+      onClick={abrir}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          abrir();
+        }
+      }}
+    >
       <span className="franja" />
       <FotoModelo modelo={fotoDelModelo(aviso)} />
       <div className="cuerpo">
@@ -61,6 +77,7 @@ function Tarjeta({ aviso, respuesta }: { aviso: ModificacionResumen; respuesta: 
         </span>
         <span className="meta">
           <span className={`pill ${estado.pill}`}>{estado.texto}</span>
+          {avisoEditable(aviso.estado) && <span className="cuando">Toca para corregirlo o borrarlo</span>}
         </span>
         {respuesta && (
           <div className="respuesta">
@@ -68,7 +85,14 @@ function Tarjeta({ aviso, respuesta }: { aviso: ModificacionResumen; respuesta: 
               <b>{respuesta.autor ?? 'Despacho'}:</b> {respuesta.texto}
             </span>
             {audioRespuesta && <Audio compacto adjuntoId={audioRespuesta.id} duracionSeg={audioRespuesta.duracionSeg ?? 0} />}
-            <button className="boton marca" type="button" onClick={() => navegar(`/avisos/${aviso.id}/contestar`)}>
+            <button
+              className="boton marca"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                navegar(`/avisos/${aviso.id}/contestar`);
+              }}
+            >
               Contestar
             </button>
           </div>

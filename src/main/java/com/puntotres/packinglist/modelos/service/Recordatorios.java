@@ -319,10 +319,11 @@ public class Recordatorios {
         if (m.getTitulo() != null && !m.getTitulo().isBlank()) {
             return m.getTitulo().strip();
         }
-        if (m.getTipoCambio() == null) {
+        String texto = props.textoTiposCambio(m.getTipoCambio());
+        if (texto == null) {
             return m.esAviso() ? "aviso del taller" : "orden";
         }
-        return props.tipoCambio(m.getTipoCambio()).map(ModelosProperties.TipoCambio::texto).orElse(m.getTipoCambio());
+        return texto;
     }
 
     private static String nombre(Usuario usuario) {

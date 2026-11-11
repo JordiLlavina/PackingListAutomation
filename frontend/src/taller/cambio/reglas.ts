@@ -8,7 +8,8 @@ export type AudioBorrador = { blob: Blob; duracionSeg: number; url: string };
 /** Lo que lleva el aviso mientras se prepara (sin los setters del contexto). */
 export type EstadoBorrador = {
   modelo: { id: number } | null;
-  tipo: string | null;
+  /** Las razones del cambio (claves del yml) marcadas; puede haber varias. */
+  tipos: string[];
   fotos: FotoBorrador[];
   audio: AudioBorrador | null;
 };
@@ -16,12 +17,12 @@ export type EstadoBorrador = {
 /** Por qué no se puede mandar todavía, en el orden en que se pide; null si se puede. */
 export function motivoNoEnviar(b: EstadoBorrador): string | null {
   if (!b.modelo) return 'Elige el modelo';
-  if (!b.tipo) return 'Di qué has cambiado';
+  if (b.tipos.length === 0) return 'Di qué has cambiado';
   if (b.fotos.length === 0 && !b.audio) return 'Hace falta una nota de voz o una foto';
   return null;
 }
 
-/** Hace falta el modelo, el tipo de cambio y al menos una foto o la nota de voz. */
+/** Hace falta el modelo, al menos una razón del cambio y al menos una foto o la nota de voz. */
 export function puedeEnviar(b: EstadoBorrador): boolean {
   return motivoNoEnviar(b) === null;
 }

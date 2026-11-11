@@ -1,5 +1,6 @@
 package com.puntotres.packinglist.modelos.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,6 +75,11 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
  * <li>Una DESCARTADA no cambia de destinos, ni se marca
  * hecha, pero sigue admitiendo mensajes: se puede explicar por qué se
  * descartó.</li>
+ * <li>El taller puede <b>corregir y borrar sus avisos</b> mientras el
+ * despacho no haya empezado a aplicarlos (NUEVA o VISTA; decisión del
+ * usuario, noviembre de 2026): es la única vez que una modificación se
+ * borra de verdad. Corregirlo lo devuelve a NUEVA para que el despacho lo
+ * vuelva a mirar.</li>
  * <li>Cada respuesta enciende {@code necesita_respuesta} y deja la pelota en
  * el otro lado ({@link #ladoQueDebeResponder}). Abrir la modificación no la
  * apaga: la pelota cambia de lado cuando ese lado contesta.</li>
@@ -129,24 +135,43 @@ public class Modificaciones implements Modelos.FuenteEventos {
         this.cola = cola;
     }
 
-    /** Lo que manda el taller: el modelo, el tipo de cambio (clave del yml) y sus fotos y notas de voz. */
+    /**
+     * Lo que manda el taller: el modelo, las razones del cambio (claves del
+     * yml, una o varias separadas por comas) y sus fotos y notas de voz.
+     */
     public record AvisoTaller(Long modeloId, String tipoCambio, List<AdjuntoNuevo> adjuntos) {
     }
 
     /**
-     * Lo que manda el despacho; el tipo de cambio es opcional, el título no.
+     * Lo que manda el despacho; las razones del cambio (claves separadas por
+     * comas) son opcionales, el título no.
      *
-     * @param urgente marcada urgente desde que nace
-     * @param antesDe la orden de la cola delante de la que va; null, al final
+     * @param urgente       marcada urgente desde que nace
+     * @param antesDe       la orden de la cola delante de la que va; null, al final
+     * @param fechaObjetivo para qué día debería estar hecha; null si no se dice
      */
     public record OrdenDespacho(Long modeloId, String tipoCambio, String titulo, String texto, boolean urgente,
-                                Long antesDe, List<AdjuntoNuevo> adjuntos) {
+                                Long antesDe, LocalDate fechaObjetivo, List<AdjuntoNuevo> adjuntos) {
 
-        /** Ni urgente, y al final de la cola. */
+        /** Sin fecha objetivo. */
+        public OrdenDespacho(Long modeloId, String tipoCambio, String titulo, String texto, boolean urgente,
+                             Long antesDe, List<AdjuntoNuevo> adjuntos) {
+            this(modeloId, tipoCambio, titulo, texto, urgente, antesDe, null, adjuntos);
+        }
+
+        /** Ni urgente, sin fecha y al final de la cola. */
         public OrdenDespacho(Long modeloId, String tipoCambio, String titulo, String texto,
                              List<AdjuntoNuevo> adjuntos) {
-            this(modeloId, tipoCambio, titulo, texto, false, null, adjuntos);
+            this(modeloId, tipoCambio, titulo, texto, false, null, null, adjuntos);
         }
+    }
+
+    /**
+     * Lo que el taller cambia de un aviso suyo: las razones (null = no tocar),
+     * los adjuntos nuevos del cuerpo (una nota de voz nueva sustituye a la que
+     * había) y los adjuntos del cuerpo que quita.
+     */
+    public record EdicionAviso(String tipoCambio, List<AdjuntoNuevo> adjuntosNuevos, List<Long> quitar) {
     }
 
     /**
@@ -201,6 +226,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
         Modificacion nueva = new Modificacion(orden.modeloId(), Direccion.DESPACHO_A_TALLER, tipoCambio, titulo,
                 idDe(quien), ahora);
         nueva.marcarUrgente(orden.urgente());
+        nueva.ponerFechaObjetivo(orden.fechaObjetivo());
         Modificacion modificacion = repositorio.save(nueva);
         cola.colocar(modificacion, orden.antesDe());
         guardarMensaje(modificacion.getId(), vacio(orden.texto()) ? "" : orden.texto().trim(),
@@ -208,6 +234,87 @@ public class Modificaciones implements Modelos.FuenteEventos {
         // El push al taller sale cuando se confirma la transacción (Push).
         eventos.publishEvent(new ModificacionCreada(modificacion.getId(), Direccion.DESPACHO_A_TALLER, idDe(quien)));
         return modificacion;
+    }
+
+    /**
+     * El taller corrige un aviso suyo que el despacho no ha empezado a aplicar
+     * (NUEVA o VISTA): las razones, fotos que añade o quita y la nota de voz
+     * (una nueva sustituye a la anterior, y si el título lo había puesto la IA
+     * se suelta para que la nota nueva le ponga el suyo). Solo se tocan los
+     * adjuntos del cuerpo (el primer mensaje): las respuestas son de quien las
+     * escribió. Al final tiene que seguir habiendo una foto o una nota de voz,
+     * y el aviso vuelve a NUEVA para que el despacho lo vuelva a mirar.
+     */
+    @Transactional
+    public Modificacion editarAviso(Long id, EdicionAviso edicion, UsuarioActual quien) {
+        Modificacion modificacion = avisoQueElTallerPuedeTocar(id, quien, "cambiar");
+        if (edicion == null) {
+            throw new IllegalArgumentException("Falta qué cambiar");
+        }
+        Mensaje cuerpo = mensajes.findByModificacionIdOrderByCreadoEnAscIdAsc(id).stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("El aviso " + id + " no tiene cuerpo"));
+        if (edicion.tipoCambio() != null) {
+            modificacion.cambiarTipoCambio(tipoCambioDelYml(edicion.tipoCambio(), true));
+        }
+        List<ResumenAdjunto> delCuerpo = adjuntos.deMensajes(List.of(cuerpo.getId()));
+        Set<Long> idsDelCuerpo = delCuerpo.stream().map(ResumenAdjunto::id).collect(Collectors.toSet());
+        for (Long quitar : edicion.quitar() == null ? List.<Long>of() : edicion.quitar()) {
+            if (quitar != null && !idsDelCuerpo.contains(quitar)) {
+                throw new IllegalArgumentException("El adjunto " + quitar + " no es de este aviso");
+            }
+            adjuntos.borrar(quitar);
+        }
+        List<AdjuntoNuevo> nuevos = sinNulos(edicion.adjuntosNuevos());
+        if (nuevos.stream().anyMatch(a -> a.tipo() == TipoAdjunto.AUDIO)) {
+            // Una nota de voz nueva sustituye a la que había: en una etiqueta solo cabe una explicación.
+            delCuerpo.stream().filter(a -> a.tipo() == TipoAdjunto.AUDIO).forEach(a -> adjuntos.borrar(a.id()));
+            modificacion.quitarTituloDeIa();
+        }
+        for (AdjuntoNuevo nuevo : nuevos) {
+            if (nuevo.tipo() == TipoAdjunto.DOCUMENTO) {
+                throw new IllegalArgumentException("El taller no adjunta documentos");
+            }
+            adjuntos.guardar(cuerpo.getId(), nuevo);
+        }
+        boolean conAlgo = adjuntos.deMensajes(List.of(cuerpo.getId())).stream()
+                .anyMatch(a -> a.tipo() == TipoAdjunto.FOTO || a.tipo() == TipoAdjunto.AUDIO);
+        if (!conAlgo) {
+            throw new IllegalArgumentException("Hace falta una foto o una nota de voz");
+        }
+        modificacion.volverANueva();
+        return modificacion;
+    }
+
+    /**
+     * El taller borra un aviso suyo que el despacho no ha empezado a aplicar
+     * (NUEVA o VISTA). Se borra de verdad, con sus mensajes, adjuntos y
+     * destinos (las claves ajenas van en cascada): es la única vez que una
+     * modificación desaparece, porque todavía no ha pasado nada con ella.
+     */
+    @Transactional
+    public void borrarAviso(Long id, UsuarioActual quien) {
+        avisoQueElTallerPuedeTocar(id, quien, "borrar");
+        repositorio.deleteById(id);
+    }
+
+    /** El aviso, si quien pide es del taller y el despacho no ha empezado a aplicarlo; si no, por qué no. */
+    private Modificacion avisoQueElTallerPuedeTocar(Long id, UsuarioActual quien, String que) {
+        if (quien == null || quien.rol() != Rol.TALLER) {
+            throw new AccessDeniedException("Solo el taller puede " + que + " sus avisos");
+        }
+        Modificacion modificacion = modificacionQueExiste(id);
+        if (!modificacion.esAviso()) {
+            throw new IllegalArgumentException("Una orden del despacho no se puede " + que + " desde el taller");
+        }
+        switch (modificacion.getEstado()) {
+            case NUEVA, VISTA -> {
+                return modificacion;
+            }
+            case EN_CURSO -> throw new IllegalArgumentException(
+                    "El despacho ya está aplicando este aviso: ya no se puede " + que);
+            case HECHA -> throw new IllegalArgumentException("Este aviso ya está hecho: ya no se puede " + que);
+            default -> throw new IllegalArgumentException("Este aviso está descartado: ya no se puede " + que);
+        }
     }
 
     /**
@@ -293,6 +400,23 @@ public class Modificaciones implements Modelos.FuenteEventos {
         }
     }
 
+    /**
+     * Pone o quita (null) la fecha objetivo de una orden abierta para el
+     * taller. No mueve la cola ni marca nada: es solo la etiqueta de fecha.
+     */
+    @Transactional
+    public void cambiarFechaObjetivo(Long id, LocalDate fecha, UsuarioActual quien) {
+        exigirDespacho(quien);
+        Modificacion modificacion = modificacionQueExiste(id);
+        if (modificacion.esAviso()) {
+            throw new IllegalArgumentException("Solo una orden para el taller lleva fecha objetivo");
+        }
+        if (!ColaTaller.enLaCola(modificacion)) {
+            throw new IllegalArgumentException("La orden ya está cerrada");
+        }
+        modificacion.ponerFechaObjetivo(fecha);
+    }
+
     /** La cola del taller, de la primera a la última, como la ve la bandeja. */
     @Transactional(readOnly = true)
     public List<ModificacionResumen> cola() {
@@ -376,6 +500,10 @@ public class Modificaciones implements Modelos.FuenteEventos {
             modificacion.marcarVista(ahora);
         }
         modificacion.marcarHecha(idDe(quien), ahora);
+        if (!modificacion.esAviso() && quien != null && quien.rol() == Rol.TALLER) {
+            // El push al despacho sale cuando se confirma la transacción (Push): el taller ha acabado una orden.
+            eventos.publishEvent(new OrdenHecha(id, idDe(quien)));
+        }
     }
 
     /**
@@ -741,7 +869,7 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     modelo == null ? null : modelo.nombreVisible(), modelo == null ? null : modelo.getNombre(),
                     modelo == null ? null : modelo.getCliente(), fotosPrincipales.get(m.getModeloId()),
                     m.getDireccion(), m.getTipoCambio(), tipoCambioTexto(m.getTipoCambio()), m.isUrgente(),
-                    posiciones.get(m.getId()), m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
+                    posiciones.get(m.getId()), m.getFechaObjetivo(), m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
                     m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()), pendiente,
                     modelo == null ? null : modelo.getEtapa(), estados,
                     numeroFotos, audios, documentos, duracionAudio, ultimoMensajeDe);
@@ -763,26 +891,32 @@ public class Modificaciones implements Modelos.FuenteEventos {
         return porId;
     }
 
-    /** El texto del tipo de cambio en el yml; la clave si ya no está; null si no hay. */
-    private String tipoCambioTexto(String clave) {
-        if (clave == null) {
-            return null;
-        }
-        return props.tipoCambio(clave).map(TipoCambio::texto).orElse(clave);
+    /** Los textos de las razones en el yml, unidos («Consumo piel · Fornituras»); la clave si ya no está; null si no hay. */
+    private String tipoCambioTexto(String claves) {
+        return props.textoTiposCambio(claves);
     }
 
-    /** La clave tal cual si está en el yml; un 400 si no; null si falta y no es obligatoria. */
-    private String tipoCambioDelYml(String clave, boolean obligatorio) {
-        if (vacio(clave)) {
+    /**
+     * Las claves que llegan ({@code A,B}), cada una comprobada contra el yml
+     * (un 400 si alguna no existe), sin repetidas y <b>en el orden del yml</b>,
+     * para que la misma elección se guarde siempre igual; null si no llega
+     * ninguna y no es obligatoria.
+     */
+    private String tipoCambioDelYml(String claves, boolean obligatorio) {
+        List<String> pedidas = ModelosProperties.clavesDe(claves);
+        if (pedidas.isEmpty()) {
             if (obligatorio) {
                 throw new IllegalArgumentException("Falta el tipo de cambio");
             }
             return null;
         }
-        String limpia = clave.trim();
-        return props.tipoCambio(limpia)
-                .map(TipoCambio::clave)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el tipo de cambio " + limpia));
+        for (String clave : pedidas) {
+            if (props.tipoCambio(clave).isEmpty()) {
+                throw new IllegalArgumentException("No existe el tipo de cambio " + clave);
+            }
+        }
+        List<String> enOrden = props.tiposCambio().stream().map(TipoCambio::clave).filter(pedidas::contains).toList();
+        return String.join(ModelosProperties.SEPARADOR_TIPOS, enOrden);
     }
 
     /**

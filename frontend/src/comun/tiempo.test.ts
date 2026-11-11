@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hace, mmss } from './tiempo';
+import { diaYMes, diasDesde, diasHasta, hace, mmss } from './tiempo';
 
 // Fechas sin zona: se leen en la hora local, así que el día no cambia según
 // dónde corran los tests.
@@ -42,5 +42,33 @@ describe('mmss', () => {
 
   it('cero', () => {
     expect(mmss(0)).toBe('00:00');
+  });
+});
+
+describe('diasHasta', () => {
+  it('cuenta días de calendario, no horas', () => {
+    expect(diasHasta('2026-11-09', ahora)).toBe(0);
+    expect(diasHasta('2026-11-10', new Date('2026-11-09T23:59:00'))).toBe(1);
+    expect(diasHasta('2026-11-14', ahora)).toBe(5);
+    expect(diasHasta('2026-11-02', ahora)).toBe(-7);
+  });
+
+  it('admite una fecha con hora y no pasa por UTC', () => {
+    expect(diasHasta('2026-11-10T00:30:00', ahora)).toBe(1);
+  });
+});
+
+describe('diasDesde', () => {
+  it('días enteros, y nunca negativos', () => {
+    expect(diasDesde('2026-11-06T13:00:00', ahora)).toBe(2);
+    expect(diasDesde('2026-11-09T10:00:00', ahora)).toBe(0);
+    expect(diasDesde('2026-11-10T10:00:00', ahora)).toBe(0);
+  });
+});
+
+describe('diaYMes', () => {
+  it('día y mes en palabras, y el año solo si no es el de hoy', () => {
+    expect(diaYMes('2026-11-11', ahora)).toBe('11 noviembre');
+    expect(diaYMes('2027-01-03', ahora)).toBe('3 enero 2027');
   });
 });

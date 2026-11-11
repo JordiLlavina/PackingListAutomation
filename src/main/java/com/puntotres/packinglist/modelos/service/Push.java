@@ -55,7 +55,9 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  * <li>Una orden nueva del despacho avisa al taller; un aviso nuevo del taller,
  * al despacho (el ADMIN cuenta como despacho); una respuesta, al otro lado del
  * que la escribe, <b>esté como esté la modificación</b>: también en una cerrada,
- * que es donde el despacho explica por qué la ha descartado.</li>
+ * que es donde el despacho explica por qué la ha descartado. Y una orden que
+ * el taller marca hecha avisa al despacho, que es quien la tiene que trasladar
+ * a ICSUITE y al escandallo (decisión del usuario, noviembre de 2026).</li>
  * <li>Solo a usuarios activos, y nunca a un aparato revocado.</li>
  * <li>El push sale cuando se confirma la transacción que creó la
  * modificación o el mensaje (antes no existiría para el hilo de los push), y
@@ -226,6 +228,12 @@ public class Push {
         encolar(() -> avisoDeRespuesta(evento));
     }
 
+    /** El taller ha marcado hecha una orden: al despacho, cuando la transacción se confirma. */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void alHacer(OrdenHecha evento) {
+        encolar(() -> avisoDeHecha(evento));
+    }
+
     /** Cuántos push quedan por acabar (para los tests: se espera a que sea 0). */
     public int pendientes() {
         return pendientes.get();
@@ -269,8 +277,7 @@ public class Push {
         Modelo modelo = modelos.findById(m.getModeloId()).orElse(null);
         String referencia = modelo == null ? "" : modelo.nombreVisible();
         if (m.esAviso()) {
-            String tipo = props.tipoCambio(m.getTipoCambio()).map(ModelosProperties.TipoCambio::texto)
-                    .orElse(Objects.toString(m.getTipoCambio(), "cambio"));
+            String tipo = Objects.toString(props.textoTiposCambio(m.getTipoCambio()), "cambio");
             // Sin creador el aviso sale igual, con una raya: findById(null) tiraría el push entero.
             String quien = evento.creadaPorId() == null ? "—"
                     : usuarios.findById(evento.creadaPorId()).map(Usuario::getNombre).orElse("el taller");
@@ -301,6 +308,21 @@ public class Push {
             url = "/app/bandeja/" + m.getId();
         }
         return new Destino(para, new Aviso("Respuesta de " + autor, cuerpoDe(ultimo), url, m.getId()));
+    }
+
+    private Destino avisoDeHecha(OrdenHecha evento) {
+        Modificacion m = modificaciones.findById(evento.id()).orElse(null);
+        if (m == null || m.esAviso()) {
+            return null;
+        }
+        Modelo modelo = modelos.findById(m.getModeloId()).orElse(null);
+        String referencia = modelo == null ? "" : modelo.nombreVisible();
+        String quien = evento.hechaPorId() == null ? "el taller"
+                : usuarios.findById(evento.hechaPorId()).map(Usuario::getNombre).orElse("el taller");
+        // Con su propio tag: no tapa una respuesta de la misma orden que esté por leer.
+        return new Destino(Rol.DESPACHO, new Aviso("Hecha: " + Objects.toString(m.getTitulo(), ""),
+                juntar(referencia, "por " + quien), "/app/bandeja/" + m.getId() + "?pestana=despacho", m.getId(),
+                "hecha-" + m.getId()));
     }
 
     /** Las 80 primeras letras del texto; sin texto, qué lleva. */

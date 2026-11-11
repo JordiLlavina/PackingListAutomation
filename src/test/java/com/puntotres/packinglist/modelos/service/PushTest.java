@@ -116,7 +116,7 @@ class PushTest {
         assertEquals(orden.getId().longValue(), carga.get("modificacionId").asLong());
         assertEquals("modificacion-" + orden.getId(), carga.get("tag").asText());
 
-        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "PIEL",
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL",
                 List.of(ModificacionesTest.foto())), actual(taller));
         esperarALaCola();
 
@@ -126,7 +126,7 @@ class PushTest {
                 "el aviso le llega al despacho, y el administrador cuenta como despacho");
         assertEquals(2, delAviso.size());
         JsonNode delDespacho = json.readTree(delAviso.get(0).payload());
-        assertEquals("Aviso del taller: Piel / material", delDespacho.get("titulo").asText());
+        assertEquals("Aviso del taller: Consumo piel", delDespacho.get("titulo").asText());
         assertEquals(referencia + " · de " + taller.getNombre(), delDespacho.get("cuerpo").asText());
         assertEquals("/app/bandeja/" + aviso.getId(), delDespacho.get("url").asText());
     }
@@ -172,7 +172,7 @@ class PushTest {
         Usuario despacho = usuario(Rol.DESPACHO);
         suscribir(despacho, "despacho");
         Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("SIN-CREADOR"),
-                "PIEL", List.of(ModificacionesTest.foto())), actual(taller));
+                "CONSUMO_PIEL", List.of(ModificacionesTest.foto())), actual(taller));
         esperarALaCola();
         enviador.envios.clear();
 
@@ -234,7 +234,7 @@ class PushTest {
         suscribir(taller, "taller");
         suscribir(despacho, "despacho");
         Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("CERRADO"),
-                "FORRO", List.of(ModificacionesTest.foto())), actual(taller));
+                "REFUERZOS", List.of(ModificacionesTest.foto())), actual(taller));
         modificaciones.descartar(aviso.getId(), "Ya estaba así", actual(despacho));
         esperarALaCola();
         enviador.envios.clear();
@@ -260,6 +260,39 @@ class PushTest {
         JsonNode deVoz = json.readTree(delTaller.get(0).payload());
         assertEquals("Nota de voz", deVoz.get("cuerpo").asText());
         assertEquals("/app/bandeja/" + aviso.getId(), deVoz.get("url").asText());
+    }
+
+    @Test
+    void unaOrdenHechaPorElTallerAvisaAlDespachoYUnaCerradaPorElDespachoNo() throws Exception {
+        Usuario taller = usuario(Rol.TALLER);
+        Usuario despacho = usuario(Rol.DESPACHO);
+        suscribir(taller, "taller");
+        suscribir(despacho, "despacho");
+        Long modeloId = modelo("HECHA");
+        Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
+                "Coser el asa", "", List.of()), actual(despacho));
+        Modificacion otra = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
+                "Cambiar el forro", "", List.of()), actual(despacho));
+        esperarALaCola();
+        enviador.envios.clear();
+
+        modificaciones.marcarHecha(orden.getId(), actual(taller));
+        esperarALaCola();
+        List<EnviadorFalso.Envio> hecha = enviosDe(orden.getId(), taller, despacho);
+        assertEquals(List.of(despacho.getId()), hecha.stream().map(EnviadorFalso.Envio::usuarioId).toList(),
+                "el despacho se entera de que el taller ha acabado");
+        JsonNode carga = json.readTree(hecha.get(0).payload());
+        assertEquals("Hecha: Coser el asa", carga.get("titulo").asText());
+        String referencia = repositorioModelos.findById(modeloId).orElseThrow().getCodigo();
+        assertEquals(referencia + " · por " + taller.getNombre(), carga.get("cuerpo").asText());
+        assertEquals("/app/bandeja/" + orden.getId() + "?pestana=despacho", carga.get("url").asText());
+        assertEquals("hecha-" + orden.getId(), carga.get("tag").asText(), "con su tag: no tapa una respuesta");
+
+        enviador.envios.clear();
+        modificaciones.marcarHecha(otra.getId(), actual(despacho));
+        esperarALaCola();
+        assertTrue(enviosDe(otra.getId(), taller, despacho).isEmpty(),
+                "una orden que cierra el propio despacho no avisa a nadie");
     }
 
     private List<EnviadorFalso.Envio> enviosDe(Long modificacionId, Usuario... suyos) throws IOException {

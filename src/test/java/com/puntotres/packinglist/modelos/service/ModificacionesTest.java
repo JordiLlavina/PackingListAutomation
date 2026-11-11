@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import com.puntotres.packinglist.modelos.ComoUsuario;
 import com.puntotres.packinglist.modelos.api.dto.AdjuntoVista;
@@ -71,19 +73,22 @@ class ModificacionesTest {
     @Autowired
     private ModificacionRepository repositorio;
 
+    @Autowired
+    private TransactionTemplate transacciones;
+
     @Test
     void unAvisoSinFotoNiAudioSeRechaza() {
         Long modeloId = modelo("SINFOTO");
 
         IllegalArgumentException sinNada = assertThrows(IllegalArgumentException.class,
-                () -> modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "PIEL", List.of()),
+                () -> modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL", List.of()),
                         taller()));
         assertEquals("Hace falta una foto o una nota de voz", sinNada.getMessage());
 
         AdjuntoNuevo documento = new AdjuntoNuevo(TipoAdjunto.DOCUMENTO, "ficha.pdf", "application/pdf",
                 new byte[] {1, 2, 3}, null);
         IllegalArgumentException soloDocumento = assertThrows(IllegalArgumentException.class,
-                () -> modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "PIEL",
+                () -> modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL",
                         List.of(documento)), taller()));
         assertEquals("Hace falta una foto o una nota de voz", soloDocumento.getMessage());
 
@@ -100,7 +105,7 @@ class ModificacionesTest {
     void unAvisoConAudioNaceNuevoFueraDeLaColaYConLosDosDestinos() {
         Long modeloId = modelo("AUDIO");
 
-        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "PIEL",
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL",
                 List.of(audio(30))), taller());
 
         ModificacionDetalle detalle = modificaciones.detalle(aviso.getId());
@@ -110,8 +115,8 @@ class ModificacionesTest {
         assertNull(resumen.posicionCola(), "un aviso del taller no entra en la cola");
         assertEquals(Etapa.PRODUCCION, resumen.etapa(), "la etapa del modelo, para filtrar");
         assertEquals(Direccion.TALLER_A_DESPACHO, resumen.direccion());
-        assertEquals("PIEL", resumen.tipoCambio());
-        assertEquals("Piel / material", resumen.tipoCambioTexto());
+        assertEquals("CONSUMO_PIEL", resumen.tipoCambio());
+        assertEquals("Consumo piel", resumen.tipoCambioTexto());
         assertEquals("T11-AUDIO", resumen.modeloReferencia());
         assertEquals("Bolso T11", resumen.modeloNombre());
         assertEquals("AMI", resumen.cliente());
@@ -147,7 +152,7 @@ class ModificacionesTest {
                 .filter(e -> "MODIFICACION".equals(e.tipo()))
                 .findFirst()
                 .orElseThrow();
-        assertEquals("Aviso: Piel / material", evento.texto());
+        assertEquals("Aviso: Consumo piel", evento.texto());
         assertEquals("Prueba Taller (taller)", evento.quien());
         assertEquals(aviso.getId(), evento.modificacionId());
         assertEquals(nota.id(), evento.audioAdjuntoId());
@@ -217,7 +222,7 @@ class ModificacionesTest {
         assertEquals("Falta el título", sinTitulo.getMessage());
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId,
-                "HERRAJES", "Cambiar asa", "Asa de 2 cm", List.of()), despacho());
+                "FORNITURAS", "Cambiar asa", "Asa de 2 cm", List.of()), despacho());
         ModificacionDetalle detalle = modificaciones.detalle(orden.getId());
         assertEquals(EstadoModificacion.NUEVA, detalle.resumen().estado());
         assertEquals(Direccion.DESPACHO_A_TALLER, detalle.resumen().direccion());
@@ -409,10 +414,10 @@ class ModificacionesTest {
     @Test
     void laBusquedaPorTextoEncuentraLaTranscripcion() {
         Long modeloId = modelo("BUSCA");
-        Modificacion conVoz = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "FORRO",
+        Modificacion conVoz = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "REFUERZOS",
                 List.of(audio(20))), taller());
         Modificacion conResumen = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
-                "FORRO", List.of(audio(20))), taller());
+                "REFUERZOS", List.of(audio(20))), taller());
         Modificacion otra = avisoConFoto("BUSCA-OTRO");
         Long notaId = modificaciones.detalle(conVoz.getId()).mensajes().get(0).adjuntos().get(0).id();
         Long notaResumenId = modificaciones.detalle(conResumen.getId()).mensajes().get(0).adjuntos().get(0).id();
@@ -502,6 +507,137 @@ class ModificacionesTest {
         assertTrue(yaNoEsta.getMessage().contains("ya no está en la cola"), yaNoEsta.getMessage());
     }
 
+    @Test
+    void variasRazonesSeGuardanJuntasEnElOrdenDelYmlYSinRepetir() {
+        Long modeloId = modelo("RAZONES");
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
+                "FORNITURAS, CONSUMO_PIEL,FORNITURAS", List.of(foto())), taller());
+        ModificacionResumen resumen = modificaciones.detalle(aviso.getId()).resumen();
+        assertEquals("CONSUMO_PIEL,FORNITURAS", resumen.tipoCambio(), "en el orden del yml y sin repetidas");
+        assertEquals("Consumo piel · Fornituras", resumen.tipoCambioTexto());
+
+        IllegalArgumentException unaMala = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
+                        "CONSUMO_PIEL,NOPE", List.of(foto())), taller()));
+        assertEquals("No existe el tipo de cambio NOPE", unaMala.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> modificaciones.crearAvisoDeTaller(
+                new Modificaciones.AvisoTaller(modeloId, " , ", List.of(foto())), taller()), "solo comas es nada");
+    }
+
+    @Test
+    void elTallerCorrigeSuAvisoMientrasElDespachoNoLoAplicaYVuelveANuevo() {
+        Long modeloId = modelo("EDITAR");
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL",
+                List.of(foto(), audio(12))), taller());
+        modificaciones.marcarVista(aviso.getId(), despacho());
+        assertEquals(EstadoModificacion.VISTA, estado(aviso));
+        ModificacionDetalle antes = modificaciones.detalle(aviso.getId());
+        List<AdjuntoVista> delCuerpo = antes.mensajes().get(0).adjuntos();
+        Long laFoto = delCuerpo.stream().filter(a -> a.tipo() == TipoAdjunto.FOTO).findFirst().orElseThrow().id();
+        Long elAudio = delCuerpo.stream().filter(a -> a.tipo() == TipoAdjunto.AUDIO).findFirst().orElseThrow().id();
+        // Como lo pondría la transcripción (la sentencia pide transacción).
+        assertEquals(1, transacciones.execute(t -> repositorio.ponerTituloDeIaSiNoTiene(aviso.getId(),
+                Direccion.TALLER_A_DESPACHO, "Título de la IA")));
+        assertEquals("Título de la IA", modificaciones.detalle(aviso.getId()).resumen().titulo());
+
+        // Otra razón, se quita la foto, se añade otra y la nota de voz nueva sustituye a la vieja.
+        AdjuntoNuevo fotoNueva = new AdjuntoNuevo(TipoAdjunto.FOTO, "otra.png", "image/png", png(12, 12), null);
+        modificaciones.editarAviso(aviso.getId(), new Modificaciones.EdicionAviso("FORNITURAS,CONSUMO_PIEL",
+                List.of(fotoNueva, audio(7)), List.of(laFoto)), taller());
+
+        ModificacionDetalle despues = modificaciones.detalle(aviso.getId());
+        assertEquals("CONSUMO_PIEL,FORNITURAS", despues.resumen().tipoCambio());
+        assertEquals(EstadoModificacion.NUEVA, despues.resumen().estado(), "vuelve a nueva: el despacho tiene que mirarlo");
+        assertNull(despues.resumen().vistaEn());
+        assertNull(despues.resumen().titulo(), "el título de la IA se suelta para que la nota nueva ponga el suyo");
+        List<AdjuntoVista> ahora = despues.mensajes().get(0).adjuntos();
+        assertEquals(2, ahora.size(), "una foto y una nota: " + ahora);
+        assertTrue(ahora.stream().noneMatch(a -> a.id().equals(laFoto) || a.id().equals(elAudio)));
+        assertEquals(7, ahora.stream().filter(a -> a.tipo() == TipoAdjunto.AUDIO).findFirst().orElseThrow().duracionSeg());
+        assertEquals("otra.jpg", ahora.stream().filter(a -> a.tipo() == TipoAdjunto.FOTO).findFirst().orElseThrow().nombre());
+
+        // Sin tocar las razones ni los adjuntos no cambia nada de eso, pero no puede quedarse sin foto ni nota.
+        Long fotoActual = ahora.stream().filter(a -> a.tipo() == TipoAdjunto.FOTO).findFirst().orElseThrow().id();
+        Long audioActual = ahora.stream().filter(a -> a.tipo() == TipoAdjunto.AUDIO).findFirst().orElseThrow().id();
+        IllegalArgumentException sinNada = assertThrows(IllegalArgumentException.class, () -> modificaciones.editarAviso(
+                aviso.getId(), new Modificaciones.EdicionAviso(null, List.of(), List.of(fotoActual, audioActual)),
+                taller()));
+        assertEquals("Hace falta una foto o una nota de voz", sinNada.getMessage());
+        assertEquals(2, modificaciones.detalle(aviso.getId()).mensajes().get(0).adjuntos().size(),
+                "la transacción se deshace: siguen los dos");
+
+        // Un adjunto de una respuesta no es del cuerpo y no se puede quitar desde aquí.
+        Mensaje respuesta = modificaciones.responder(aviso.getId(), "", List.of(foto()), despacho());
+        Long deLaRespuesta = modificaciones.detalle(aviso.getId()).mensajes().stream()
+                .filter(m -> m.id().equals(respuesta.getId())).findFirst().orElseThrow().adjuntos().get(0).id();
+        IllegalArgumentException ajeno = assertThrows(IllegalArgumentException.class, () -> modificaciones.editarAviso(
+                aviso.getId(), new Modificaciones.EdicionAviso(null, List.of(), List.of(deLaRespuesta)), taller()));
+        assertTrue(ajeno.getMessage().contains("no es de este aviso"), ajeno.getMessage());
+
+        assertThrows(AccessDeniedException.class, () -> modificaciones.editarAviso(aviso.getId(),
+                new Modificaciones.EdicionAviso("OTROS", List.of(), List.of()), despacho()));
+    }
+
+    @Test
+    void elTallerBorraSuAvisoSoloMientrasNadieLoHaAplicado() {
+        Long modeloId = modelo("BORRAR");
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "OTROS",
+                List.of(foto(), audio(5))), taller());
+        modificaciones.responder(aviso.getId(), "¿Cuál?", List.of(), despacho());
+        assertThrows(AccessDeniedException.class, () -> modificaciones.borrarAviso(aviso.getId(), despacho()));
+
+        modificaciones.borrarAviso(aviso.getId(), taller());
+        assertTrue(repositorio.findById(aviso.getId()).isEmpty(), "se borra de verdad");
+        assertTrue(modificaciones.listar(new Modificaciones.Filtro(Direccion.TALLER_A_DESPACHO, null, modeloId, null,
+                null), taller()).isEmpty());
+        assertTrue(modelos.ficha(modeloId).lineaTiempo().stream().noneMatch(e -> "MODIFICACION".equals(e.tipo())),
+                "con sus mensajes, adjuntos y destinos: no queda rastro en el historial del modelo");
+
+        Modificacion enCurso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "OTROS",
+                List.of(foto())), taller());
+        modificaciones.marcarDestino(enCurso.getId(), DestinoAplicacion.ICSUITE, true, true, despacho());
+        IllegalArgumentException aplicando = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.borrarAviso(enCurso.getId(), taller()));
+        assertEquals("El despacho ya está aplicando este aviso: ya no se puede borrar", aplicando.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> modificaciones.editarAviso(enCurso.getId(),
+                new Modificaciones.EdicionAviso("OTROS", List.of(), List.of()), taller()));
+
+        Modificacion orden = orden(modeloId, "Una orden", null);
+        IllegalArgumentException unaOrden = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.borrarAviso(orden.getId(), taller()));
+        assertTrue(unaOrden.getMessage().contains("Una orden del despacho"), unaOrden.getMessage());
+    }
+
+    @Test
+    void laFechaObjetivoEsOpcionalSeCambiaYSoloEnOrdenesAbiertas() {
+        Long modeloId = modelo("FECHA");
+        Modificacion sinFecha = orden(modeloId, "Sin fecha", null);
+        assertNull(modificaciones.detalle(sinFecha.getId()).resumen().fechaObjetivo());
+
+        LocalDate dia = LocalDate.of(2026, 11, 20);
+        Modificacion conFecha = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
+                "Con fecha", null, false, null, dia, List.of()), despacho());
+        assertEquals(dia, modificaciones.detalle(conFecha.getId()).resumen().fechaObjetivo());
+
+        modificaciones.cambiarFechaObjetivo(sinFecha.getId(), dia.plusDays(3), despacho());
+        assertEquals(dia.plusDays(3), modificaciones.detalle(sinFecha.getId()).resumen().fechaObjetivo());
+        modificaciones.cambiarFechaObjetivo(sinFecha.getId(), null, despacho());
+        assertNull(modificaciones.detalle(sinFecha.getId()).resumen().fechaObjetivo(), "null la quita");
+
+        assertThrows(AccessDeniedException.class,
+                () -> modificaciones.cambiarFechaObjetivo(sinFecha.getId(), dia, taller()));
+        Modificacion aviso = aviso(modeloId);
+        IllegalArgumentException enAviso = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.cambiarFechaObjetivo(aviso.getId(), dia, despacho()));
+        assertEquals("Solo una orden para el taller lleva fecha objetivo", enAviso.getMessage());
+        modificaciones.marcarHecha(conFecha.getId(), taller());
+        IllegalArgumentException cerrada = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.cambiarFechaObjetivo(conFecha.getId(), dia, despacho()));
+        assertEquals("La orden ya está cerrada", cerrada.getMessage());
+        assertEquals(dia, modificaciones.detalle(conFecha.getId()).resumen().fechaObjetivo(),
+                "una hecha conserva la fecha que tenía");
+    }
+
     private Modificacion orden(Long modeloId, String titulo, Long antesDe) {
         return modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null, titulo, null,
                 false, antesDe, List.of()), despacho());
@@ -519,7 +655,7 @@ class ModificacionesTest {
     }
 
     private Modificacion aviso(Long modeloId) {
-        return modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "PIEL", List.of(foto())),
+        return modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL", List.of(foto())),
                 taller());
     }
 

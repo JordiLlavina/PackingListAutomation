@@ -9,9 +9,11 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -97,14 +99,14 @@ class ModificacionesControllerTest {
         int nuevasAntes = resumenDespacho().get("nuevas").asInt();
 
         String creada = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.RED))
-                        .param("tipoCambio", "PIEL")
+                        .param("tipoCambio", "CONSUMO_PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.modeloId").value(modeloId))
                 .andExpect(jsonPath("$.modificacion.modeloReferencia").value("T12-AVISO"))
                 .andExpect(jsonPath("$.modificacion.direccion").value("TALLER_A_DESPACHO"))
                 .andExpect(jsonPath("$.modificacion.estado").value("NUEVA"))
-                .andExpect(jsonPath("$.modificacion.tipoCambioTexto").value("Piel / material"))
+                .andExpect(jsonPath("$.modificacion.tipoCambioTexto").value("Consumo piel"))
                 .andExpect(jsonPath("$.modificacion.fotos").value(1))
                 .andExpect(jsonPath("$.modificacion.destinos", hasSize(2)))
                 .andExpect(jsonPath("$.documentosGuardados", hasSize(0)))
@@ -166,7 +168,7 @@ class ModificacionesControllerTest {
         long modeloId = alta("T12-ROL");
 
         String creada = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.BLUE))
-                        .param("tipoCambio", "FORRO").param("titulo", "Orden del taller")
+                        .param("tipoCambio", "REFUERZOS").param("titulo", "Orden del taller")
                         .param("urgente", "true")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
@@ -224,7 +226,7 @@ class ModificacionesControllerTest {
         long modeloId = alta("T12-DOCS");
 
         mvc.perform(nueva(modeloId).file(foto("foto.png", Color.RED)).file(documento("plano.pdf"))
-                        .param("tipoCambio", "PIEL")
+                        .param("tipoCambio", "CONSUMO_PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("El taller no adjunta documentos"));
@@ -249,7 +251,7 @@ class ModificacionesControllerTest {
 
         for (String duracion : new String[] {null, "", "tres", "-1"}) {
             MockMultipartHttpServletRequestBuilder peticion = nueva(modeloId).file(audio());
-            peticion.param("tipoCambio", "PIEL");
+            peticion.param("tipoCambio", "CONSUMO_PIEL");
             if (duracion != null) {
                 peticion.param("audioDuracionSeg", duracion);
             }
@@ -269,7 +271,7 @@ class ModificacionesControllerTest {
         mvc.perform(nueva(modeloId)
                         .file(new MockMultipartFile("audio", "nota.html", "text/html",
                                 "<script>alert(1)</script>".getBytes()))
-                        .param("audioDuracionSeg", "5").param("tipoCambio", "PIEL")
+                        .param("audioDuracionSeg", "5").param("tipoCambio", "CONSUMO_PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("La nota de voz no es un fichero de audio"));
@@ -289,7 +291,7 @@ class ModificacionesControllerTest {
                 new byte[0]);
 
         String creada = mvc.perform(nueva(modeloId).file(foto("C:\\fakepath\\foto.png", Color.RED))
-                        .file(fotoSinElegir).file(sinElegir).file(audioSinElegir).param("tipoCambio", "PIEL")
+                        .file(fotoSinElegir).file(sinElegir).file(audioSinElegir).param("tipoCambio", "CONSUMO_PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.fotos").value(1))
@@ -313,7 +315,7 @@ class ModificacionesControllerTest {
     void elAudioSeSirveConRangos() throws Exception {
         long modeloId = alta("T12-AUDIO");
         String creada = mvc.perform(nueva(modeloId).file(audio()).param("audioDuracionSeg", "5")
-                        .param("tipoCambio", "COSTURA")
+                        .param("tipoCambio", "CONSTRUCCION")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modificacion.audios").value(1))
@@ -342,7 +344,7 @@ class ModificacionesControllerTest {
     @Test
     void elAdjuntoSeSirveSinOlfatearloYConSuNombre() throws Exception {
         long modeloId = alta("T12-SERVIR");
-        String aviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.GREEN)).param("tipoCambio", "PIEL")
+        String aviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.GREEN)).param("tipoCambio", "CONSUMO_PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -400,7 +402,7 @@ class ModificacionesControllerTest {
     @Test
     void aGaleriaDejaLaFotoEnElModelo() throws Exception {
         long modeloId = alta("T12-GALERIA");
-        String aviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.RED)).param("tipoCambio", "PIEL")
+        String aviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.RED)).param("tipoCambio", "CONSUMO_PIEL")
                         .with(comoUsuario(taller())).with(csrf()))
                 .andReturn().getResponse().getContentAsString();
         long fotoId = primerAdjunto(JSON.readTree(aviso).get("modificacion").get("id").asLong());
@@ -418,7 +420,7 @@ class ModificacionesControllerTest {
         mvc.perform(post("/api/adjuntos/" + fotoId + "/a-galeria").with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(jsonPath("$", hasSize(1)));
         String otroAviso = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.BLUE))
-                        .param("tipoCambio", "PIEL").with(comoUsuario(taller())).with(csrf()))
+                        .param("tipoCambio", "CONSUMO_PIEL").with(comoUsuario(taller())).with(csrf()))
                 .andReturn().getResponse().getContentAsString();
         long otraFotoId = primerAdjunto(JSON.readTree(otroAviso).get("modificacion").get("id").asLong());
         mvc.perform(post("/api/adjuntos/" + otraFotoId + "/a-galeria").with(comoUsuario(despacho())).with(csrf()))
@@ -431,7 +433,7 @@ class ModificacionesControllerTest {
                 .andExpect(jsonPath("$", hasSize(2)));
 
         String conAudio = mvc.perform(nueva(modeloId).file(audio()).param("audioDuracionSeg", "3")
-                        .param("tipoCambio", "PIEL").with(comoUsuario(taller())).with(csrf()))
+                        .param("tipoCambio", "CONSUMO_PIEL").with(comoUsuario(taller())).with(csrf()))
                 .andReturn().getResponse().getContentAsString();
         long audioId = primerAdjunto(JSON.readTree(conAudio).get("modificacion").get("id").asLong());
         mvc.perform(post("/api/adjuntos/" + audioId + "/a-galeria").with(comoUsuario(despacho())).with(csrf()))
@@ -469,6 +471,58 @@ class ModificacionesControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.urgente").value(true))
                 .andExpect(jsonPath("$.posicionCola").value(1));
+    }
+
+    @Test
+    void elTallerCorrigeYBorraSuAvisoYElDespachoNo() throws Exception {
+        long modeloId = alta("T12-MIAVISO");
+        String creada = mvc.perform(nueva(modeloId).file(foto("foto.png", Color.RED)).param("tipoCambio", "OTROS")
+                        .with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = JSON.readTree(creada).get("modificacion").get("id").asLong();
+        long laFoto = primerAdjunto(id);
+
+        mvc.perform(multipart("/api/modificaciones/" + id + "/aviso").file(foto("otra.png", Color.BLUE))
+                        .param("tipoCambio", "FORNITURAS").param("quitar", String.valueOf(laFoto))
+                        .with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tipoCambioTexto").value("Fornituras"))
+                .andExpect(jsonPath("$.estado").value("NUEVA"))
+                .andExpect(jsonPath("$.fotos").value(1));
+        mvc.perform(multipart("/api/modificaciones/" + id + "/aviso").param("tipoCambio", "OTROS")
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(delete("/api/modificaciones/" + id).with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete("/api/modificaciones/" + id).with(comoUsuario(taller())).with(csrf()))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/modificaciones/" + id).with(comoUsuario(taller())))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void laFechaObjetivoEntraAlCrearYSeCambiaConUnPatch() throws Exception {
+        long modeloId = alta("T12-FECHA");
+        String creada = mvc.perform(nueva(modeloId).param("titulo", "Con fecha").param("fechaObjetivo", "2026-11-20")
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.modificacion.fechaObjetivo").value("2026-11-20"))
+                .andReturn().getResponse().getContentAsString();
+        long id = JSON.readTree(creada).get("modificacion").get("id").asLong();
+
+        mvc.perform(patch("/api/modificaciones/" + id + "/fecha-objetivo").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fecha\":\"2026-12-01\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fechaObjetivo").value("2026-12-01"));
+        mvc.perform(patch("/api/modificaciones/" + id + "/fecha-objetivo").with(comoUsuario(despacho())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fecha\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fechaObjetivo").value(nullValue()));
+        mvc.perform(patch("/api/modificaciones/" + id + "/fecha-objetivo").with(comoUsuario(taller())).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"fecha\":\"2026-12-01\"}"))
+                .andExpect(status().isForbidden());
     }
 
     private long crearOrden(long modeloId, String titulo, Long antesDe) throws Exception {
@@ -562,12 +616,12 @@ class ModificacionesControllerTest {
     void unFicheroDeMasDe15MbSeRechazaSinLeerloYNoCreaNada() throws Exception {
         long modeloId = alta("T27-ENORME");
 
-        mvc.perform(nueva(modeloId).file(enorme("audio", "nota.webm", "audio/webm")).param("tipoCambio", "PIEL")
+        mvc.perform(nueva(modeloId).file(enorme("audio", "nota.webm", "audio/webm")).param("tipoCambio", "CONSUMO_PIEL")
                         .param("audioDuracionSeg", "30").with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("El fichero nota.webm pesa más de 15 MB"));
         mvc.perform(nueva(modeloId).file(enorme("fotos", "foto.jpg", MediaType.IMAGE_JPEG_VALUE))
-                        .param("tipoCambio", "PIEL").with(comoUsuario(taller())).with(csrf()))
+                        .param("tipoCambio", "CONSUMO_PIEL").with(comoUsuario(taller())).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("El fichero foto.jpg pesa más de 15 MB"));
         mvc.perform(nueva(modeloId).file(enorme("documentos", "ficha.pdf", MediaType.APPLICATION_PDF_VALUE))

@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
+import FechaObjetivo from '../comun/FechaObjetivo';
 import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
 import type { Cliente } from '../comun/modelos';
@@ -91,6 +92,7 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
               </span>
             )}
             {m.urgente && !estaCerrada(m.estado) && <span className="pill urgente">Urgente</span>}
+            {!estaCerrada(m.estado) && <FechaObjetivo fecha={m.fechaObjetivo} />}
             {m.respuestaPendienteDe === 'DESPACHO' && <span className="etiqueta espera">Te toca responder</span>}
           </span>
         </span>

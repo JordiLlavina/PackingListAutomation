@@ -19,6 +19,7 @@ import { Link } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
 import Etapa from '../comun/Etapa';
+import FechaObjetivo from '../comun/FechaObjetivo';
 import FotoModelo from '../comun/FotoModelo';
 import { useGrabadora } from '../comun/Grabadora';
 import { extensionAudio, type Grabacion } from '../comun/grabador';
@@ -281,6 +282,8 @@ export default function Modificacion({ id, onCambiado, soloLectura = false }: { 
   // El título mientras se corrige; null = no se está corrigiendo.
   const [titulo, setTitulo] = useState<string | null>(null);
   const [errorTitulo, setErrorTitulo] = useState<string | null>(null);
+  // La fecha objetivo mientras se cambia; null = se enseña la etiqueta, no el campo.
+  const [fecha, setFecha] = useState<string | null>(null);
 
   // La última versión del aviso a la bandeja, sin que cada pintado del padre vuelva a pedir el detalle.
   const avisar = useRef(onCambiado);
@@ -438,6 +441,23 @@ export default function Modificacion({ id, onCambiado, soloLectura = false }: { 
     }
   };
 
+  /** Guarda la fecha objetivo que se está tecleando (vacía = quitarla) con un PATCH y vuelve a la etiqueta. */
+  const guardarFecha = async (e: FormEvent) => {
+    e.preventDefault();
+    setOcupado(true);
+    setErrorAccion(null);
+    try {
+      await api(`/api/modificaciones/${id}/fecha-objetivo`, { method: 'PATCH', body: JSON.stringify({ fecha: fecha || null }) });
+      setFecha(null);
+      toast(fecha ? 'Fecha objetivo guardada' : 'Fecha objetivo quitada');
+      await trasCambiar();
+    } catch (err) {
+      setErrorAccion(mensaje(err, 'No se ha podido guardar la fecha objetivo'));
+    } finally {
+      setOcupado(false);
+    }
+  };
+
   const marcar = (d: DestinoEstado, aplica: boolean, hecho: boolean) =>
     void accion(`/destinos/${d.destino}`, { aplica, hecho }, 'No se ha podido marcar el destino');
 
@@ -521,6 +541,7 @@ export default function Modificacion({ id, onCambiado, soloLectura = false }: { 
             {r.tipoCambioTexto && <span className="etiqueta">{r.tipoCambioTexto}</span>}
             <span className={`pill ${estado.pill}`}>{estado.texto}</span>
             {r.urgente && !cerrada && <span className="pill urgente">Urgente</span>}
+            {!cerrada && <FechaObjetivo fecha={r.fechaObjetivo} />}
             <span>
               {hace(r.creadaEn)}
               {r.creadaPor && ` · de ${r.creadaPor}`}
@@ -591,6 +612,25 @@ export default function Modificacion({ id, onCambiado, soloLectura = false }: { 
                   {r.urgente ? 'Urgente · quitar' : 'Marcar urgente'}
                 </button>
               )}
+              {!soloLectura &&
+                (fecha === null ? (
+                  <span className="fecha-detalle">
+                    {r.fechaObjetivo ? <FechaObjetivo fecha={r.fechaObjetivo} /> : <span className="meta">Sin fecha objetivo</span>}
+                    <button className="chip" type="button" disabled={ocupado} onClick={() => setFecha(r.fechaObjetivo ?? '')}>
+                      {r.fechaObjetivo ? 'Cambiar la fecha' : 'Poner fecha objetivo'}
+                    </button>
+                  </span>
+                ) : (
+                  <form className="editar-fecha" onSubmit={(e) => void guardarFecha(e)}>
+                    <input type="date" aria-label="Fecha objetivo" value={fecha} autoFocus onChange={(e) => setFecha(e.target.value)} />
+                    <button className="boton ok" type="submit" disabled={ocupado}>
+                      {fecha ? 'Guardar' : 'Quitar la fecha'}
+                    </button>
+                    <button className="boton" type="button" onClick={() => setFecha(null)}>
+                      Cancelar
+                    </button>
+                  </form>
+                ))}
             </fieldset>
           )}
 

@@ -151,7 +151,7 @@ class RecordatoriosTest {
         recordatorios.revisar(creada.plusDays(7).plusHours(1));
         List<JsonNode> porAplicar = recibidos(aviso, despacho);
         assertEquals(1, porAplicar.size());
-        assertEquals("Por aplicar: Piel / material", porAplicar.get(0).get("titulo").asText());
+        assertEquals("Por aplicar: Consumo piel", porAplicar.get(0).get("titulo").asText());
         assertEquals("ICSUITE / Excel de escandallos pendientes · " + referencia(aviso),
                 porAplicar.get(0).get("cuerpo").asText());
         assertEquals("/app/bandeja/" + aviso.getId(), porAplicar.get(0).get("url").asText());
@@ -302,7 +302,7 @@ class RecordatoriosTest {
     }
 
     private Modificacion aviso(String que) {
-        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo(que), "PIEL",
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo(que), "CONSUMO_PIEL",
                 List.of(ModificacionesTest.foto())), actual(taller));
         esperarALaCola();
         enviador.envios.clear();

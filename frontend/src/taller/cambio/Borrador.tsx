@@ -1,5 +1,5 @@
-// El aviso de un cambio mientras se prepara: el modelo, el tipo de cambio, las
-// fotos y la nota de voz. Vive por encima de las rutas del taller, así que
+// El aviso de un cambio mientras se prepara: el modelo, las razones del cambio
+// (una o varias), las fotos y la nota de voz. Vive por encima de las rutas del taller, así que
 // salir del recorrido por la barra de abajo no lo pierde: sigue ahí hasta que
 // se manda o se empieza otro con un modelo distinto. Las fotos y la nota se
 // enseñan con URLs de objeto (blob:) que se sueltan al quitarlas.
@@ -9,7 +9,8 @@ import type { AudioBorrador, FotoBorrador } from './reglas';
 
 type Estado = {
   modelo: ModeloResumen | null;
-  tipo: string | null;
+  /** Las razones marcadas (claves del yml), en el orden en que se tocaron. */
+  tipos: string[];
   fotos: FotoBorrador[];
   audio: AudioBorrador | null;
 };
@@ -17,7 +18,8 @@ type Estado = {
 export type Borrador = Estado & {
   /** Elige el modelo; si es otro que el del borrador, empieza uno nuevo (lo de antes era de otro modelo). */
   elegirModelo: (modelo: ModeloResumen) => void;
-  elegirTipo: (tipo: string) => void;
+  /** Marca una razón, o la desmarca si ya estaba. */
+  alternarTipo: (tipo: string) => void;
   anadirFotos: (blobs: Blob[]) => void;
   quitarFoto: (indice: number) => void;
   /** La nota de voz nueva (la anterior se suelta) o null para tirarla. */
@@ -26,7 +28,7 @@ export type Borrador = Estado & {
   reiniciar: () => void;
 };
 
-const VACIO: Estado = { modelo: null, tipo: null, fotos: [], audio: null };
+const VACIO: Estado = { modelo: null, tipos: [], fotos: [], audio: null };
 
 const BorradorContexto = createContext<Borrador | null>(null);
 
@@ -65,7 +67,14 @@ export function BorradorProvider({ children }: { children: ReactNode }) {
     [cambiar],
   );
 
-  const elegirTipo = useCallback((tipo: string) => cambiar({ ...actual.current, tipo }), [cambiar]);
+  const alternarTipo = useCallback(
+    (tipo: string) => {
+      const antes = actual.current;
+      const tipos = antes.tipos.includes(tipo) ? antes.tipos.filter((t) => t !== tipo) : [...antes.tipos, tipo];
+      cambiar({ ...antes, tipos });
+    },
+    [cambiar],
+  );
 
   const anadirFotos = useCallback(
     (blobs: Blob[]) => {
@@ -99,8 +108,8 @@ export function BorradorProvider({ children }: { children: ReactNode }) {
   useEffect(() => () => soltar(actual.current), []);
 
   const valor = useMemo<Borrador>(
-    () => ({ ...estado, elegirModelo, elegirTipo, anadirFotos, quitarFoto, ponerAudio, reiniciar }),
-    [estado, elegirModelo, elegirTipo, anadirFotos, quitarFoto, ponerAudio, reiniciar],
+    () => ({ ...estado, elegirModelo, alternarTipo, anadirFotos, quitarFoto, ponerAudio, reiniciar }),
+    [estado, elegirModelo, alternarTipo, anadirFotos, quitarFoto, ponerAudio, reiniciar],
   );
   return <BorradorContexto.Provider value={valor}>{children}</BorradorContexto.Provider>;
 }

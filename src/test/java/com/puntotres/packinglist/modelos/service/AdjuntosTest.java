@@ -146,7 +146,7 @@ class AdjuntosTest {
 
         IllegalArgumentException avisoConNoImagen = assertThrows(IllegalArgumentException.class,
                 () -> modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("NOIMAGEN-AVISO"),
-                        "PIEL", List.of(new AdjuntoNuevo(TipoAdjunto.FOTO, "foto.heic", "image/heic",
+                        "CONSUMO_PIEL", List.of(new AdjuntoNuevo(TipoAdjunto.FOTO, "foto.heic", "image/heic",
                                 new byte[] {0, 0, 0, 24}, null))), taller()));
         assertEquals("El fichero foto.heic no es una imagen", avisoConNoImagen.getMessage());
     }
@@ -172,7 +172,7 @@ class AdjuntosTest {
 
     /** El primer mensaje de un aviso nuevo de un modelo {@code T11-ADJ-…}. */
     private Long mensaje(String codigo) {
-        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo(codigo), "PIEL",
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo(codigo), "CONSUMO_PIEL",
                 List.of(ModificacionesTest.foto())), taller());
         return modificaciones.detalle(aviso.getId()).mensajes().get(0).id();
     }

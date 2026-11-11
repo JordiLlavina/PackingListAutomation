@@ -365,7 +365,7 @@ class FusionTest {
     /** Un aviso del taller con su nota de voz y un cambio de etapa: lo que la V5 no deja que caiga con el modelo. */
     private Historial historialEn(Modelo modelo) {
         Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo.getId(),
-                "PIEL", List.of(ModificacionesTest.audio(30))), taller());
+                "CONSUMO_PIEL", List.of(ModificacionesTest.audio(30))), taller());
         Mensaje mensaje = mensajes.findByModificacionIdOrderByCreadoEnAscIdAsc(aviso.getId()).get(0);
         Long adjuntoId = adjuntosRepositorio.resumenes(List.of(mensaje.getId())).get(0).id();
         modelos.cambiarEtapa(modelo.getId(), Etapa.SMS, "T26 a muestras", despacho());

@@ -2,6 +2,7 @@ package com.puntotres.packinglist.modelos;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -23,14 +24,22 @@ class ModelosPropertiesTest {
     private ModelosProperties modelos;
 
     @Test
-    void elYmlTraeLosSieteTiposDeCambioYLosDosDestinos() {
+    void elYmlTraeLasOchoRazonesDeCambioEnSuOrdenYLosDosDestinos() {
         assertEquals(
-                List.of("PIEL", "FORRO", "HERRAJES", "COSTURA", "MEDIDAS", "PATRON", "OTRO"),
+                List.of("MEDIDAS_PATRONES", "CONSTRUCCION", "MANO_OBRA", "CONSUMO_PIEL", "REFUERZOS", "FORNITURAS",
+                        "TROQUELES", "OTROS"),
                 modelos.tiposCambio().stream().map(ModelosProperties.TipoCambio::clave).toList());
-        ModelosProperties.TipoCambio herrajes = modelos.tipoCambio("HERRAJES").orElseThrow();
-        assertEquals("Herrajes", herrajes.texto());
+        ModelosProperties.TipoCambio herrajes = modelos.tipoCambio("FORNITURAS").orElseThrow();
+        assertEquals("Fornituras", herrajes.texto());
         assertEquals("herraje", herrajes.icono());
-        assertEquals("Piel / material", modelos.tipoCambio("PIEL").orElseThrow().texto());
+        assertEquals("Consumo piel · Fornituras", modelos.textoTiposCambio("CONSUMO_PIEL,FORNITURAS"),
+                "varias razones salen juntas");
+        assertEquals("Consumo piel · VIEJA", modelos.textoTiposCambio(" CONSUMO_PIEL , VIEJA,, "),
+                "una clave que ya no está en el yml sale tal cual");
+        assertNull(modelos.textoTiposCambio(null));
+        assertNull(modelos.textoTiposCambio(" , "));
+        assertEquals(List.of("A", "B"), ModelosProperties.clavesDe("A, B,A"));
+        assertEquals("Consumo piel", modelos.tipoCambio("CONSUMO_PIEL").orElseThrow().texto());
         assertTrue(modelos.tipoCambio("NO_EXISTE").isEmpty());
         assertTrue(modelos.tipoCambio(null).isEmpty());
         assertEquals(List.of("ICSUITE", "EXCEL_ESCANDALLOS"), modelos.destinosAplicacion());

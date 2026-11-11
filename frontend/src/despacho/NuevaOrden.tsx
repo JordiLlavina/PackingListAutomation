@@ -1,11 +1,15 @@
 // Una orden nueva para el taller, en el panel de la derecha de la bandeja:
 // el modelo (buscador con foto; viene elegido desde «Nueva orden para este
 // modelo»), título, texto, su sitio en la cola del taller (al final, la
-// primera o delante de cualquiera) y si es urgente, tipo de cambio, nota de
-// voz, fotos y documentos, con la casilla «Guardar también en el modelo».
+// primera o delante de cualquiera), si es urgente y la fecha objetivo
+// (opcional), tipo de cambio, nota de voz, fotos y documentos, con la casilla
+// «Guardar también en el modelo». Si el modelo ya tiene órdenes abiertas en la
+// cola se dice, con un enlace a cada una: así no se manda dos veces lo mismo
+// ni se pisa lo que el taller está haciendo.
 // Lo que el servidor exige (modelo, título) se dice antes de mandar, con sus
 // mismas palabras; lo demás lo contesta él.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
 import Etapa from '../comun/Etapa';
@@ -15,7 +19,7 @@ import { extensionAudio, type Grabacion } from '../comun/grabador';
 import { Icono } from '../comun/iconos';
 import { reducirImagen } from '../comun/imagen';
 import type { ModeloFicha, ModeloResumen, Subida } from '../comun/modelos';
-import { opcionesPosicion, type ModificacionCreada, type ModificacionResumen } from '../comun/modificaciones';
+import { opcionesPosicion, ordenesAbiertasDe, puesto, tituloVisible, type ModificacionCreada, type ModificacionResumen } from '../comun/modificaciones';
 import { mmss } from '../comun/tiempo';
 import { toast } from '../comun/toast';
 import { useTiposCambio } from '../taller/cambio/tipos';
@@ -49,7 +53,10 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
   /** El id de la orden delante de la que va; vacío, al final. */
   const [antesDe, setAntesDe] = useState('');
   const [urgente, setUrgente] = useState(false);
-  const [tipo, setTipo] = useState('');
+  /** La fecha objetivo (`2026-11-20`); vacía, sin fecha. */
+  const [fechaObjetivo, setFechaObjetivo] = useState('');
+  /** Las razones del cambio marcadas (claves del yml); puede haber varias. */
+  const [razones, setRazones] = useState<string[]>([]);
   const [nota, setNota] = useState<Nota | null>(null);
   const [fotos, setFotos] = useState<File[]>([]);
   const [documentos, setDocumentos] = useState<File[]>([]);
@@ -144,7 +151,8 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
     datos.append('texto', texto.trim());
     if (antesDe) datos.append('antesDe', antesDe);
     if (urgente) datos.append('urgente', 'true');
-    if (tipo) datos.append('tipoCambio', tipo);
+    if (fechaObjetivo) datos.append('fechaObjetivo', fechaObjetivo);
+    if (razones.length > 0) datos.append('tipoCambio', razones.join(','));
     if (nota) {
       datos.append('audio', nota.blob, `nota-de-voz.${extensionAudio(nota.blob.type)}`);
       datos.append('audioDuracionSeg', String(nota.duracionSeg));
@@ -186,6 +194,7 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
   };
 
   const nombres = (ficheros: File[]) => ficheros.map((f) => f.name).join(', ');
+  const yaAbiertas = modelo && cola ? ordenesAbiertasDe(cola, modelo.id) : [];
 
   return (
     <>
@@ -238,6 +247,18 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
         )}
       </div>
 
+      {yaAbiertas.length > 0 && (
+        <p className="aviso-orden-existente" role="status">
+          <b>{yaAbiertas.length === 1 ? 'Este modelo ya tiene una orden abierta' : `Este modelo ya tiene ${yaAbiertas.length} órdenes abiertas`}</b> en la cola del taller:
+          {yaAbiertas.map((o) => (
+            <Link key={o.id} to={`/bandeja/${o.id}?pestana=despacho`}>
+              {o.posicionCola !== null && `${puesto(o.posicionCola)} · `}
+              {tituloVisible(o)}
+            </Link>
+          ))}
+        </p>
+      )}
+
       <label className="campo">
         Título
         <input value={titulo} maxLength={200} placeholder="Qué hay que cambiar, en pocas palabras" onChange={(e) => setTitulo(e.target.value)} />
@@ -260,19 +281,29 @@ export default function NuevaOrden({ modeloInicial, onCreada, onCancelar }: Prop
           <input type="checkbox" checked={urgente} onChange={(e) => marcarUrgente(e.target.checked)} />
           Urgente <span className="ayuda">(la pone la primera; puedes cambiarlo arriba)</span>
         </label>
+        <label className="campo fecha-objetivo-campo">
+          Fecha objetivo (opcional)
+          <input type="date" value={fechaObjetivo} onChange={(e) => setFechaObjetivo(e.target.value)} />
+          <span className="ayuda">El taller la ve como una etiqueta que se va poniendo roja al acercarse el día.</span>
+        </label>
       </fieldset>
 
-      <label className="campo">
-        Tipo de cambio (opcional)
-        <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-          <option value="">Sin tipo</option>
+      <div className="campo">
+        Razón del cambio (opcional; puedes marcar varias)
+        <div className="chips razones-chips">
           {(tipos ?? []).map((t) => (
-            <option key={t.clave} value={t.clave}>
+            <button
+              key={t.clave}
+              className="chip"
+              type="button"
+              aria-pressed={razones.includes(t.clave)}
+              onClick={() => setRazones(razones.includes(t.clave) ? razones.filter((r) => r !== t.clave) : [...razones, t.clave])}
+            >
               {t.texto}
-            </option>
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
+      </div>
 
       <div className="campo">
         Nota de voz (opcional)

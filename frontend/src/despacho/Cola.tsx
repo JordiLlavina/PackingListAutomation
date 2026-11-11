@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState, type DragEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
+import FechaObjetivo from '../comun/FechaObjetivo';
 import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
 import type { Cliente, Etapa as TipoEtapa } from '../comun/modelos';
@@ -254,6 +255,7 @@ export default function Cola() {
                     {m.etapa && <Etapa etapa={m.etapa} />}
                     <span className={`pill ${estado.pill}`}>{estado.texto}</span>
                     {m.urgente && <span className="pill urgente">Urgente</span>}
+                    <FechaObjetivo fecha={m.fechaObjetivo} />
                     {m.respuestaPendienteDe === 'DESPACHO' && <span className="etiqueta espera">Te toca responder</span>}
                   </span>
                 </span>
