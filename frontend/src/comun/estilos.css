@@ -15,7 +15,7 @@
   --fg: #16213a;          /* tinta azul oscuro */
   --muted: #5d6779;
   --line: #d5dbe4;
-  --accent: #a8731f;      /* latón de los herrajes: marca y acciones secundarias */
+  --accent: #482922;      /* el marrón de los botones de la app vieja (tema Puntotres de estilo.css): marca y acciones secundarias */
   --accent-ink: #ffffff;
   --ok: #1d8a4c;          /* hecho / enviar */
   --ok-ink: #ffffff;
@@ -30,7 +30,7 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #11161f; --surface: #1a2130; --fg: #e9edf3; --muted: #9ca7b9; --line: #2a3447;
-    --accent: #d7a24a; --accent-ink: #1a1408; --ok: #35b26c; --ok-ink: #06200f;
+    --accent: #c4937f; --accent-ink: #24120e; --ok: #35b26c; --ok-ink: #06200f;
     --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0; --cambio: #a995ef;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
     color-scheme: dark;
@@ -38,7 +38,7 @@
 }
 :root[data-theme="dark"] {
   --bg: #11161f; --surface: #1a2130; --fg: #e9edf3; --muted: #9ca7b9; --line: #2a3447;
-  --accent: #d7a24a; --accent-ink: #1a1408; --ok: #35b26c; --ok-ink: #06200f;
+  --accent: #c4937f; --accent-ink: #24120e; --ok: #35b26c; --ok-ink: #06200f;
   --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0; --cambio: #a995ef;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
   color-scheme: dark;
@@ -53,10 +53,13 @@ h1, h2, h3 { margin: 0; text-wrap: balance; line-height: 1.15; }
 .cabecera { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
   display: flex; align-items: center; gap: 12px; min-height: 64px;
   padding-block: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.cabecera .logo { height: 1rem; width: auto; flex: none; color: var(--accent); }
 .cabecera h1 { font-size: 1.15rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .atras { width: 56px; height: 56px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; flex: none; }
 main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px calc(96px + env(safe-area-inset-bottom, 0px)); max-width: 1100px; margin: 0 auto; }
 .saludo { font-size: 1.9rem; margin-bottom: 4px; }
+/* En el inicio, el mismo aire debajo que encima (el relleno de arriba de main). */
+.saludo.inicio { margin-bottom: 16px; }
 .sub { color: var(--muted); margin: 0 0 18px; }
 .losas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .losa { position: relative; min-height: 150px; border-radius: 20px; border: 0; background: var(--surface); box-shadow: var(--shadow); text-align: left; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; }
@@ -191,9 +194,6 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
 .escaner { position: relative; aspect-ratio: 4 / 3; max-height: 60vh; border-radius: 20px; overflow: hidden; background: linear-gradient(160deg, #2a3140, #0d1118); display: grid; place-items: center; color: #cbd3df; text-align: center; padding: 16px; }
 .escaner .marco { position: absolute; inset: 14% 22%; border: 4px solid var(--accent); border-radius: 18px; }
 @media (max-width: 480px) { .escaner .marco { inset: 20% 12%; } }
-.teclado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 360px; margin: 0 auto; }
-.teclado button { min-height: 72px; font-size: 1.6rem; border-radius: 16px; border: 2px solid var(--line); background: var(--surface); font-weight: 700; }
-.codigo { font-size: 2.2rem; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; min-height: 1.4em; margin: 10px 0 18px; }
 
 /* ---------- Añadidos de la PWA (no están en la maqueta) ---------- */
 
@@ -201,14 +201,13 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
    hoja, un SVG dentro de un chip se pintaría a 300×150. */
 .chip svg { width: 22px; height: 22px; vertical-align: middle; margin-right: 6px; }
 
-/* Entrada: el login del PC y los enlaces para cambiar entre él y el teclado del taller. */
+/* Entrada: el login, el mismo para todos. */
 .entrada { max-width: 440px; margin: 24px auto 0; display: grid; gap: 16px; }
 .campo { display: grid; gap: 6px; font-weight: 700; }
 .campo input { font: inherit; font-weight: 400; color: var(--fg); background: var(--surface); min-height: 60px; padding: 0 16px; border: 2px solid var(--line); border-radius: 14px; }
 .campo input:focus-visible { outline: 3px solid var(--new); outline-offset: 2px; }
 .error { color: var(--alta); font-weight: 700; margin: 0; min-height: 1.35em; }
 .enlace { border: 0; background: none; padding: 8px 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; font-size: 1rem; justify-self: center; }
-.teclado ~ .enlace { display: block; margin: 18px auto 0; }
 
 /* Despacho (PC): la misma hoja con la letra a 15 px; la jerarquía la hace el
    peso, no el color. Sin barra inferior, así que main no reserva su hueco. */
@@ -218,7 +217,7 @@ main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: m
   display: flex; align-items: center; gap: 24px; min-height: 56px;
   padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
 .despacho-barra .marca { font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.despacho-barra .marca::before { content: ""; width: 12px; height: 12px; background: var(--accent); transform: rotate(45deg); border-radius: 2px; }
+.despacho-barra .marca .logo { height: .95rem; width: auto; flex: none; color: var(--accent); }
 .despacho-barra .pestanas { display: flex; gap: 4px; flex: 1; min-width: 0; }
 .despacho-barra .pestanas a { color: var(--muted); text-decoration: none; padding: 16px 12px; border-bottom: 3px solid transparent; }
 .despacho-barra .pestanas a[aria-current="page"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--accent); }
@@ -530,11 +529,10 @@ a.boton { text-decoration: none; color: var(--fg); }
 .escaner { width: 100%; }
 .escaner video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 
-/* ---------- Administración (Task 26): usuarios, dispositivos y código de alta ----------
+/* ---------- Administración (Task 26): usuarios y dispositivos ----------
    Dos bloques apilados con una tabla sencilla cada uno: cabecera gris, filetes
    finos entre filas y los botones de cada fila a la medida de la tabla. Lo
-   inactivo o revocado, en gris. El código de alta, grande y espaciado para
-   leerlo de un vistazo y teclearlo en la tablet. */
+   inactivo o revocado, en gris. */
 .admin { display: grid; gap: 32px; max-width: 1100px; }
 .admin section { display: grid; gap: 4px; }
 .admin .fila-titulo { margin-top: 0; }
@@ -552,8 +550,6 @@ a.boton { text-decoration: none; color: var(--fg); }
 .tabla-admin select:disabled, .tabla-admin .boton:disabled { opacity: .5; cursor: not-allowed; }
 .estado-dispositivo[data-estado="activo"] { color: var(--ok); font-weight: 700; }
 .estado-dispositivo[data-estado="revocado"] { color: var(--alta); }
-.codigo-alta { margin: 4px 0; font-size: 3rem; font-weight: 700; letter-spacing: .25em; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.codigo-alta[data-caducado] { color: var(--muted); text-decoration: line-through; }
 .admin .dialogo p { margin: 0; }
 .admin .cuenta-atras { font-weight: 700; }
 
@@ -659,3 +655,6 @@ a.boton { text-decoration: none; color: var(--fg); }
 .miniaturas .con-quitar.nueva img { outline: 3px solid var(--ok); outline-offset: -3px; }
 .aviso-fijo { margin: 0; padding: 12px 16px; border-radius: 14px; background: color-mix(in oklab, var(--normal) 22%, var(--surface)); }
 .boton.peligro.confirmar { background: var(--alta); color: #fff; }
+
+/* Usuarios: un usuario del taller de cuando se entraba con código, sin contraseña todavía. */
+.sin-password { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 999px; font-size: .8rem; font-weight: 700; color: var(--alta); background: color-mix(in oklab, var(--alta) 12%, var(--surface)); }

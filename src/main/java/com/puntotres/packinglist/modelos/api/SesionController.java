@@ -25,28 +25,33 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.seguridad.AutenticacionModelos;
 import com.puntotres.packinglist.modelos.seguridad.FiltroDispositivo;
-import com.puntotres.packinglist.modelos.seguridad.FrenoCanje;
+import com.puntotres.packinglist.modelos.persistence.Rol;
+import com.puntotres.packinglist.modelos.seguridad.FrenoEntrada;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
 import com.puntotres.packinglist.modelos.service.Dispositivos;
 import com.puntotres.packinglist.modelos.service.Usuarios;
 
 /**
- * Entrar y salir de la app de modelos.
+ * Entrar y salir de la app de modelos. Todos entran igual, con usuario y
+ * contraseña en {@code POST /api/sesion} (decisión del usuario, noviembre de
+ * 2026: antes el taller tecleaba un código de alta), y lo que pasa después
+ * depende del rol:
  *
  * <ul>
- * <li>Con contraseña (el despacho): {@code POST /api/sesion} abre una sesión
- * de 8 horas, una jornada, puesta en esa sesión y no en la configuración
- * global, que es la de la app vieja.</li>
- * <li>Con un dispositivo (el taller): {@code POST /api/sesion/dispositivo}
- * canjea el código de alta y deja en el aparato la cookie
- * {@value FiltroDispositivo#COOKIE}, que vale un año y con la que entra cada
- * petición sin sesión ({@link FiltroDispositivo}).</li>
+ * <li>El despacho y el admin: una sesión de 8 horas, una jornada, puesta en
+ * esa sesión y no en la configuración global, que es la de la app vieja.</li>
+ * <li>El taller: el aparato se da de alta ({@link Dispositivos#darDeAlta}) y
+ * se queda con la cookie {@value FiltroDispositivo#COOKIE}, que vale un año y
+ * con la que entra cada petición sin sesión ({@link FiltroDispositivo}). Así
+ * la tablet y el móvil no piden la contraseña cada mañana, y cada aparato es
+ * un alta aparte que el admin puede revocar.</li>
  * </ul>
+ *
+ * Las entradas fallidas se frenan por IP ({@link FrenoEntrada}).
  */
 @RestController
 @RequestMapping("/api/sesion")
@@ -61,30 +66,39 @@ public class SesionController {
 
     private final Usuarios usuarios;
     private final Dispositivos dispositivos;
-    private final FrenoCanje freno;
+    private final FrenoEntrada freno;
     private final SecurityContextHolderStrategy estrategia = SecurityContextHolder.getContextHolderStrategy();
     private final SecurityContextRepository repositorioContexto = new HttpSessionSecurityContextRepository();
 
-    public SesionController(Usuarios usuarios, Dispositivos dispositivos, FrenoCanje freno) {
+    public SesionController(Usuarios usuarios, Dispositivos dispositivos, FrenoEntrada freno) {
         this.usuarios = usuarios;
         this.dispositivos = dispositivos;
         this.freno = freno;
     }
 
-    /** Lo que se teclea en el login. */
-    public record Credenciales(String login, String password) {
-    }
-
-    /** El código de alta y cómo se quiere llamar al aparato ("Tablet del taller"). */
-    public record Canje(String codigo, String nombre) {
+    /**
+     * Lo que se teclea en el login, y cómo llamar al aparato si es del taller
+     * (lo manda la app: el navegador y el sistema, para reconocerlo en la
+     * lista de dispositivos).
+     */
+    public record Credenciales(String login, String password, String nombre) {
     }
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> entrar(@RequestBody Credenciales credenciales,
                                                       HttpServletRequest request, HttpServletResponse response) {
+        String ip = request.getRemoteAddr();
+        if (freno.frenada(ip)) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("mensaje", DEMASIADOS_INTENTOS));
+        }
         Usuario usuario = usuarios.autenticar(credenciales.login(), credenciales.password()).orElse(null);
         if (usuario == null) {
+            freno.fallo(ip);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("mensaje", INCORRECTOS));
+        }
+        freno.acierto(ip);
+        if (usuario.getRol() == Rol.TALLER) {
+            return entrarConDispositivo(usuario, credenciales.nombre(), request);
         }
         // Id de sesión nuevo al entrar: uno que alguien hubiera fijado antes no sirve después.
         if (request.getSession(false) != null) {
@@ -97,7 +111,32 @@ public class SesionController {
         contexto.setAuthentication(autenticacion);
         estrategia.setContext(contexto);
         repositorioContexto.saveContext(contexto, request, response);
-        return ResponseEntity.ok(datos(autenticacion.getPrincipal()));
+        Map<String, Object> datos = datos(autenticacion.getPrincipal());
+        datos.put("dispositivo", false);
+        return ResponseEntity.ok(datos);
+    }
+
+    /**
+     * El taller: se da de alta el aparato y se le deja la cookie. Si en ese
+     * navegador había una sesión de contraseña (alguien del despacho entró
+     * antes), se quita de la sesión: la sesión manda sobre la cookie
+     * ({@link FiltroDispositivo} solo actúa sin autenticación), y la tablet
+     * seguiría atendida como esa otra persona.
+     */
+    private ResponseEntity<Map<String, Object>> entrarConDispositivo(Usuario usuario, String nombre,
+                                                                      HttpServletRequest request) {
+        HttpSession sesion = request.getSession(false);
+        if (sesion != null) {
+            sesion.removeAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+            request.changeSessionId();
+        }
+        estrategia.clearContext();
+        Dispositivos.TokenDispositivo token = dispositivos.darDeAlta(usuario.getId(), nombre);
+        UsuarioActual actual = AutenticacionModelos.de(usuario, token.dispositivo().getId()).getPrincipal();
+        String cookie = cookie(request, token.tokenEnClaro(), Dispositivos.VIGENCIA_COOKIE.toSeconds()).toString();
+        Map<String, Object> datos = datos(actual);
+        datos.put("dispositivo", true);
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie).body(datos);
     }
 
     /** Quién ha entrado; 401 si nadie, que es como la SPA sabe que tiene que enseñar el login. */
@@ -114,7 +153,8 @@ public class SesionController {
     /**
      * Salir: quita de la sesión quién ha entrado y, si se entró con un
      * dispositivo, le borra la cookie. El dispositivo no se revoca (eso lo hace
-     * el admin); el aparato tendrá que darse de alta con un código nuevo.
+     * el admin, y la cookie ya no está en ningún sitio); al volver a entrar con
+     * la contraseña, el aparato se da de alta otra vez.
      *
      * La sesión NO se invalida, a propósito: la app de modelos y las pantallas
      * viejas se sirven desde el mismo origen y comparten la misma sesión HTTP,
@@ -137,29 +177,6 @@ public class SesionController {
             respuesta.header(HttpHeaders.SET_COOKIE, cookie(request, "", 0).toString());
         }
         return respuesta.build();
-    }
-
-    @PostMapping("/dispositivo")
-    public ResponseEntity<Map<String, Object>> canjear(@RequestBody Canje canje, HttpServletRequest request) {
-        String ip = request.getRemoteAddr();
-        if (freno.frenada(ip)) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("mensaje", DEMASIADOS_INTENTOS));
-        }
-        Dispositivos.TokenDispositivo token;
-        try {
-            token = dispositivos.canjear(canje.codigo(), canje.nombre());
-        } catch (IllegalArgumentException codigoQueNoVale) {
-            freno.fallo(ip);
-            throw codigoQueNoVale;
-        }
-        freno.acierto(ip);
-        Usuario usuario = usuarios.porId(token.dispositivo().getUsuarioId())
-                .filter(Usuario::isActivo)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Este usuario está desactivado"));
-
-        UsuarioActual actual = AutenticacionModelos.de(usuario, token.dispositivo().getId()).getPrincipal();
-        String cookie = cookie(request, token.tokenEnClaro(), Dispositivos.VIGENCIA_COOKIE.toSeconds()).toString();
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie).body(datos(actual));
     }
 
     /** HttpOnly (la SPA no la necesita leer), Lax y Secure solo en https: el PC de desarrollo va en http. */

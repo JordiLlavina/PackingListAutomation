@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
-  apuntarDivertida,
+  apuntarSaludo,
+  claveDia,
   conNombre,
   DE_FRANJA,
   DIVERTIDAS,
   elegirSaludo,
-  MAX_DIVERTIDAS,
-  TIPICAS,
-  VENTANA_MS,
-  type HistorialDivertidas,
+  HISTORIAL_VACIO,
+  HOLA,
+  SEPARACION_FRANJAS_MS,
+  type HistorialSaludo,
 } from './saludo';
 
 // 2026-11-09 es lunes, el 11 miércoles y el 13 viernes (hora local).
 const fecha = (dia: number, horas: number, minutos = 0) => new Date(2026, 10, dia, horas, minutos);
-const vacio: HistorialDivertidas = { veces: [], ultima: null };
 /** Devuelve los valores en orden y repite el último. */
 const secuencia = (...valores: number[]) => {
   let i = 0;
@@ -22,62 +22,63 @@ const secuencia = (...valores: number[]) => {
 const textos = (frases: { texto: string }[]) => frases.map((f) => f.texto);
 
 describe('elegirSaludo', () => {
-  it('con una franja que vale, sale de franja si el azar cae en la mitad baja', () => {
-    // Miércoles 9:00: solo «Buen comienzo de día».
-    expect(elegirSaludo(fecha(11, 9), vacio, secuencia(0.1, 0))).toEqual({
-      plantilla: 'Buen comienzo de día, {n}',
-      divertida: false,
+  it('una frase de franja que vale y no ha salido hoy sale siempre, en lugar del saludo', () => {
+    // Miércoles 9:00: solo «Buen comienzo de día». Da igual el azar.
+    for (const r of [0, 0.5, 0.99]) {
+      expect(elegirSaludo(fecha(11, 9), HISTORIAL_VACIO, secuencia(r))).toEqual({
+        plantilla: 'Buen comienzo de día, {n}',
+        tipo: 'franja',
+      });
+    }
+  });
+
+  it('cada frase de franja sale una sola vez al día', () => {
+    const tras = apuntarSaludo(HISTORIAL_VACIO, { plantilla: 'Buen comienzo de día, {n}', tipo: 'franja' }, fecha(11, 8));
+    // Pasadas las 4 horas ya no está en su franja; dentro de ella, tampoco repite.
+    const sinCuatroHoras: HistorialSaludo = { ...tras, ultimaFranja: null };
+    expect(elegirSaludo(fecha(11, 10), sinCuatroHoras, secuencia(0.9)).tipo).toBe('hola');
+    // Al día siguiente vuelve.
+    expect(elegirSaludo(fecha(12, 9), tras, secuencia(0.9)).tipo).toBe('franja');
+  });
+
+  it('nunca dos frases de franja con menos de 4 horas entre ellas', () => {
+    // Viernes: «Feliz viernes» a las 10:00; a las 13:00 vale «Buen fin de semana» pero espera.
+    const tras = apuntarSaludo(HISTORIAL_VACIO, { plantilla: 'Feliz viernes, {n}', tipo: 'franja' }, fecha(13, 10));
+    expect(elegirSaludo(fecha(13, 13), tras, secuencia(0.9)).tipo).toBe('hola');
+    const cuatroHorasDespues = new Date(fecha(13, 10).getTime() + SEPARACION_FRANJAS_MS);
+    expect(elegirSaludo(cuatroHorasDespues, tras, secuencia(0.9))).toEqual({
+      plantilla: 'Buen fin de semana, {n}',
+      tipo: 'franja',
     });
   });
 
-  it('con una franja que vale y el azar en la mitad alta, sale típica o divertida', () => {
-    const e = elegirSaludo(fecha(11, 9), vacio, secuencia(0.9, 0.9, 0));
-    expect(textos(TIPICAS)).toContain(e.plantilla);
-  });
-
-  it('sin franja, 1 de cada 4 sale una divertida', () => {
-    const e = elegirSaludo(fecha(11, 11), vacio, secuencia(0.1, 0));
-    expect(e.divertida).toBe(true);
-    expect(textos(DIVERTIDAS)).toContain(e.plantilla);
-  });
-
-  it('sin franja y sin divertida, una típica de la hora', () => {
-    const manana = elegirSaludo(fecha(11, 11), vacio, secuencia(0.9, 0));
-    expect(manana.plantilla).toBe('Buenos días, {n}');
-    const tarde = elegirSaludo(fecha(11, 16), vacio, secuencia(0.9, 0));
-    expect(tarde.plantilla).toBe('Buenas tardes, {n}');
-  });
-
-  it('no más de 6 divertidas en las últimas 24 horas, aunque haya cambiado el día', () => {
-    // Seis de ayer por la tarde: siguen dentro de la ventana de 24 h.
-    const ayer = Array.from({ length: MAX_DIVERTIDAS }, (_, i) => fecha(10, 17, i).getTime());
-    const lleno: HistorialDivertidas = { veces: ayer, ultima: null };
-    const e = elegirSaludo(fecha(11, 11), lleno, secuencia(0.1, 0));
-    expect(e.divertida).toBe(false);
-    // Pasadas 24 h desde la más antigua, vuelve a haber hueco (miércoles 17:00, sin franja).
-    const despues = new Date(fecha(10, 17).getTime() + VENTANA_MS + 1);
-    expect(elegirSaludo(despues, lleno, secuencia(0.1, 0)).divertida).toBe(true);
+  it('sin franja, 1 de cada 6 una divertida y si no «Hola»', () => {
+    const divertida = elegirSaludo(fecha(11, 11), HISTORIAL_VACIO, secuencia(0.1, 0));
+    expect(divertida.tipo).toBe('divertida');
+    expect(textos(DIVERTIDAS)).toContain(divertida.plantilla);
+    expect(elegirSaludo(fecha(11, 11), HISTORIAL_VACIO, secuencia(1 / 6 + 0.01))).toEqual({ plantilla: HOLA, tipo: 'hola' });
+    expect(elegirSaludo(fecha(11, 16), HISTORIAL_VACIO, secuencia(0.99))).toEqual({ plantilla: HOLA, tipo: 'hola' });
   });
 
   it('no repite la última divertida', () => {
     const ultima = '¡Ya llegó el jefe de los bolsos!';
     expect(textos(DIVERTIDAS)).toContain(ultima);
+    const historial: HistorialSaludo = { ...HISTORIAL_VACIO, ultimaDivertida: ultima };
     for (let r = 0; r < 1; r += 0.05) {
-      const e = elegirSaludo(fecha(11, 11), { veces: [], ultima }, secuencia(0.1, r));
-      expect(e.plantilla).not.toBe(ultima);
+      expect(elegirSaludo(fecha(11, 11), historial, secuencia(0.1, r)).plantilla).not.toBe(ultima);
     }
   });
 
   it('las divertidas con hora solo salen a partir de su hora', () => {
     const todas = (cuando: Date) => {
       const vistas = new Set<string>();
-      for (let r = 0; r < 1; r += 0.01) vistas.add(elegirSaludo(cuando, vacio, secuencia(0.1, r)).plantilla);
+      for (let r = 0; r < 1; r += 0.01) vistas.add(elegirSaludo(cuando, HISTORIAL_VACIO, secuencia(0.1, r)).plantilla);
       return vistas;
     };
     expect(todas(fecha(11, 11))).not.toContain('¡Mediodía, tarde y gol!');
     expect(todas(fecha(11, 11))).not.toContain('Segunda parte del partido, ¡y vamos ganando!');
     expect(todas(fecha(11, 17, 30))).toContain('¡Mediodía, tarde y gol!');
-    expect(todas(fecha(11, 15, 45))).toContain('Segunda parte del partido, ¡y vamos ganando!');
+    expect(todas(fecha(11, 16))).toContain('Segunda parte del partido, ¡y vamos ganando!');
   });
 });
 
@@ -97,15 +98,28 @@ describe('franjas', () => {
   });
 });
 
-describe('apuntarDivertida', () => {
-  it('añade la de ahora y olvida las de hace más de 24 horas', () => {
+describe('apuntarSaludo', () => {
+  it('una de franja apunta el día y la hora, y olvida las de otros días', () => {
+    const ayer: HistorialSaludo = { ...HISTORIAL_VACIO, franjas: { '¡Buen provecho, {n}!': '2026-11-10' } };
     const ahora = fecha(11, 9);
-    const vieja = ahora.getTime() - VENTANA_MS - 1;
-    const reciente = ahora.getTime() - 1000;
-    expect(apuntarDivertida({ veces: [vieja, reciente], ultima: null }, 'Modo artista: activado', ahora)).toEqual({
-      veces: [reciente, ahora.getTime()],
-      ultima: 'Modo artista: activado',
+    expect(apuntarSaludo(ayer, { plantilla: 'Buen comienzo de día, {n}', tipo: 'franja' }, ahora)).toEqual({
+      ultimaDivertida: null,
+      ultimaFranja: ahora.getTime(),
+      franjas: { 'Buen comienzo de día, {n}': '2026-11-11' },
     });
+  });
+
+  it('una divertida apunta cuál fue y «Hola» no apunta nada', () => {
+    expect(apuntarSaludo(HISTORIAL_VACIO, { plantilla: 'Modo artista: activado', tipo: 'divertida' }, fecha(11, 11))).toEqual({
+      ...HISTORIAL_VACIO,
+      ultimaDivertida: 'Modo artista: activado',
+    });
+    expect(apuntarSaludo(HISTORIAL_VACIO, { plantilla: HOLA, tipo: 'hola' }, fecha(11, 11))).toBe(HISTORIAL_VACIO);
+  });
+
+  it('el día es el local', () => {
+    expect(claveDia(fecha(11, 0, 5))).toBe('2026-11-11');
+    expect(claveDia(fecha(11, 23, 55))).toBe('2026-11-11');
   });
 });
 
@@ -113,7 +127,7 @@ describe('conNombre', () => {
   it('pone el nombre o quita el hueco con su coma', () => {
     expect(conNombre('¡Buen provecho, {n}!', 'Bachir')).toBe('¡Buen provecho, Bachir!');
     expect(conNombre('¡Buen provecho, {n}!', undefined)).toBe('¡Buen provecho!');
-    expect(conNombre('¿Qué tal, {n}?', ' ')).toBe('¿Qué tal?');
+    expect(conNombre(HOLA, ' ')).toBe('Hola');
     expect(conNombre('Modo artista: activado', 'Bachir')).toBe('Modo artista: activado');
   });
 });

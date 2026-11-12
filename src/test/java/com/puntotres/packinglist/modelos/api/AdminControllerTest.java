@@ -139,38 +139,28 @@ class AdminControllerTest {
     }
 
     @Test
-    void elCodigoDeAltaCaducaEnDiezMinutos() throws Exception {
+    void laListaDiceQuienNoTieneContrasena() throws Exception {
         Usuario admin = usuarioDePrueba(usuarios, Rol.ADMIN);
-        Usuario taller = usuarios.crear(new Usuarios.Alta("Bachir T7", "t7-bachir", "", Rol.TALLER));
+        Usuario taller = usuarios.crear(new Usuarios.Alta("Bachir T7", "t7-bachir", "clave-taller", Rol.TALLER));
 
-        MvcResult resultado = mvc.perform(post("/api/usuarios/" + taller.getId() + "/codigo-alta")
-                        .with(comoUsuario(admin)).with(csrf()))
+        mvc.perform(get("/api/usuarios").with(comoUsuario(admin)))
                 .andExpect(status().isOk())
-                .andReturn();
-        JsonNode cuerpo = JSON.readTree(resultado.getResponse().getContentAsString());
+                .andExpect(jsonPath("$[?(@.id==" + taller.getId() + ")].conPassword").value(true));
+    }
 
-        assertTrue(cuerpo.get("codigo").asText().matches("\\d{6}"), cuerpo.toString());
-        LocalDateTime caduca = LocalDateTime.parse(cuerpo.get("caduca").asText());
-        long segundos = Duration.between(LocalDateTime.now(), caduca).toSeconds();
-        assertTrue(segundos > 9 * 60 && segundos <= 10 * 60, "caduca en " + segundos + " segundos");
-
-        // El código sirve de verdad.
-        Dispositivos.TokenDispositivo token = dispositivos.canjear(cuerpo.get("codigo").asText(), "Móvil T7");
-        assertEquals(taller.getId(), token.dispositivo().getUsuarioId());
-
-        mvc.perform(post("/api/usuarios/999999/codigo-alta").with(comoUsuario(admin)).with(csrf()))
-                .andExpect(status().isNotFound());
-        mvc.perform(post("/api/usuarios/" + taller.getId() + "/codigo-alta")
-                        .with(comoUsuario(usuarioDePrueba(usuarios, Rol.DESPACHO))).with(csrf()))
-                .andExpect(status().isForbidden());
+    @Test
+    void yaNoHayCodigosDeAlta() throws Exception {
+        Usuario admin = usuarioDePrueba(usuarios, Rol.ADMIN);
+        Usuario taller = usuarioDePrueba(usuarios, Rol.TALLER);
+        mvc.perform(post("/api/usuarios/" + taller.getId() + "/codigo-alta").with(comoUsuario(admin)).with(csrf()))
+                .andExpect(status().is4xxClientError());
     }
 
     @Test
     void elAdminListaYRevocaDispositivos() throws Exception {
         Usuario admin = usuarioDePrueba(usuarios, Rol.ADMIN);
-        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller T7 disp", "t7-disp", "", Rol.TALLER));
-        String codigo = dispositivos.generarCodigoAlta(taller.getId());
-        Dispositivo dispositivo = dispositivos.canjear(codigo, "Tablet T7").dispositivo();
+        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller T7 disp", "t7-disp", "clave-taller", Rol.TALLER));
+        Dispositivo dispositivo = dispositivos.darDeAlta(taller.getId(), "Tablet T7").dispositivo();
 
         String filtro = "$[?(@.id==" + dispositivo.getId() + ")]";
         MvcResult listado = mvc.perform(get("/api/dispositivos").with(comoUsuario(admin)))

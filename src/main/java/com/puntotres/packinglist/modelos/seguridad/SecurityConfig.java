@@ -37,8 +37,8 @@ import com.puntotres.packinglist.modelos.service.Usuarios;
  * <ol>
  * <li><b>La app de modelos</b> ({@code /app/**}, {@code /api/**},
  * {@code /m/**}): la SPA y las páginas de {@code /m} se sirven sin sesión
- * (la SPA enseña ella misma el login) y entrar, mirar si se ha entrado y
- * canjear un código de alta también están abiertos; el resto de la API pide
+ * (la SPA enseña ella misma el login) y entrar y mirar si se ha entrado
+ * también están abiertos; el resto de la API pide
  * haber entrado, con sesión o con la cookie del dispositivo
  * ({@link FiltroDispositivo}); una sesión de contraseña vuelve a mirar a su
  * usuario en cada petición ({@link RevalidacionSesion}). CSRF por cookie {@code XSRF-TOKEN} que la SPA
@@ -65,7 +65,7 @@ public class SecurityConfig {
         http.securityMatcher("/app/**", "/api/**", "/m/**")
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/app/**", "/m/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/sesion", "/api/sesion/dispositivo").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/sesion").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/sesion").permitAll()
                         .anyRequest().authenticated())
                 .csrf(c -> c
@@ -73,8 +73,7 @@ public class SecurityConfig {
                         // Sin enmascarar: la SPA devuelve tal cual el valor de la cookie.
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
                         // Entrar no puede pedir un token que todavía no se tiene.
-                        .ignoringRequestMatchers(rutas.matcher(HttpMethod.POST, "/api/sesion"),
-                                rutas.matcher(HttpMethod.POST, "/api/sesion/dispositivo")))
+                        .ignoringRequestMatchers(rutas.matcher(HttpMethod.POST, "/api/sesion")))
                 .addFilterAfter(new CargaTokenCsrf(), CsrfFilter.class)
                 .addFilterBefore(new FiltroDispositivo(dispositivos, usuarios,
                         SecurityContextHolder.getContextHolderStrategy()), UsernamePasswordAuthenticationFilter.class)

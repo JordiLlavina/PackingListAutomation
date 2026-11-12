@@ -40,7 +40,6 @@ class CoberturaDeRutasTest {
     /** Las únicas rutas a las que se llega sin haber entrado. */
     private static final Set<String> PUBLICAS = Set.of(
             "POST /api/sesion",
-            "POST /api/sesion/dispositivo",
             "GET /api/sesion",
             "GET /m/{id}",
             // La PWA (SpaController): enseña ella misma el login.

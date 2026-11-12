@@ -10,10 +10,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Un móvil o una tablet dado de alta con un {@link CodigoAlta}: el taller no
- * teclea contraseñas, el aparato lleva una cookie con un token que lo
- * identifica. Aquí se guarda solo el hash SHA-256 de ese token; el token en
- * claro se entrega una vez, al canjear el código.
+ * Un móvil o una tablet del taller, dado de alta al entrar con usuario y
+ * contraseña: el aparato lleva una cookie con un token que lo identifica y no
+ * vuelve a pedir la contraseña. Aquí se guarda solo el hash SHA-256 de ese
+ * token; el token en claro se entrega una vez, al entrar.
  *
  * Revocar no lo borra: queda la traza de qué aparato fue y cuándo dejó de
  * valer.

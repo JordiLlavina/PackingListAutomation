@@ -15,29 +15,25 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.puntotres.packinglist.modelos.persistence.CodigoAlta;
-import com.puntotres.packinglist.modelos.persistence.CodigoAltaRepository;
 import com.puntotres.packinglist.modelos.persistence.Dispositivo;
 import com.puntotres.packinglist.modelos.persistence.DispositivoRepository;
 import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
 
 /**
- * Alta de móviles y tablets sin contraseña: el despacho genera un código de
- * seis cifras para un usuario, se teclea en el aparato y, al canjearlo, el
- * aparato recibe un token que guardará en una cookie. El token en claro se
- * entrega UNA vez; en la base de datos solo queda su SHA-256, así que quien
- * lea la base no puede hacerse pasar por ningún aparato.
+ * Los móviles y tablets del taller. Cuando un usuario del taller entra con su
+ * usuario y contraseña, el aparato se da de alta y recibe un token que guarda
+ * en una cookie de un año: así no tiene que volver a teclear nada. Cada
+ * aparato es un alta distinta (Bachir puede entrar con la tablet y con su
+ * móvil a la vez) y el admin los ve y los revoca uno a uno. El token en claro
+ * se entrega UNA vez; en la base de datos solo queda su SHA-256, así que
+ * quien lea la base no puede hacerse pasar por ningún aparato.
  *
- * Un usuario tiene como mucho un código vivo: generar otro BORRA los
- * anteriores sin usar (no se marcan como usados, porque no lo fueron: se
- * anularon). Así un código apuntado en un papel y olvidado deja de valer en
- * cuanto se pide uno nuevo.
+ * Hasta noviembre de 2026 el aparato se daba de alta tecleando un código de
+ * seis cifras que generaba el admin; el usuario prefirió el mismo login para
+ * todos (la tabla del código se borró en la V9).
  */
 @Service
 public class Dispositivos {
-
-    /** Lo que vale un código de alta desde que se genera. */
-    public static final Duration VIGENCIA_CODIGO = Duration.ofMinutes(10);
 
     /** Lo que dura la cookie del dispositivo en el navegador. */
     public static final Duration VIGENCIA_COOKIE = Duration.ofDays(365);
@@ -49,18 +45,14 @@ public class Dispositivos {
      */
     public static final Duration CADA_CUANTO_SE_APUNTA_EL_USO = Duration.ofHours(1);
 
-    private static final String NO_VALE = "El código no vale o ha caducado";
     private static final int BYTES_TOKEN = 32;
     private static final int LARGO_NOMBRE = 120;
 
-    private final CodigoAltaRepository codigos;
     private final DispositivoRepository dispositivos;
     private final UsuarioRepository usuarios;
     private final SecureRandom azar = new SecureRandom();
 
-    public Dispositivos(CodigoAltaRepository codigos, DispositivoRepository dispositivos,
-                        UsuarioRepository usuarios) {
-        this.codigos = codigos;
+    public Dispositivos(DispositivoRepository dispositivos, UsuarioRepository usuarios) {
         this.dispositivos = dispositivos;
         this.usuarios = usuarios;
     }
@@ -70,57 +62,18 @@ public class Dispositivos {
     }
 
     /**
-     * Un código nuevo de seis cifras (con ceros delante si toca) para ese
-     * usuario, válido {@link #VIGENCIA_CODIGO}. Borra los que tuviera sin usar
-     * y no repite un código que esté vivo para otro usuario: si no, canjear no
-     * sabría de quién es.
+     * Da de alta el aparato desde el que acaba de entrar ese usuario, con el
+     * hash de un token nuevo. Quien llama ya ha comprobado la contraseña.
      *
      * @throws IllegalArgumentException si no hay ningún usuario con ese id
      */
     @Transactional
-    public String generarCodigoAlta(Long usuarioId) {
-        return generarCodigo(usuarioId).getCodigo();
-    }
-
-    /**
-     * Lo mismo que {@link #generarCodigoAlta}, pero devolviendo el código
-     * guardado, para quien necesite también cuándo caduca.
-     *
-     * @throws IllegalArgumentException si no hay ningún usuario con ese id
-     */
-    @Transactional
-    public CodigoAlta generarCodigo(Long usuarioId) {
+    public TokenDispositivo darDeAlta(Long usuarioId, String nombreDispositivo) {
         if (usuarioId == null || !usuarios.existsById(usuarioId)) {
             throw new IllegalArgumentException("No hay ningún usuario con id " + usuarioId);
         }
-        codigos.deleteByUsuarioIdAndUsadoEnIsNull(usuarioId);
-        LocalDateTime ahora = LocalDateTime.now();
-        String codigo;
-        do {
-            codigo = String.format("%06d", azar.nextInt(1_000_000));
-        } while (vigente(codigo, ahora).isPresent());
-        return codigos.save(new CodigoAlta(usuarioId, codigo, ahora.plus(VIGENCIA_CODIGO)));
-    }
-
-    /**
-     * Canjea un código vigente: lo marca como usado y da de alta el
-     * dispositivo con el hash de un token nuevo.
-     *
-     * @throws IllegalArgumentException con "El código no vale o ha caducado"
-     *                                  si no existe, ya se usó o caducó (no se
-     *                                  dice cuál)
-     */
-    @Transactional
-    public TokenDispositivo canjear(String codigo, String nombreDispositivo) {
-        LocalDateTime ahora = LocalDateTime.now();
-        CodigoAlta alta = vigente(codigo == null ? null : codigo.trim(), ahora)
-                .orElseThrow(() -> new IllegalArgumentException(NO_VALE));
-        alta.usar(ahora);
-        codigos.save(alta);
-
         String token = tokenNuevo();
-        Dispositivo dispositivo = dispositivos.save(
-                new Dispositivo(alta.getUsuarioId(), nombreDe(nombreDispositivo), hashDe(token)));
+        Dispositivo dispositivo = dispositivos.save(new Dispositivo(usuarioId, nombreDe(nombreDispositivo), hashDe(token)));
         return new TokenDispositivo(token, dispositivo);
     }
 
@@ -165,15 +118,6 @@ public class Dispositivos {
                 .orElseThrow(() -> new IllegalArgumentException("No hay ningún dispositivo con id " + id));
         dispositivo.revocar();
         dispositivos.save(dispositivo);
-    }
-
-    private Optional<CodigoAlta> vigente(String codigo, LocalDateTime ahora) {
-        if (codigo == null || codigo.isEmpty()) {
-            return Optional.empty();
-        }
-        return codigos.findByCodigoAndUsadoEnIsNull(codigo).stream()
-                .filter(alta -> alta.vigente(ahora))
-                .findFirst();
     }
 
     private String tokenNuevo() {

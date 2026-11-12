@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.puntotres.packinglist.modelos.persistence.CodigoAlta;
 import com.puntotres.packinglist.modelos.persistence.Dispositivo;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
@@ -27,9 +26,8 @@ import com.puntotres.packinglist.modelos.service.Dispositivos;
 import com.puntotres.packinglist.modelos.service.Usuarios;
 
 /**
- * Lo que solo hace el admin: dar de alta y cambiar usuarios, generar los
- * códigos con los que se da de alta un móvil o una tablet y revocar
- * dispositivos. Ninguna respuesta lleva el hash de la contraseña ni el del
+ * Lo que solo hace el admin: dar de alta y cambiar usuarios y revocar los
+ * móviles y tablets del taller (que se dan de alta solos al entrar). Ninguna respuesta lleva el hash de la contraseña ni el del
  * token de un dispositivo.
  */
 @RestController
@@ -46,25 +44,26 @@ public class AdminController {
     }
 
     /** Un usuario tal como lo ve la pantalla de administración. */
+    /**
+     * Un usuario tal como lo ve la pantalla de administración. {@code conPassword}
+     * dice si puede entrar: los del taller dados de alta cuando entraban con
+     * un código no tienen contraseña hasta que se la pone el admin.
+     */
     public record UsuarioDto(Long id, String nombre, String login, Rol rol, boolean activo,
-                             LocalDateTime ultimoAcceso) {
+                             LocalDateTime ultimoAcceso, boolean conPassword) {
 
         static UsuarioDto de(Usuario usuario) {
             return new UsuarioDto(usuario.getId(), usuario.getNombre(), usuario.getLogin(), usuario.getRol(),
-                    usuario.isActivo(), usuario.getUltimoAcceso());
+                    usuario.isActivo(), usuario.getUltimoAcceso(), usuario.getPasswordHash() != null);
         }
     }
 
-    /** Un usuario nuevo; la contraseña puede ir vacía si solo va a entrar con un dispositivo. */
+    /** Un usuario nuevo, con su contraseña. */
     public record NuevoUsuario(String nombre, String login, String password, Rol rol) {
     }
 
     /** Lo que se cambia de un usuario: lo que no llega, no se toca. */
     public record CambiosUsuario(String nombre, Rol rol, Boolean activo, String password) {
-    }
-
-    /** El código de seis cifras que se teclea en el aparato y cuándo deja de valer. */
-    public record CodigoAltaDto(String codigo, LocalDateTime caduca) {
     }
 
     /** Un dispositivo dado de alta, con el nombre de su usuario. */
@@ -90,13 +89,6 @@ public class AdminController {
         usuarioQueExiste(id);
         usuarios.cambiar(id, cambios.nombre(), cambios.rol(), cambios.activo(), cambios.password(), quien);
         return UsuarioDto.de(usuarioQueExiste(id));
-    }
-
-    @PostMapping("/usuarios/{id}/codigo-alta")
-    public CodigoAltaDto generarCodigoDeAlta(@PathVariable Long id) {
-        usuarioQueExiste(id);
-        CodigoAlta codigo = dispositivos.generarCodigo(id);
-        return new CodigoAltaDto(codigo.getCodigo(), codigo.getCaduca());
     }
 
     @GetMapping("/dispositivos")

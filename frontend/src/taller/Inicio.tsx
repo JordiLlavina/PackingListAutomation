@@ -5,29 +5,41 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import ActivarAvisos from '../comun/ActivarAvisos';
 import { Icono } from '../comun/iconos';
-import { apuntarDivertida, conNombre, elegirSaludo, type HistorialDivertidas } from '../comun/saludo';
+import { apuntarSaludo, conNombre, elegirSaludo, HISTORIAL_VACIO, type HistorialSaludo } from '../comun/saludo';
 import { useSesion } from '../comun/sesion';
 import { useBandeja } from '../comun/useBandeja';
 import RejillaModelos from './RejillaModelos';
 
-// Las divertidas que han salido en esta tablet, para el tope de 6 en 24 horas.
-const DIVERTIDAS_VISTAS = 'modelos.saludo.divertidas';
+// Lo que ya ha salido en esta tablet: las frases de franja de hoy y la última
+// divertida (ver comun/saludo.ts).
+const SALUDOS_VISTOS = 'modelos.saludo';
+// La clave de la primera versión (tope de divertidas), que ya no se usa.
+const CLAVE_VIEJA = 'modelos.saludo.divertidas';
 
-function leerHistorial(): HistorialDivertidas {
+function leerHistorial(): HistorialSaludo {
   try {
-    const guardado = localStorage.getItem(DIVERTIDAS_VISTAS);
-    const h = guardado ? (JSON.parse(guardado) as Partial<HistorialDivertidas>) : {};
-    return { veces: Array.isArray(h.veces) ? h.veces.filter((t) => typeof t === 'number') : [], ultima: h.ultima ?? null };
+    localStorage.removeItem(CLAVE_VIEJA);
+    const guardado = localStorage.getItem(SALUDOS_VISTOS);
+    const h = guardado ? (JSON.parse(guardado) as Partial<HistorialSaludo>) : {};
+    const franjas =
+      h.franjas && typeof h.franjas === 'object'
+        ? Object.fromEntries(Object.entries(h.franjas).filter(([, dia]) => typeof dia === 'string'))
+        : {};
+    return {
+      ultimaDivertida: typeof h.ultimaDivertida === 'string' ? h.ultimaDivertida : null,
+      ultimaFranja: typeof h.ultimaFranja === 'number' ? h.ultimaFranja : null,
+      franjas,
+    };
   } catch {
-    return { veces: [], ultima: null };
+    return HISTORIAL_VACIO;
   }
 }
 
-function guardarHistorial(historial: HistorialDivertidas) {
+function guardarHistorial(historial: HistorialSaludo) {
   try {
-    localStorage.setItem(DIVERTIDAS_VISTAS, JSON.stringify(historial));
+    localStorage.setItem(SALUDOS_VISTOS, JSON.stringify(historial));
   } catch {
-    // Sin almacenamiento (ventana privada) no hay tope: sale 1 de cada 4 igualmente.
+    // Sin almacenamiento (ventana privada) una frase de franja puede repetirse: no pasa nada.
   }
 }
 
@@ -37,9 +49,9 @@ function useSaludo(nombre: string | undefined): string {
   // Se apunta una sola vez, aunque el modo estricto repita el efecto en desarrollo.
   const apuntada = useRef(false);
   useEffect(() => {
-    if (!eleccion.divertida || apuntada.current) return;
+    if (eleccion.tipo === 'hola' || apuntada.current) return;
     apuntada.current = true;
-    guardarHistorial(apuntarDivertida(leerHistorial(), eleccion.plantilla, new Date()));
+    guardarHistorial(apuntarSaludo(leerHistorial(), eleccion, new Date()));
   }, [eleccion]);
   return conNombre(eleccion.plantilla, nombre);
 }
@@ -54,7 +66,7 @@ export default function Inicio() {
 
   return (
     <>
-      <h2 className="saludo">{saludo}</h2>
+      <h2 className="saludo inicio">{saludo}</h2>
       <ActivarAvisos motivo="Para que suene cuando despacho mande una orden" />
       <div className="losas">
         <button className="losa" type="button" onClick={() => navegar('/ordenes')}>
@@ -68,8 +80,6 @@ export default function Inicio() {
           <Icono nombre="mic" />
           <span>
             <span className="t">Crear Modificación</span>
-            <br />
-            <span className="m">Avisar con fotos y voz</span>
           </span>
         </button>
       </div>

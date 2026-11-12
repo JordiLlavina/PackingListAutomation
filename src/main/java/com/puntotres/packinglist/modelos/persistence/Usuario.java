@@ -12,10 +12,13 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Un usuario de la app de modelos. Entra de una de tres formas: con login y
- * contraseña (el despacho), con un dispositivo dado de alta por código (el
- * taller, ver {@link Dispositivo}) o, más adelante, con su cuenta de Microsoft
- * Entra ({@link #getOidEntra()}). Por eso login y contraseña pueden faltar.
+ * Un usuario de la app de modelos. Todos entran con login y contraseña; el
+ * del taller, además, deja dado de alta el aparato desde el que entra (ver
+ * {@link Dispositivo}) y no vuelve a teclearla en él. Más adelante podrá
+ * entrar con su cuenta de Microsoft Entra ({@link #getOidEntra()}), y por eso
+ * login y contraseña pueden faltar en la base (también en los usuarios del
+ * taller dados de alta antes de noviembre de 2026, que entraban con un código
+ * y no tenían contraseña: no entran hasta que el admin les pone una).
  *
  * La contraseña nunca se guarda: solo su hash BCrypt. Un usuario no se borra,
  * se desactiva ({@link #desactivar()}): sus mensajes y modificaciones lo

@@ -46,11 +46,7 @@ public class Usuarios implements ApplicationRunner {
         this.props = props;
     }
 
-    /**
-     * Lo que hace falta para dar de alta a un usuario. Una contraseña vacía es
-     * un usuario que no entra con contraseña (el taller entra con un
-     * dispositivo dado de alta por código).
-     */
+    /** Lo que hace falta para dar de alta a un usuario: todo, también la contraseña, que es como entran todos. */
     public record Alta(String nombre, String login, String password, Rol rol) {
     }
 
@@ -58,8 +54,9 @@ public class Usuarios implements ApplicationRunner {
      * Da de alta un usuario activo. El login es único sin mirar mayúsculas:
      * {@code Pepa} y {@code pepa} serían la misma persona al teclearlo.
      *
-     * @throws IllegalArgumentException si falta el nombre, el login o el rol,
-     *                                  o si el login ya existe
+     * @throws IllegalArgumentException si falta el nombre, el login, la
+     *                                  contraseña o el rol, o si el login ya
+     *                                  existe
      */
     @Transactional
     public Usuario crear(Alta alta) {
@@ -67,6 +64,9 @@ public class Usuarios implements ApplicationRunner {
         String login = recortado(alta.login());
         if (nombre == null || login == null || alta.rol() == null) {
             throw new IllegalArgumentException("Un usuario necesita nombre, login y rol");
+        }
+        if (alta.password() == null || alta.password().isBlank()) {
+            throw new IllegalArgumentException("Un usuario necesita contraseña: es como entran todos, también el taller");
         }
         if (repositorio.existsByLoginIgnoreCase(login)) {
             throw new IllegalArgumentException("Ya hay un usuario con el login " + login);

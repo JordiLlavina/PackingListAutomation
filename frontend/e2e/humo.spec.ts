@@ -1,7 +1,7 @@
 // Recorrido de humo de la app de modelos (spec §11): despacho da de alta un
 // modelo y un usuario del taller por la API; la tablet del taller entra con
-// el código de alta, avisa de un cambio con una foto (de fichero: sin cámara
-// ni micrófono en Chromium sin ventana) y despacho lo ve en su bandeja.
+// su usuario y contraseña, avisa de un cambio con una foto (de fichero: sin
+// cámara ni micrófono en Chromium sin ventana) y despacho lo ve en su bandeja.
 import { expect, test, type APIResponse, type BrowserContext } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,28 +42,22 @@ test('Bachir avisa de un cambio con una foto y despacho lo ve en la bandeja', as
       data: { cliente: 'AMI', nombrePrototipo: PROTOTIPO, nombre: 'BOLSO E2E', temporadaId: temporada.id },
     }),
   );
-  const bachir = await cuerpo<{ id: number }>(
+  await cuerpo(
     await despacho.request.post('/api/usuarios', {
       headers: cabeceras,
-      data: { nombre: 'Bachir', login: `bachir${SUFIJO}`, password: 'prueba', rol: 'TALLER' },
+      data: { nombre: 'Bachir', login: `bachir${SUFIJO}`, password: 'prueba-taller', rol: 'TALLER' },
     }),
   );
-  const { codigo } = await cuerpo<{ codigo: string }>(
-    await despacho.request.post(`/api/usuarios/${bachir.id}/codigo-alta`, { headers: cabeceras }),
-  );
-  expect(codigo).toMatch(/^\d{6}$/);
 
   // b) La tablet del taller, sin cookies ni permisos de cámara o micrófono.
   const taller = await browser.newContext({ permissions: [] });
   const tablet = await taller.newPage();
   await tablet.goto('/app/');
-  await tablet.getByRole('button', { name: 'Soy del taller' }).click();
-  for (const cifra of codigo) {
-    await tablet.getByRole('button', { name: cifra, exact: true }).click();
-  }
-  await expect(tablet.getByText(codigo)).toBeVisible();
-  await tablet.getByRole('button', { name: 'OK', exact: true }).click();
-  await expect(tablet.getByText('Hola, Bachir')).toBeVisible();
+  await tablet.getByLabel('Usuario').fill(`bachir${SUFIJO}`);
+  await tablet.getByLabel('Contraseña').fill('prueba-taller');
+  await tablet.getByRole('button', { name: 'Entrar', exact: true }).click();
+  // El saludo cambia (a veces una frase de franja o una divertida): la cara del taller se reconoce por su barra.
+  await expect(tablet.getByRole('navigation', { name: 'Secciones' }).getByText('Bandeja de Entrada')).toBeVisible();
 
   await tablet.getByRole('button', { name: /Crear Modificación/ }).click();
   await tablet.getByRole('button', { name: new RegExp(PROTOTIPO) }).click();
@@ -80,10 +74,10 @@ test('Bachir avisa de un cambio con una foto y despacho lo ve en la bandeja', as
   await tablet.getByRole('button', { name: 'Enviar a despacho' }).click();
   await expect(tablet.getByText('Enviado a despacho')).toBeVisible();
 
-  // c) Despacho abre su bandeja: el aviso está en «Del taller», como nuevo.
+  // c) Despacho abre su bandeja: el aviso está en «Recibido del Taller», como nuevo.
   const bandeja = await despacho.newPage();
   await bandeja.goto('/app/bandeja');
-  await expect(bandeja.getByRole('button', { name: 'Del taller' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(bandeja.getByRole('button', { name: 'Recibido del Taller' })).toHaveAttribute('aria-pressed', 'true');
   const aviso = bandeja.getByRole('listitem').filter({ hasText: PROTOTIPO });
   await expect(aviso).toHaveCount(1);
   await expect(aviso.getByText('Nueva', { exact: true })).toBeVisible();

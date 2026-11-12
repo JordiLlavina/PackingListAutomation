@@ -1,5 +1,5 @@
 // La bandeja de despacho, en dos paneles: a la izquierda las dos pestañas
-// («Del taller», los avisos que manda el taller; «Al taller», las órdenes que
+// («Recibido del Taller», los avisos que manda el taller; «Enviado desde Oficina», las órdenes que
 // se le mandan), los contadores, los filtros y la lista; a la derecha el
 // detalle de lo elegido o el alta de una orden nueva. Lo elegido va en la
 // dirección (/app/bandeja/12, /app/bandeja/nueva?modelo=7) y la pestaña en
@@ -111,7 +111,7 @@ export default function Bandeja() {
   const nueva = id === 'nueva';
   const elegido = id && /^\d+$/.test(id) ? Number(id) : null;
   const modeloInicial = Number(params.get('modelo')) || null;
-  // El alta de una orden va con «Al taller» aunque el enlace no lo diga.
+  // El alta de una orden va con «Enviado desde Oficina» aunque el enlace no lo diga.
   const pestanaPedida = params.get('pestana');
   const pestana: Pestana = pestanaPedida === 'despacho' || (nueva && pestanaPedida === null) ? 'despacho' : 'taller';
   const sufijo = pestana === 'despacho' ? '?pestana=despacho' : '';
@@ -197,10 +197,10 @@ export default function Bandeja() {
 
         <div className="pestanas-bandeja">
           <button type="button" aria-pressed={pestana === 'taller'} onClick={() => cambiarPestana('taller')}>
-            Del taller
+            Recibido del Taller
           </button>
           <button type="button" aria-pressed={pestana === 'despacho'} onClick={() => cambiarPestana('despacho')}>
-            Al taller
+            Enviado desde Oficina
           </button>
         </div>
 

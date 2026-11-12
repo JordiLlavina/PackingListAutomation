@@ -20,7 +20,8 @@ import com.puntotres.packinglist.modelos.service.Usuarios;
 /**
  * Cookie {@value #COOKIE} → {@link Dispositivos#porToken} →
  * {@link AutenticacionModelos}: el taller entra con el móvil o la tablet que
- * se dio de alta con un código, sin teclear nada. Sin cookie, con un
+ * se dio de alta al entrar con su usuario y contraseña, sin volver a teclear
+ * nada. Sin cookie, con un
  * dispositivo revocado o con su usuario desactivado, la petición sigue sin
  * autenticar (y la cadena contesta 401 donde haga falta entrar).
  *

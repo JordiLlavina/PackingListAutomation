@@ -10,23 +10,24 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Component;
 
 /**
- * Freno a quien prueba códigos de alta a ciegas: un código son seis cifras,
- * un millón de combinaciones que en una red local se recorren en los diez
- * minutos que vale. Con más de {@link #MAXIMO_FALLOS} canjes fallidos desde la
- * misma IP en {@link #VENTANA}, esa IP no puede canjear (ni siquiera un código
- * bueno) hasta que el más antiguo salga de la ventana. Un canje bueno borra
- * los fallos de su IP: quien se equivoca tecleando no se queda frenado.
+ * Freno a quien prueba contraseñas a ciegas. Con {@link #MAXIMO_FALLOS}
+ * entradas fallidas desde la misma IP en {@link #VENTANA}, esa IP no puede
+ * entrar (ni siquiera con la contraseña buena) hasta que el más antiguo salga
+ * de la ventana. Una entrada buena borra los fallos de su IP: quien se
+ * equivoca tecleando no se queda frenado. (Nació para los códigos de alta del
+ * taller, que se quitaron en noviembre de 2026; ahora frena el login, que
+ * hasta entonces no tenía freno.)
  *
  * En memoria a propósito: un reinicio lo vacía, y no pasa nada, porque lo que
  * frena es la velocidad de prueba, no a una IP para siempre.
  */
 @Component
-public class FrenoCanje {
+public class FrenoEntrada {
 
-    /** Canjes fallidos que se toleran dentro de la ventana. */
+    /** Entradas fallidas que se toleran dentro de la ventana. */
     public static final int MAXIMO_FALLOS = 10;
 
-    /** Lo que se recuerda un canje fallido. */
+    /** Lo que se recuerda una entrada fallida. */
     public static final Duration VENTANA = Duration.ofMinutes(10);
 
     private static final int IPS_ANTES_DE_LIMPIAR = 1000;
@@ -45,7 +46,7 @@ public class FrenoCanje {
         return frenada[0];
     }
 
-    /** Apunta un canje fallido de esa IP. */
+    /** Apunta una entrada fallida de esa IP. */
     public void fallo(String ip) {
         fallos.compute(ip, (clave, deIp) -> {
             Deque<Instant> lista = deIp == null ? new ArrayDeque<>() : deIp;
@@ -64,7 +65,7 @@ public class FrenoCanje {
         }
     }
 
-    /** Un canje bueno: esa IP vuelve a empezar de cero. */
+    /** Una entrada buena: esa IP vuelve a empezar de cero. */
     public void acierto(String ip) {
         fallos.remove(ip);
     }

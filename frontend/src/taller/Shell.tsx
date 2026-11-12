@@ -8,6 +8,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Outlet, useMatches, useNavigate, type Params } from 'react-router';
 import { Icono, type NombreIcono } from '../comun/iconos';
+import { LogoPuntotres } from '../comun/LogoPuntotres';
 import { llegaronNuevas } from '../comun/modificaciones';
 import { toast } from '../comun/toast';
 import { ProveedorBandeja, useBandeja } from '../comun/useBandeja';
@@ -36,7 +37,7 @@ const DESTINOS: { seccion: Seccion; ruta: string; texto: string; icono: NombreIc
   { seccion: 'inicio', ruta: '/', texto: 'Inicio', icono: 'casa' },
   { seccion: 'ordenes', ruta: '/ordenes', texto: 'Bandeja de Entrada', icono: 'bandeja' },
   { seccion: 'avisos', ruta: '/avisos', texto: 'Mis avisos', icono: 'lista' },
-  { seccion: 'modelos', ruta: '/modelos', texto: 'Modelos', icono: 'rejilla' },
+  { seccion: 'modelos', ruta: '/modelos', texto: 'Modelos', icono: 'bolso' },
 ];
 
 const PANTALLA_POR_DEFECTO: Pantalla = { titulo: 'Inicio · Puntotres', seccion: 'inicio' };
@@ -97,6 +98,7 @@ function Marco() {
             <Icono nombre="atras" />
           </button>
         )}
+        <LogoPuntotres className="logo" />
         <h1>{tituloPropio ?? pantalla.titulo}</h1>
       </header>
       <main>

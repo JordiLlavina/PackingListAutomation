@@ -1,23 +1,21 @@
-// La administración (solo ADMIN), dos bloques apilados. «Usuarios»: la tabla
-// con su rol, si está activo y su último acceso; por fila, cambiar el rol,
-// desactivar o activar, cambiar la contraseña y, en los de taller, el código
-// de alta para la tablet (seis cifras que se teclean en «Soy del taller»,
-// con su cuenta atrás). «Dispositivos»: los aparatos dados de alta con su
-// último uso y «Revocar», que cierra la sesión de esa tablet. Cada acción
-// vuelve a pedir las dos listas: el código y la revocación cambian las dos.
+// La administración (solo ADMIN, pestaña «Usuarios»), dos bloques apilados.
+// «Usuarios»: la tabla con su rol, si está activo y su último acceso; por
+// fila, cambiar el rol, desactivar o activar y cambiar la contraseña. Todos
+// entran con usuario y contraseña; un usuario del taller de cuando se entraba
+// con código sale marcado «sin contraseña» hasta que se le pone una.
+// «Dispositivos»: los móviles y tablets del taller, que se dan de alta solos
+// al entrar, con su último uso y «Revocar», que lo saca de la app en ese
+// aparato. Cada acción vuelve a pedir las dos listas.
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { ErrorApi } from '../comun/api';
 import {
   ROLES,
-  caducaEn,
   cambiarUsuario,
   crearUsuario,
   dispositivos as pedirDispositivos,
   estadoDispositivo,
-  generarCodigoAlta,
   revocarDispositivo,
   usuarios as pedirUsuarios,
-  type CodigoAlta,
   type Dispositivo,
   type Rol,
   type Usuario,
@@ -59,12 +57,6 @@ export default function Admin() {
   const [password, setPassword] = useState('');
   const [errorPassword, setErrorPassword] = useState<string | null>(null);
 
-  const dialogoCodigo = useRef<HTMLDialogElement>(null);
-  const [paraCodigo, setParaCodigo] = useState<Usuario | null>(null);
-  const [codigo, setCodigo] = useState<CodigoAlta | null>(null);
-  const [errorCodigo, setErrorCodigo] = useState<string | null>(null);
-  const [ahora, setAhora] = useState(() => new Date());
-
   const dialogoRevocar = useRef<HTMLDialogElement>(null);
   const [aRevocar, setARevocar] = useState<Dispositivo | null>(null);
 
@@ -88,14 +80,6 @@ export default function Admin() {
   useEffect(() => {
     void cargar();
   }, [cargar]);
-
-  // La cuenta atrás del código: el reloj solo corre mientras hay un código a la vista.
-  useEffect(() => {
-    if (!codigo) return;
-    setAhora(new Date());
-    const reloj = setInterval(() => setAhora(new Date()), 1000);
-    return () => clearInterval(reloj);
-  }, [codigo]);
 
   const cambiar = async (u: Usuario, cambios: Parameters<typeof cambiarUsuario>[1], hecho: string) => {
     setOcupado(true);
@@ -148,35 +132,12 @@ export default function Admin() {
       await cambiarUsuario(paraPassword.id, { password });
       dialogoPassword.current?.close();
       toast('Contraseña cambiada');
+      await cargar();
     } catch (err) {
       setErrorPassword(mensaje(err, 'No se ha podido cambiar la contraseña'));
     } finally {
       setOcupado(false);
     }
-  };
-
-  const generarCodigo = async (u: Usuario) => {
-    setParaCodigo(u);
-    setOcupado(true);
-    setErrorCodigo(null);
-    try {
-      const nuevoCodigo = await generarCodigoAlta(u.id);
-      setCodigo(nuevoCodigo);
-      if (!dialogoCodigo.current?.open) dialogoCodigo.current?.showModal();
-    } catch (err) {
-      const texto = mensaje(err, 'No se ha podido generar el código');
-      if (dialogoCodigo.current?.open) setErrorCodigo(texto);
-      else toast(texto);
-    } finally {
-      setOcupado(false);
-    }
-  };
-
-  const cerrarCodigo = () => {
-    setCodigo(null);
-    setParaCodigo(null);
-    // El código canjeado da de alta un dispositivo: al cerrar se vuelve a pedir la lista.
-    void cargar();
   };
 
   const abrirRevocar = (d: Dispositivo) => {
@@ -199,8 +160,6 @@ export default function Admin() {
       setOcupado(false);
     }
   };
-
-  const restante = codigo ? caducaEn(codigo.caduca, ahora) : '';
 
   return (
     <div className="admin">
@@ -238,7 +197,14 @@ export default function Admin() {
                       <td>
                         <b>{u.nombre}</b>
                       </td>
-                      <td>{u.login}</td>
+                      <td>
+                        {u.login}
+                        {!u.conPassword && (
+                          <span className="sin-password" title="No puede entrar hasta que se le ponga una contraseña">
+                            sin contraseña
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <select
                           aria-label={`Rol de ${u.nombre}`}
@@ -267,14 +233,9 @@ export default function Admin() {
                           >
                             {u.activo ? 'Desactivar' : 'Activar'}
                           </button>
-                          <button className="boton" type="button" disabled={ocupado} onClick={() => abrirPassword(u)}>
-                            Cambiar contraseña
+                          <button className={u.conPassword ? 'boton' : 'boton marca'} type="button" disabled={ocupado} onClick={() => abrirPassword(u)}>
+                            {u.conPassword ? 'Cambiar contraseña' : 'Poner contraseña'}
                           </button>
-                          {u.rol === 'TALLER' && (
-                            <button className="boton marca" type="button" disabled={ocupado} onClick={() => void generarCodigo(u)}>
-                              Código de alta para la tablet
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -295,7 +256,7 @@ export default function Admin() {
         ) : !listaDispositivos ? (
           <p className="ayuda">Cargando…</p>
         ) : listaDispositivos.length === 0 ? (
-          <p className="ayuda">Todavía no hay dispositivos registrados</p>
+          <p className="ayuda">Todavía no ha entrado nadie del taller</p>
         ) : (
           <div className="marco-tabla">
             <table className="tabla-admin">
@@ -366,7 +327,9 @@ export default function Admin() {
               onChange={(e) => setNuevo({ ...nuevo, password: e.target.value })}
             />
           </label>
-          {nuevo.rol === 'TALLER' && <p className="ayuda">El taller entra con el código de alta: la contraseña puede quedar vacía.</p>}
+          {nuevo.rol === 'TALLER' && (
+            <p className="ayuda">Con ella entra en la tablet y en su móvil; cada aparato se queda dentro y sale abajo, en «Dispositivos».</p>
+          )}
           <label className="campo">
             Rol
             <select value={nuevo.rol} onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as Rol })}>
@@ -379,7 +342,7 @@ export default function Admin() {
           </label>
           {errorAlta && <p className="error">{errorAlta}</p>}
           <div className="botones">
-            <button className="boton ok" type="submit" disabled={ocupado || !nuevo.nombre.trim() || !nuevo.login.trim()}>
+            <button className="boton ok" type="submit" disabled={ocupado || !nuevo.nombre.trim() || !nuevo.login.trim() || !nuevo.password.trim()}>
               Dar de alta
             </button>
             <button className="boton" type="button" onClick={() => dialogoAlta.current?.close()}>
@@ -391,7 +354,7 @@ export default function Admin() {
 
       <dialog ref={dialogoPassword} className="dialogo" aria-labelledby="titulo-password">
         <form onSubmit={(e) => void guardarPassword(e)}>
-          <h2 id="titulo-password">Cambiar la contraseña de {paraPassword?.nombre}</h2>
+          <h2 id="titulo-password">{paraPassword?.conPassword ? 'Cambiar' : 'Poner'} la contraseña de {paraPassword?.nombre}</h2>
           <label className="campo">
             Contraseña nueva
             <input type="password" value={password} autoComplete="new-password" autoFocus onChange={(e) => setPassword(e.target.value)} />
@@ -408,32 +371,10 @@ export default function Admin() {
         </form>
       </dialog>
 
-      <dialog ref={dialogoCodigo} className="dialogo" aria-labelledby="titulo-codigo" onClose={cerrarCodigo}>
-        <div className="formulario">
-          <h2 id="titulo-codigo">Código de alta para {paraCodigo?.nombre}</h2>
-          <p className="codigo-alta" data-caducado={restante === 'caducado' || undefined}>
-            {codigo?.codigo}
-          </p>
-          <p>Tecléalo en la tablet en «Soy del taller». Caduca en 10 minutos.</p>
-          <p className="ayuda cuenta-atras" aria-live="polite">
-            {restante}
-          </p>
-          {errorCodigo && <p className="error">{errorCodigo}</p>}
-          <div className="botones">
-            <button className="boton" type="button" disabled={ocupado || !paraCodigo} onClick={() => paraCodigo && void generarCodigo(paraCodigo)}>
-              Generar otro
-            </button>
-            <button className="boton" type="button" onClick={() => dialogoCodigo.current?.close()}>
-              Cerrar
-            </button>
-          </div>
-        </div>
-      </dialog>
-
       <dialog ref={dialogoRevocar} className="dialogo" aria-labelledby="titulo-revocar">
         <div className="formulario">
           <h2 id="titulo-revocar">Revocar el dispositivo de {aRevocar?.usuario ?? 'este usuario'}</h2>
-          <p>Se cerrará la sesión de esa tablet. ¿Revocar?</p>
+          <p>Ese aparato sale de la app y, para volver a usarlo, tendrá que entrar con su contraseña. ¿Revocar?</p>
           <div className="botones">
             <button className="boton peligro" type="button" disabled={ocupado} onClick={() => void revocar()}>
               Revocar

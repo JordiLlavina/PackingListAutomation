@@ -1,13 +1,14 @@
-// El saludo de la pantalla de inicio del taller, que cambia según la hora y el
-// día para que la app sea más amigable. Las frases y sus franjas las eligió el
-// usuario (noviembre de 2026). Cada vez que se abre el inicio se elige una:
+// El saludo de la pantalla de inicio del taller. Las frases y sus franjas las
+// eligió el usuario (noviembre de 2026), y también la regla, porque la primera
+// versión cambiaba demasiado. Cada vez que se abre el inicio:
 //
-//   1. Si hay frases de franja que valen ahora (buen provecho, buen fin de
-//      semana…), sale una de ellas 1 de cada 2 veces.
-//   2. Si no, 1 de cada 4 veces sale una divertida, al azar y sin repetir la
-//      última, pero no más de 6 en 24 horas. Las 24 horas son una ventana que
-//      se desliza: el contador no vuelve a cero a medianoche.
-//   3. Si no, una típica de las que valen a esa hora.
+//   1. Si vale ahora una frase de franja (buen provecho, buen fin de semana…)
+//      que hoy todavía no ha salido, sale ella en lugar del saludo: una sola
+//      vez al día cada una, y nunca dos de franja con menos de 4 horas entre
+//      ellas (la que no cabe espera a que pasen las 4 horas, si su franja aún
+//      dura).
+//   2. Si no, 1 de cada 6 veces una divertida, al azar y sin repetir la última.
+//   3. Si no, «Hola, {n}».
 //
 // `{n}` es el nombre de quien ha entrado; sin nombre se quita con su coma.
 
@@ -21,15 +22,7 @@ const LUNES = 1;
 const VIERNES = 5;
 const h = (horas: number, minutos = 0) => horas * 60 + minutos;
 
-export const TIPICAS: Frase[] = [
-  { texto: 'Buenos días, {n}', vale: (_d, m) => m < h(14) },
-  { texto: 'Buen día, {n}', vale: (_d, m) => m < h(14) },
-  { texto: 'Buenas tardes, {n}', vale: (_d, m) => m >= h(14) },
-  { texto: 'Hola, {n}' },
-  { texto: 'Hola de nuevo, {n}' },
-  { texto: '¿Qué tal, {n}?' },
-  { texto: 'Bienvenido, {n}' },
-];
+export const HOLA = 'Hola, {n}';
 
 export const DE_FRANJA: Frase[] = [
   { texto: 'Buen comienzo de día, {n}', vale: (_d, m) => m < h(10, 30) },
@@ -54,15 +47,23 @@ export const DIVERTIDAS: Frase[] = [
   { texto: '¡Hoy llevas el guapo subido!' },
 ];
 
-export const PROB_FRANJA = 1 / 2;
-export const PROB_DIVERTIDA = 1 / 4;
-export const MAX_DIVERTIDAS = 6;
-export const VENTANA_MS = 24 * 60 * 60 * 1000;
+export const PROB_DIVERTIDA = 1 / 6;
+/** Lo mínimo entre dos frases de franja. */
+export const SEPARACION_FRANJAS_MS = 4 * 60 * 60 * 1000;
 
-/** Las divertidas que ya han salido: cuándo, y la última, para no repetirla. */
-export type HistorialDivertidas = { veces: number[]; ultima: string | null };
+/** Lo que ya ha salido en esta tablet. */
+export type HistorialSaludo = {
+  /** La última divertida, para no repetirla. */
+  ultimaDivertida: string | null;
+  /** Cuándo salió la última frase de franja (ms), para las 4 horas. */
+  ultimaFranja: number | null;
+  /** El día (`YYYY-MM-DD` local) en que salió cada frase de franja, para que salga una vez al día. */
+  franjas: Record<string, string>;
+};
 
-export type Eleccion = { plantilla: string; divertida: boolean };
+export const HISTORIAL_VACIO: HistorialSaludo = { ultimaDivertida: null, ultimaFranja: null, franjas: {} };
+
+export type Eleccion = { plantilla: string; tipo: 'hola' | 'franja' | 'divertida' };
 
 function valenAhora(frases: Frase[], ahora: Date): Frase[] {
   const dia = ahora.getDay();
@@ -70,37 +71,51 @@ function valenAhora(frases: Frase[], ahora: Date): Frase[] {
   return frases.filter((f) => !f.vale || f.vale(dia, minutos));
 }
 
-function unaAlAzar(lista: Frase[], azar: () => number): Frase {
-  // Las típicas sin hora («Hola, {n}») valen siempre, así que nunca está vacía.
-  return lista[Math.min(lista.length - 1, Math.floor(azar() * lista.length))] ?? { texto: 'Hola, {n}' };
+function unaAlAzar(lista: Frase[], azar: () => number): Frase | undefined {
+  if (lista.length === 0) return undefined;
+  return lista[Math.min(lista.length - 1, Math.floor(azar() * lista.length))];
 }
 
-/** Las divertidas de las últimas 24 horas que cuentan para el tope. */
-export function recientes(historial: HistorialDivertidas, ahora: Date): number[] {
-  const desde = ahora.getTime() - VENTANA_MS;
-  return historial.veces.filter((t) => t > desde && t <= ahora.getTime());
+/** El día local de `ahora` como `YYYY-MM-DD` (no `toISOString`, que es UTC y cambia de día a deshora). */
+export function claveDia(ahora: Date): string {
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return `${ahora.getFullYear()}-${dos(ahora.getMonth() + 1)}-${dos(ahora.getDate())}`;
+}
+
+/** Las frases de franja que podrían salir ahora mismo. */
+export function franjasPosibles(ahora: Date, historial: HistorialSaludo): Frase[] {
+  if (historial.ultimaFranja !== null && ahora.getTime() - historial.ultimaFranja < SEPARACION_FRANJAS_MS) return [];
+  const hoy = claveDia(ahora);
+  return valenAhora(DE_FRANJA, ahora).filter((f) => historial.franjas[f.texto] !== hoy);
 }
 
 /** Elige la plantilla del saludo. `azar` es inyectable para los tests. */
-export function elegirSaludo(ahora: Date, historial: HistorialDivertidas, azar: () => number = Math.random): Eleccion {
-  const franja = valenAhora(DE_FRANJA, ahora);
-  if (franja.length > 0 && azar() < PROB_FRANJA) {
-    return { plantilla: unaAlAzar(franja, azar).texto, divertida: false };
-  }
-  if (azar() < PROB_DIVERTIDA && recientes(historial, ahora).length < MAX_DIVERTIDAS) {
+export function elegirSaludo(ahora: Date, historial: HistorialSaludo, azar: () => number = Math.random): Eleccion {
+  const franja = unaAlAzar(franjasPosibles(ahora, historial), azar);
+  if (franja) return { plantilla: franja.texto, tipo: 'franja' };
+  if (azar() < PROB_DIVERTIDA) {
     const posibles = valenAhora(DIVERTIDAS, ahora);
-    const sinRepetir = posibles.filter((f) => f.texto !== historial.ultima);
-    const candidatas = sinRepetir.length > 0 ? sinRepetir : posibles;
-    if (candidatas.length > 0) {
-      return { plantilla: unaAlAzar(candidatas, azar).texto, divertida: true };
-    }
+    const sinRepetir = posibles.filter((f) => f.texto !== historial.ultimaDivertida);
+    const divertida = unaAlAzar(sinRepetir.length > 0 ? sinRepetir : posibles, azar);
+    if (divertida) return { plantilla: divertida.texto, tipo: 'divertida' };
   }
-  return { plantilla: unaAlAzar(valenAhora(TIPICAS, ahora), azar).texto, divertida: false };
+  return { plantilla: HOLA, tipo: 'hola' };
 }
 
-/** El historial después de enseñar una divertida, sin lo que ya no cuenta. */
-export function apuntarDivertida(historial: HistorialDivertidas, plantilla: string, ahora: Date): HistorialDivertidas {
-  return { veces: [...recientes(historial, ahora), ahora.getTime()], ultima: plantilla };
+/** El historial después de enseñar `eleccion`. */
+export function apuntarSaludo(historial: HistorialSaludo, eleccion: Eleccion, ahora: Date): HistorialSaludo {
+  switch (eleccion.tipo) {
+    case 'franja': {
+      // Solo hace falta recordar las de hoy: las de otros días ya no cuentan.
+      const hoy = claveDia(ahora);
+      const deHoy = Object.fromEntries(Object.entries(historial.franjas).filter(([, dia]) => dia === hoy));
+      return { ...historial, ultimaFranja: ahora.getTime(), franjas: { ...deHoy, [eleccion.plantilla]: hoy } };
+    }
+    case 'divertida':
+      return { ...historial, ultimaDivertida: eleccion.plantilla };
+    default:
+      return historial;
+  }
 }
 
 export function conNombre(plantilla: string, nombre: string | null | undefined): string {

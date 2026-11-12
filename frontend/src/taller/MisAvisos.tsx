@@ -140,8 +140,6 @@ export default function MisAvisos() {
 
   return (
     <>
-      <h2 className="saludo">Mis avisos</h2>
-      <p className="sub">Lo que has mandado a despacho y en qué punto está.</p>
       {avisos.length > 0 ? (
         <div className="lista">
           {avisos.map((a) => (

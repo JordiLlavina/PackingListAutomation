@@ -1,7 +1,8 @@
 // Quién ha entrado en la app. Al arrancar se pregunta al servidor
-// (GET /api/sesion): un 401 es «nadie» y la app enseña la entrada. El taller
-// entra una vez con el código de alta y se queda dentro con la cookie del
-// dispositivo; despacho entra con usuario y contraseña.
+// (GET /api/sesion): un 401 es «nadie» y la app enseña la entrada. Todos
+// entran con usuario y contraseña; el del taller se queda dentro de ese
+// aparato con la cookie del dispositivo (un año), el despacho con una sesión
+// de 8 horas.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, SESION_CADUCADA } from './api';
 import { desactivarPush } from './push';
@@ -9,13 +10,10 @@ import { toast } from './toast';
 
 export type Sesion = { id: number; nombre: string; rol: 'TALLER' | 'DESPACHO' | 'ADMIN'; dispositivo: boolean };
 
-type Entrado = Omit<Sesion, 'dispositivo'>;
-
 type ContextoSesion = {
   sesion: Sesion | null;
   cargando: boolean;
   entrar(login: string, password: string): Promise<void>;
-  entrarConCodigo(codigo: string, nombre: string): Promise<void>;
   salir(): Promise<void>;
 };
 
@@ -74,19 +72,12 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   const entrar = useCallback(async (login: string, password: string) => {
-    const entrado = await api<Entrado>('/api/sesion', {
+    // El nombre solo se usa si es del taller: así se reconoce el aparato en la lista de dispositivos.
+    const entrado = await api<Sesion>('/api/sesion', {
       method: 'POST',
-      body: JSON.stringify({ login, password }),
+      body: JSON.stringify({ login, password, nombre: nombreDelAparato(navigator.userAgent) }),
     });
-    setSesion({ ...entrado, dispositivo: false });
-  }, []);
-
-  const entrarConCodigo = useCallback(async (codigo: string, nombre: string) => {
-    const entrado = await api<Entrado>('/api/sesion/dispositivo', {
-      method: 'POST',
-      body: JSON.stringify({ codigo, nombre }),
-    });
-    setSesion({ ...entrado, dispositivo: true });
+    setSesion(entrado);
   }, []);
 
   const salir = useCallback(async () => {
@@ -100,8 +91,8 @@ export function ProveedorSesion({ children }: { children: ReactNode }) {
   }, []);
 
   const valor = useMemo(
-    () => ({ sesion, cargando, entrar, entrarConCodigo, salir }),
-    [sesion, cargando, entrar, entrarConCodigo, salir],
+    () => ({ sesion, cargando, entrar, salir }),
+    [sesion, cargando, entrar, salir],
   );
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
 }
@@ -115,4 +106,40 @@ export function useSesion(): ContextoSesion {
 /** Si quien atiende el servidor ya no es quien pinta la app: otro usuario, o el mismo con otro rol (cambia de cara). */
 export function cambioDeUsuario(antes: Pick<Sesion, 'id' | 'rol'>, ahora: Pick<Sesion, 'id' | 'rol'>): boolean {
   return antes.id !== ahora.id || antes.rol !== ahora.rol;
+}
+
+/**
+ * Cómo llamar al aparato en la lista de dispositivos, sacado del navegador:
+ * «Móvil Android · Chrome», «Tablet Android · Chrome», «iPhone · Safari»,
+ * «Windows · Edge». Si no se reconoce, el principio del texto del navegador.
+ */
+export function nombreDelAparato(agente: string): string {
+  const sistema = /iPhone/.test(agente)
+    ? 'iPhone'
+    : /iPad/.test(agente)
+      ? 'iPad'
+      : /Android/.test(agente)
+        ? /Mobile/.test(agente)
+          ? 'Móvil Android'
+          : 'Tablet Android'
+        : /Windows/.test(agente)
+          ? 'Windows'
+          : /Mac OS X/.test(agente)
+            ? 'Mac'
+            : /Linux/.test(agente)
+              ? 'Linux'
+              : null;
+  const navegador = /Edg\//.test(agente)
+    ? 'Edge'
+    : /SamsungBrowser\//.test(agente)
+      ? 'Samsung Internet'
+      : /Firefox\/|FxiOS\//.test(agente)
+        ? 'Firefox'
+        : /Chrome\/|CriOS\//.test(agente)
+          ? 'Chrome'
+          : /Safari\//.test(agente)
+            ? 'Safari'
+            : null;
+  if (!sistema && !navegador) return agente.slice(0, 80) || 'Sin nombre';
+  return [sistema, navegador].filter(Boolean).join(' · ');
 }

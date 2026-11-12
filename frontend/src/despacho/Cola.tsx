@@ -156,11 +156,10 @@ export default function Cola() {
   const flechaAtrasar = alReves ? '▲' : '▼';
 
   return (
-    <section className="pantalla-cola" aria-label="Cola del taller">
+    <section className="pantalla-cola" aria-label="Lista de prioridades">
       <div className="cabecera-cola">
         <div>
-          <h2>Cola del taller</h2>
-          <p className="ayuda">La primera es la siguiente que hará el taller. Arrastra una orden sobre otra, o usa los botones, para cambiar el orden.</p>
+          <h2>Lista de prioridades</h2>
         </div>
         <button className="boton marca" type="button" onClick={() => navegar('/bandeja/nueva?pestana=despacho')}>
           <Icono nombre="mas" /> Nueva orden

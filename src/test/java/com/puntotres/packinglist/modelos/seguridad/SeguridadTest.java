@@ -90,14 +90,12 @@ class SeguridadTest {
 
     @Test
     void unaPeticionConCookieDeDispositivoValidaEntraComoTaller() throws Exception {
-        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller Tánger T6", "t6-cookie", "", Rol.TALLER));
-        String codigo = dispositivos.generarCodigoAlta(taller.getId());
-
-        MvcResult canje = mvc.perform(post("/api/sesion/dispositivo").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"codigo\":\"" + codigo + "\",\"nombre\":\"Tablet T6\"}"))
+        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller Tánger T6", "t6-cookie", "clave-taller", Rol.TALLER));
+        MvcResult entrada = mvc.perform(post("/api/sesion").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"login\":\"t6-cookie\",\"password\":\"clave-taller\",\"nombre\":\"Tablet T6\"}"))
                 .andExpect(status().isOk())
                 .andReturn();
-        Cookie cookie = canje.getResponse().getCookie(FiltroDispositivo.COOKIE);
+        Cookie cookie = entrada.getResponse().getCookie(FiltroDispositivo.COOKIE);
         assertNotNull(cookie);
 
         mvc.perform(get("/api/sesion").cookie(cookie))
@@ -113,9 +111,8 @@ class SeguridadTest {
 
     @Test
     void unDispositivoRevocadoRecibe401() throws Exception {
-        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller Fez T6", "t6-revocado", "", Rol.TALLER));
-        Dispositivos.TokenDispositivo token = dispositivos.canjear(
-                dispositivos.generarCodigoAlta(taller.getId()), "Móvil T6");
+        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller Fez T6", "t6-revocado", "clave-taller", Rol.TALLER));
+        Dispositivos.TokenDispositivo token = dispositivos.darDeAlta(taller.getId(), "Móvil T6");
         Cookie cookie = new Cookie(FiltroDispositivo.COOKIE, token.tokenEnClaro());
         mvc.perform(get("/api/sesion").cookie(cookie)).andExpect(status().isOk());
 
@@ -128,9 +125,8 @@ class SeguridadTest {
 
     @Test
     void unUsuarioDesactivadoNoEntraConSuDispositivo() throws Exception {
-        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller Ubrique T6", "t6-inactivo", "", Rol.TALLER));
-        Dispositivos.TokenDispositivo token = dispositivos.canjear(
-                dispositivos.generarCodigoAlta(taller.getId()), "Móvil T6");
+        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller Ubrique T6", "t6-inactivo", "clave-taller", Rol.TALLER));
+        Dispositivos.TokenDispositivo token = dispositivos.darDeAlta(taller.getId(), "Móvil T6");
         Cookie cookie = new Cookie(FiltroDispositivo.COOKIE, token.tokenEnClaro());
 
         usuarios.cambiar(taller.getId(), null, null, false, null);
@@ -142,9 +138,8 @@ class SeguridadTest {
 
     @Test
     void elUsoDelDispositivoSeApuntaComoMuchoUnaVezPorHora() throws Exception {
-        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller T6 uso", "t6-uso", "", Rol.TALLER));
-        Dispositivos.TokenDispositivo token = dispositivos.canjear(
-                dispositivos.generarCodigoAlta(taller.getId()), "Móvil T6");
+        Usuario taller = usuarios.crear(new Usuarios.Alta("Taller T6 uso", "t6-uso", "clave-taller", Rol.TALLER));
+        Dispositivos.TokenDispositivo token = dispositivos.darDeAlta(taller.getId(), "Móvil T6");
         Cookie cookie = new Cookie(FiltroDispositivo.COOKIE, token.tokenEnClaro());
 
         mvc.perform(get("/api/sesion").cookie(cookie)).andExpect(status().isOk());
