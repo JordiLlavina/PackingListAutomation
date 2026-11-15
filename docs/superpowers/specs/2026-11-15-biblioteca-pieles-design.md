@@ -41,6 +41,11 @@ condiciones:
 | ¿Tipo? | **Lista cerrada**, en orden alfabético: `Animal print`, `Cabra`, `Cocodrilo`, `Grabado`, `Napa`, `Nubuck`, `Release`, `Serpiente`, `Serraje`, `Serraje de forro`. |
 | ¿Acabado y grabado como campos aparte? | **No.** Se eliminan los dos (los había propuesto el asistente). |
 | ¿Texto libre? | Un campo **«Comentarios»** en la ficha. |
+| ¿Cuántos tipos lleva una piel? | **Uno solo.** |
+| ¿Más animales (cocodrilo, serpiente)? | **No.** Solo hay dos animales en la lista. |
+| ¿Login para estas pantallas? | **No.** Quedan abiertas en la red local, como el resto de la app vieja. |
+| ¿Enlazar solo por nombre una piel de cliente con su ficha? | **Se propone y lo acepta el usuario**; nunca se enlaza solo. |
+| ¿Filtro por precio? | **Descartado.** |
 
 ## Supuestos (míos, a confirmar)
 
@@ -57,7 +62,6 @@ condiciones:
   razones de cambio de la app de modelos: añadir un valor es una línea y un
   reinicio. Un valor guardado que luego se quite del yml se sigue enseñando tal
   cual, no se pierde.
-- Una piel lleva **un solo tipo**.
 - El **MOQ es el tramo de precio más bajo**: no hay un campo MOQ aparte de los
   tramos, porque dos sitios para el mismo dato acaban diciendo cosas distintas.
   Un MOQ del que aún no se sabe el precio es un tramo con el precio vacío.
@@ -102,14 +106,11 @@ cosas distintas. Con el enlace:
 `fecha_actualizacion`.
 
 **`ficha_piel`**: `id`, `proveedor_id`, `nombre` (único dentro del proveedor),
-`ref_proveedor`, `animal`, `tipo`, `curticion` (cromo, vegetal,
-*metal-free*…), `pais_curticion`, `seleccion` (1ª, 2ª…),
-`grueso_min_mm` y `grueso_max_mm`, `superficie_min_m2` y `superficie_max_m2`
-(un valor fijo es mínimo = máximo), `stock_service` (sí, no o nulo si no se
-sabe), `colores_stock`, `colores_disponibles`, `plazo_stock_dias`,
-`plazo_fabricacion_dias`, `moq_por_color`, `fecha_precios`,
-`precio_muestra_eur`, `certificaciones` (LWG, REACH, CITES…), `calidad` (1-5),
-`nota_calidad`, `ubicacion_muestra`, `comentarios`, `origen` (`MANUAL`, `FICHA`,
+`ref_proveedor`, `animal`, `tipo`, `grueso_min_mm` y `grueso_max_mm`,
+`superficie_min_m2` y `superficie_max_m2` (un valor fijo es mínimo = máximo),
+`stock_service` (sí, no o nulo si no se sabe), `plazo_entrega_dias`,
+`moq_por_color`, `fecha_precios`, `calidad` (1-5), `nota_calidad`,
+`comentarios`, `origen` (`MANUAL`, `FICHA`,
 `AGENTE`), `fecha_alta`, `fecha_actualizacion`.
 
 **`precio_piel`**: `id`, `ficha_piel_id`, `moq_m2`, `precio_eur_m2` (puede ir
@@ -124,10 +125,13 @@ fotos del catálogo (`FotoCatalogo.nombreLibre`; HEIC por el conversor del corte
 `fecha`. Las fichas técnicas y ofertas en PDF. Se guardan aunque el agente aún no
 exista: si un dato está mal, se puede ir al original.
 
-**`evento_piel`**: `id`, `ficha_piel_id`, `fecha`, `cliente`, `tipo`, `modelo_id`
-(opcional), `ref_cliente` (opcional), `nota`. El recorrido de la piel. Los tipos
-son `MOSTRADA` (se enseñó o propuso), `MUESTRA` (se mandó una muestra),
-`PROTOTIPO`, `SMS`, `PRODUCCION` y `DESCARTADA` (con el motivo en la nota).
+**`evento_piel`**: `id`, `ficha_piel_id`, `fecha`, `cliente`, `tipo`, `modelo`
+(texto libre, opcional: `PROTO B`, `ULL027`), `nota`. El recorrido de la piel.
+Los tipos son `BUSCADA` (se buscó para ese cliente), `MOSTRADA` (se le enseñó o
+propuso), `MUESTRA` (se mandó una muestra), `PROTOTIPO`, `SMS`, `PRODUCCION` y
+`DESCARTADA` (con el motivo en la nota). El modelo es texto y no un enlace a la
+app de modelos: al fusionar allí un prototipo con su referencia, un enlace se
+perdería en silencio.
 
 **`piel`** gana `ficha_piel_id bigint` nulo, con FK a `ficha_piel(id)` y `on delete
 set null`. Al ser de una sola columna, el `set null` no tiene el problema de la FK
@@ -139,9 +143,7 @@ La ficha enseña una sola **línea de tiempo**, de más antiguo a más reciente,
 junta dos fuentes:
 
 1. **Los eventos apuntados** (`evento_piel`): «2026-03-12 · APC · Mostrada»,
-   «2026-05-02 · APC · Prototipo `PROTO B`». Un evento puede apuntar a un modelo
-   de la app de modelos (un prototipo que aún no tiene referencia) y entonces
-   enlaza a su ficha.
+   «2026-05-02 · APC · Prototipo `PROTO B`».
 2. **Lo que ya sabe el catálogo**, sin teclear nada: las filas de `piel` enlazadas
    a la ficha → sus artículos → su modelo (con su etapa) y sus temporadas. Salen
    como «AMI · `ULL027.AL0103` · Producción · H26».
@@ -168,7 +170,10 @@ esta versión: un prototipo no dice con qué piel se hizo.
   referencias de cliente enlazadas (`AMI AL0103`, `APC PXCBC`). Debajo van las
   filas de `piel` sin ficha, marcadas «sin ficha», con dos acciones: **enlazar a
   una ficha existente** (buscador por nombre y proveedor) o **crear la ficha**
-  (rellena el nombre).
+  (rellena el nombre). Si una piel sin ficha **se llama igual** que una ficha,
+  la fila lo propone («¿Es ALPACA TOUCH de Curtidos X?») y se enlaza solo cuando
+  el usuario lo acepta. Al enlazar una piel de cliente sin nombre, se le pone el
+  de la ficha (rellenar un hueco, nunca pisar).
 - **Filtros**: buscador (nombre, referencia de proveedor o de cliente), proveedor,
   cliente, animal, tipo, rango de grueso, stock service, y «solo sin ficha».
 - **Edición celda a celda por `fetch`**, como `/catalogo` y `/colores`, para
@@ -187,6 +192,8 @@ esta versión: un prototipo no dice con qué piel se hizo.
 - **«Duplicar»** una ficha del mismo proveedor: las pieles de una curtiduría
   comparten casi todo (país, curtición, plazos, MOQ, certificaciones), y solo se
   cambia el nombre, el grueso y el precio.
+- **«Buscada para»** en el alta: un desplegable de cliente que apunta el primer
+  evento (`BUSCADA`) con la fecha de hoy, sin un segundo paso.
 - **Proveedor nuevo sin salir de la ficha**: si el nombre tecleado no existe, se
   crea al guardar.
 - **Soltar fotos y PDFs** encima de la ficha, como el campo de fotos del corte.
@@ -225,55 +232,25 @@ SQL del subconjunto común a H2 y PostgreSQL, como desde la V4, y binarios como
   podría sugerir el enlace al leerlo.
 - Que los eventos salgan solos de la app de modelos.
 
-## Revisión crítica del diseño (propuestas pendientes de decidir)
+## Límites conocidos de esta versión
 
-Hecha por el asistente a petición del usuario, el mismo 2026-11-15. Nada de esto
-está decidido todavía.
+De la revisión crítica del 2026-11-15. Lo que el usuario decidió está en la tabla
+de decisiones. Tres propuestas del asistente no tuvieron respuesta y se aplican
+**salvo que el usuario diga otra cosa**: quitar los campos que no pidió
+(curtición, país, selección, colores, precio de muestra, certificaciones,
+ubicación de la muestra: caben en «Comentarios») dejando solo un plazo de
+entrega; el modelo de un evento como texto y no como enlace; y «Buscada para» en
+el alta.
 
-**Quitaría:**
-
-1. **Los campos que el usuario no pidió**: `curticion`, `pais_curticion`,
-   `seleccion`, `colores_stock`, `colores_disponibles`, `precio_muestra_eur`,
-   `certificaciones` y `ubicacion_muestra`. Cada campo de más es una casilla
-   vacía que revisar en cada alta, y todo eso cabe en «Comentarios» hasta que se
-   vea que alguno hace falta de verdad; añadir una columna después es una
-   migración pequeña. Dejaría solo un **plazo de entrega** (días), que es el
-   dato que más pesa al elegir una piel después del precio.
-2. **El enlace del evento a un modelo** (`evento_piel.modelo_id`). Al fusionar
-   un prototipo con su referencia en la app de modelos habría que mover también
-   esos eventos, o el enlace se perdería en silencio. Con un texto libre en el
-   evento («PROTO B») se sabe lo mismo sin acoplar las dos aplicaciones.
-
-**Añadiría:**
-
-3. **Login para estas pantallas.** Las pantallas viejas están abiertas a toda
-   la red local, también a la tablet del taller, y aquí van precios y
-   valoraciones de proveedores. Propuesta: exigir la sesión de la app de modelos
-   con rol de despacho o admin en `/biblioteca-pieles/**`.
-4. **«Buscada para» en el alta de la ficha**: un desplegable de cliente que crea
-   el primer evento con la fecha de hoy. Sin él, el campo que pidió el usuario
-   («para qué cliente se ha buscado») obliga a un segundo paso.
-5. **Proponer el enlace por nombre.** Si una piel de cliente sin ficha se llama
-   igual que una ficha, la pantalla lo propone y se enlaza con un clic. Y al
-   enlazar una piel de cliente que no tiene nombre, se le pone el de la ficha
-   (rellenar un hueco, nunca pisar).
-6. **Filtro por precio máximo y orden por precio**: la pregunta habitual será
-   «un serraje de 1,2 mm por menos de 40 €/m² con stock service».
-
-**Límites que hay que conocer:**
-
-7. **Los forros y las combinaciones no salen en el recorrido automático.** En el
-   catálogo son texto libre, sin referencia de piel, así que un «serraje de
-   forro» de la biblioteca no se puede enlazar a los modelos que lo llevan. Su
-   recorrido serían solo los eventos apuntados a mano.
-8. **El recorrido automático depende de que alguien enlace** cada piel de
-   cliente con su ficha. Sin enlaces, solo se ven los eventos a mano. Por eso el
-   punto 5.
-9. **Nombres escritos de dos formas** (`ALPACA TOUCH`, `ALPACA-TOUCH`) darían
-   dos fichas. Se guardan en mayúsculas y sin espacios de sobra, y el alta
-   sugiere las que ya existen del proveedor, pero no hay fusión de fichas en esta
-   versión.
-10. **Dudas sobre la lista de tipos**: `Cabra` está en animal y en tipo;
-    `floter`, que estaba en la primera lista, ya no está; y con animal `Vaca` o
-    `Cabra`, un tipo `Cocodrilo` o `Serpiente` solo puede ser un grabado o un
-    print, no la piel de ese animal.
+- **Los forros y las combinaciones no salen en el recorrido automático.** En el
+  catálogo son texto libre, sin referencia de piel, así que un «serraje de
+  forro» de la biblioteca no se puede enlazar a los modelos que lo llevan. Su
+  recorrido son solo los eventos apuntados a mano.
+- **El recorrido automático depende de que alguien acepte los enlaces** de cada
+  piel de cliente con su ficha. Sin enlaces, solo se ven los eventos a mano.
+- **Nombres escritos de dos formas** (`ALPACA TOUCH`, `ALPACA-TOUCH`) dan dos
+  fichas. Se guardan en mayúsculas y sin espacios de sobra, y el alta sugiere las
+  que ya existen del proveedor, pero no hay fusión de fichas.
+- **Sin login**: precios y valoraciones de proveedores se ven desde cualquier
+  equipo de la red local, incluida la tablet del taller.
+- **`Cabra` está en animal y en tipo**, tal como dio las listas el usuario.
