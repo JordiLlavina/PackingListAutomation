@@ -37,14 +37,15 @@ export const DIVERTIDAS: Frase[] = [
   { texto: '¡Ya llegó el jefe de los bolsos!' },
   { texto: '¿Café primero o bolsos primero?' },
   { texto: 'Cuidado, que hoy el cuero está de buen humor' },
-  { texto: 'No hay costuras torcidas, solo costuras con personalidad' },
   { texto: 'Con ese talento, hoy sale todo redondo' },
   { texto: '¡Mediodía, tarde y gol!', vale: (_d, m) => m >= h(17) },
   { texto: 'Modo artista: activado' },
-  { texto: 'Si el cuero hablara, te daría las gracias' },
+  { texto: 'Si el cuero hablara, te daría las gracias ;)' },
   { texto: 'Segunda parte del partido, ¡y vamos ganando!', vale: (_d, m) => m >= h(15) },
   { texto: '¿En qué andamos hoy?' },
   { texto: '¡Hoy llevas el guapo subido!' },
+  { texto: 'Esto huele a obra maestra, Bachir' },
+  
 ];
 
 export const PROB_DIVERTIDA = 1 / 6;
