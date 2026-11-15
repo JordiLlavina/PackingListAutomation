@@ -37,6 +37,10 @@ condiciones:
 | ¿Histórico de valoraciones o una nota? | **Una sola nota que se va corrigiendo.** |
 | ¿Unidad del precio? | **€/m²**, siempre. |
 | ¿Fotos? | **Sí**, fotos de la piel. |
+| ¿Animal? | **Lista cerrada**: `Vaca` (por defecto) y `Cabra`. |
+| ¿Tipo? | **Lista cerrada**, en orden alfabético: `Animal print`, `Cabra`, `Cocodrilo`, `Grabado`, `Napa`, `Nubuck`, `Release`, `Serpiente`, `Serraje`, `Serraje de forro`. |
+| ¿Acabado y grabado como campos aparte? | **No.** Se eliminan los dos (los había propuesto el asistente). |
+| ¿Texto libre? | Un campo **«Comentarios»** en la ficha. |
 
 ## Supuestos (míos, a confirmar)
 
@@ -49,14 +53,14 @@ condiciones:
   precios, sería una tabla más sin tocar nada de lo de aquí.
 - El **MOQ** se expresa en m², con una casilla «por color» (el MOQ de un color o
   el del pedido entero, que no es lo mismo).
-- El **tipo de piel** de la lista del usuario mezcla cosas distintas (animal:
-  cabra, cocodrilo; corte: floter, serraje, napa; dibujo: animal print). Se parte
-  en **animal, tipo, acabado y grabado**, para que «napa de cabra» o «floter con
-  grabado coco» se puedan escribir.
-- Esos campos son **texto con sugerencias**, no listas cerradas: el yml trae una
-  semilla de valores y el desplegable sugiere la semilla más lo que ya se ha
-  escrito. Así un valor nuevo no pide editar el yml ni reiniciar, y el agente
-  tendrá una lista de valores conocidos a la que ajustarse.
+- Las dos **listas cerradas** (animal y tipo) viven en `application.yml`, como las
+  razones de cambio de la app de modelos: añadir un valor es una línea y un
+  reinicio. Un valor guardado que luego se quite del yml se sigue enseñando tal
+  cual, no se pierde.
+- Una piel lleva **un solo tipo**.
+- El **MOQ es el tramo de precio más bajo**: no hay un campo MOQ aparte de los
+  tramos, porque dos sitios para el mismo dato acaban diciendo cosas distintas.
+  Un MOQ del que aún no se sabe el precio es un tramo con el precio vacío.
 - La **pantalla vive en la app vieja** (Thymeleaf, como `/catalogo` y `/colores`),
   no en la PWA de modelos, porque la pidió para «la app de Automatizaciones».
 
@@ -98,18 +102,19 @@ cosas distintas. Con el enlace:
 `fecha_actualizacion`.
 
 **`ficha_piel`**: `id`, `proveedor_id`, `nombre` (único dentro del proveedor),
-`ref_proveedor`, `animal`, `tipo`, `acabado`, `grabado`, `curticion` (cromo,
-vegetal, *metal-free*…), `pais_curticion`, `seleccion` (1ª, 2ª…),
+`ref_proveedor`, `animal`, `tipo`, `curticion` (cromo, vegetal,
+*metal-free*…), `pais_curticion`, `seleccion` (1ª, 2ª…),
 `grueso_min_mm` y `grueso_max_mm`, `superficie_min_m2` y `superficie_max_m2`
 (un valor fijo es mínimo = máximo), `stock_service` (sí, no o nulo si no se
 sabe), `colores_stock`, `colores_disponibles`, `plazo_stock_dias`,
-`plazo_fabricacion_dias`, `moq_m2`, `moq_por_color`, `fecha_precios`,
+`plazo_fabricacion_dias`, `moq_por_color`, `fecha_precios`,
 `precio_muestra_eur`, `certificaciones` (LWG, REACH, CITES…), `calidad` (1-5),
-`nota_calidad`, `ubicacion_muestra`, `notas`, `origen` (`MANUAL`, `FICHA`,
+`nota_calidad`, `ubicacion_muestra`, `comentarios`, `origen` (`MANUAL`, `FICHA`,
 `AGENTE`), `fecha_alta`, `fecha_actualizacion`.
 
-**`precio_piel`**: `id`, `ficha_piel_id`, `desde_m2`, `precio_eur_m2`. Los tramos
-de una ficha, ordenados por `desde_m2`.
+**`precio_piel`**: `id`, `ficha_piel_id`, `moq_m2`, `precio_eur_m2` (puede ir
+vacío). Los tramos de una ficha, ordenados por `moq_m2`; el más bajo es el MOQ de
+la piel.
 
 **`foto_piel`**: `id`, `ficha_piel_id`, `nombre_fichero`, `principal`, `orden`,
 `bytes`. Reducidas a 1.600 px y con nombre único dentro de la ficha, como las
@@ -190,15 +195,15 @@ esta versión: un prototipo no dice con qué piel se hizo.
 
 El patrón será el de la conversión del excel del taller, que ya funciona: **Claude
 lee, Java decide, la persona confirma.** Se suelta una ficha técnica. Claude
-devuelve los campos con salida estructurada, ajustándose a los valores conocidos
-de animal, tipo y acabado. Java comprueba lo comprobable (unidades, rangos
+devuelve los campos con salida estructurada, eligiendo animal y tipo de las dos
+listas cerradas. Java comprueba lo comprobable (unidades, rangos
 mínimo ≤ máximo, proveedor existente). La pantalla enseña el formulario relleno
 con las dudas en amarillo, y la persona guarda. Para eso el diseño ya trae:
 
 - `origen` en la ficha, para saber qué entró por el agente;
 - `documento_piel`, donde queda el PDF del que salieron los datos;
 - todos los campos opcionales, para que una ficha técnica incompleta no falle;
-- las listas de valores conocidos, que irán en el prompt.
+- las dos listas cerradas, que irán en el prompt y en el esquema de la salida.
 
 Otra entrada posible para más adelante: **dictar** la valoración de un proveedor
 con la transcripción de notas de voz que ya existe en la app de modelos.
@@ -219,3 +224,56 @@ SQL del subconjunto común a H2 y PostgreSQL, como desde la V4, y binarios como
   la piel del proveedor (`ALPACA TOUCH`) junto a la referencia del cliente, y
   podría sugerir el enlace al leerlo.
 - Que los eventos salgan solos de la app de modelos.
+
+## Revisión crítica del diseño (propuestas pendientes de decidir)
+
+Hecha por el asistente a petición del usuario, el mismo 2026-11-15. Nada de esto
+está decidido todavía.
+
+**Quitaría:**
+
+1. **Los campos que el usuario no pidió**: `curticion`, `pais_curticion`,
+   `seleccion`, `colores_stock`, `colores_disponibles`, `precio_muestra_eur`,
+   `certificaciones` y `ubicacion_muestra`. Cada campo de más es una casilla
+   vacía que revisar en cada alta, y todo eso cabe en «Comentarios» hasta que se
+   vea que alguno hace falta de verdad; añadir una columna después es una
+   migración pequeña. Dejaría solo un **plazo de entrega** (días), que es el
+   dato que más pesa al elegir una piel después del precio.
+2. **El enlace del evento a un modelo** (`evento_piel.modelo_id`). Al fusionar
+   un prototipo con su referencia en la app de modelos habría que mover también
+   esos eventos, o el enlace se perdería en silencio. Con un texto libre en el
+   evento («PROTO B») se sabe lo mismo sin acoplar las dos aplicaciones.
+
+**Añadiría:**
+
+3. **Login para estas pantallas.** Las pantallas viejas están abiertas a toda
+   la red local, también a la tablet del taller, y aquí van precios y
+   valoraciones de proveedores. Propuesta: exigir la sesión de la app de modelos
+   con rol de despacho o admin en `/biblioteca-pieles/**`.
+4. **«Buscada para» en el alta de la ficha**: un desplegable de cliente que crea
+   el primer evento con la fecha de hoy. Sin él, el campo que pidió el usuario
+   («para qué cliente se ha buscado») obliga a un segundo paso.
+5. **Proponer el enlace por nombre.** Si una piel de cliente sin ficha se llama
+   igual que una ficha, la pantalla lo propone y se enlaza con un clic. Y al
+   enlazar una piel de cliente que no tiene nombre, se le pone el de la ficha
+   (rellenar un hueco, nunca pisar).
+6. **Filtro por precio máximo y orden por precio**: la pregunta habitual será
+   «un serraje de 1,2 mm por menos de 40 €/m² con stock service».
+
+**Límites que hay que conocer:**
+
+7. **Los forros y las combinaciones no salen en el recorrido automático.** En el
+   catálogo son texto libre, sin referencia de piel, así que un «serraje de
+   forro» de la biblioteca no se puede enlazar a los modelos que lo llevan. Su
+   recorrido serían solo los eventos apuntados a mano.
+8. **El recorrido automático depende de que alguien enlace** cada piel de
+   cliente con su ficha. Sin enlaces, solo se ven los eventos a mano. Por eso el
+   punto 5.
+9. **Nombres escritos de dos formas** (`ALPACA TOUCH`, `ALPACA-TOUCH`) darían
+   dos fichas. Se guardan en mayúsculas y sin espacios de sobra, y el alta
+   sugiere las que ya existen del proveedor, pero no hay fusión de fichas en esta
+   versión.
+10. **Dudas sobre la lista de tipos**: `Cabra` está en animal y en tipo;
+    `floter`, que estaba en la primera lista, ya no está; y con animal `Vaca` o
+    `Cabra`, un tipo `Cocodrilo` o `Serpiente` solo puede ser un grabado o un
+    print, no la piel de ese animal.
