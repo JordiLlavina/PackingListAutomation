@@ -4,10 +4,11 @@
 <body>
 <header th:replace="~{fragmentos :: cabeceraMenu('Automatizaciones de Puntotres')}"></header>
 <main>
-    <!-- Cada tarjeta se presenta con lo que produce. El párrafo que había
-         encima de la lista repetía lo que la lista ya dice, así que se quitó:
-         aquí solo se elige por dónde empezar. -->
-    <div class="menu-tarjetas">
+    <!-- Cada tarjeta dice solo lo que genera, en la zona clara y en pocas
+         palabras: aquí solo se elige por dónde empezar. En menu-principal
+         las zonas claras empiezan a la misma altura y llegan hasta abajo,
+         aunque un título ocupe dos líneas y otro una. -->
+    <div class="menu-tarjetas menu-principal">
         <a class="tarjeta menu-tarjeta" th:href="@{/packing-list}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -17,11 +18,11 @@
                 </svg>
                 Packing list y etiquetas
             </h2>
-            <p class="menu-entrada">Necesitas el packing list del envío.</p>
-            <ul class="menu-lista">
-                <li>Un packing list por destinación, en la plantilla del cliente</li>
-                <li>Etiquetas de caja y de palet</li>
-                <li>Volcado del albarán para el ERP</li>
+            <ul class="menu-entrada">
+                <li>Packing list</li>
+                <li>Etiquetas de Caja y Palet</li>
+                <li>Volcado albarán ICSUITE</li>
+                <li>Packing de Susana</li>
             </ul>
         </a>
 
@@ -34,11 +35,9 @@
                 </svg>
                 Etiquetas de artículo
             </h2>
-            <p class="menu-entrada">Las etiquetas que se pegan en cada pieza.</p>
-            <ul class="menu-lista">
-                <li>Producción, del excel de pedido del cliente</li>
-                <li>SMS — en desarrollo</li>
-                <li>Prototipos — en desarrollo</li>
+            <ul class="menu-entrada">
+                <li>Etiquetas de Producción</li>
+                <li>Etiquetas de SMS</li>
             </ul>
         </a>
 
@@ -47,12 +46,9 @@
                 <svg th:replace="~{fragmentos :: iconoPiel('menu-icono')}"></svg>
                 Documentos del Corte
             </h2>
-            <p class="menu-entrada">Necesitas el pedido de la temporada y las fotos de cada modelo.</p>
-            <ul class="menu-lista">
-                <li>Un Excel de órdenes de corte, con una hoja por modelo, piel y color</li>
-                <li>Un Word de fotos por modelo</li>
-                <li>AMI y APC — genéricos en desarrollo</li>
-                <li>Hojas de corte de SMS, del excel de pedido de SMS (APC)</li>
+            <ul class="menu-entrada">
+                <li>Órdenes de corte</li>
+                <li>Fotos de los modelos</li>
             </ul>
         </a>
 
@@ -65,28 +61,9 @@
                 </svg>
                 Etiqueta Info de Embalaje para Taller
             </h2>
-            <p class="menu-entrada">La hoja que va pegada en el sobre de etiquetas de cada modelo.</p>
-            <ul class="menu-lista">
-                <li>Caja, unidades por caja, bolsa y destinaciones con su pedido</li>
-                <li>Un Word A4, con QR al vídeo de embalaje si lo hay</li>
-                <li>Cada hoja queda guardada para repetirla o corregirla</li>
-            </ul>
-        </a>
-
-        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
-            <h2 class="menu-titulo">
-                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M5 3h9l5 5v13H5z"/>
-                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
-                </svg>
-                Escandallos para ClickUp
-            </h2>
-            <p class="menu-entrada">Necesitas los excels de escandallo de ICSUITE.</p>
-            <ul class="menu-lista">
-                <li>Un solo excel con una hoja por escandallo</li>
-                <li>Cada hoja, con el nombre de su modelo y su color</li>
-                <li>Sin precios, sin importes y sin fases</li>
+            <ul class="menu-entrada">
+                <li>Hoja de embalaje para el sobre</li>
+                <li>QR al vídeo de embalaje</li>
             </ul>
         </a>
 
@@ -104,13 +81,11 @@
                     <rect x="5" y="2.5" width="14" height="19" rx="2"/>
                     <path d="M10 18.5h4M8.5 8.5h7M8.5 12h7"/>
                 </svg>
-                Modelos y taller
+                App de Modificaciones
             </h2>
-            <p class="menu-entrada">Los cambios de cada modelo, en los dos sentidos.</p>
-            <ul class="menu-lista">
-                <li>Bachir avisa con fotos y voz desde la tablet</li>
-                <li>Despacho manda órdenes y las marca hechas</li>
-                <li>Etapas, histórico y etiqueta de patrones con QR</li>
+            <ul class="menu-entrada">
+                <li>Tracker de modificaciones</li>
+                <li>Etiquetas de patrones con QR</li>
             </ul>
         </a>
 
@@ -159,6 +134,20 @@
                 <span class="menu-panel-titulo">Taras de los cartones</span>
             </a>
         </div>
+
+        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 3h9l5 5v13H5z"/>
+                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
+                </svg>
+                Escandallos para ClickUp
+            </h2>
+            <ul class="menu-entrada">
+                <li>Pasa Escandallos ICSUITE → ClickUp</li>
+            </ul>
+        </a>
     </div>
 </main>
 </body>

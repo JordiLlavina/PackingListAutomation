@@ -803,6 +803,23 @@ header.cabecera .enlace-menu:hover {
     line-height: 1.45;
 }
 
+/* En el menú principal la zona clara es la lista de lo que genera la tarjeta:
+   las viñetas van dentro del recuadro, no colgando por fuera. */
+ul.menu-entrada {
+    padding-left: 1.9rem;
+    line-height: 1.6;
+}
+
+/* Todos los textos a la misma altura: el título se reserva siempre dos
+   líneas (con una sola va centrado en ese hueco), así que la zona clara
+   arranca en el mismo sitio en todas las tarjetas. En vertical la zona
+   clara se ciñe a su texto (con su padding de margen) y no se estira. */
+.menu-principal .menu-titulo {
+    min-height: 2.6em;
+    align-items: center;
+}
+.menu-principal .menu-entrada { margin-bottom: 0; }
+
 .menu-lista {
     margin: 0 0 1.2rem;
     padding-left: 1.2rem;
