@@ -23,7 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.modelos.ComoUsuario;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionResumen;
-import com.puntotres.packinglist.modelos.persistence.Mensaje;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Rol;
@@ -197,7 +196,6 @@ class RecordatoriosTest {
     @Test
     void unaHechaNoRecibeNada() throws IOException {
         Modificacion orden = orden("HECHA", true);
-        modificaciones.responder(orden.getId(), "¿Qué forro?", List.of(), actual(taller));
         modificaciones.marcarHecha(orden.getId(), actual(taller));
         Modificacion aviso = aviso("HECHO");
         modificaciones.marcarHecha(aviso.getId(), actual(despacho));
@@ -218,59 +216,12 @@ class RecordatoriosTest {
         }
     }
 
-    @Test
-    void unaRespuestaPendienteAvisaAlLadoQueDebeResponder() throws IOException {
-        Modificacion orden = orden("RESPUESTA", false);
-        Mensaje pregunta = modificaciones.responder(orden.getId(), "¿Qué forro?", List.of(), actual(taller));
-        LocalDateTime creada = LocalDateTime.of(2004, 3, 1, 8, 0);
-        alPasado(orden, creada);
-        alPasado(pregunta, creada.plusHours(1));
-        esperarALaCola();
-        enviador.envios.clear();
-
-        recordatorios.revisar(creada.plusHours(24));
-        assertTrue(respuestas(orden, despacho).isEmpty(), "hasta las 24 h del último mensaje no se insiste");
-
-        recordatorios.revisar(creada.plusHours(26));
-        List<JsonNode> alDespacho = respuestas(orden, despacho);
-        assertEquals(1, alDespacho.size(), "la pelota está en el despacho");
-        assertEquals("Respuesta pendiente: Cambiar el forro", alDespacho.get(0).get("titulo").asText());
-        assertEquals(taller.getNombre() + " espera respuesta · " + referencia(orden),
-                alDespacho.get(0).get("cuerpo").asText());
-        assertEquals("/app/bandeja/" + orden.getId(), alDespacho.get(0).get("url").asText());
-        assertTrue(respuestas(orden, taller).isEmpty());
-
-        recordatorios.revisar(creada.plusHours(30));
-        assertEquals(1, respuestas(orden, despacho).size(), "no se repite dentro de las 24 h");
-
-        Mensaje contestacion = modificaciones.responder(orden.getId(), "El de siempre", List.of(), actual(despacho));
-        alPasado(contestacion, creada.plusHours(31));
-        esperarALaCola();
-        recordatorios.revisar(creada.plusHours(56));
-        List<JsonNode> alTaller = respuestas(orden, taller);
-        assertEquals(1, alTaller.size(), "ahora espera el taller");
-        assertEquals(despacho.getNombre() + " espera respuesta · " + referencia(orden),
-                alTaller.get(0).get("cuerpo").asText());
-        assertEquals("/app/ordenes/" + orden.getId(), alTaller.get(0).get("url").asText());
-        assertEquals(1, respuestas(orden, despacho).size());
-    }
-
     /** Los resúmenes de la cola que le han llegado al taller, en orden. */
     private List<JsonNode> resumenesDeLaCola() throws IOException {
         List<JsonNode> lista = new ArrayList<>();
         for (EnviadorFalso.Envio envio : enviador.envios) {
             JsonNode carga = json.readTree(envio.payload());
             if (taller.getId().equals(envio.usuarioId()) && carga.get("titulo").asText().startsWith("Tienes ")) {
-                lista.add(carga);
-            }
-        }
-        return lista;
-    }
-
-    private List<JsonNode> respuestas(Modificacion m, Usuario usuario) throws IOException {
-        List<JsonNode> lista = new ArrayList<>();
-        for (JsonNode carga : recibidos(m, usuario)) {
-            if (carga.get("titulo").asText().startsWith("Respuesta pendiente")) {
                 lista.add(carga);
             }
         }
@@ -313,10 +264,6 @@ class RecordatoriosTest {
     private void alPasado(Modificacion m, LocalDateTime cuando) {
         jdbc.update("update modificacion set creada_en = ? where id = ?", cuando, m.getId());
         jdbc.update("update mensaje set creado_en = ? where modificacion_id = ?", cuando, m.getId());
-    }
-
-    private void alPasado(Mensaje mensaje, LocalDateTime cuando) {
-        jdbc.update("update mensaje set creado_en = ? where id = ?", cuando, mensaje.getId());
     }
 
     private String referencia(Modificacion m) {

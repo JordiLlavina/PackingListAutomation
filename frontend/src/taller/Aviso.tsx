@@ -1,5 +1,6 @@
 // Un aviso del taller, abierto desde «Mis avisos»: lo que se mandó (modelo,
-// razones, fotos, nota de voz) y lo que ha contestado despacho. Mientras
+// razones, fotos, nota de voz). No hay respuestas: las dudas van por
+// teléfono. Mientras
 // despacho no haya empezado a aplicarlo (enviado o visto) se puede corregir
 // —marcar otras razones, quitar o añadir fotos, grabar otra nota de voz— y
 // borrar (petición del usuario, noviembre de 2026). Después solo se mira, y la
@@ -37,28 +38,6 @@ type Nota = { blob: Blob; duracionSeg: number; url: string };
 
 function deTipo(m: MensajeVista | undefined, tipo: AdjuntoVista['tipo']): AdjuntoVista[] {
   return m?.adjuntos.filter((a) => a.tipo === tipo) ?? [];
-}
-
-/** Una respuesta de despacho (o una duda nuestra) debajo del aviso. */
-function Mensaje({ mensaje }: { mensaje: MensajeVista }) {
-  const audio = deTipo(mensaje, 'AUDIO')[0];
-  const fotos = deTipo(mensaje, 'FOTO');
-  return (
-    <div className="mensaje">
-      <span className="quien">
-        {mensaje.autor ?? 'Sin autor'} · {hace(mensaje.creadoEn)}
-      </span>
-      {mensaje.texto && <p>{mensaje.texto}</p>}
-      {audio && <Audio compacto adjuntoId={audio.id} duracionSeg={audio.duracionSeg ?? 0} />}
-      {fotos.length > 0 && (
-        <div className="miniaturas">
-          {fotos.map((f) => (
-            <img key={f.id} src={adjuntoUrl(f.id)} alt="" loading="lazy" />
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function Aviso() {
@@ -130,7 +109,7 @@ export default function Aviso() {
   }
   if (!detalle || !r) return null;
 
-  const [cuerpo, ...respuestas] = detalle.mensajes;
+  const [cuerpo] = detalle.mensajes;
   const audioActual = deTipo(cuerpo, 'AUDIO')[0];
   const fotosActualesDelAviso = deTipo(cuerpo, 'FOTO').filter((f) => !quitar.includes(f.id));
   const editable = avisoEditable(r.estado);
@@ -285,51 +264,34 @@ export default function Aviso() {
 
       <section className="bloque-aviso">
         <h3>Nota de voz</h3>
-        {nota ? (
-          <>
+        {/* A la derecha de la nota, el botón que la tira, la quita o la recupera, con un icono por cada caso. */}
+        <div className="nota-con-boton">
+          {nota ? (
             <Audio key={nota.url} src={nota.url} duracionSeg={nota.duracionSeg} />
-            <p className="ayuda">Nota nueva: sustituirá a la anterior al guardar.</p>
-          </>
-        ) : audioActual && !quitarNota ? (
-          <Audio adjuntoId={audioActual.id} duracionSeg={audioActual.duracionSeg ?? 0} />
-        ) : (
-          <p className="ayuda">{quitarNota ? 'La nota se quitará al guardar.' : 'Sin nota de voz.'}</p>
-        )}
+          ) : audioActual && !quitarNota ? (
+            <Audio adjuntoId={audioActual.id} duracionSeg={audioActual.duracionSeg ?? 0} />
+          ) : (
+            <p className="ayuda">{quitarNota ? 'La nota se quitará al guardar.' : 'Sin nota de voz.'}</p>
+          )}
+          {editable && nota && (
+            <button className="boton" type="button" disabled={ocupado || grabadora.grabando} onClick={() => ponerNota(null)}>
+              <Icono nombre="papelera" /> Tirar la nota nueva
+            </button>
+          )}
+          {editable && !nota && audioActual && (
+            <button className="boton" type="button" disabled={ocupado || grabadora.grabando} onClick={() => setQuitarNota(!quitarNota)}>
+              <Icono nombre={quitarNota ? 'deshacer' : 'sinMic'} /> {quitarNota ? 'Dejar la nota que había' : 'Quitar la nota'}
+            </button>
+          )}
+        </div>
+        {nota && <p className="ayuda">Nota nueva: sustituirá a la anterior al guardar.</p>}
         {editable && (
           <>
-            <Grabadora estado={grabadora} grabadaSeg={null} />
-            <div className="acciones">
-              {nota && (
-                <button className="boton" type="button" disabled={ocupado || grabadora.grabando} onClick={() => ponerNota(null)}>
-                  Tirar la nota nueva
-                </button>
-              )}
-              {!nota && audioActual && (
-                <button className="boton" type="button" disabled={ocupado || grabadora.grabando} onClick={() => setQuitarNota(!quitarNota)}>
-                  {quitarNota ? 'Dejar la nota que había' : 'Quitar la nota'}
-                </button>
-              )}
-            </div>
+            <Grabadora estado={grabadora} grabadaSeg={null} pequena />
             {grabadora.sinMicro && <p className="ayuda">No puedo usar el micrófono: puedes dejar la nota que había o solo fotos.</p>}
           </>
         )}
       </section>
-
-      {respuestas.length > 0 && (
-        <section className="bloque-aviso">
-          <h3>Respuestas</h3>
-          <div className="hilo">
-            {respuestas.map((m) => (
-              <Mensaje key={m.id} mensaje={m} />
-            ))}
-          </div>
-          {r.ultimoMensajeDe === 'DESPACHO' && (
-            <button className="boton marca" type="button" onClick={() => navegar(`/avisos/${r.id}/contestar`)}>
-              Contestar
-            </button>
-          )}
-        </section>
-      )}
 
       {editable && (
         <div>
@@ -346,15 +308,12 @@ export default function Aviso() {
               {errorAccion}
             </p>
           )}
-          <p className="ayuda">
-            {confirmandoBorrar
-              ? 'Toca otra vez para borrarlo del todo. Si no, espera y se queda.'
-              : hayCambios && !sePuedeGuardar
-                ? marcadas.length === 0
-                  ? 'Marca al menos una razón.'
-                  : 'Hace falta una foto o una nota de voz.'
-                : 'Al guardar, despacho lo verá como un aviso nuevo.'}
-          </p>
+          {confirmandoBorrar ? (
+            <p className="ayuda">Toca otra vez para borrarlo del todo. Si no, espera y se queda.</p>
+          ) : (
+            hayCambios &&
+            !sePuedeGuardar && <p className="ayuda">{marcadas.length === 0 ? 'Marca al menos una razón.' : 'Hace falta una foto o una nota de voz.'}</p>
+          )}
         </div>
       )}
     </div>

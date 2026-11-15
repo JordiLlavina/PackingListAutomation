@@ -58,8 +58,8 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
 /**
  * Las modificaciones de los modelos en los dos sentidos: los avisos del
  * taller al despacho y las órdenes del despacho al taller, con su ciclo
- * (NUEVA → VISTA → EN_CURSO → HECHA, o DESCARTADA), sus destinos, sus
- * mensajes y la bandeja de cada lado.
+ * (NUEVA → VISTA → EN_CURSO → HECHA, o DESCARTADA), sus destinos y la
+ * bandeja de cada lado.
  *
  * Reglas del ciclo que no se ven en las firmas:
  * <ul>
@@ -72,17 +72,18 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
  * <li>Un aviso pasa solo a EN_CURSO al marcar el primer destino hecho y a
  * HECHA cuando están hechos todos los que aplican (también si ya no aplica
  * ninguno). Desmarcar un destino de un aviso HECHO lo devuelve a EN_CURSO.</li>
- * <li>Una DESCARTADA no cambia de destinos, ni se marca
- * hecha, pero sigue admitiendo mensajes: se puede explicar por qué se
- * descartó.</li>
+ * <li>Una DESCARTADA no cambia de destinos ni se marca hecha.</li>
  * <li>El taller puede <b>corregir y borrar sus avisos</b> mientras el
  * despacho no haya empezado a aplicarlos (NUEVA o VISTA; decisión del
  * usuario, noviembre de 2026): es la única vez que una modificación se
  * borra de verdad. Corregirlo lo devuelve a NUEVA para que el despacho lo
  * vuelva a mirar.</li>
- * <li>Cada respuesta enciende {@code necesita_respuesta} y deja la pelota en
- * el otro lado ({@link #ladoQueDebeResponder}). Abrir la modificación no la
- * apaga: la pelota cambia de lado cuando ese lado contesta.</li>
+ * <li><b>No hay conversación</b> (noviembre de 2026, decisión del usuario:
+ * las dudas se resuelven por teléfono). Una modificación es su cuerpo, el
+ * primer mensaje, y nada más: no se contesta ni desde el taller ni desde el
+ * despacho. Las respuestas que se guardaron antes siguen en la base pero no
+ * se leen ({@code contexto} solo carga el primer mensaje de cada una), y la
+ * columna {@code necesita_respuesta} se queda sin usar.</li>
  * </ul>
  *
  * El modelo se lee del catálogo ({@link CatalogoModelos}, {@link FotosCatalogo})
@@ -200,7 +201,11 @@ public class Modificaciones implements Modelos.FuenteEventos {
         Modificacion modificacion = repositorio.save(new Modificacion(aviso.modeloId(), Direccion.TALLER_A_DESPACHO,
                 tipoCambio, null, idDe(quien), ahora));
         for (DestinoAplicacion destino : destinosDelYml()) {
-            destinos.save(new ModificacionDestino(modificacion.getId(), destino));
+            ModificacionDestino nuevo = new ModificacionDestino(modificacion.getId(), destino);
+            if (!aplicaDeEntrada(destino, tipoCambio)) {
+                nuevo.marcar(false, false, null, ahora);
+            }
+            destinos.save(nuevo);
         }
         guardarMensaje(modificacion.getId(), "", nuevos, quien, ahora);
         // El push al despacho sale cuando se confirma la transacción (Push).
@@ -254,7 +259,16 @@ public class Modificaciones implements Modelos.FuenteEventos {
         Mensaje cuerpo = mensajes.findByModificacionIdOrderByCreadoEnAscIdAsc(id).stream().findFirst()
                 .orElseThrow(() -> new IllegalStateException("El aviso " + id + " no tiene cuerpo"));
         if (edicion.tipoCambio() != null) {
+            String antes = modificacion.getTipoCambio();
             modificacion.cambiarTipoCambio(tipoCambioDelYml(edicion.tipoCambio(), true));
+            // Con otras razones puede cambiar lo que aplica de entrada (pedir troqueles). Solo se toca el destino
+            // cuyo valor de entrada cambia, y nunca uno ya hecho: un «No aplica» puesto a mano en otro se respeta.
+            for (ModificacionDestino destino : destinos.findByModificacionIdOrderByIdAsc(id)) {
+                boolean ahoraAplica = aplicaDeEntrada(destino.getDestino(), modificacion.getTipoCambio());
+                if (!destino.hecho() && ahoraAplica != aplicaDeEntrada(destino.getDestino(), antes)) {
+                    destino.marcar(ahoraAplica, false, null, LocalDateTime.now());
+                }
+            }
         }
         List<ResumenAdjunto> delCuerpo = adjuntos.deMensajes(List.of(cuerpo.getId()));
         Set<Long> idsDelCuerpo = delCuerpo.stream().map(ResumenAdjunto::id).collect(Collectors.toSet());
@@ -507,6 +521,29 @@ public class Modificaciones implements Modelos.FuenteEventos {
     }
 
     /**
+     * Deshace «Hecho» en una orden para el taller: es fácil tocarlo sin
+     * querer (noviembre de 2026, petición del usuario). Vuelve a abrirse
+     * (VISTA) y entra en la cola la primera, detrás de las urgentes
+     * ({@link ColaTaller#trasLasUrgentes}). La pueden reabrir el taller y el
+     * despacho. Un aviso no se reabre aquí: se desmarca uno de sus destinos.
+     * No avisa a nadie: el despacho la vuelve a ver abierta en la cola.
+     *
+     * @throws IllegalArgumentException si es un aviso o si no está hecha
+     */
+    @Transactional
+    public void marcarNoHecha(Long id, UsuarioActual quien) {
+        Modificacion modificacion = modificacionQueExiste(id);
+        if (modificacion.esAviso()) {
+            throw new IllegalArgumentException("Un aviso se vuelve a abrir desmarcando uno de sus destinos");
+        }
+        if (modificacion.getEstado() != EstadoModificacion.HECHA) {
+            throw new IllegalArgumentException("La orden no está hecha");
+        }
+        modificacion.reabrir();
+        cola.trasLasUrgentes(modificacion);
+    }
+
+    /**
      * DESCARTADA con su motivo, que es obligatorio; no se borra nada. Una que
      * ya está cerrada (HECHA o DESCARTADA) no se descarta: volver a hacerlo
      * cambiaría en silencio el motivo, y una hecha ya no tiene nada que
@@ -544,22 +581,6 @@ public class Modificaciones implements Modelos.FuenteEventos {
             throw new IllegalArgumentException("El título no puede pasar de " + LARGO_TITULO + " caracteres");
         }
         modificacion.cambiarTitulo(limpio);
-    }
-
-    /** Un mensaje más, también en una descartada; deja la pelota en el otro lado. */
-    @Transactional
-    public Mensaje responder(Long id, String texto, List<AdjuntoNuevo> adjuntosNuevos, UsuarioActual quien) {
-        Modificacion modificacion = modificacionQueExiste(id);
-        List<AdjuntoNuevo> nuevos = sinNulos(adjuntosNuevos);
-        String limpio = vacio(texto) ? "" : texto.trim();
-        if (limpio.isEmpty() && nuevos.isEmpty()) {
-            throw new IllegalArgumentException("Escribe algo o adjunta una nota de voz o una foto");
-        }
-        Mensaje mensaje = guardarMensaje(id, limpio, nuevos, quien, LocalDateTime.now());
-        modificacion.pedirRespuesta();
-        // El push al otro lado sale cuando se confirma la transacción (Push), también en una cerrada.
-        eventos.publishEvent(new MensajeRespondido(id, quien == null ? null : quien.rol()));
-        return mensaje;
     }
 
     /**
@@ -600,18 +621,16 @@ public class Modificaciones implements Modelos.FuenteEventos {
      * Los números de la bandeja de quien la mira.
      * <ul>
      * <li>TALLER: nuevas = órdenes NUEVAS; pendientes = órdenes NUEVA, VISTA o
-     * EN_CURSO; conRespuesta = avisos suyos abiertos con respuesta del
-     * despacho pendiente de contestar.</li>
+     * EN_CURSO.</li>
      * <li>DESPACHO: nuevas = avisos NUEVOS; pendientes = avisos NUEVA, VISTA o
-     * EN_CURSO; conRespuesta = órdenes abiertas con una duda del taller
-     * pendiente de contestar.</li>
+     * EN_CURSO.</li>
      * </ul>
      * En los dos, urgentes = órdenes para el taller abiertas y urgentes.
      */
     @Transactional(readOnly = true)
     public ResumenBandeja resumen(UsuarioActual quien) {
         if (quien == null || quien.rol() == null) {
-            return new ResumenBandeja(0, 0, 0, 0);
+            return new ResumenBandeja(0, 0, 0);
         }
         Direccion ordenes = Direccion.DESPACHO_A_TALLER;
         int urgentes = (int) repositorio.countByDireccionAndUrgenteTrueAndEstadoIn(ordenes, ABIERTAS);
@@ -619,33 +638,11 @@ public class Modificaciones implements Modelos.FuenteEventos {
             Direccion avisos = Direccion.TALLER_A_DESPACHO;
             int nuevas = (int) repositorio.countByDireccionAndEstadoIn(avisos, EnumSet.of(EstadoModificacion.NUEVA));
             int pendientes = (int) repositorio.countByDireccionAndEstadoIn(avisos, ABIERTAS);
-            int conRespuesta = esperandoA(repositorio.findByDireccionAndNecesitaRespuestaTrue(ordenes),
-                    Rol.DESPACHO);
-            return new ResumenBandeja(nuevas, pendientes, urgentes, conRespuesta);
+            return new ResumenBandeja(nuevas, pendientes, urgentes);
         }
         int nuevas = (int) repositorio.countByDireccionAndEstadoIn(ordenes, EnumSet.of(EstadoModificacion.NUEVA));
         int pendientes = (int) repositorio.countByDireccionAndEstadoIn(ordenes, ABIERTAS);
-        int conRespuesta = esperandoA(repositorio.findByDireccionAndNecesitaRespuestaTrueAndCreadaPor(
-                Direccion.TALLER_A_DESPACHO, quien.id()), Rol.TALLER);
-        return new ResumenBandeja(nuevas, pendientes, urgentes, conRespuesta);
-    }
-
-    /**
-     * El lado que tiene que contestar: el contrario del autor del último
-     * mensaje (TALLER o DESPACHO; un ADMIN habla por el despacho), si la
-     * modificación espera respuesta; null si no la espera o el último mensaje
-     * no tiene autor.
-     */
-    @Transactional(readOnly = true)
-    public Rol ladoQueDebeResponder(Modificacion m) {
-        if (m == null || !m.isNecesitaRespuesta()) {
-            return null;
-        }
-        return mensajes.findFirstByModificacionIdOrderByCreadoEnDescIdDesc(m.getId())
-                .map(Mensaje::getAutorId)
-                .flatMap(usuarios::findById)
-                .map(autor -> ladoContrario(autor.getRol()))
-                .orElse(null);
+        return new ResumenBandeja(nuevas, pendientes, urgentes);
     }
 
     /**
@@ -703,29 +700,6 @@ public class Modificaciones implements Modelos.FuenteEventos {
     }
 
     /**
-     * Cuántas de esas modificaciones, de las abiertas, esperan respuesta de
-     * ese lado; una consulta para todas. Una cerrada no cuenta aunque tenga la
-     * marca encendida, igual que en {@code respuestaPendienteDe}.
-     */
-    private int esperandoA(List<Modificacion> candidatas, Rol lado) {
-        List<Modificacion> conRespuesta = candidatas.stream().filter(m -> !m.getEstado().cerrada()).toList();
-        if (conRespuesta.isEmpty()) {
-            return 0;
-        }
-        Map<Long, Mensaje> ultimos = new HashMap<>();
-        for (Mensaje mensaje : mensajes.findByModificacionIdInOrderByCreadoEnAscIdAsc(ids(conRespuesta))) {
-            ultimos.put(mensaje.getModificacionId(), mensaje);
-        }
-        Map<Long, Usuario> autores = usuariosPorId(ultimos.values().stream().map(Mensaje::getAutorId).toList());
-        return (int) conRespuesta.stream()
-                .map(m -> ultimos.get(m.getId()))
-                .filter(Objects::nonNull)
-                .map(ultimo -> autores.get(ultimo.getAutorId()))
-                .filter(autor -> autor != null && ladoContrario(autor.getRol()) == lado)
-                .count();
-    }
-
-    /**
      * Las cerradas al final si se pide; las órdenes de la cola por su puesto;
      * lo demás, NUEVA primero y la más antigua primero.
      */
@@ -748,10 +722,13 @@ public class Modificaciones implements Modelos.FuenteEventos {
         Map<Long, Long> principales = fotos.principalesDe(modeloIds);
 
         List<Long> ids = ids(lista);
+        // Solo el cuerpo (el primer mensaje) de cada una: las respuestas que se
+        // guardaron cuando había conversación no se enseñan, ni se cuentan, ni
+        // se buscan.
         Map<Long, List<Mensaje>> mensajesPorModificacion = new LinkedHashMap<>();
-        List<Mensaje> todos = mensajes.findByModificacionIdInOrderByCreadoEnAscIdAsc(ids);
-        todos.forEach(mensaje -> mensajesPorModificacion
-                .computeIfAbsent(mensaje.getModificacionId(), clave -> new ArrayList<>()).add(mensaje));
+        mensajes.findByModificacionIdInOrderByCreadoEnAscIdAsc(ids).forEach(mensaje -> mensajesPorModificacion
+                .putIfAbsent(mensaje.getModificacionId(), List.of(mensaje)));
+        List<Mensaje> todos = mensajesPorModificacion.values().stream().flatMap(List::stream).toList();
         Map<Long, List<ResumenAdjunto>> adjuntosPorMensaje = new HashMap<>();
         adjuntos.deMensajes(todos.stream().map(Mensaje::getId).toList()).forEach(adjunto -> adjuntosPorMensaje
                 .computeIfAbsent(adjunto.mensajeId(), clave -> new ArrayList<>()).add(adjunto));
@@ -844,17 +821,6 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     }
                 }
             }
-            // De qué lado es el último mensaje: el taller enseña la última palabra del despacho
-            // también en un aviso cerrado (por qué se descartó).
-            Usuario autorUltimo = suyos.isEmpty() ? null : usuarios.get(suyos.get(suyos.size() - 1).getAutorId());
-            Rol ultimoMensajeDe = autorUltimo == null ? null : ladoDe(autorUltimo.getRol());
-            Rol pendiente = null;
-            // Una cerrada no espera a nadie, aunque la marca siga encendida
-            // (se puede escribir en una descartada sin reabrirla).
-            if (m.isNecesitaRespuesta() && !m.getEstado().cerrada() && !suyos.isEmpty()) {
-                Usuario autor = usuarios.get(suyos.get(suyos.size() - 1).getAutorId());
-                pendiente = autor == null ? null : ladoContrario(autor.getRol());
-            }
             List<DestinoEstado> estados = destinosPorModificacion.getOrDefault(m.getId(), List.of()).stream()
                     .map(d -> new DestinoEstado(d.getDestino(), TextosDestino.texto(d.getDestino()), d.isAplica(),
                             d.getHechoEn(), nombre(d.getHechoPor())))
@@ -870,9 +836,9 @@ public class Modificaciones implements Modelos.FuenteEventos {
                     modelo == null ? null : modelo.getCliente(), fotosPrincipales.get(m.getModeloId()),
                     m.getDireccion(), m.getTipoCambio(), tipoCambioTexto(m.getTipoCambio()), m.isUrgente(),
                     posiciones.get(m.getId()), m.getFechaObjetivo(), m.getEstado(), m.getTitulo(), m.isTituloDeIa(), m.getCreadaEn(), nombre(m.getCreadaPor()),
-                    m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()), pendiente,
+                    m.getVistaEn(), m.getHechaEn(), nombre(m.getHechaPor()),
                     modelo == null ? null : modelo.getEtapa(), estados,
-                    numeroFotos, audios, documentos, duracionAudio, ultimoMensajeDe);
+                    numeroFotos, audios, documentos, duracionAudio);
         }
 
         private String nombre(Long usuarioId) {
@@ -924,6 +890,23 @@ public class Modificaciones implements Modelos.FuenteEventos {
      * que no sea de {@link DestinoAplicacion} se salta: no hay dónde
      * guardarlo, y el desplegable no puede ofrecer algo que no se guarda.
      */
+    /** Las razones de cambio con las que hace falta pedir troqueles nuevos (claves de {@code modelos.tipos-cambio}). */
+    static final Set<String> RAZONES_QUE_PIDEN_TROQUELES = Set.of("MEDIDAS_PATRONES", "TROQUELES");
+
+    /**
+     * Si un aviso con esas razones nace aplicando en ese destino. Todos
+     * aplican salvo {@link DestinoAplicacion#PEDIR_TROQUELES}, que solo si
+     * entre las razones está «Medidas / Patrones» o «Cambio de troqueles»
+     * (decisión del usuario): en los demás nace con «No aplica» puesto, y el
+     * despacho lo puede quitar.
+     */
+    static boolean aplicaDeEntrada(DestinoAplicacion destino, String tipoCambio) {
+        if (destino != DestinoAplicacion.PEDIR_TROQUELES) {
+            return true;
+        }
+        return ModelosProperties.clavesDe(tipoCambio).stream().anyMatch(RAZONES_QUE_PIDEN_TROQUELES::contains);
+    }
+
     private List<DestinoAplicacion> destinosDelYml() {
         List<DestinoAplicacion> lista = new ArrayList<>();
         if (props.destinosAplicacion() == null) {
@@ -944,21 +927,6 @@ public class Modificaciones implements Modelos.FuenteEventos {
             return false;
         }
         return m.esAviso() ? quien.esDespacho() : quien.rol() == Rol.TALLER;
-    }
-
-    /** TALLER o DESPACHO: un ADMIN habla por el despacho. */
-    private static Rol ladoDe(Rol rol) {
-        if (rol == null) {
-            return null;
-        }
-        return rol.esDespacho() ? Rol.DESPACHO : Rol.TALLER;
-    }
-
-    private static Rol ladoContrario(Rol autor) {
-        if (autor == null) {
-            return null;
-        }
-        return autor.esDespacho() ? Rol.TALLER : Rol.DESPACHO;
     }
 
     private static void exigirDespacho(UsuarioActual quien) {

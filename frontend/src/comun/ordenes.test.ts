@@ -44,14 +44,12 @@ function orden(estado: EstadoModificacion, posicionCola: number | null, creadaEn
     vistaEn: null,
     hechaEn: null,
     hechaPor: null,
-    respuestaPendienteDe: null,
     etapa: 'PRODUCCION',
     destinos: [],
     fotos: 0,
     audios: 0,
     documentos: 0,
     duracionAudioSeg: null,
-    ultimoMensajeDe: null,
     ...extra,
   };
 }

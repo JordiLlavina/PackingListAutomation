@@ -1,9 +1,11 @@
 // Una orden de despacho abierta, la de la maqueta: la ficha del modelo, la
 // nota de voz, el texto en grande, las fotos (se abren a pantalla completa) y
-// los documentos (en otra pestaña, con el visor de la tablet); debajo, las
-// respuestas que haya. Abrirla la da por vista. «Hecho» pide dos toques para
+// los documentos (en otra pestaña, con el visor de la tablet). Las dudas se
+// resuelven por teléfono: aquí no se contesta. Abrirla la da por vista. «Hecho» pide dos toques para
 // que no se marque sin querer: el primero lo pone en verde y, si no llega el
-// segundo en 6 s, se queda como estaba.
+// segundo en 6 s, se queda como estaba. Aun así se puede tocar sin querer, así
+// que una hecha tiene «No está hecha»: vuelve a la Bandeja de Entrada la
+// primera, detrás de las urgentes.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
@@ -63,21 +65,6 @@ function deTipo(m: MensajeVista | undefined, tipo: AdjuntoVista['tipo']): Adjunt
   return m?.adjuntos.filter((a) => a.tipo === tipo) ?? [];
 }
 
-/** Una respuesta de debajo (una duda del taller, lo que contesta despacho). */
-function Respuesta({ mensaje, onAbrir }: { mensaje: MensajeVista; onAbrir: (id: number) => void }) {
-  const audio = deTipo(mensaje, 'AUDIO')[0];
-  return (
-    <div className="mensaje">
-      <span className="quien">
-        {mensaje.autor ?? 'Sin autor'} · {hace(mensaje.creadoEn)}
-      </span>
-      {mensaje.texto && <p>{mensaje.texto}</p>}
-      {audio && <Audio compacto adjuntoId={audio.id} duracionSeg={audio.duracionSeg ?? 0} />}
-      <Miniaturas fotos={deTipo(mensaje, 'FOTO')} onAbrir={onAbrir} />
-    </div>
-  );
-}
-
 export default function Orden() {
   const { id } = useParams();
   const navegar = useNavigate();
@@ -88,6 +75,7 @@ export default function Orden() {
   const [confirmando, setConfirmando] = useState(false);
   const [marcando, setMarcando] = useState(false);
   const [errorHecho, setErrorHecho] = useState<string | null>(null);
+  const [reabriendo, setReabriendo] = useState(false);
   const reloj = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const peticion = useRef(0);
@@ -137,7 +125,7 @@ export default function Orden() {
   }
   if (!detalle || !r) return null;
 
-  const [primero, ...respuestas] = detalle.mensajes;
+  const [primero] = detalle.mensajes;
   const audio = deTipo(primero, 'AUDIO')[0];
   const documentos = deTipo(primero, 'DOCUMENTO');
 
@@ -161,6 +149,24 @@ export default function Orden() {
       setErrorHecho(e instanceof ErrorApi ? e.message : 'No se ha podido marcar como hecha');
       setMarcando(false);
       setConfirmando(false);
+    }
+  };
+
+  const noHecha = async () => {
+    if (reabriendo) return;
+    setReabriendo(true);
+    setErrorHecho(null);
+    try {
+      const resumen = await api<ModificacionResumen>(`/api/modificaciones/${r.id}/no-hecha`, { method: 'POST' });
+      setDetalle((antes) => (antes ? { ...antes, resumen } : antes));
+      setConfirmando(false);
+      setMarcando(false);
+      toast(resumen.posicionCola !== null ? `Vuelve a la Bandeja de Entrada, ${puesto(resumen.posicionCola)}` : 'Vuelve a la Bandeja de Entrada');
+      recargar();
+    } catch (e: unknown) {
+      setErrorHecho(e instanceof ErrorApi ? e.message : 'No se ha podido cambiar');
+    } finally {
+      setReabriendo(false);
     }
   };
 
@@ -213,17 +219,23 @@ export default function Orden() {
           ))}
         </div>
       )}
-      {respuestas.length > 0 && (
-        <div className="hilo">
-          {respuestas.map((m) => (
-            <Respuesta key={m.id} mensaje={m} onAbrir={setFotoAbierta} />
-          ))}
-        </div>
-      )}
       {r.estado === 'HECHA' ? (
-        <div className="vacio cerrada">
-          <Icono nombre="ok" />
-          <b>Hecha</b>
+        <div>
+          <div className="vacio cerrada">
+            <Icono nombre="ok" />
+            <b>Hecha</b>
+          </div>
+          <div className="acciones">
+            <button className="boton" type="button" disabled={reabriendo} onClick={() => void noHecha()}>
+              {reabriendo ? 'Cambiando…' : 'No está hecha'}
+            </button>
+          </div>
+          {errorHecho && (
+            <p className="error-envio" role="alert">
+              {errorHecho}
+            </p>
+          )}
+          <p className="ayuda">Si la marcaste sin querer: vuelve a la Bandeja de Entrada, la primera detrás de las urgentes.</p>
         </div>
       ) : r.estado === 'DESCARTADA' ? (
         <div className="vacio cerrada">
@@ -233,9 +245,6 @@ export default function Orden() {
       ) : (
         <div>
           <div className="acciones">
-            <button className="boton" type="button" disabled={marcando} onClick={() => navegar(`/ordenes/${r.id}/duda`)}>
-              <Icono nombre="duda" /> Tengo una duda
-            </button>
             <button className={confirmando ? 'boton ok' : 'boton'} type="button" disabled={marcando} onClick={() => void hecho()}>
               <Icono nombre="check" /> {marcando ? 'Marcando…' : confirmando ? 'Confirmar: está hecho' : 'Hecho'}
             </button>

@@ -15,7 +15,6 @@ import ColaDespacho from './despacho/Cola';
 import ReportesDespacho from './despacho/Reportes';
 import VerModificacion from './despacho/VerModificacion';
 import Entrada from './entrada/Entrada';
-import Duda from './taller/Duda';
 import Aviso from './taller/Aviso';
 import MisAvisos from './taller/MisAvisos';
 import Orden from './taller/Orden';
@@ -67,11 +66,9 @@ const rutasTaller: RouteObject[] = [
       { path: 'ordenes', element: <Ordenes />, ...pantalla({ titulo: 'Bandeja de Entrada', seccion: 'ordenes', fab: true }) },
       // El título lo pone la orden con el suyo. Sin escáner: taparía «Hecho».
       { path: 'ordenes/:id', element: <Orden />, ...pantalla({ titulo: 'Orden', atras: '/ordenes', seccion: 'ordenes' }) },
-      { path: 'ordenes/:id/duda', element: <Duda modo="duda" />, ...pantalla({ titulo: 'Tengo una duda', atras: (p) => `/ordenes/${p.id}`, seccion: 'ordenes' }) },
       { path: 'avisos', element: <MisAvisos />, ...pantalla({ titulo: 'Mis avisos', seccion: 'avisos', fab: true }) },
       // El título lo pone el aviso con su modelo. Sin escáner: taparía «Guardar».
       { path: 'avisos/:id', element: <Aviso />, ...pantalla({ titulo: 'Mi aviso', atras: '/avisos', seccion: 'avisos' }) },
-      { path: 'avisos/:id/contestar', element: <Duda modo="contestar" />, ...pantalla({ titulo: 'Contestar a despacho', atras: (p) => `/avisos/${p.id}`, seccion: 'avisos' }) },
       { path: 'modelos', element: <ModelosTaller />, ...pantalla({ titulo: 'Modelos', seccion: 'modelos', fab: true }) },
       { path: 'modelos/:id', element: <FichaModeloTaller />, ...pantalla({ titulo: 'Modelo', atras: '/modelos', seccion: 'modelos', fab: true }) },
       { path: 'cambio', children: rutasCambio },

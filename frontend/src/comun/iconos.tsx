@@ -17,7 +17,10 @@ const I = {
   check: '<path d="M4 12.5 10 18.5 20 6.5"/>',
   atras: '<path d="M15 5l-7 7 7 7"/>',
   mas: '<path d="M12 5v14M5 12h14"/>',
-  duda: '<path d="M9 9a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4"/><circle cx="12" cy="18" r=".8" fill="currentColor"/><circle cx="12" cy="12" r="9.5"/>',
+  // Los tres estados del botón de la nota de voz al corregir un aviso.
+  papelera: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
+  sinMic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path d="M3 3l18 18"/>',
+  deshacer: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   pdf: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/><path d="M9 17v-5h2a1.5 1.5 0 0 1 0 3H9"/>',
   piel: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 12c3-3 5 3 8 0s5 3 10 0"/>',
   forro: '<rect x="4" y="8" width="13" height="12" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-1"/>',

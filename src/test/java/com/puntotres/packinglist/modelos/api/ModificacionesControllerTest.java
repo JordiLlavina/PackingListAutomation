@@ -108,7 +108,7 @@ class ModificacionesControllerTest {
                 .andExpect(jsonPath("$.modificacion.estado").value("NUEVA"))
                 .andExpect(jsonPath("$.modificacion.tipoCambioTexto").value("Consumo piel"))
                 .andExpect(jsonPath("$.modificacion.fotos").value(1))
-                .andExpect(jsonPath("$.modificacion.destinos", hasSize(2)))
+                .andExpect(jsonPath("$.modificacion.destinos", hasSize(3)))
                 .andExpect(jsonPath("$.documentosGuardados", hasSize(0)))
                 .andExpect(jsonPath("$.avisos", hasSize(0)))
                 .andReturn().getResponse().getContentAsString();
@@ -142,15 +142,13 @@ class ModificacionesControllerTest {
                 .andExpect(jsonPath("$.estado").value("VISTA"));
         assertEquals(nuevasAntes, resumenDespacho().get("nuevas").asInt());
 
+        // Ya no hay respuestas: las dudas van por teléfono.
         mvc.perform(multipart("/api/modificaciones/" + id + "/mensajes").param("texto", "¿Qué piel?")
                         .with(comoUsuario(despacho())).with(csrf()))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.texto").value("¿Qué piel?"))
-                .andExpect(jsonPath("$.rolAutor").value("DESPACHO"))
-                .andExpect(jsonPath("$.adjuntos", hasSize(0)));
+                .andExpect(status().is4xxClientError());
         mvc.perform(get("/api/modificaciones/" + id).with(comoUsuario(taller())))
-                .andExpect(jsonPath("$.resumen.respuestaPendienteDe").value("TALLER"))
-                .andExpect(jsonPath("$.mensajes", hasSize(2)));
+                .andExpect(jsonPath("$.resumen.respuestaPendienteDe").doesNotExist())
+                .andExpect(jsonPath("$.mensajes", hasSize(1)));
 
         mvc.perform(post("/api/modificaciones/" + id + "/destinos/ICSUITE").with(comoUsuario(despacho()))
                         .with(csrf()).contentType(MediaType.APPLICATION_JSON)
@@ -159,8 +157,7 @@ class ModificacionesControllerTest {
                 .andExpect(jsonPath("$.estado").value("EN_CURSO"));
         mvc.perform(post("/api/modificaciones/" + id + "/hecha").with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estado").value("HECHA"))
-                .andExpect(jsonPath("$.respuestaPendienteDe").value(nullValue()));
+                .andExpect(jsonPath("$.estado").value("HECHA"));
     }
 
     @Test
@@ -302,13 +299,6 @@ class ModificacionesControllerTest {
         mvc.perform(get("/api/modificaciones/" + id).with(comoUsuario(despacho())))
                 .andExpect(jsonPath("$.mensajes[0].adjuntos", hasSize(1)))
                 .andExpect(jsonPath("$.mensajes[0].adjuntos[0].nombre").value("foto.jpg"));
-
-        mvc.perform(multipart("/api/modificaciones/" + id + "/mensajes")
-                        .file(foto("../../otra.png", Color.BLUE)).file(fotoSinElegir)
-                        .with(comoUsuario(despacho())).with(csrf()))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.adjuntos", hasSize(1)))
-                .andExpect(jsonPath("$.adjuntos[0].nombre").value("otra.jpg"));
     }
 
     @Test

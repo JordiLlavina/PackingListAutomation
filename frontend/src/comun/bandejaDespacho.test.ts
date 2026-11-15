@@ -24,9 +24,9 @@ describe('textoVoz', () => {
 });
 
 describe('numeroBandejaDespacho', () => {
-  it('suma los avisos nuevos y las órdenes con respuesta, no las pendientes ni las urgentes', () => {
-    expect(numeroBandejaDespacho({ nuevas: 2, pendientes: 7, urgentes: 1, conRespuesta: 3 })).toBe(5);
-    expect(numeroBandejaDespacho({ nuevas: 0, pendientes: 4, urgentes: 0, conRespuesta: 0 })).toBe(0);
+  it('cuenta los avisos nuevos, no los pendientes ni las urgentes', () => {
+    expect(numeroBandejaDespacho({ nuevas: 2, pendientes: 7, urgentes: 1 })).toBe(2);
+    expect(numeroBandejaDespacho({ nuevas: 0, pendientes: 4, urgentes: 0 })).toBe(0);
   });
 
   it('es cero mientras no se sabe', () => {
@@ -91,14 +91,12 @@ function resumen(extra: Partial<ModificacionResumen>): ModificacionResumen {
     vistaEn: null,
     hechaEn: null,
     hechaPor: null,
-    respuestaPendienteDe: null,
     etapa: 'PRODUCCION',
     destinos: [],
     fotos: 0,
     audios: 1,
     documentos: 0,
     duracionAudioSeg: 12,
-    ultimoMensajeDe: 'TALLER',
     ...extra,
   };
 }

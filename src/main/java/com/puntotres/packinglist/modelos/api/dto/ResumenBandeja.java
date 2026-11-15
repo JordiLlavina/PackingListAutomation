@@ -6,5 +6,5 @@ package com.puntotres.packinglist.modelos.api.dto;
  *
  * @param urgentes órdenes para el taller abiertas y marcadas urgentes (los dos lados)
  */
-public record ResumenBandeja(int nuevas, int pendientes, int urgentes, int conRespuesta) {
+public record ResumenBandeja(int nuevas, int pendientes, int urgentes) {
 }

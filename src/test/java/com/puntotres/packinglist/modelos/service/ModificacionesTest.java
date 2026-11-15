@@ -11,6 +11,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +36,7 @@ import com.puntotres.packinglist.modelos.persistence.Direccion;
 import com.puntotres.packinglist.modelos.persistence.EstadoModificacion;
 import com.puntotres.packinglist.modelos.persistence.EstadoTranscripcion;
 import com.puntotres.packinglist.modelos.persistence.Mensaje;
+import com.puntotres.packinglist.modelos.persistence.MensajeRepository;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Rol;
@@ -48,7 +50,7 @@ import com.puntotres.packinglist.persistence.TipoArticulo;
 
 /**
  * El ciclo de una modificación en los dos sentidos: avisos del taller,
- * órdenes del despacho, destinos, respuestas, bandeja y búsqueda. La base de
+ * órdenes del despacho, destinos, bandeja y búsqueda. La base de
  * datos es la misma para toda la suite: los modelos de este test se llaman
  * {@code T11-…} y los recuentos de la bandeja se miran como diferencias.
  */
@@ -72,6 +74,9 @@ class ModificacionesTest {
 
     @Autowired
     private ModificacionRepository repositorio;
+
+    @Autowired
+    private MensajeRepository mensajes;
 
     @Autowired
     private TransactionTemplate transacciones;
@@ -123,16 +128,18 @@ class ModificacionesTest {
         assertEquals("Prueba Taller", resumen.creadaPor());
         assertNotNull(resumen.creadaEn());
         assertNull(resumen.vistaEn());
-        assertNull(resumen.respuestaPendienteDe());
         assertEquals(0, resumen.fotos());
         assertEquals(1, resumen.audios());
         assertEquals(30, resumen.duracionAudioSeg(), "cuánto dura la nota de voz del primer mensaje");
         assertEquals(0, resumen.documentos());
-        assertEquals(List.of(DestinoAplicacion.ICSUITE, DestinoAplicacion.EXCEL_ESCANDALLOS),
+        assertEquals(List.of(DestinoAplicacion.ICSUITE, DestinoAplicacion.EXCEL_ESCANDALLOS,
+                        DestinoAplicacion.PEDIR_TROQUELES),
                 resumen.destinos().stream().map(DestinoEstado::destino).toList());
-        assertEquals(List.of("ICSUITE", "Excel de escandallos"),
+        assertEquals(List.of("ICSUITE", "Excel de escandallos", "Pedir troqueles"),
                 resumen.destinos().stream().map(DestinoEstado::texto).toList());
-        assertTrue(resumen.destinos().stream().allMatch(destino -> destino.aplica() && destino.hechoEn() == null));
+        assertEquals(List.of(true, true, false), resumen.destinos().stream().map(DestinoEstado::aplica).toList(),
+                "un cambio de consumo de piel no pide troqueles: nace con «No aplica»");
+        assertTrue(resumen.destinos().stream().allMatch(destino -> destino.hechoEn() == null));
 
         assertEquals(1, detalle.mensajes().size());
         MensajeVista primero = detalle.mensajes().get(0);
@@ -259,35 +266,21 @@ class ModificacionesTest {
     }
 
     @Test
-    void unaRespuestaEnciendeNecesitaRespuestaDelOtroLado() {
+    void lasRespuestasDeAntesNoSeEnsenanNiSeCuentanNiSeBuscan() {
         Modificacion aviso = avisoConFoto("RESPUESTA");
-        assertNull(modificaciones.ladoQueDebeResponder(recargar(aviso)));
-        int antes = modificaciones.resumen(taller()).conRespuesta();
+        // Una respuesta de cuando había conversación: sigue en la base, pero ya no se lee.
+        respuestaDeAntes(aviso, "Mira el T11GATO de la esquina", foto());
 
-        IllegalArgumentException vacia = assertThrows(IllegalArgumentException.class,
-                () -> modificaciones.responder(aviso.getId(), "  ", List.of(), despacho()));
-        assertEquals("Escribe algo o adjunta una nota de voz o una foto", vacia.getMessage());
-
-        Mensaje respuesta = modificaciones.responder(aviso.getId(), "¿Qué piel?", List.of(), despacho());
-        assertNotNull(respuesta.getId());
-        Modificacion recargada = recargar(aviso);
-        assertTrue(recargada.isNecesitaRespuesta());
-        assertEquals(Rol.TALLER, modificaciones.ladoQueDebeResponder(recargada));
-        assertEquals(Rol.TALLER, modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
-        assertEquals(antes + 1, modificaciones.resumen(taller()).conRespuesta());
-
-        modificaciones.responder(aviso.getId(), null, List.of(audio(12)), taller());
-        assertEquals(Rol.DESPACHO, modificaciones.ladoQueDebeResponder(recargar(aviso)));
-        assertEquals(antes, modificaciones.resumen(taller()).conRespuesta());
-        List<MensajeVista> mensajes = modificaciones.detalle(aviso.getId()).mensajes();
-        assertEquals(3, mensajes.size());
-        assertEquals("¿Qué piel?", mensajes.get(1).texto());
-        assertEquals(Rol.DESPACHO, mensajes.get(1).rolAutor());
-        assertEquals(TipoAdjunto.AUDIO, mensajes.get(2).adjuntos().get(0).tipo());
+        ModificacionDetalle detalle = modificaciones.detalle(aviso.getId());
+        assertEquals(1, detalle.mensajes().size(), "solo el cuerpo");
+        assertEquals(Rol.TALLER, detalle.mensajes().get(0).rolAutor());
+        assertEquals(1, detalle.resumen().fotos(), "la foto de la respuesta no cuenta");
+        assertTrue(modificaciones.listar(filtroTexto("t11gato"), despacho()).isEmpty(),
+                "el texto de la respuesta no se busca");
     }
 
     @Test
-    void unaDescartadaNoSeMarcaHechaPeroAdmiteMensajes() {
+    void unaDescartadaNoSeMarcaHecha() {
         Modificacion aviso = avisoConFoto("DESCARTE");
 
         assertThrows(AccessDeniedException.class, () -> modificaciones.descartar(aviso.getId(), "no", taller()));
@@ -311,15 +304,11 @@ class ModificacionesTest {
                         despacho()));
         assertEquals("La modificación está descartada", destino.getMessage());
 
-        modificaciones.responder(aviso.getId(), "Era el mismo cambio que el de ayer", List.of(), despacho());
-        ModificacionDetalle conRespuesta = modificaciones.detalle(aviso.getId());
-        assertEquals(EstadoModificacion.DESCARTADA, conRespuesta.resumen().estado());
-        assertEquals(2, conRespuesta.mensajes().size());
-
         Modificacion otra = avisoConFoto("HECHA");
         modificaciones.marcarHecha(otra.getId(), despacho());
         assertTrue(modificaciones.detalle(otra.getId()).resumen().destinos().stream()
-                .allMatch(d -> d.hechoEn() != null), "el atajo marca hechos todos los destinos que aplican");
+                .allMatch(d -> d.aplica() == (d.hechoEn() != null)),
+                "el atajo marca hechos todos los destinos que aplican, y solo esos (pedir troqueles no aplica aquí)");
 
         // Una orden cerrada ya no está en la cola: no se marca urgente.
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
@@ -350,38 +339,6 @@ class ModificacionesTest {
     }
 
     @Test
-    void unaCerradaNoEsperaRespuestaAunqueLaPidiera() {
-        int tallerAntes = modificaciones.resumen(taller()).conRespuesta();
-        Modificacion aviso = avisoConFoto("CERRADA-R");
-        assertEquals(Rol.TALLER, modificaciones.detalle(aviso.getId()).resumen().ultimoMensajeDe(),
-                "el cuerpo del aviso es el primer mensaje, del taller");
-        modificaciones.responder(aviso.getId(), "¿Qué piel?", List.of(), despacho());
-        assertEquals(Rol.TALLER, modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
-        assertEquals(Rol.DESPACHO, modificaciones.detalle(aviso.getId()).resumen().ultimoMensajeDe());
-        assertEquals(tallerAntes + 1, modificaciones.resumen(taller()).conRespuesta());
-
-        modificaciones.descartar(aviso.getId(), "Ya no hace falta", despacho());
-        assertTrue(recargar(aviso).isNecesitaRespuesta(), "descartar no apaga la marca");
-        assertNull(modificaciones.detalle(aviso.getId()).resumen().respuestaPendienteDe());
-        assertEquals(Rol.DESPACHO, modificaciones.detalle(aviso.getId()).resumen().ultimoMensajeDe(),
-                "en una cerrada se sigue sabiendo quién habló el último: el taller enseña la respuesta");
-        assertEquals(tallerAntes, modificaciones.resumen(taller()).conRespuesta());
-
-        int despachoAntes = modificaciones.resumen(despacho()).conRespuesta();
-        Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(
-                modelo("CERRADA-O"), null, "Cambiar asa", null, List.of()), despacho());
-        modificaciones.responder(orden.getId(), "¿Qué asa?", List.of(), taller());
-        assertEquals(Rol.DESPACHO, modificaciones.detalle(orden.getId()).resumen().respuestaPendienteDe());
-        assertEquals(despachoAntes + 1, modificaciones.resumen(despacho()).conRespuesta());
-
-        modificaciones.marcarHecha(orden.getId(), taller());
-        assertNull(modificaciones.detalle(orden.getId()).resumen().respuestaPendienteDe());
-        assertTrue(modificaciones.listar(new Modificaciones.Filtro(null, null, recargar(orden).getModeloId(),
-                null, null), despacho()).stream().allMatch(r -> r.respuestaPendienteDe() == null));
-        assertEquals(despachoAntes, modificaciones.resumen(despacho()).conRespuesta());
-    }
-
-    @Test
     void elResumenCuentaNuevasPendientesYUrgentes() {
         ResumenBandeja antes = modificaciones.resumen(despacho());
         ResumenBandeja tallerAntes = modificaciones.resumen(taller());
@@ -406,9 +363,6 @@ class ModificacionesTest {
         modificaciones.marcarVista(orden.getId(), taller());
         assertEquals(tallerAntes.nuevas() + 1, modificaciones.resumen(taller()).nuevas());
         assertEquals(tallerAntes.pendientes() + 2, modificaciones.resumen(taller()).pendientes());
-
-        modificaciones.responder(orden.getId(), "¿Qué costura?", List.of(), taller());
-        assertEquals(antes.conRespuesta() + 1, modificaciones.resumen(despacho()).conRespuesta());
     }
 
     @Test
@@ -418,7 +372,6 @@ class ModificacionesTest {
                 List.of(audio(20))), taller());
         Modificacion conResumen = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
                 "REFUERZOS", List.of(audio(20))), taller());
-        Modificacion otra = avisoConFoto("BUSCA-OTRO");
         Long notaId = modificaciones.detalle(conVoz.getId()).mensajes().get(0).adjuntos().get(0).id();
         Long notaResumenId = modificaciones.detalle(conResumen.getId()).mensajes().get(0).adjuntos().get(0).id();
 
@@ -427,9 +380,6 @@ class ModificacionesTest {
 
         assertEquals(List.of(conVoz.getId()), ids(modificaciones.listar(filtroTexto("T11ZORRO"), despacho())));
         assertEquals(List.of(conResumen.getId()), ids(modificaciones.listar(filtroTexto("t11lince"), despacho())));
-
-        modificaciones.responder(otra.getId(), "Mira el T11GATO de la esquina", List.of(), despacho());
-        assertEquals(List.of(otra.getId()), ids(modificaciones.listar(filtroTexto("t11gato"), despacho())));
 
         Modificacion orden = modificaciones.crearOrdenParaTaller(new Modificaciones.OrdenDespacho(modeloId, null,
                 "Cambiar T11TOPO", null, List.of()), despacho());
@@ -508,6 +458,94 @@ class ModificacionesTest {
     }
 
     @Test
+    void unaOrdenHechaSinQuererSeVuelveAAbrirLaPrimeraDetrasDeLasUrgentes() {
+        Long modeloId = modelo("NOHECHA");
+        Modificacion a = orden(modeloId, "A", null);
+        Modificacion b = orden(modeloId, "B", null);
+        Modificacion c = orden(modeloId, "C", null);
+        modificaciones.marcarUrgente(c.getId(), true, despacho());
+        modificaciones.marcarHecha(b.getId(), taller());
+        assertFalse(ids(modificaciones.cola()).contains(b.getId()));
+
+        modificaciones.marcarNoHecha(b.getId(), taller());
+
+        ModificacionResumen reabierta = modificaciones.detalle(b.getId()).resumen();
+        assertEquals(EstadoModificacion.VISTA, reabierta.estado());
+        assertNull(recargar(b).getHechaPor(), "olvida quién la dio por hecha");
+        assertNull(recargar(b).getHechaEn());
+        List<Long> cola = ids(modificaciones.cola());
+        int urgentesDelante = 0;
+        while (modificaciones.detalle(cola.get(urgentesDelante)).resumen().urgente()) {
+            urgentesDelante++;
+        }
+        assertEquals(urgentesDelante + 1, reabierta.posicionCola(), "la primera detrás de las urgentes");
+        assertEquals(List.of(c.getId(), b.getId(), a.getId()), deEste(cola, a, b, c));
+
+        IllegalArgumentException abierta = assertThrows(IllegalArgumentException.class,
+                () -> modificaciones.marcarNoHecha(a.getId(), taller()));
+        assertEquals("La orden no está hecha", abierta.getMessage());
+        Modificacion aviso = avisoConFoto("NOHECHA-AVISO");
+        modificaciones.marcarHecha(aviso.getId(), despacho());
+        assertThrows(IllegalArgumentException.class, () -> modificaciones.marcarNoHecha(aviso.getId(), taller()));
+    }
+
+    @Test
+    void unaUrgenteReabiertaVaLaPrimera() {
+        Long modeloId = modelo("NOHECHA-URG");
+        Modificacion a = orden(modeloId, "A", null);
+        modificaciones.marcarUrgente(a.getId(), true, despacho());
+        modificaciones.marcarHecha(a.getId(), taller());
+
+        modificaciones.marcarNoHecha(a.getId(), despacho());
+
+        assertEquals(1, modificaciones.detalle(a.getId()).resumen().posicionCola());
+    }
+
+    @Test
+    void pedirTroquelesSoloAplicaDeEntradaConPatronesOConTroqueles() {
+        Long modeloId = modelo("TROQUEL");
+        assertTrue(aplicaPedirTroqueles(modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
+                "MEDIDAS_PATRONES", List.of(foto())), taller())));
+        assertTrue(aplicaPedirTroqueles(modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
+                "CONSUMO_PIEL,TROQUELES", List.of(foto())), taller())));
+        Modificacion sinTroqueles = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
+                "CONSTRUCCION,REFUERZOS", List.of(foto())), taller());
+        assertFalse(aplicaPedirTroqueles(sinTroqueles));
+
+        // Con «No aplica» de entrada no hace falta: los otros dos hechos la cierran.
+        modificaciones.marcarDestino(sinTroqueles.getId(), DestinoAplicacion.ICSUITE, true, true, despacho());
+        modificaciones.marcarDestino(sinTroqueles.getId(), DestinoAplicacion.EXCEL_ESCANDALLOS, true, true, despacho());
+        assertEquals(EstadoModificacion.HECHA, estado(sinTroqueles));
+    }
+
+    @Test
+    void alCorregirLasRazonesPedirTroquelesSigueALaRegla() {
+        Long modeloId = modelo("TROQUEL-EDIT");
+        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL",
+                List.of(foto())), taller());
+        modificaciones.marcarDestino(aviso.getId(), DestinoAplicacion.ICSUITE, false, false, despacho());
+        assertFalse(aplicaPedirTroqueles(aviso));
+
+        modificaciones.editarAviso(aviso.getId(), new Modificaciones.EdicionAviso("TROQUELES", List.of(), List.of()),
+                taller());
+        assertTrue(aplicaPedirTroqueles(aviso), "ahora el cambio es de troqueles");
+        assertFalse(modificaciones.detalle(aviso.getId()).resumen().destinos().get(0).aplica(),
+                "el «No aplica» que puso el despacho en ICSUITE no lo toca la corrección");
+
+        modificaciones.editarAviso(aviso.getId(), new Modificaciones.EdicionAviso("FORNITURAS", List.of(), List.of()),
+                taller());
+        assertFalse(aplicaPedirTroqueles(aviso));
+    }
+
+    private boolean aplicaPedirTroqueles(Modificacion aviso) {
+        return modificaciones.detalle(aviso.getId()).resumen().destinos().stream()
+                .filter(d -> d.destino() == DestinoAplicacion.PEDIR_TROQUELES)
+                .findFirst()
+                .orElseThrow()
+                .aplica();
+    }
+
+    @Test
     void variasRazonesSeGuardanJuntasEnElOrdenDelYmlYSinRepetir() {
         Long modeloId = modelo("RAZONES");
         Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId,
@@ -536,7 +574,7 @@ class ModificacionesTest {
         Long laFoto = delCuerpo.stream().filter(a -> a.tipo() == TipoAdjunto.FOTO).findFirst().orElseThrow().id();
         Long elAudio = delCuerpo.stream().filter(a -> a.tipo() == TipoAdjunto.AUDIO).findFirst().orElseThrow().id();
         // Como lo pondría la transcripción (la sentencia pide transacción).
-        assertEquals(1, transacciones.execute(t -> repositorio.ponerTituloDeIaSiNoTiene(aviso.getId(),
+        assertEquals(Integer.valueOf(1), transacciones.execute(t -> repositorio.ponerTituloDeIaSiNoTiene(aviso.getId(),
                 Direccion.TALLER_A_DESPACHO, "Título de la IA")));
         assertEquals("Título de la IA", modificaciones.detalle(aviso.getId()).resumen().titulo());
 
@@ -566,10 +604,8 @@ class ModificacionesTest {
         assertEquals(2, modificaciones.detalle(aviso.getId()).mensajes().get(0).adjuntos().size(),
                 "la transacción se deshace: siguen los dos");
 
-        // Un adjunto de una respuesta no es del cuerpo y no se puede quitar desde aquí.
-        Mensaje respuesta = modificaciones.responder(aviso.getId(), "", List.of(foto()), despacho());
-        Long deLaRespuesta = modificaciones.detalle(aviso.getId()).mensajes().stream()
-                .filter(m -> m.id().equals(respuesta.getId())).findFirst().orElseThrow().adjuntos().get(0).id();
+        // Un adjunto de una respuesta de antes no es del cuerpo y no se puede quitar desde aquí.
+        Long deLaRespuesta = respuestaDeAntes(aviso, "", foto());
         IllegalArgumentException ajeno = assertThrows(IllegalArgumentException.class, () -> modificaciones.editarAviso(
                 aviso.getId(), new Modificaciones.EdicionAviso(null, List.of(), List.of(deLaRespuesta)), taller()));
         assertTrue(ajeno.getMessage().contains("no es de este aviso"), ajeno.getMessage());
@@ -583,7 +619,7 @@ class ModificacionesTest {
         Long modeloId = modelo("BORRAR");
         Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "OTROS",
                 List.of(foto(), audio(5))), taller());
-        modificaciones.responder(aviso.getId(), "¿Cuál?", List.of(), despacho());
+        respuestaDeAntes(aviso, "¿Cuál?", foto());
         assertThrows(AccessDeniedException.class, () -> modificaciones.borrarAviso(aviso.getId(), despacho()));
 
         modificaciones.borrarAviso(aviso.getId(), taller());
@@ -657,6 +693,17 @@ class ModificacionesTest {
     private Modificacion aviso(Long modeloId) {
         return modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modeloId, "CONSUMO_PIEL", List.of(foto())),
                 taller());
+    }
+
+    /**
+     * Una respuesta del despacho guardada como se guardaban cuando había
+     * conversación (hasta noviembre de 2026): un mensaje más con su adjunto.
+     * Ya no hay forma de crearla desde la app. Devuelve el id del adjunto.
+     */
+    private Long respuestaDeAntes(Modificacion modificacion, String texto, AdjuntoNuevo adjunto) {
+        Mensaje mensaje = mensajes.save(new Mensaje(modificacion.getId(), despacho().id(), texto,
+                LocalDateTime.now().plusSeconds(1)));
+        return adjuntos.guardar(mensaje.getId(), adjunto).getId();
     }
 
     private EstadoModificacion estado(Modificacion modificacion) {

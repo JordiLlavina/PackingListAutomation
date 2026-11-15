@@ -1,6 +1,6 @@
-// La grabadora de la maqueta, la misma en «Crear Modificación» y en «Tengo una
-// duda»: el botón redondo de 160 px que graba y para, el contador y la onda
-// que dicen que está escuchando. useGrabadora lleva el micrófono (pedir
+// La grabadora de la maqueta, la misma en «Crear Modificación» y al corregir
+// un aviso: el botón redondo que graba y para (160 px; la mitad, con
+// `pequena`), el contador y la onda que dicen que está escuchando. useGrabadora lleva el micrófono (pedir
 // permiso, parar al tope o si se va solo, soltarlo al salir de la pantalla) y
 // Grabadora lo pinta; qué se hace con la nota grabada lo decide la pantalla.
 import { useEffect, useRef, useState } from 'react';
@@ -87,16 +87,18 @@ type Props = {
   estado: EstadoGrabadora;
   /** Duración de la nota ya grabada; null si todavía no hay ninguna. */
   grabadaSeg: number | null;
+  /** El botón a la mitad (al corregir un aviso, donde grabar no es lo principal de la pantalla). */
+  pequena?: boolean;
 };
 
 /** El botón, el contador y la onda. Con una nota ya grabada, tocar el botón graba otra (como en la maqueta). */
-export default function Grabadora({ estado, grabadaSeg }: Props) {
+export default function Grabadora({ estado, grabadaSeg, pequena = false }: Props) {
   const { grabando, seg, iniciando, alternar } = estado;
   const listo = !grabando && grabadaSeg !== null;
   const segundos = grabando ? seg : (grabadaSeg ?? 0);
   const clases = ['mic', grabando ? 'grabando' : '', listo ? 'listo' : ''].filter(Boolean).join(' ');
   return (
-    <div className="grabador">
+    <div className={pequena ? 'grabador pequena' : 'grabador'}>
       <button className={clases} type="button" aria-label={grabando ? 'Parar' : 'Grabar'} disabled={iniciando} onClick={() => void alternar()}>
         <Icono nombre={grabando ? 'pausa' : listo ? 'check' : 'mic'} />
       </button>

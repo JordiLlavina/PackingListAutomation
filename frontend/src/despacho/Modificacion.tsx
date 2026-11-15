@@ -1,11 +1,11 @@
 // El detalle de una modificación en despacho, en el panel de la derecha de la
-// bandeja: la cabecera (foto, modelo, tipo, estado, quién y cuándo), el hilo
-// de mensajes con sus notas de voz (y lo que se transcribió), fotos y
-// documentos, y al lado el panel de acciones: en un aviso del taller los
+// bandeja: la cabecera (foto, modelo, tipo, estado, quién y cuándo), el cuerpo
+// con su nota de voz (y lo que se transcribió), fotos y documentos, y al lado el panel de acciones: en un aviso del taller los
 // destinos donde hay que aplicarlo, «Marcar hecha» y «Descartar»; en una
 // orden, su puesto en la cola del taller, la marca de urgente y en qué punto
 // la tiene el taller.
-// Debajo del hilo, «Responder». Abrir un aviso NUEVO lo da por visto. Tras
+// No se contesta desde aquí: las dudas van por teléfono (noviembre de 2026).
+// Abrir un aviso NUEVO lo da por visto. Tras
 // cada acción se vuelve a pedir el detalle y se avisa a la bandeja (lista y
 // números). Mientras alguna nota de voz se está transcribiendo, el detalle se
 // vuelve a pedir solo cada pocos segundos; una que falló se puede reintentar,
@@ -13,18 +13,15 @@
 //
 // Con `soloLectura` (desde el historial de un modelo, /app/modificaciones/12)
 // se ve todo igual pero no se toca nada: ni título, ni urgente, ni destinos,
-// ni «Responder», ni pasar fotos a la galería; y abrirla no la da por vista.
-import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+// ni pasar fotos a la galería; y abrirla no la da por vista.
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
 import Audio from '../comun/Audio';
 import Etapa from '../comun/Etapa';
 import FechaObjetivo from '../comun/FechaObjetivo';
 import FotoModelo from '../comun/FotoModelo';
-import { useGrabadora } from '../comun/Grabadora';
-import { extensionAudio, type Grabacion } from '../comun/grabador';
 import { Icono } from '../comun/iconos';
-import { reducirImagen } from '../comun/imagen';
 import type { ModeloFicha, ModeloResumen, ResumenFoto } from '../comun/modelos';
 import {
   adjuntoUrl,
@@ -43,7 +40,7 @@ import {
   type ModificacionDetalle,
   type Rol,
 } from '../comun/modificaciones';
-import { hace, mmss } from '../comun/tiempo';
+import { hace } from '../comun/tiempo';
 import { toast } from '../comun/toast';
 
 const ROL_TEXTO: Record<Rol, string> = { TALLER: 'taller', DESPACHO: 'despacho', ADMIN: 'admin' };
@@ -163,108 +160,6 @@ function Mensaje({
         </div>
       )}
     </article>
-  );
-}
-
-type Nota = { blob: Blob; duracionSeg: number; url: string };
-
-/** Responder: texto y, si se quiere, una nota de voz y fotos. Hace falta texto o nota (o una foto, como el servidor). */
-function Responder({ id, onEnviado }: { id: number; onEnviado: () => Promise<void> }) {
-  const [texto, setTexto] = useState('');
-  const [nota, setNota] = useState<Nota | null>(null);
-  const [fotos, setFotos] = useState<File[]>([]);
-  const [enviando, setEnviando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Cambiar la key vacía el selector de fotos tras enviar.
-  const [vueltaFotos, setVueltaFotos] = useState(0);
-
-  // La URL blob: de la nota se suelta al sustituirla y al salir.
-  const notaActual = useRef<Nota | null>(null);
-  const ponerNota = useCallback((nueva: Nota | null) => {
-    if (notaActual.current) URL.revokeObjectURL(notaActual.current.url);
-    notaActual.current = nueva;
-    setNota(nueva);
-  }, []);
-  useEffect(
-    () => () => {
-      if (notaActual.current) URL.revokeObjectURL(notaActual.current.url);
-    },
-    [],
-  );
-  const grabadora = useGrabadora((g: Grabacion) => ponerNota({ blob: g.blob, duracionSeg: g.duracionSeg, url: URL.createObjectURL(g.blob) }));
-
-  const enviar = async (e: FormEvent) => {
-    e.preventDefault();
-    if (enviando || grabadora.grabando) return;
-    const limpio = texto.trim();
-    if (!limpio && !nota && fotos.length === 0) {
-      setError('Escribe algo o graba una nota');
-      return;
-    }
-    setEnviando(true);
-    setError(null);
-    const datos = new FormData();
-    if (limpio) datos.append('texto', limpio);
-    if (nota) {
-      datos.append('audio', nota.blob, `nota-de-voz.${extensionAudio(nota.blob.type)}`);
-      datos.append('audioDuracionSeg', String(nota.duracionSeg));
-    }
-    for (const f of fotos) datos.append('fotos', await reducirImagen(f), f.name);
-    try {
-      await api<unknown>(`/api/modificaciones/${id}/mensajes`, { method: 'POST', body: datos });
-      setTexto('');
-      ponerNota(null);
-      setFotos([]);
-      setVueltaFotos((v) => v + 1);
-      toast('Respuesta enviada');
-      await onEnviado();
-    } catch (err) {
-      setError(mensaje(err, 'No se ha podido enviar la respuesta'));
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  const elegirFotos = (e: ChangeEvent<HTMLInputElement>) => setFotos([...(e.target.files ?? [])]);
-
-  return (
-    <form className="responder" onSubmit={(e) => void enviar(e)}>
-      <h3>Responder</h3>
-      <label className="campo">
-        Texto
-        <textarea rows={3} value={texto} onChange={(e) => setTexto(e.target.value)} />
-      </label>
-      <div className="adjuntar">
-        <button className={grabadora.grabando ? 'boton grabando' : 'boton'} type="button" disabled={grabadora.iniciando || enviando} onClick={() => void grabadora.alternar()}>
-          <Icono nombre={grabadora.grabando ? 'pausa' : 'mic'} />
-          {grabadora.grabando ? `Parar · ${mmss(grabadora.seg)}` : nota ? 'Grabar otra nota' : 'Grabar nota de voz'}
-        </button>
-        <label className="boton subir">
-          <Icono nombre="cam" /> Fotos
-          <input key={vueltaFotos} type="file" multiple accept="image/*" onChange={elegirFotos} />
-        </label>
-        {fotos.length > 0 && <span className="ficheros">{fotos.length === 1 ? '1 foto elegida' : `${fotos.length} fotos elegidas`}</span>}
-      </div>
-      {nota && !grabadora.grabando && (
-        <div className="voz">
-          <Audio key={nota.url} compacto src={nota.url} duracionSeg={nota.duracionSeg} />
-          <button className="chip" type="button" onClick={() => ponerNota(null)}>
-            Quitar la nota
-          </button>
-        </div>
-      )}
-      {grabadora.sinMicro && <p className="ayuda">No puedo usar el micrófono: responde por escrito.</p>}
-      <div className="botones">
-        <button className="boton ok" type="submit" disabled={enviando || grabadora.grabando}>
-          {enviando ? 'Enviando…' : 'Enviar respuesta'}
-        </button>
-      </div>
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
-    </form>
   );
 }
 
@@ -551,7 +446,7 @@ export default function Modificacion({ id, onCambiado, soloLectura = false }: { 
         </div>
       </div>
 
-      <div className="cuerpo-modificacion">
+      <div className={`cuerpo-modificacion${esAviso ? ' con-destinos' : ''}`}>
         <div className="hilo">
           {detalle.mensajes.map((m) => (
             <Mensaje
@@ -564,13 +459,9 @@ export default function Modificacion({ id, onCambiado, soloLectura = false }: { 
               soloLectura={soloLectura}
             />
           ))}
-          {!soloLectura && <Responder id={r.id} onEnviado={trasCambiar} />}
         </div>
 
         <aside className="acciones-detalle" aria-label="Acciones">
-          {r.respuestaPendienteDe === 'DESPACHO' && <p className="espera-respuesta">El taller espera tu respuesta</p>}
-          {r.respuestaPendienteDe === 'TALLER' && <p className="ayuda">Esperando la respuesta del taller.</p>}
-
           {r.estado === 'HECHA' && (
             <div className="estado-cerrada">
               <b>

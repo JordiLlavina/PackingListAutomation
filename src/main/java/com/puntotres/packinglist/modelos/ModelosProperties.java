@@ -67,10 +67,9 @@ public record ModelosProperties(
         }
 
         /**
-         * @param sinAplicarDias          cada cuántos días se recuerda un aviso sin aplicar del todo
-         * @param respuestaPendienteHoras horas hasta avisar de una respuesta pendiente
+         * @param sinAplicarDias cada cuántos días se recuerda un aviso sin aplicar del todo
          */
-        public record Despacho(int sinAplicarDias, int respuestaPendienteHoras) {
+        public record Despacho(int sinAplicarDias) {
         }
     }
 

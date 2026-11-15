@@ -38,7 +38,7 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
 /**
  * Transcribe las notas de voz y las resume para el despacho, en segundo
  * plano: guardar una nota de voz nunca espera a Azure ni a Claude, y que
- * cualquiera de los dos falle nunca impide crear un aviso o responder.
+ * cualquiera de los dos falle nunca impide crear un aviso o una orden.
  *
  * Cada nota de voz pasa por un solo hilo ({@code transcripcion}), una detrás
  * de otra, y cada paso va en su propia transacción: no se tiene una

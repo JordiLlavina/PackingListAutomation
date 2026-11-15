@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -24,15 +23,11 @@ import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.persistence.AvisoEnviado;
 import com.puntotres.packinglist.modelos.persistence.AvisoEnviadoRepository;
 import com.puntotres.packinglist.modelos.persistence.EstadoModificacion;
-import com.puntotres.packinglist.modelos.persistence.Mensaje;
-import com.puntotres.packinglist.modelos.persistence.MensajeRepository;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionDestino;
 import com.puntotres.packinglist.modelos.persistence.ModificacionDestinoRepository;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
 import com.puntotres.packinglist.modelos.persistence.Rol;
-import com.puntotres.packinglist.modelos.persistence.Usuario;
-import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
 import com.puntotres.packinglist.persistence.Modelo;
 import com.puntotres.packinglist.persistence.ModeloRepository;
 
@@ -50,14 +45,9 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  * crearla y otra vez cada tantos días.</li>
  * <li>Un aviso del taller sin aplicar del todo: al DESPACHO, cada
  * {@code sin-aplicar-dias} desde que se creó, diciendo qué destinos faltan.</li>
- * <li>Una pregunta sin contestar ({@code necesita_respuesta}): al lado que
- * tiene que contestar (el contrario del autor del último mensaje; un ADMIN
- * habla por el despacho), a las {@code respuesta-pendiente-horas} de ese
- * mensaje y otra vez cada tanto.</li>
  * </ul>
  *
- * Lo cerrado (HECHA o DESCARTADA) no insiste nunca, tampoco con una pregunta
- * pendiente. Cada envío se apunta en {@code aviso_enviado} y no se repite
+ * Lo cerrado (HECHA o DESCARTADA) no insiste nunca. Cada envío se apunta en {@code aviso_enviado} y no se repite
  * mientras el último del mismo tipo de esa modificación sea más reciente que
  * el plazo. Un plazo de 0 o sin configurar apaga su regla: avisar cada hora
  * sería ruido, no un recordatorio.
@@ -74,9 +64,7 @@ public class Recordatorios {
             EstadoModificacion.VISTA, EstadoModificacion.EN_CURSO);
 
     private final ModificacionRepository modificaciones;
-    private final MensajeRepository mensajes;
     private final ModificacionDestinoRepository destinos;
-    private final UsuarioRepository usuarios;
     private final ModeloRepository modelos;
     private final AvisoEnviadoRepository enviados;
     private final Push push;
@@ -85,15 +73,13 @@ public class Recordatorios {
     private final Clock reloj;
     private final boolean activo;
 
-    public Recordatorios(ModificacionRepository modificaciones, MensajeRepository mensajes,
-                         ModificacionDestinoRepository destinos, UsuarioRepository usuarios, ModeloRepository modelos,
+    public Recordatorios(ModificacionRepository modificaciones, ModificacionDestinoRepository destinos,
+                         ModeloRepository modelos,
                          AvisoEnviadoRepository enviados, Push push, ColaTaller cola, ModelosProperties props,
                          Clock reloj,
                          @Value("${modelos.recordatorios.activo:true}") boolean activo) {
         this.modificaciones = modificaciones;
-        this.mensajes = mensajes;
         this.destinos = destinos;
-        this.usuarios = usuarios;
         this.modelos = modelos;
         this.enviados = enviados;
         this.push = push;
@@ -147,7 +133,7 @@ public class Recordatorios {
         }
         Contexto contexto = contexto(abiertas);
         for (Modificacion m : abiertas) {
-            for (Pendiente pendiente : pendientes(m, contexto.ultimoMensaje.get(m.getId()), contexto)) {
+            for (Pendiente pendiente : pendientes(m)) {
                 if (!pendiente.toca(ahora) || contexto.repetido(m.getId(), pendiente, ahora)) {
                     continue;
                 }
@@ -206,17 +192,9 @@ public class Recordatorios {
     }
 
     /** Lo que se le podría recordar a esa modificación, toque ya o no. */
-    private List<Pendiente> pendientes(Modificacion m, Mensaje ultimo, Contexto contexto) {
-        List<Pendiente> lista = new ArrayList<>();
+    private List<Pendiente> pendientes(Modificacion m) {
         Pendiente principal = reglaPrincipal(m);
-        if (principal != null) {
-            lista.add(principal);
-        }
-        Pendiente respuesta = respuestaPendiente(m, ultimo, contexto);
-        if (respuesta != null) {
-            lista.add(respuesta);
-        }
-        return lista;
+        return principal == null ? List.of() : List.of(principal);
     }
 
     /** La orden urgente sin hacer o el aviso sin aplicar; null si no hay o está cerrada. */
@@ -241,21 +219,6 @@ public class Recordatorios {
         }
         return Pendiente.de(AvisoEnviado.Tipo.RECORDATORIO, Rol.DESPACHO,
                 Duration.ofDays(reglas.despacho().sinAplicarDias()), m.getCreadaEn());
-    }
-
-    /** La pregunta sin contestar de una abierta; null si no la hay. */
-    private Pendiente respuestaPendiente(Modificacion m, Mensaje ultimo, Contexto contexto) {
-        if (!m.isNecesitaRespuesta() || m.getEstado().cerrada() || ultimo == null || ultimo.getCreadoEn() == null
-                || props.recordatorios() == null || props.recordatorios().despacho() == null) {
-            return null;
-        }
-        Usuario autor = contexto.usuarios.get(ultimo.getAutorId());
-        if (autor == null || autor.getRol() == null) {
-            return null;
-        }
-        Rol para = autor.getRol().esDespacho() ? Rol.TALLER : Rol.DESPACHO;
-        return Pendiente.de(AvisoEnviado.Tipo.RESPUESTA, para,
-                Duration.ofHours(props.recordatorios().despacho().respuestaPendienteHoras()), ultimo.getCreadoEn());
     }
 
     /** Lo manda al rol y lo apunta, una fila por destinatario; false si ese rol no tiene a nadie. */
@@ -291,16 +254,8 @@ public class Recordatorios {
                         juntar(destinosPendientes(contexto.destinos.getOrDefault(m.getId(), List.of())), referencia),
                         bandeja, m.getId(), tag);
             }
-            case RESPUESTA -> {
-                Mensaje ultimo = contexto.ultimoMensaje.get(m.getId());
-                String autor = nombre(ultimo == null ? null : contexto.usuarios.get(ultimo.getAutorId()));
-                // El taller no tiene pantalla de un aviso suelto: sus avisos se leen en la lista.
-                String url = pendiente.para() == Rol.DESPACHO ? bandeja : (m.esAviso() ? "/app/avisos" : ordenes);
-                yield new Push.Aviso("Respuesta pendiente: " + queEs,
-                        juntar(autor + " espera respuesta", referencia), url, m.getId(), tag);
-            }
             // Ya no hay regla que los mande (ver AvisoEnviado.Tipo); el switch tiene que cubrirlos.
-            case SIN_PRIORIDAD, RESUMEN_COLA -> throw new IllegalStateException("No es un recordatorio de una "
+            case SIN_PRIORIDAD, RESPUESTA, RESUMEN_COLA -> throw new IllegalStateException("No es un recordatorio de una "
                     + "modificación: " + pendiente.tipo());
         };
     }
@@ -324,10 +279,6 @@ public class Recordatorios {
             return m.esAviso() ? "aviso del taller" : "orden";
         }
         return texto;
-    }
-
-    private static String nombre(Usuario usuario) {
-        return usuario == null ? "—" : usuario.getNombre();
     }
 
     private static String juntar(String primero, String segundo) {
@@ -360,28 +311,11 @@ public class Recordatorios {
         modelos.findAllById(abiertas.stream().map(Modificacion::getModeloId).collect(Collectors.toSet()))
                 .forEach(modelo -> porModelo.put(modelo.getId(), modelo));
 
-        List<Long> conPregunta = abiertas.stream().filter(Modificacion::isNecesitaRespuesta)
-                .map(Modificacion::getId).toList();
-        Map<Long, Mensaje> ultimos = new HashMap<>();
-        if (!conPregunta.isEmpty()) {
-            mensajes.findByModificacionIdInOrderByCreadoEnAscIdAsc(conPregunta)
-                    .forEach(mensaje -> ultimos.put(mensaje.getModificacionId(), mensaje));
-        }
-
         List<Long> avisos = abiertas.stream().filter(Modificacion::esAviso).map(Modificacion::getId).toList();
         Map<Long, List<ModificacionDestino>> porDestino = new HashMap<>();
         if (!avisos.isEmpty()) {
             destinos.findByModificacionIdInOrderByIdAsc(avisos).forEach(d -> porDestino
                     .computeIfAbsent(d.getModificacionId(), clave -> new ArrayList<>()).add(d));
-        }
-
-        Set<Long> usuarioIds = new HashSet<>();
-        abiertas.forEach(m -> usuarioIds.add(m.getCreadaPor()));
-        ultimos.values().forEach(mensaje -> usuarioIds.add(mensaje.getAutorId()));
-        usuarioIds.remove(null);
-        Map<Long, Usuario> porUsuario = new HashMap<>();
-        if (!usuarioIds.isEmpty()) {
-            usuarios.findAllById(usuarioIds).forEach(usuario -> porUsuario.put(usuario.getId(), usuario));
         }
 
         Map<String, LocalDateTime> ultimosEnvios = new HashMap<>();
@@ -391,15 +325,14 @@ public class Recordatorios {
         // El puesto en la cola solo lo dice el recordatorio de una urgente.
         Map<Long, Integer> posiciones = abiertas.stream().anyMatch(m -> !m.esAviso() && m.isUrgente())
                 ? cola.posiciones() : Map.of();
-        return new Contexto(porModelo, ultimos, porDestino, porUsuario, ultimosEnvios, posiciones);
+        return new Contexto(porModelo, porDestino, ultimosEnvios, posiciones);
     }
 
     private static String clave(Long modificacionId, AvisoEnviado.Tipo tipo) {
         return modificacionId + "/" + tipo;
     }
 
-    private record Contexto(Map<Long, Modelo> modelos, Map<Long, Mensaje> ultimoMensaje,
-                            Map<Long, List<ModificacionDestino>> destinos, Map<Long, Usuario> usuarios,
+    private record Contexto(Map<Long, Modelo> modelos, Map<Long, List<ModificacionDestino>> destinos,
                             Map<String, LocalDateTime> ultimosEnvios, Map<Long, Integer> posiciones) {
 
         /** Ya se mandó uno de ese tipo dentro del plazo. */

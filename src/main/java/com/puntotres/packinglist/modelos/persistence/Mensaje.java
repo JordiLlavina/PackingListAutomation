@@ -11,7 +11,8 @@ import jakarta.persistence.Table;
 
 /**
  * Lo que se dice en una modificación: el primero es el cuerpo con el que se
- * creó y los siguientes, las respuestas. Sus fotos, notas de voz y
+ * creó y los siguientes, las respuestas de cuando había conversación (hasta
+ * noviembre de 2026), que se quedan en la base pero ya no se leen. Sus fotos, notas de voz y
  * documentos son {@link Adjunto}s.
  */
 @Entity

@@ -56,4 +56,3 @@ modelos:
       urgente-dias: 1
     despacho:
       sin-aplicar-dias: 7
-      respuesta-pendiente-horas: 24

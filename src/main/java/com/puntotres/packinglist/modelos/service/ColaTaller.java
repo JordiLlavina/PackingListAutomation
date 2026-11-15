@@ -107,6 +107,27 @@ public class ColaTaller {
     }
 
     /**
+     * La pone la primera de la cola pero detrás de las urgentes que van
+     * delante (una orden que se marcó hecha sin querer y vuelve a abrirse:
+     * era lo que se estaba haciendo, pero lo urgente sigue siendo lo urgente).
+     * Cuentan las urgentes seguidas desde el principio: una urgente que el
+     * despacho ha bajado más abajo ya no está «delante». Si ella misma es
+     * urgente, va la primera.
+     */
+    @Transactional
+    public void trasLasUrgentes(Modificacion orden) {
+        List<Modificacion> lista = sinElla(orden);
+        int indice = 0;
+        if (!orden.isUrgente()) {
+            while (indice < lista.size() && lista.get(indice).isUrgente()) {
+                indice++;
+            }
+        }
+        lista.add(indice, orden);
+        numerar(lista);
+    }
+
+    /**
      * Deja la cola en el orden de {@code ids}, que tiene que ser la cola
      * entera: si falta alguna o sobra alguna (otra persona ha creado o cerrado
      * una mientras tanto), {@link ColaCambiada} y no se toca nada. Así un

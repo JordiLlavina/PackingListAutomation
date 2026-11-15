@@ -282,7 +282,9 @@ modelos:
     - { clave: OTROS, texto: "Otros", icono: otro }
 
   # Dónde aplica un cambio el despacho.
-  destinos-aplicacion: [ICSUITE, EXCEL_ESCANDALLOS]
+  # PEDIR_TROQUELES nace «no aplica» salvo en los avisos de Medidas / Patrones
+  # o de Cambio de troqueles (Modificaciones.aplicaDeEntrada).
+  destinos-aplicacion: [ICSUITE, EXCEL_ESCANDALLOS, PEDIR_TROQUELES]
 
   # Reglas anti-olvido (tarea programada cada hora).
   recordatorios:
@@ -291,7 +293,6 @@ modelos:
       urgente-dias: 1              # una orden urgente sin hacer se recuerda cada N días (0 lo apaga)
     despacho:
       sin-aplicar-dias: 7          # aviso de taller sin aplicar del todo, cada 7 días desde que se crea
-      respuesta-pendiente-horas: 24
 
   # Web Push con VAPID; sin las dos claves no hay avisos al móvil.
   push:

@@ -44,8 +44,6 @@ export type ModificacionResumen = {
   vistaEn: string | null;
   hechaEn: string | null;
   hechaPor: string | null;
-  /** El lado que tiene que contestar; null si nadie. */
-  respuestaPendienteDe: Rol | null;
   /** La etapa del modelo, para filtrar; null si el modelo ya no está. */
   etapa: Etapa | null;
   destinos: DestinoEstado[];
@@ -54,8 +52,6 @@ export type ModificacionResumen = {
   documentos: number;
   /** Cuánto dura la nota de voz del primer mensaje (el cuerpo); null si no lleva. */
   duracionAudioSeg: number | null;
-  /** De qué lado es el último mensaje (TALLER o DESPACHO), también en una cerrada; null si no hay ninguno. */
-  ultimoMensajeDe: 'TALLER' | 'DESPACHO' | null;
 };
 
 /** Un adjunto de un mensaje, sin sus bytes (van en adjuntoUrl). */
@@ -90,19 +86,18 @@ export type ModificacionCreada = { modificacion: ModificacionResumen; documentos
 export type ModificacionDetalle = {
   resumen: ModificacionResumen;
   motivoDescarte: string | null;
-  /** Del primero (el cuerpo de la orden o del aviso) al último. */
+  /** Solo el cuerpo de la orden o del aviso: ya no hay respuestas (las dudas van por teléfono). */
   mensajes: MensajeVista[];
 };
 
 /**
- * Los números de la bandeja (GET /api/bandeja/resumen). En el taller: nuevas = órdenes sin abrir, pendientes = órdenes abiertas,
- * conRespuesta = avisos suyos con una respuesta de despacho por leer. En los dos lados, urgentes = órdenes abiertas marcadas urgentes.
+ * Los números de la bandeja (GET /api/bandeja/resumen). En el taller: nuevas = órdenes sin abrir, pendientes = órdenes abiertas;
+ * en despacho, lo mismo de los avisos del taller. En los dos lados, urgentes = órdenes abiertas marcadas urgentes.
  */
 export type ResumenBandeja = {
   nuevas: number;
   pendientes: number;
   urgentes: number;
-  conRespuesta: number;
 };
 
 export function adjuntoUrl(id: number): string {
@@ -193,11 +188,10 @@ export function textoVoz(duracionAudioSeg: number | null): string {
 
 /**
  * La pepita de «Bandeja» en despacho: lo que le toca mirar ya, los avisos
- * nuevos del taller y las órdenes con una duda del taller por contestar.
- * Cero (y sin pepita) mientras no se sabe.
+ * nuevos del taller. Cero (y sin pepita) mientras no se sabe.
  */
 export function numeroBandejaDespacho(resumen: ResumenBandeja | null): number {
-  return resumen ? resumen.nuevas + resumen.conRespuesta : 0;
+  return resumen ? resumen.nuevas : 0;
 }
 
 /** La pastilla de estado en la bandeja de despacho (avisos y órdenes). */

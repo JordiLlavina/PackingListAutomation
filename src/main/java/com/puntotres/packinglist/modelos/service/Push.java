@@ -32,15 +32,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.persistence.DispositivoRepository;
-import com.puntotres.packinglist.modelos.persistence.Mensaje;
-import com.puntotres.packinglist.modelos.persistence.MensajeRepository;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.ModificacionRepository;
-import com.puntotres.packinglist.modelos.persistence.ResumenAdjunto;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.SuscripcionPush;
 import com.puntotres.packinglist.modelos.persistence.SuscripcionPushRepository;
-import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
 import com.puntotres.packinglist.modelos.persistence.Usuario;
 import com.puntotres.packinglist.modelos.persistence.UsuarioRepository;
 import com.puntotres.packinglist.modelos.seguridad.UsuarioActual;
@@ -53,14 +49,12 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  *
  * <ul>
  * <li>Una orden nueva del despacho avisa al taller; un aviso nuevo del taller,
- * al despacho (el ADMIN cuenta como despacho); una respuesta, al otro lado del
- * que la escribe, <b>esté como esté la modificación</b>: también en una cerrada,
- * que es donde el despacho explica por qué la ha descartado. Y una orden que
+ * al despacho (el ADMIN cuenta como despacho). Y una orden que
  * el taller marca hecha avisa al despacho, que es quien la tiene que trasladar
  * a ICSUITE y al escandallo (decisión del usuario, noviembre de 2026).</li>
  * <li>Solo a usuarios activos, y nunca a un aparato revocado.</li>
  * <li>El push sale cuando se confirma la transacción que creó la
- * modificación o el mensaje (antes no existiría para el hilo de los push), y
+ * modificación o la cierra (antes no existiría para el hilo de los push), y
  * en un hilo aparte ({@code push}): el servidor de push del navegador puede
  * tardar, y la petición no lo espera.</li>
  * <li>Cada envío va por su cuenta: una suscripción que el navegador ya ha
@@ -68,16 +62,13 @@ import com.puntotres.packinglist.persistence.ModeloRepository;
  * cualquier otro fallo se apunta en el log y se sigue con las demás, aunque
  * su texto lleve un 404 o un 410: un proxy que contesta mal no es motivo para
  * tirar la suscripción. Nada de esto llega nunca a quien ha creado o
- * contestado: la modificación ya está guardada.</li>
+ * cerrado la modificación: ya está guardada.</li>
  * </ul>
  */
 @Service
 public class Push {
 
     private static final Logger LOG = LoggerFactory.getLogger(Push.class);
-
-    /** Lo que se enseña, como mucho, del texto de una respuesta. */
-    static final int LARGO_CUERPO = 80;
 
     /**
      * Lo más largo que se admite de una suscripción. Los de verdad son mucho
@@ -96,7 +87,7 @@ public class Push {
      * no se dice otro, {@code modificacion-<id>}: un segundo aviso de la misma
      * modificación sustituye al primero en vez de apilarse. Los recordatorios
      * llevan el suyo ({@code recordatorio-<id>}) para no tapar el aviso de
-     * creación ni una respuesta.
+     * creación.
      */
     public record Aviso(String titulo, String cuerpo, String url, Long modificacionId, String tag) {
 
@@ -109,8 +100,6 @@ public class Push {
     private final UsuarioRepository usuarios;
     private final DispositivoRepository dispositivos;
     private final ModificacionRepository modificaciones;
-    private final MensajeRepository mensajes;
-    private final Adjuntos adjuntos;
     private final ModeloRepository modelos;
     private final ModelosProperties props;
     private final EnviadorPush enviador;
@@ -127,14 +116,12 @@ public class Push {
 
     public Push(SuscripcionPushRepository suscripciones, UsuarioRepository usuarios,
                 DispositivoRepository dispositivos, ModificacionRepository modificaciones,
-                MensajeRepository mensajes, Adjuntos adjuntos, ModeloRepository modelos, ModelosProperties props,
+                ModeloRepository modelos, ModelosProperties props,
                 EnviadorPush enviador, PlatformTransactionManager transacciones) {
         this.suscripciones = suscripciones;
         this.usuarios = usuarios;
         this.dispositivos = dispositivos;
         this.modificaciones = modificaciones;
-        this.mensajes = mensajes;
-        this.adjuntos = adjuntos;
         this.modelos = modelos;
         this.props = props;
         this.enviador = enviador;
@@ -222,12 +209,6 @@ public class Push {
         encolar(() -> avisoDeCreada(evento));
     }
 
-    /** Una respuesta: al otro lado del que la escribe, cuando la transacción se confirma. */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    public void alResponder(MensajeRespondido evento) {
-        encolar(() -> avisoDeRespuesta(evento));
-    }
-
     /** El taller ha marcado hecha una orden: al despacho, cuando la transacción se confirma. */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void alHacer(OrdenHecha evento) {
@@ -289,27 +270,6 @@ public class Push {
                 juntar(referencia, nombre), "/app/ordenes/" + m.getId(), m.getId()));
     }
 
-    private Destino avisoDeRespuesta(MensajeRespondido evento) {
-        Modificacion m = modificaciones.findById(evento.modificacionId()).orElse(null);
-        Mensaje ultimo = mensajes.findFirstByModificacionIdOrderByCreadoEnDescIdDesc(evento.modificacionId())
-                .orElse(null);
-        if (m == null || ultimo == null || evento.autor() == null) {
-            return null;
-        }
-        boolean delDespacho = evento.autor().esDespacho();
-        Rol para = delDespacho ? Rol.TALLER : Rol.DESPACHO;
-        String autor = usuarios.findById(ultimo.getAutorId()).map(Usuario::getNombre)
-                .orElse(delDespacho ? "despacho" : "el taller");
-        String url;
-        if (para == Rol.TALLER) {
-            // El taller no tiene pantalla de un aviso suelto: sus avisos se leen en la lista.
-            url = m.esAviso() ? "/app/avisos" : "/app/ordenes/" + m.getId();
-        } else {
-            url = "/app/bandeja/" + m.getId();
-        }
-        return new Destino(para, new Aviso("Respuesta de " + autor, cuerpoDe(ultimo), url, m.getId()));
-    }
-
     private Destino avisoDeHecha(OrdenHecha evento) {
         Modificacion m = modificaciones.findById(evento.id()).orElse(null);
         if (m == null || m.esAviso()) {
@@ -319,20 +279,10 @@ public class Push {
         String referencia = modelo == null ? "" : modelo.nombreVisible();
         String quien = evento.hechaPorId() == null ? "el taller"
                 : usuarios.findById(evento.hechaPorId()).map(Usuario::getNombre).orElse("el taller");
-        // Con su propio tag: no tapa una respuesta de la misma orden que esté por leer.
+        // Con su propio tag: no tapa el aviso de creación de la misma orden.
         return new Destino(Rol.DESPACHO, new Aviso("Hecha: " + Objects.toString(m.getTitulo(), ""),
                 juntar(referencia, "por " + quien), "/app/bandeja/" + m.getId() + "?pestana=despacho", m.getId(),
                 "hecha-" + m.getId()));
-    }
-
-    /** Las 80 primeras letras del texto; sin texto, qué lleva. */
-    private String cuerpoDe(Mensaje mensaje) {
-        String texto = mensaje.getTexto() == null ? "" : mensaje.getTexto().strip();
-        if (!texto.isEmpty()) {
-            return texto.length() <= LARGO_CUERPO ? texto : texto.substring(0, LARGO_CUERPO) + "…";
-        }
-        List<ResumenAdjunto> suyos = adjuntos.deMensajes(List.of(mensaje.getId()));
-        return suyos.stream().anyMatch(a -> a.tipo() == TipoAdjunto.AUDIO) ? "Nota de voz" : "Adjunto";
     }
 
     /** Las suscripciones de los usuarios activos de ese rol, sin las de un aparato revocado. */

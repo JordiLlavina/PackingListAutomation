@@ -34,10 +34,6 @@ public interface ModificacionRepository extends JpaRepository<Modificacion, Long
 
     long countByDireccionAndUrgenteTrueAndEstadoIn(Direccion direccion, Collection<EstadoModificacion> estados);
 
-    List<Modificacion> findByDireccionAndNecesitaRespuestaTrue(Direccion direccion);
-
-    List<Modificacion> findByDireccionAndNecesitaRespuestaTrueAndCreadaPor(Direccion direccion, Long creadaPor);
-
     /**
      * Pone el título de la IA a un aviso del taller solo si todavía no tiene
      * ninguno, en una sola sentencia: si mientras se resumía la nota de voz el

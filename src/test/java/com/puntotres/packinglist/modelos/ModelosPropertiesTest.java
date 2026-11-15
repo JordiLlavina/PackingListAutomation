@@ -42,11 +42,10 @@ class ModelosPropertiesTest {
         assertEquals("Consumo piel", modelos.tipoCambio("CONSUMO_PIEL").orElseThrow().texto());
         assertTrue(modelos.tipoCambio("NO_EXISTE").isEmpty());
         assertTrue(modelos.tipoCambio(null).isEmpty());
-        assertEquals(List.of("ICSUITE", "EXCEL_ESCANDALLOS"), modelos.destinosAplicacion());
+        assertEquals(List.of("ICSUITE", "EXCEL_ESCANDALLOS", "PEDIR_TROQUELES"), modelos.destinosAplicacion());
         assertEquals(-1, modelos.recordatorios().taller().resumenColaHora());
         assertEquals(1, modelos.recordatorios().taller().urgenteDias());
         assertEquals(7, modelos.recordatorios().despacho().sinAplicarDias());
-        assertEquals(24, modelos.recordatorios().despacho().respuestaPendienteHoras());
     }
 
     @Test

@@ -17,5 +17,4 @@ public interface MensajeRepository extends JpaRepository<Mensaje, Long> {
 
     List<Mensaje> findByModificacionIdInOrderByCreadoEnAscIdAsc(Collection<Long> modificacionIds);
 
-    Optional<Mensaje> findFirstByModificacionIdOrderByCreadoEnDescIdDesc(Long modificacionId);
 }

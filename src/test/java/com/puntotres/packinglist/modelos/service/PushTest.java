@@ -228,41 +228,6 @@ class PushTest {
     }
 
     @Test
-    void unaRespuestaAUnAvisoCerradoTambienAvisa() throws Exception {
-        Usuario taller = usuario(Rol.TALLER);
-        Usuario despacho = usuario(Rol.DESPACHO);
-        suscribir(taller, "taller");
-        suscribir(despacho, "despacho");
-        Modificacion aviso = modificaciones.crearAvisoDeTaller(new Modificaciones.AvisoTaller(modelo("CERRADO"),
-                "REFUERZOS", List.of(ModificacionesTest.foto())), actual(taller));
-        modificaciones.descartar(aviso.getId(), "Ya estaba así", actual(despacho));
-        esperarALaCola();
-        enviador.envios.clear();
-
-        String largo = "Lo descarto porque el forro ya era ese, el de la temporada pasada, y no hay que cambiar"
-                + " nada en el escandallo";
-        modificaciones.responder(aviso.getId(), largo, List.of(), actual(despacho));
-        esperarALaCola();
-
-        List<EnviadorFalso.Envio> respuesta = enviosDe(aviso.getId(), taller, despacho);
-        assertEquals(List.of(taller.getId()), respuesta.stream().map(EnviadorFalso.Envio::usuarioId).toList(),
-                "la respuesta del despacho le llega al taller aunque el aviso esté descartado");
-        JsonNode carga = json.readTree(respuesta.get(0).payload());
-        assertEquals("Respuesta de " + despacho.getNombre(), carga.get("titulo").asText());
-        assertEquals(largo.substring(0, 80) + "…", carga.get("cuerpo").asText(), "los 80 primeros caracteres");
-        assertEquals("/app/avisos", carga.get("url").asText(), "el taller no tiene pantalla de un aviso suelto");
-
-        enviador.envios.clear();
-        modificaciones.responder(aviso.getId(), "", List.of(ModificacionesTest.audio(5)), actual(taller));
-        esperarALaCola();
-        List<EnviadorFalso.Envio> delTaller = enviosDe(aviso.getId(), taller, despacho);
-        assertEquals(List.of(despacho.getId()), delTaller.stream().map(EnviadorFalso.Envio::usuarioId).toList());
-        JsonNode deVoz = json.readTree(delTaller.get(0).payload());
-        assertEquals("Nota de voz", deVoz.get("cuerpo").asText());
-        assertEquals("/app/bandeja/" + aviso.getId(), deVoz.get("url").asText());
-    }
-
-    @Test
     void unaOrdenHechaPorElTallerAvisaAlDespachoYUnaCerradaPorElDespachoNo() throws Exception {
         Usuario taller = usuario(Rol.TALLER);
         Usuario despacho = usuario(Rol.DESPACHO);

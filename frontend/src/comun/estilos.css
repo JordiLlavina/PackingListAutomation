@@ -15,13 +15,13 @@
   --fg: #16213a;          /* tinta azul oscuro */
   --muted: #5d6779;
   --line: #d5dbe4;
-  --accent: #482922;      /* el marrón de los botones de la app vieja (tema Puntotres de estilo.css): marca y acciones secundarias */
+  --accent: #61372e;      /* el marrón de la app vieja (#482922, tema Puntotres de estilo.css) un poco más claro, para que no pese tanto: marca y acciones secundarias */
   --accent-ink: #ffffff;
   --ok: #1d8a4c;          /* hecho / enviar */
   --ok-ink: #ffffff;
   --new: #2456d1;         /* nuevo, sin leer */
   --alta: #c4372b;        /* urgente */
-  --cambio: #6d4fc2;      /* la cola ha cambiado (etiqueta suave en la tablet) */
+  --cambio: #e0633f;      /* coral: la cola ha cambiado (etiqueta suave en la tablet); más naranja que el rojo de urgente */
   --normal: #d29a1c;
   --baja: #7c8699;
   --shadow: 0 1px 2px rgba(22,33,58,.08), 0 6px 18px rgba(22,33,58,.06);
@@ -31,7 +31,7 @@
   :root:not([data-theme="light"]) {
     --bg: #11161f; --surface: #1a2130; --fg: #e9edf3; --muted: #9ca7b9; --line: #2a3447;
     --accent: #c4937f; --accent-ink: #24120e; --ok: #35b26c; --ok-ink: #06200f;
-    --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0; --cambio: #a995ef;
+    --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0; --cambio: #ff9a76;
     --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
     color-scheme: dark;
   }
@@ -39,7 +39,7 @@
 :root[data-theme="dark"] {
   --bg: #11161f; --surface: #1a2130; --fg: #e9edf3; --muted: #9ca7b9; --line: #2a3447;
   --accent: #c4937f; --accent-ink: #24120e; --ok: #35b26c; --ok-ink: #06200f;
-  --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0; --cambio: #a995ef;
+  --new: #6f94ff; --alta: #ff6f61; --normal: #f0b43a; --baja: #8f9bb0; --cambio: #ff9a76;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
   color-scheme: dark;
 }
@@ -364,8 +364,6 @@ img.foto { object-fit: cover; background: var(--line); }
 .orden.aviso-visto .franja { background: var(--normal); }
 .orden.aviso-hecho .franja { background: var(--ok); }
 .orden.aviso-descartado .franja { background: var(--baja); }
-.respuesta { display: grid; gap: 10px; margin-top: 6px; padding: 12px; border-radius: 14px; background: var(--bg); color: var(--fg); }
-.respuesta .boton { justify-self: start; min-height: 64px; }
 .ficha .texto .meta { color: var(--muted); }
 .miniaturas .ampliar { display: block; width: 100%; padding: 0; border: 0; background: none; border-radius: 14px; }
 .hilo { display: grid; gap: 12px; }
@@ -401,7 +399,7 @@ a.boton { text-decoration: none; color: var(--fg); }
 .dato { display: inline-flex; align-items: baseline; gap: .35em; white-space: nowrap; line-height: 1.3; padding: .25em .7em; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: .9em; }
 .dato b { color: var(--fg); font-size: 1.15em; font-variant-numeric: tabular-nums; }
 .dato.nuevo:not(.cero) b { color: var(--new); }
-.dato.urgente:not(.cero) b, .dato.con-respuesta:not(.cero) b { color: var(--alta); }
+.dato.urgente:not(.cero) b { color: var(--alta); }
 .dato.cero { opacity: .65; }
 
 /* La lista: filas de 72 px (.fila-bandeja, de arriba) con foto, título, línea
@@ -417,7 +415,6 @@ a.boton { text-decoration: none; color: var(--fg); }
 .fila-bandeja .meta { color: var(--muted); font-size: .9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .etiquetas { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: .85em; }
 .etiqueta { display: inline-flex; align-items: center; padding: .1em .55em; border-radius: 6px; background: var(--bg); color: var(--fg); }
-.etiqueta.espera { background: color-mix(in oklab, var(--alta) 14%, var(--surface)); color: var(--alta); font-weight: 700; }
 .etiqueta.fallo { background: color-mix(in oklab, var(--alta) 12%, var(--surface)); color: var(--alta); }
 .marcas-destino { display: inline-flex; gap: 8px; white-space: nowrap; }
 .marca-destino { color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -440,7 +437,8 @@ a.boton { text-decoration: none; color: var(--fg); }
 .cabecera-modificacion .meta { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
 .cabecera-modificacion a { color: var(--accent); text-underline-offset: 3px; }
 .cuerpo-modificacion { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 20px; align-items: start; }
-@media (max-width: 1180px) { .cuerpo-modificacion { grid-template-columns: 1fr; } .cuerpo-modificacion .acciones-detalle { order: -1; } }
+.cuerpo-modificacion.con-destinos { grid-template-columns: minmax(0, 1fr) 440px; }
+@media (max-width: 1180px) { .cuerpo-modificacion, .cuerpo-modificacion.con-destinos { grid-template-columns: 1fr; } .cuerpo-modificacion .acciones-detalle { order: -1; } }
 .despacho .mensaje { box-shadow: none; border: 1px solid var(--line); padding: 12px 14px; }
 .despacho .mensaje.de-taller { border-left: 4px solid var(--accent); }
 .despacho .mensaje .quien { font-size: .9em; }
@@ -471,9 +469,12 @@ a.boton { text-decoration: none; color: var(--fg); }
 .acciones-detalle legend { font-weight: 700; padding: 0; margin-bottom: 6px; }
 .acciones-detalle .ayuda { margin: 0; font-size: .9em; }
 .acciones-detalle .chip[disabled] { opacity: .45; cursor: not-allowed; }
-.destino { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+/* Cada destino en UNA línea (petición del usuario): nombre, casilla «Aplicado»
+   y «No aplica»; debajo, quién y cuándo. Por eso un aviso lleva el panel más
+   ancho (.con-destinos) que una orden. */
+.destino { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .destino:first-of-type { border-top: 0; }
-.destino .nombre { font-weight: 700; grid-column: 1 / -1; }
+.destino .nombre { font-weight: 700; }
 .destino .casilla { display: inline-flex; align-items: center; gap: .45em; }
 .destino .casilla input { width: 18px; height: 18px; accent-color: var(--ok); }
 .destino .meta { grid-column: 1 / -1; color: var(--muted); font-size: .85em; }
@@ -481,13 +482,11 @@ a.boton { text-decoration: none; color: var(--fg); }
 .estado-cerrada { display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; background: var(--surface); }
 .estado-cerrada b { display: flex; align-items: center; gap: .4em; }
 .estado-cerrada svg { width: 20px; height: 20px; color: var(--ok); }
-.espera-respuesta { padding: 8px 10px; border-radius: 10px; background: color-mix(in oklab, var(--alta) 12%, var(--surface)); color: var(--alta); font-weight: 700; }
 
-/* Responder y nueva orden: texto, nota de voz con un botón (la grabadora
-   redonda de la tablet es demasiado para el PC) y ficheros. */
-.responder { display: grid; gap: 10px; padding-top: 6px; }
-.responder h3, .formulario h3 { font-size: 1.05em; }
-.voz, .adjuntar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+/* Nueva orden: texto, nota de voz con un botón (la grabadora redonda de la
+   tablet es demasiado para el PC) y ficheros. */
+.formulario h3 { font-size: 1.05em; }
+.voz { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .voz .audio { flex: 1 1 260px; }
 .boton.grabando { border-color: var(--alta); color: var(--alta); }
 .ficheros { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: .9em; }
@@ -595,10 +594,56 @@ a.boton { text-decoration: none; color: var(--fg); }
 .mandos-cola .flecha { min-width: 2.4em; justify-content: center; }
 .mandos-cola .chip[disabled] { opacity: .4; cursor: not-allowed; }
 @media (max-width: 900px) {
-  .fila-cola { grid-template-columns: 2.6em 56px 1fr; }
-  .fila-cola .asa { display: none; }
-  .mandos-cola { grid-column: 1 / -1; justify-content: flex-start; }
+  .lista-cola .fila-cola { grid-template-columns: 2.6em 56px 1fr; }
+  .lista-cola .fila-cola .asa { display: none; }
+  .lista-cola .mandos-cola { grid-column: 1 / -1; justify-content: flex-start; }
 }
+
+/* El interruptor «Estilo Lista / Estilo Tabla», a la izquierda de «Nueva orden»:
+   el mismo que el «Estilo Puntotres» del menú de la app vieja (estilo.css),
+   con los colores de esta hoja porque aquí va sobre fondo claro. */
+.acciones-cabecera-cola { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.interruptor-estilo { display: inline-flex; align-items: center; gap: .55rem; padding: .2rem 0; border: none; background: none; color: var(--fg); font: inherit; font-size: .9rem; font-weight: 500; cursor: pointer; }
+.interruptor-estilo:focus-visible { outline: 3px solid var(--new); outline-offset: 3px; border-radius: 999px; }
+.interruptor-estilo .interruptor-pista { position: relative; width: 2.3rem; height: 1.3rem; border-radius: 999px; background: var(--line); transition: background .2s ease; flex: none; }
+.interruptor-estilo .interruptor-pista::after { content: ""; position: absolute; top: .15rem; left: .15rem; width: 1rem; height: 1rem; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: transform .2s ease; }
+.interruptor-estilo[aria-checked="true"] .interruptor-pista { background: var(--accent); }
+.interruptor-estilo[aria-checked="true"] .interruptor-pista::after { transform: translateX(1rem); }
+@media (prefers-reduced-motion: reduce) {
+  .interruptor-estilo .interruptor-pista, .interruptor-estilo .interruptor-pista::after { transition: none; }
+}
+
+/* La cola en estilo tabla: una fila por orden y una columna por dato. Las filas
+   llevan la clase .fila-cola de la lista (arrastrar, soltar encima), así que
+   aquí se deshace su rejilla; la franja de color de la izquierda (gris, o roja
+   si es urgente) y el resalte al soltar van en las celdas, que es donde una
+   tabla los pinta bien. */
+.tabla-cola { width: 100%; border-collapse: collapse; }
+.tabla-cola[aria-busy="true"] { opacity: .75; }
+.tabla-cola th { text-align: left; font-weight: 700; font-size: .85em; color: var(--muted); padding: 10px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tabla-cola td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.tabla-cola tbody tr:last-child td { border-bottom: 0; }
+.tabla-cola .fila-cola { display: table-row; padding: 0; }
+.tabla-cola .fila-cola::before { content: none; }
+.tabla-cola .fila-cola > td:first-child { box-shadow: inset 6px 0 0 var(--baja); padding-left: 16px; }
+.tabla-cola .fila-cola[data-urgente] > td:first-child { box-shadow: inset 6px 0 0 var(--alta); }
+.tabla-cola .fila-cola.encima > td { box-shadow: inset 0 3px 0 var(--new), inset 0 -3px 0 var(--new); }
+.tabla-cola .fila-cola.encima > td:first-child { box-shadow: inset 6px 0 0 var(--baja), inset 0 3px 0 var(--new), inset 0 -3px 0 var(--new); }
+.tabla-cola .fila-cola.encima[data-urgente] > td:first-child { box-shadow: inset 6px 0 0 var(--alta), inset 0 3px 0 var(--new), inset 0 -3px 0 var(--new); }
+.tabla-cola .col-puesto { white-space: nowrap; }
+.tabla-cola .col-puesto .asa { margin-right: 6px; }
+.tabla-cola .puesto-cola { font-size: 1.1em; }
+.tabla-cola .col-foto { width: 52px; padding-right: 0; }
+.tabla-cola .foto { width: 40px; height: 40px; border-radius: 8px; }
+.tabla-cola .col-titulo { min-width: 12em; }
+.tabla-cola .col-titulo .tit { display: block; white-space: normal; }
+.tabla-cola .col-ref, .tabla-cola .col-creada { white-space: nowrap; }
+.tabla-cola .col-creada { color: var(--muted); font-size: .9em; }
+.pastillas-cola { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabla-cola .col-mandos { text-align: right; }
+.tabla-cola .mandos-cola { flex-wrap: nowrap; gap: 4px; }
+.tabla-cola .mandos-cola .chip { height: 30px; padding: 0 9px; font-size: .85rem; white-space: nowrap; }
+.tabla-cola .mandos-cola .flecha { min-width: 2.1em; }
 
 /* ---------- Fecha objetivo, cambio de puesto y reportes ---------- */
 
@@ -651,7 +696,22 @@ a.boton { text-decoration: none; color: var(--fg); }
 .bloque-aviso .chip { height: 56px; }
 .bloque-aviso .chip svg { width: 24px; height: 24px; }
 .bloque-aviso .chip[disabled] { opacity: .7; cursor: default; }
-.camara.pequena { min-height: 96px; }
+/* «Hacer otra foto» en el aviso, un tercio más bajo que antes (~76 px en vez de ~114): el icono al lado del texto, no encima. */
+.camara.pequena { min-height: 76px; padding: 10px 16px; grid-auto-flow: column; justify-content: center; align-items: center; gap: 12px; }
+.camara.pequena svg { width: 32px; height: 32px; }
+/* El reproductor del aviso, un tercio más bajo (~66 px en vez de 100). */
+.editar-aviso .audio { padding: 9px 14px; }
+.editar-aviso .audio .play { width: 48px; height: 48px; }
+.editar-aviso .audio .play svg { width: 24px; height: 24px; }
+/* La nota de voz del aviso con su botón (tirar / quitar / recuperar) a la derecha; en estrecho, debajo. */
+.nota-con-boton { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.nota-con-boton > .audio, .nota-con-boton > .ayuda { flex: 1 1 320px; min-width: 0; margin: 0; }
+.nota-con-boton > .boton { flex: none; }
+/* La grabadora al corregir un aviso: el botón a la mitad (80 px en vez de 160). */
+.grabador.pequena { gap: 10px; padding: 8px 0; }
+.grabador.pequena .mic { width: 80px; height: 80px; }
+.grabador.pequena .mic svg { width: 36px; height: 36px; }
+.grabador.pequena .tiempo { font-size: 1.6rem; }
 .miniaturas .con-quitar.nueva img { outline: 3px solid var(--ok); outline-offset: -3px; }
 .aviso-fijo { margin: 0; padding: 12px 16px; border-radius: 14px; background: color-mix(in oklab, var(--normal) 22%, var(--surface)); }
 .boton.peligro.confirmar { background: var(--alta); color: #fff; }

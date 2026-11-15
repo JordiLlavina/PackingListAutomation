@@ -27,14 +27,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.puntotres.packinglist.modelos.api.dto.MensajeVista;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionCreada;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionDetalle;
 import com.puntotres.packinglist.modelos.api.dto.ModificacionResumen;
 import com.puntotres.packinglist.modelos.persistence.DestinoAplicacion;
 import com.puntotres.packinglist.modelos.persistence.Direccion;
 import com.puntotres.packinglist.modelos.persistence.EstadoModificacion;
-import com.puntotres.packinglist.modelos.persistence.Mensaje;
 import com.puntotres.packinglist.modelos.persistence.Modificacion;
 import com.puntotres.packinglist.modelos.persistence.Rol;
 import com.puntotres.packinglist.modelos.persistence.TipoAdjunto;
@@ -46,8 +44,9 @@ import com.puntotres.packinglist.modelos.service.Modificaciones;
 
 /**
  * Las modificaciones en la app: crear, listar, abrir, el ciclo (vista,
- * urgente, título, destinos, hecha, descartada), los mensajes y la cola de
- * órdenes del taller ({@code /api/modificaciones/cola}).
+ * urgente, título, destinos, hecha, descartada) y la cola de órdenes del
+ * taller ({@code /api/modificaciones/cola}). No hay respuestas: las dudas se
+ * resuelven por teléfono.
  *
  * <b>La dirección la decide el rol de quien la crea, nunca lo que mande</b>:
  * lo que crea el taller es siempre un aviso para el despacho (su título, la
@@ -281,6 +280,13 @@ public class ModificacionesController {
         return resumen(id);
     }
 
+    /** Deshace «Hecho» en una orden: vuelve a la cola, la primera detrás de las urgentes. */
+    @PostMapping("/{id}/no-hecha")
+    public ModificacionResumen marcarNoHecha(@PathVariable Long id, @AuthenticationPrincipal UsuarioActual quien) {
+        modificaciones.marcarNoHecha(id, quien);
+        return resumen(id);
+    }
+
     /** Corrige el título (el que puso la IA en un aviso, o el de una orden): deja de ser de la IA. */
     @PatchMapping("/{id}/titulo")
     @PreAuthorize(DESPACHO)
@@ -296,23 +302,6 @@ public class ModificacionesController {
                                          @AuthenticationPrincipal UsuarioActual quien) {
         modificaciones.descartar(id, descarte.motivo(), quien);
         return resumen(id);
-    }
-
-    /** Una respuesta con texto, nota de voz o fotos (de los dos lados; sin documentos). */
-    @PostMapping("/{id}/mensajes")
-    public ResponseEntity<MensajeVista> responder(@PathVariable Long id,
-                                                  @RequestParam(required = false) String texto,
-                                                  @RequestParam(required = false) MultipartFile audio,
-                                                  @RequestParam(required = false) String audioDuracionSeg,
-                                                  @RequestParam(name = "fotos", required = false)
-                                                  List<MultipartFile> fotos,
-                                                  @AuthenticationPrincipal UsuarioActual quien) throws IOException {
-        Mensaje mensaje = modificaciones.responder(id, texto, adjuntos(audio, audioDuracionSeg, fotos), quien);
-        MensajeVista vista = modificaciones.detalle(id).mensajes().stream()
-                .filter(m -> m.id().equals(mensaje.getId()))
-                .findFirst()
-                .orElseThrow();
-        return ResponseEntity.status(HttpStatus.CREATED).body(vista);
     }
 
     private ModificacionResumen resumen(Long id) {

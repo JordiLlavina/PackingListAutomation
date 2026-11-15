@@ -20,8 +20,7 @@ export type Pantalla = {
   titulo: string;
   /**
    * Destino de «atrás» si no hay historial; sin él no hay botón. Con una
-   * función, se calcula con los parámetros de la ruta (la duda de una orden
-   * vuelve a esa orden).
+   * función, se calcula con los parámetros de la ruta.
    */
   atras?: string | ((params: Params) => string);
   /** El destino de la barra inferior que queda marcado (el escáner no marca ninguno). */

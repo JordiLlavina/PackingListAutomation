@@ -33,7 +33,11 @@ public class AvisoEnviado {
          * prioridades); se conserva para leer las filas que ya están en la base.
          */
         SIN_PRIORIDAD,
-        /** Una pregunta sin contestar. */
+        /**
+         * Una pregunta sin contestar. Ya no se manda (desde noviembre de 2026 no
+         * hay respuestas: las dudas van por teléfono); se conserva para leer las
+         * filas que ya están en la base.
+         */
         RESPUESTA,
         /**
          * El resumen del día de la cola al taller (cuántas órdenes tiene y cuál

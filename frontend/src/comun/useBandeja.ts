@@ -69,12 +69,7 @@ export function ProveedorBandeja({ children }: { children: ReactNode }) {
 }
 
 function mismoResumen(a: ResumenBandeja, b: ResumenBandeja): boolean {
-  return (
-    a.nuevas === b.nuevas &&
-    a.pendientes === b.pendientes &&
-    a.urgentes === b.urgentes &&
-    a.conRespuesta === b.conRespuesta
-  );
+  return a.nuevas === b.nuevas && a.pendientes === b.pendientes && a.urgentes === b.urgentes;
 }
 
 export function useBandeja(): ContextoBandeja {

@@ -41,7 +41,7 @@ const CHIPS_ESTADO: [FiltroEstado, string][] = [
 ];
 
 /** El nombre corto de cada destino en la fila (el largo va en el title). */
-const DESTINO_CORTO: Record<string, string> = { EXCEL_ESCANDALLOS: 'Escandallos' };
+const DESTINO_CORTO: Record<string, string> = { EXCEL_ESCANDALLOS: 'Escandallos', PEDIR_TROQUELES: 'Troqueles' };
 
 /** Lo que se busca cuando se deja de teclear, no con cada letra. */
 function useRetrasado(valor: string, ms = 300): string {
@@ -93,7 +93,6 @@ function Fila({ m, elegida, onAbrir }: { m: ModificacionResumen; elegida: boolea
             )}
             {m.urgente && !estaCerrada(m.estado) && <span className="pill urgente">Urgente</span>}
             {!estaCerrada(m.estado) && <FechaObjetivo fecha={m.fechaObjetivo} />}
-            {m.respuestaPendienteDe === 'DESPACHO' && <span className="etiqueta espera">Te toca responder</span>}
           </span>
         </span>
         <span className={`pill ${estado.pill}`}>{estado.texto}</span>
@@ -137,7 +136,7 @@ export default function Bandeja() {
   useEffect(() => setLista(null), [pestana]);
 
   // Cuando cambian los números de la bandeja hay algo nuevo que enseñar.
-  const cambio = resumen ? `${resumen.nuevas}|${resumen.pendientes}|${resumen.urgentes}|${resumen.conRespuesta}` : '';
+  const cambio = resumen ? `${resumen.nuevas}|${resumen.pendientes}|${resumen.urgentes}` : '';
   useEffect(() => {
     const p = new URLSearchParams();
     p.set('direccion', pestana === 'taller' ? 'TALLER_A_DESPACHO' : 'DESPACHO_A_TALLER');
@@ -181,9 +180,7 @@ export default function Bandeja() {
     ? [
         { clase: 'nuevo', numero: resumen.nuevas, texto: 'nuevas', title: 'Avisos del taller que nadie ha abierto todavía' },
         { clase: '', numero: resumen.pendientes, texto: 'pendientes', title: 'Avisos del taller sin acabar (nuevos, vistos o en curso)' },
-        { clase: 'urgente', numero: resumen.urgentes, texto: 'urgentes', title: 'Órdenes para el taller marcadas urgentes y sin hacer' },
-        { clase: 'con-respuesta', numero: resumen.conRespuesta, texto: 'con respuesta', title: 'Órdenes con una duda del taller por contestar' },
-      ]
+        { clase: 'urgente', numero: resumen.urgentes, texto: 'urgentes', title: 'Órdenes para el taller marcadas urgentes y sin hacer' },      ]
     : [];
 
   return (

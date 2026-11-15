@@ -95,11 +95,13 @@ class CatalogoAuxControllerTest {
     void losDestinosDeAplicacionTienenTexto() throws Exception {
         mvc.perform(get("/api/destinos-aplicacion").with(comoUsuario(usuarioDePrueba(usuarios, Rol.DESPACHO))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$", hasSize(3)))
                 .andExpect(jsonPath("$[0].clave").value("ICSUITE"))
                 .andExpect(jsonPath("$[0].texto").value("ICSUITE"))
                 .andExpect(jsonPath("$[1].clave").value("EXCEL_ESCANDALLOS"))
-                .andExpect(jsonPath("$[1].texto").value("Excel de escandallos"));
+                .andExpect(jsonPath("$[1].texto").value("Excel de escandallos"))
+                .andExpect(jsonPath("$[2].clave").value("PEDIR_TROQUELES"))
+                .andExpect(jsonPath("$[2].texto").value("Pedir troqueles"));
     }
 
     private MockHttpServletRequestBuilder crear(String cliente, String temporada) {

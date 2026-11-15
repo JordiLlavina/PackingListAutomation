@@ -77,10 +77,6 @@ public class Modificacion {
     @Column(name = "titulo_de_ia", nullable = false)
     private boolean tituloDeIa;
 
-    /** El último mensaje espera respuesta del otro lado (ver {@code Modificaciones.ladoQueDebeResponder}). */
-    @Column(name = "necesita_respuesta", nullable = false)
-    private boolean necesitaRespuesta;
-
     @Column(name = "creada_por")
     private Long creadaPor;
 
@@ -103,7 +99,7 @@ public class Modificacion {
         // Constructor para JPA.
     }
 
-    /** Nace NUEVA, sin ver, sin hacer y sin esperar respuesta. */
+    /** Nace NUEVA, sin ver y sin hacer. */
     public Modificacion(Long modeloId, Direccion direccion, String tipoCambio, String titulo,
                         Long creadaPor, LocalDateTime creadaEn) {
         this.modeloId = modeloId;
@@ -163,10 +159,6 @@ public class Modificacion {
 
     public boolean isTituloDeIa() {
         return tituloDeIa;
-    }
-
-    public boolean isNecesitaRespuesta() {
-        return necesitaRespuesta;
     }
 
     public Long getCreadaPor() {
@@ -246,6 +238,16 @@ public class Modificacion {
         hechaEn = null;
     }
 
+    /**
+     * Deshace «Hecho»: vuelve a estar abierta (VISTA, que ya se había visto) y
+     * olvida quién la dio por hecha y cuándo.
+     */
+    public void reabrir() {
+        estado = EstadoModificacion.VISTA;
+        hechaPor = null;
+        hechaEn = null;
+    }
+
     public void marcarHecha(Long usuarioId, LocalDateTime cuando) {
         estado = EstadoModificacion.HECHA;
         hechaPor = usuarioId;
@@ -256,11 +258,6 @@ public class Modificacion {
     public void descartar(String motivo) {
         estado = EstadoModificacion.DESCARTADA;
         motivoDescarte = motivo;
-    }
-
-    /** El último mensaje espera respuesta del otro lado. */
-    public void pedirRespuesta() {
-        necesitaRespuesta = true;
     }
 
     /** El título que ha sacado la IA de la nota de voz; se marca como suyo para que se vea y se pueda corregir. */

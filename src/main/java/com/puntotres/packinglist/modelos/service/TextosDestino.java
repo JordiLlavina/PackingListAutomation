@@ -13,7 +13,8 @@ public final class TextosDestino {
 
     private static final Map<String, String> TEXTOS = Map.of(
             "ICSUITE", "ICSUITE",
-            "EXCEL_ESCANDALLOS", "Excel de escandallos");
+            "EXCEL_ESCANDALLOS", "Excel de escandallos",
+            "PEDIR_TROQUELES", "Pedir troqueles");
 
     private TextosDestino() {
     }
