@@ -73,6 +73,26 @@ packing-list:
     por-caja: 2
     peso-kg: 0.08
 
+  # Las dos listas cerradas de la biblioteca de pieles (/biblioteca-pieles),
+  # dadas por el usuario. Una piel lleva UN animal y UN tipo. El primer animal
+  # es el que sale elegido al dar de alta una piel; los tipos se enseñan en
+  # orden alfabético se escriban como se escriban aquí. Añadir un valor es una
+  # línea y un reinicio; uno que se quite de aquí y ya esté guardado en una
+  # piel se sigue enseñando tal cual, no se pierde.
+  biblioteca-pieles:
+    animales: [Vaca, Cabra]
+    tipos:
+      - Animal print
+      - Cabra
+      - Cocodrilo
+      - Grabado
+      - Napa
+      - Nubuck
+      - Release
+      - Serpiente
+      - Serraje
+      - Serraje de forro
+
   # Reglas de la entrada por packing list de taller: cómo se reparte lo que
   # llega y cómo se llenan cajas y palets. El packing del taller no se
   # respeta; se regenera con esto.

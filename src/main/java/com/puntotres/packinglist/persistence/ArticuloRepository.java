@@ -11,5 +11,8 @@ public interface ArticuloRepository extends JpaRepository<Articulo, ArticuloId> 
 
     List<Articulo> findByModeloIdOrderByReferencia(Long modeloId);
 
+    /** Los artículos que llevan una piel: para el recorrido de una ficha de la biblioteca. */
+    List<Articulo> findByClienteAndRefPielOrderByReferencia(String cliente, String refPiel);
+
     void deleteByModeloId(Long modeloId);
 }

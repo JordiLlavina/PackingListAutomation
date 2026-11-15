@@ -12,6 +12,11 @@ import jakarta.persistence.Table;
  * Cómo se llama una piel del cliente. El pedido solo trae su referencia
  * ("AL0103"); el nombre lo teclea quien prepara el corte, y es del MATERIAL:
  * la misma piel se llama igual en todos los bolsos que la usan.
+ *
+ * Puede apuntar a una {@link FichaPiel} de la biblioteca de pieles, que dice
+ * qué piel de qué proveedor es. El enlace es opcional: una piel que entra
+ * desde producción sin más que su nombre no lo lleva, y las automatizaciones
+ * (el corte, el catálogo, la pantalla de colores) no lo miran nunca.
  */
 @Entity
 @Table(name = "piel")
@@ -31,6 +36,9 @@ public class Piel {
 
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
+
+    @Column(name = "ficha_piel_id")
+    private Long fichaPielId;
 
     protected Piel() {
         // Constructor para JPA.
@@ -56,6 +64,15 @@ public class Piel {
 
     public LocalDateTime getFechaActualizacion() {
         return fechaActualizacion;
+    }
+
+    public Long getFichaPielId() {
+        return fichaPielId;
+    }
+
+    /** Enlazar o desenlazar no cambia la fecha: el nombre de la piel es el mismo. */
+    public void setFichaPielId(Long fichaPielId) {
+        this.fichaPielId = fichaPielId;
     }
 
     public void actualizar(String nombre) {

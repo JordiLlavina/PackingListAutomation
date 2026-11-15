@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Biblioteca de pieles')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Biblioteca de pieles')}"></header>
+<main class="catalogo biblioteca-pieles">
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+    <div class="alerta error" th:if="${aviso}" th:text="${aviso}"></div>
+
+    <p class="ayuda"><a th:href="@{/biblioteca-pieles}">← Todas las pieles</a></p>
+
+    <datalist id="proveedoresConocidos">
+        <option th:each="p : ${proveedores}" th:value="${p.nombre}"></option>
+    </datalist>
+    <datalist id="clientesConocidos">
+        <option th:each="entrada : ${clientes}" th:value="${entrada.key}" th:label="${entrada.value}"></option>
+    </datalist>
+
+    <!-- Lo único obligatorio es el proveedor y el nombre. Todo lo demás se rellena
+         cuando se sabe: una casilla vacía es "no se sabe", no un error. -->
+    <section class="tarjeta">
+        <h3 class="titulo-seccion" id="tituloFicha"
+            th:text="|${ficha.nombre} · ${proveedor != null ? proveedor.nombre : ''}|">ALPACA TOUCH · CURTIDOS</h3>
+        <form th:action="@{/biblioteca-pieles/{id}(id=${ficha.id})}" method="post" id="formFicha">
+            <div class="rejilla-ficha">
+                <label>Proveedor
+                    <input type="text" name="proveedor" list="proveedoresConocidos" required autocomplete="off"
+                           th:value="${proveedor != null ? proveedor.nombre : ''}">
+                </label>
+                <label>Nombre de la piel
+                    <input type="text" name="nombre" required autocomplete="off" th:value="${ficha.nombre}">
+                </label>
+                <label>Referencia del proveedor
+                    <input type="text" name="refProveedor" autocomplete="off" th:value="${ficha.refProveedor}">
+                </label>
+                <label>Animal
+                    <select name="animal">
+                        <option value="">-- no se sabe --</option>
+                        <option th:each="a : ${animales}" th:value="${a}" th:text="${a}"
+                                th:selected="${a == ficha.animal}"></option>
+                    </select>
+                </label>
+                <label>Tipo
+                    <select name="tipo">
+                        <option value="">-- no se sabe --</option>
+                        <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}"
+                                th:selected="${t == ficha.tipo}"></option>
+                    </select>
+                </label>
+                <label title="Un valor (1,2) o un rango (1,1-1,3)">Grueso (mm)
+                    <input type="text" name="grueso" autocomplete="off" placeholder="1,2 o 1,1-1,3" th:value="${grueso}">
+                </label>
+                <label title="Lo que mide una piel entera: un valor (4,5) o un rango (4-5)">Superficie (m²)
+                    <input type="text" name="superficie" autocomplete="off" placeholder="4,5 o 4-5" th:value="${superficie}">
+                </label>
+                <label>Stock service
+                    <select name="stockService">
+                        <option value="" th:selected="${stockService == ''}">-- no se sabe --</option>
+                        <option value="true" th:selected="${stockService == 'true'}">Sí</option>
+                        <option value="false" th:selected="${stockService == 'false'}">No</option>
+                    </select>
+                </label>
+                <label>Plazo de entrega (días)
+                    <input type="text" name="plazoEntregaDias" inputmode="numeric" autocomplete="off"
+                           th:value="${ficha.plazoEntregaDias}">
+                </label>
+                <label>Calidad (1 a 5)
+                    <select name="calidad">
+                        <option value="" th:selected="${ficha.calidad == null}">-- sin valorar --</option>
+                        <option th:each="n : ${#numbers.sequence(1, 5)}" th:value="${n}" th:text="${n}"
+                                th:selected="${ficha.calidad != null and ficha.calidad == n}"></option>
+                    </select>
+                </label>
+                <label class="ancha">Nota de calidad
+                    <input type="text" name="notaCalidad" autocomplete="off" th:value="${ficha.notaCalidad}"
+                           placeholder="Lo que se ha visto de la calidad de esta piel">
+                </label>
+                <label class="ancha">Comentarios
+                    <textarea name="comentarios" rows="3" th:text="${ficha.comentarios}"></textarea>
+                </label>
+            </div>
+
+            <!-- Los precios son los vigentes: al llegar una oferta nueva se corrigen estos
+                 tramos y su fecha. No hay un campo de mínimo aparte: el mínimo de pedido
+                 es el tramo más bajo. -->
+            <h4 class="subtitulo-ficha">Precios, en €/m²</h4>
+            <p class="ayuda">
+                Un tramo por cada precio: desde cuántos m² se aplica. El más bajo es el mínimo de pedido.
+                Un precio sin mínimo (el de stock service) deja vacío «Desde»; un mínimo del que aún no
+                se sabe el precio deja vacío el precio. Para quitar un tramo, vacía sus dos casillas.
+            </p>
+            <div class="precios-ficha">
+                <table class="tabla-tramos">
+                    <thead>
+                    <tr><th>Desde (m²)</th><th>Precio (€/m²)</th></tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="tramo, estado : ${tramos}">
+                        <td><input type="text" inputmode="decimal" autocomplete="off"
+                                   th:name="|tramos[${estado.index}].moq|" th:value="${tramo.moq}"
+                                   th:attr="aria-label=|Mínimo del tramo ${estado.count}|"></td>
+                        <td><input type="text" inputmode="decimal" autocomplete="off"
+                                   th:name="|tramos[${estado.index}].precio|" th:value="${tramo.precio}"
+                                   th:attr="aria-label=|Precio del tramo ${estado.count}|"></td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div>
+                    <label>El mínimo es
+                        <select name="moqPorColor">
+                            <option value="" th:selected="${moqPorColor == ''}">-- no se sabe --</option>
+                            <option value="true" th:selected="${moqPorColor == 'true'}">por color</option>
+                            <option value="false" th:selected="${moqPorColor == 'false'}">del pedido entero</option>
+                        </select>
+                    </label>
+                    <label>Fecha de la oferta
+                        <input type="date" name="fechaPrecios" th:value="${ficha.fechaPrecios}">
+                    </label>
+                </div>
+            </div>
+            <button type="submit">Guardar</button>
+        </form>
+
+        <!-- La valoración es del proveedor y vale para todas sus pieles: se edita en su pantalla. -->
+        <p class="ayuda valoracion-proveedor" th:if="${proveedor != null}">
+            Valoración de <strong th:text="${proveedor.nombre}">CURTIDOS</strong>:
+            responsabilidad <strong th:text="${proveedor.responsabilidad != null} ? ${proveedor.responsabilidad} + '/5' : 'sin valorar'">4/5</strong>,
+            entrega a tiempo <strong th:text="${proveedor.entregaATiempo != null} ? ${proveedor.entregaATiempo} + '/5' : 'sin valorar'">3/5</strong>.
+            <span th:if="${!proveedor.notaValoracion.isEmpty()}" th:text="|«${proveedor.notaValoracion}»|"></span>
+            <a th:href="@{/biblioteca-pieles/proveedores}">Editar en Proveedores</a>
+        </p>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Fotos</h3>
+        <div class="galeria-fotos">
+            <div class="galeria-foto" th:each="foto : ${fotos}" th:classappend="${foto.principal} ? 'principal'">
+                <a th:href="@{/biblioteca-pieles/foto/{id}(id=${foto.id})}" target="_blank" rel="noopener">
+                    <img th:src="@{/biblioteca-pieles/foto/{id}(id=${foto.id})}" th:alt="${foto.nombreFichero}">
+                </a>
+                <span class="nombre-foto" th:text="${foto.nombreFichero}" th:title="${foto.nombreFichero}"></span>
+                <span>
+                    <form th:if="${!foto.principal}" method="post"
+                          th:action="@{/biblioteca-pieles/foto/{id}/principal(id=${foto.id})}">
+                        <input type="hidden" name="ficha" th:value="${ficha.id}">
+                        <button type="submit" class="mini" title="Es la que se ve en la tabla">Principal</button>
+                    </form>
+                    <form method="post" th:action="@{/biblioteca-pieles/foto/{id}/borrar(id=${foto.id})}">
+                        <input type="hidden" name="ficha" th:value="${ficha.id}">
+                        <button type="submit" class="mini" onclick="return confirm('¿Borrar esta foto?')">Borrar</button>
+                    </form>
+                </span>
+            </div>
+            <p class="ayuda" th:if="${#lists.isEmpty(fotos)}">Esta piel no tiene fotos.</p>
+        </div>
+        <form th:action="@{/biblioteca-pieles/{id}/fotos(id=${ficha.id})}" method="post" enctype="multipart/form-data"
+              class="galeria-subir">
+            <input type="file" name="fotos" multiple accept="image/*,.heic" required>
+            <button type="submit" class="mini">Subir fotos</button>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Fichas técnicas y ofertas</h3>
+        <ul class="lista-documentos" th:unless="${#lists.isEmpty(documentos)}">
+            <li th:each="documento : ${documentos}">
+                <a th:href="@{/biblioteca-pieles/documento/{id}(id=${documento.id})}" target="_blank" rel="noopener"
+                   th:text="${documento.nombreFichero}">ficha.pdf</a>
+                <span class="texto-tenue"
+                      th:text="|${#temporals.format(documento.fecha, 'dd/MM/yyyy')} · ${documento.tamano / 1024} KB|"></span>
+                <form method="post" th:action="@{/biblioteca-pieles/documento/{id}/borrar(id=${documento.id})}">
+                    <input type="hidden" name="ficha" th:value="${ficha.id}">
+                    <button type="submit" class="mini" onclick="return confirm('¿Borrar este documento?')">Borrar</button>
+                </form>
+            </li>
+        </ul>
+        <p class="ayuda" th:if="${#lists.isEmpty(documentos)}">
+            Guarda aquí la ficha técnica o la oferta del proveedor, tal como llegó: si un dato está mal, se puede volver a ella.
+        </p>
+        <form th:action="@{/biblioteca-pieles/{id}/documentos(id=${ficha.id})}" method="post"
+              enctype="multipart/form-data" class="galeria-subir">
+            <input type="file" name="documentos" multiple required>
+            <button type="submit" class="mini">Subir documentos</button>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Cómo la llama cada cliente</h3>
+        <p class="ayuda">
+            La misma piel lleva una referencia distinta en cada cliente. Enlazarlas aquí es lo que hace que su
+            recorrido enseñe solo en qué modelos y temporadas ha ido.
+        </p>
+        <ul class="lista-enlazadas" th:unless="${#lists.isEmpty(enlazadas)}">
+            <li th:each="piel : ${enlazadas}">
+                <span class="etiqueta" th:text="|${piel.cliente} ${piel.refPiel}|">AMI AL0103</span>
+                <span th:text="${piel.nombre}">ALPACA TOUCH</span>
+                <form method="post" th:action="@{/biblioteca-pieles/desenlazar}">
+                    <input type="hidden" name="cliente" th:value="${piel.cliente}">
+                    <input type="hidden" name="refPiel" th:value="${piel.refPiel}">
+                    <input type="hidden" name="ficha" th:value="${ficha.id}">
+                    <button type="submit" class="mini">Quitar enlace</button>
+                </form>
+            </li>
+        </ul>
+        <form th:action="@{/biblioteca-pieles/enlazar}" method="post" class="form-tara">
+            <input type="hidden" name="ficha" th:value="${ficha.id}">
+            <input type="hidden" name="volver" value="ficha">
+            <label>Cliente
+                <select name="cliente" required>
+                    <option value="">-- elige --</option>
+                    <option th:each="entrada : ${clientes}" th:value="${entrada.key}" th:text="${entrada.value}"></option>
+                </select>
+            </label>
+            <label>Su referencia de piel
+                <input type="text" name="refPiel" required autocomplete="off" placeholder="AL0103, PXCBC…">
+            </label>
+            <button type="submit" class="secundario">Enlazar</button>
+        </form>
+    </section>
+
+    <!-- El recorrido junta lo apuntado a mano (con su día) y lo que ya sabe el catálogo
+         de las referencias enlazadas (del catálogo solo se sabe la temporada). -->
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Recorrido</h3>
+        <p class="ayuda" th:if="${#lists.isEmpty(recorrido)}">
+            Todavía no hay nada apuntado. Apunta aquí cada vez que se busque, se enseñe o se use para un cliente.
+        </p>
+        <ol class="recorrido" th:unless="${#lists.isEmpty(recorrido)}">
+            <li th:each="paso : ${recorrido}" th:classappend="${paso.fechaExacta} ? '' : 'del-catalogo'">
+                <span class="recorrido-fecha" th:if="${paso.fechaExacta}"
+                      th:text="${#temporals.format(paso.fecha, 'dd/MM/yyyy')}">12/03/2026</span>
+                <span class="recorrido-fecha" th:unless="${paso.fechaExacta}"
+                      title="Sale del catálogo de modelos: se sabe la temporada, no el día">del catálogo</span>
+                <span class="etiqueta" th:text="${paso.cliente}">APC</span>
+                <strong th:text="${paso.que}">Mostrada</strong>
+                <span th:if="${!paso.detalle.isEmpty()}" th:text="${paso.detalle}">PROTO B</span>
+                <span class="texto-tenue" th:if="${!paso.nota.isEmpty()}" th:text="|— ${paso.nota}|"></span>
+                <form th:if="${paso.eventoId != null}" method="post"
+                      th:action="@{/biblioteca-pieles/evento/{id}/borrar(id=${paso.eventoId})}">
+                    <input type="hidden" name="ficha" th:value="${ficha.id}">
+                    <button type="submit" class="mini" onclick="return confirm('¿Borrar este apunte del recorrido?')">Borrar</button>
+                </form>
+            </li>
+        </ol>
+        <form th:action="@{/biblioteca-pieles/{id}/eventos(id=${ficha.id})}" method="post" class="form-tara apuntar-evento">
+            <label>Fecha
+                <input type="date" name="fecha" th:value="${hoy}" required>
+            </label>
+            <label>Cliente
+                <input type="text" name="cliente" list="clientesConocidos" required autocomplete="off">
+            </label>
+            <label>Qué pasó
+                <select name="tipo" required>
+                    <option th:each="tipo : ${tiposEvento}" th:value="${tipo.name()}" th:text="${tipo.texto}"></option>
+                </select>
+            </label>
+            <label>Modelo o prototipo
+                <input type="text" name="modelo" autocomplete="off" placeholder="Opcional: PROTO B, ULL027…">
+            </label>
+            <label class="nota-evento">Nota
+                <input type="text" name="nota" autocomplete="off" placeholder="Opcional: por qué se descartó…">
+            </label>
+            <button type="submit" class="secundario">Apuntar</button>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Otra piel del mismo proveedor</h3>
+        <p class="ayuda">
+            Crea una piel nueva de este proveedor con los mismos datos de partida (animal, tipo, medidas,
+            stock service, plazo y precios), para cambiar solo lo que sea distinto.
+        </p>
+        <form th:action="@{/biblioteca-pieles/{id}/duplicar(id=${ficha.id})}" method="post" class="form-tara">
+            <label>Nombre de la piel nueva
+                <input type="text" name="nombre" required autocomplete="off">
+            </label>
+            <button type="submit" class="secundario">Duplicar</button>
+        </form>
+        <form th:action="@{/biblioteca-pieles/{id}/borrar(id=${ficha.id})}" method="post" class="borrar-ficha"
+              th:attr="data-confirmar=|¿Borrar ${ficha.nombre} de la biblioteca, con sus precios, fotos, documentos y recorrido? Las pieles de cliente enlazadas no se borran: se quedan sin ficha.|"
+              onsubmit="return confirm(this.dataset.confirmar)">
+            <button type="submit" class="neutro">Borrar esta piel de la biblioteca</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

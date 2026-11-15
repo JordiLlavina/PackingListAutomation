@@ -7,7 +7,19 @@ conversación con el usuario. Relacionado con
 [2026-11-08-modelos-y-modificaciones-design.md](2026-11-08-modelos-y-modificaciones-design.md)
 (los prototipos).
 
-Estado: **diseño, sin implementar.**
+Estado: **implementado** (2026-11-15, misma rama), sin el agente de fichas
+técnicas, que sigue siendo la fase siguiente. Desvíos respecto de lo escrito
+abajo, todos hacia menos trabajo al teclear:
+
+- El grueso y la superficie se teclean en **una casilla** (`1,2` o `1,1-1,3`) y no
+  en dos; en la base siguen siendo mínimo y máximo.
+- El **cliente de un evento es texto** (la pantalla sugiere los del yml): una piel
+  se puede buscar para alguien que aún no es cliente.
+- En la tabla solo se editan en la casilla los datos principales (animal, tipo,
+  grueso, superficie, stock service, plazo y calidad); los precios, las fotos y lo
+  demás, en la ficha.
+- La pantalla de proveedores no lista las pieles de cada uno: enseña cuántas tiene
+  y enlaza a la tabla filtrada por ese proveedor.
 
 ## Qué pidió el usuario
 
