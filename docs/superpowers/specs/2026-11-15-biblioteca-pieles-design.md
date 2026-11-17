@@ -229,7 +229,7 @@ con la transcripción de notas de voz que ya existe en la app de modelos.
 
 ## Migración
 
-`V10__biblioteca_pieles.sql`: crea las seis tablas y añade la columna nula
+`V11__biblioteca_pieles.sql`: crea las seis tablas y añade la columna nula
 `piel.ficha_piel_id`. No mueve datos, así que no se pierde nada de lo guardado.
 SQL del subconjunto común a H2 y PostgreSQL, como desde la V4, y binarios como
 `bytea` sin `@Lob`.
