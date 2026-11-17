@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Biblioteca de pieles')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Biblioteca de pieles')}"></header>
+<main class="catalogo biblioteca-pieles">
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <datalist id="proveedoresConocidos">
+        <option th:each="p : ${proveedores}" th:value="${p.nombre}"></option>
+    </datalist>
+
+    <!-- El alta va arriba del todo y pide lo mínimo: lo demás se completa en
+         la ficha, o no se completa. Una piel a medias se guarda igual. -->
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Nueva piel</h3>
+        <form th:action="@{/biblioteca-pieles/nueva}" method="post" class="form-tara alta-piel">
+            <label>Proveedor
+                <input type="text" name="proveedor" list="proveedoresConocidos" required autocomplete="off"
+                       placeholder="Se crea si no existe">
+            </label>
+            <label>Nombre de la piel
+                <input type="text" name="nombre" required autocomplete="off">
+            </label>
+            <label>Animal
+                <select name="animal">
+                    <option th:each="a : ${animales}" th:value="${a}" th:text="${a}"
+                            th:selected="${a == animalPorDefecto}"></option>
+                </select>
+            </label>
+            <label>Tipo
+                <select name="tipo">
+                    <option value="">-- no se sabe --</option>
+                    <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}"></option>
+                </select>
+            </label>
+            <label title="Apunta en su recorrido que hoy se buscó para ese cliente">Buscada para
+                <select name="buscadaPara">
+                    <option value="">-- nadie en concreto --</option>
+                    <option th:each="entrada : ${clientes}" th:value="${entrada.key}" th:text="${entrada.value}"></option>
+                </select>
+            </label>
+            <button type="submit">Añadir piel</button>
+        </form>
+    </section>
+
+    <!-- Los filtros van por GET: la dirección dice lo que se está viendo y se puede guardar. -->
+    <section class="tarjeta catalogo-cabecera">
+        <form th:action="@{/biblioteca-pieles}" method="get" class="fila-filtros">
+            <label>Buscar
+                <input type="search" name="q" th:value="${q}" placeholder="Piel, proveedor o referencia"
+                       autocomplete="off">
+            </label>
+            <label>Proveedor
+                <select name="proveedor" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <option th:each="p : ${proveedores}" th:value="${p.id}" th:text="${p.nombre}"
+                            th:selected="${p.id == proveedorElegido}"></option>
+                </select>
+            </label>
+            <label>Cliente
+                <select name="cliente" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <option th:each="entrada : ${clientes}" th:value="${entrada.key}" th:text="${entrada.value}"
+                            th:selected="${entrada.key == clienteElegido}"></option>
+                </select>
+            </label>
+            <label>Animal
+                <select name="animal" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <option th:each="a : ${animales}" th:value="${a}" th:text="${a}"
+                            th:selected="${a == animalElegido}"></option>
+                </select>
+            </label>
+            <label>Tipo
+                <select name="tipo" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}"
+                            th:selected="${t == tipoElegido}"></option>
+                </select>
+            </label>
+            <label title="Un valor (1,2) o un rango (1-1,4): salen las pieles cuyo grueso cae dentro">Grueso (mm)
+                <input type="text" name="grueso" th:value="${grueso}" placeholder="1,2 o 1-1,4" class="filtro-corto"
+                       autocomplete="off">
+            </label>
+            <label>Stock service
+                <select name="stock" onchange="this.form.submit()">
+                    <option value="">Todos</option>
+                    <option value="si" th:selected="${stock == 'si'}">Sí</option>
+                    <option value="no" th:selected="${stock == 'no'}">No</option>
+                </select>
+            </label>
+            <label class="casilla-filtro">
+                <input type="checkbox" name="sinFicha" value="true" th:checked="${sinFicha}"
+                       onchange="this.form.submit()">
+                Solo las que no tienen ficha
+            </label>
+            <button type="submit" class="secundario">Filtrar</button>
+            <a th:if="${hayFiltro}" th:href="@{/biblioteca-pieles}">Quitar filtros</a>
+        </form>
+        <p class="ayuda enlaces-catalogo">
+            Proveedores y su valoración en <a th:href="@{/biblioteca-pieles/proveedores}">Proveedores</a>.
+            Las pieles de cada cliente (referencia y nombre) se siguen editando en
+            <a th:href="@{/colores}">Colores y Pieles de Cliente</a>.
+        </p>
+    </section>
+
+    <section class="tarjeta" th:if="${!sinFicha and #lists.isEmpty(filas)}">
+        <p class="ayuda" th:if="${hayFiltro}">Ninguna piel de la biblioteca pasa esos filtros.</p>
+        <p class="ayuda" th:unless="${hayFiltro}">
+            Todavía no hay ninguna piel en la biblioteca. Añade la primera aquí arriba: basta con el proveedor y el nombre.
+        </p>
+    </section>
+
+    <section class="tarjeta tabla-catalogo-tarjeta" th:if="${!#lists.isEmpty(filas)}">
+        <h3 class="titulo-seccion" th:text="|Pieles con ficha (${#lists.size(filas)})|">Pieles con ficha</h3>
+        <div class="scroll-tabla">
+        <table class="tabla-catalogo tabla-pieles">
+            <thead>
+            <tr>
+                <th>Foto</th>
+                <th>Proveedor</th>
+                <th>Piel</th>
+                <th>Animal</th>
+                <th>Tipo</th>
+                <th>Grueso (mm)</th>
+                <th>Superficie (m²)</th>
+                <th>Stock service</th>
+                <th>Plazo (días)</th>
+                <th title="Desde cuántos m² y a cuántos €/m². El primero es el mínimo de pedido. Se editan en la ficha.">Precios (€/m²)</th>
+                <th>Calidad</th>
+                <th>Clientes</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="fila : ${filas}" th:with="ficha=${fila.ficha}, url=|/biblioteca-pieles/${fila.ficha.id}/campo|">
+                <td class="c-foto">
+                    <a th:href="@{/biblioteca-pieles/{id}(id=${ficha.id})}">
+                        <img th:if="${fila.fotoId != null}" class="miniatura"
+                             th:src="@{/biblioteca-pieles/foto/{id}(id=${fila.fotoId})}" th:alt="|Foto de ${ficha.nombre}|">
+                        <span th:if="${fila.fotoId == null}" class="sin-foto">sin foto</span>
+                    </a>
+                </td>
+                <td th:text="${fila.proveedor != null} ? ${fila.proveedor.nombre} : ''">CURTIDOS</td>
+                <td class="c-modelo">
+                    <a th:href="@{/biblioteca-pieles/{id}(id=${ficha.id})}" th:text="${ficha.nombre}">ALPACA TOUCH</a>
+                    <span class="ref-proveedor" th:if="${!ficha.refProveedor.isEmpty()}" th:text="${ficha.refProveedor}"></span>
+                </td>
+                <td>
+                    <select class="celda" data-campo="animal" th:attr="data-url=${url}, aria-label=|Animal de ${ficha.nombre}|">
+                        <option value=""></option>
+                        <option th:each="a : ${animales}" th:value="${a}" th:text="${a}" th:selected="${a == ficha.animal}"></option>
+                        <option th:if="${!ficha.animal.isEmpty() and !#lists.contains(animales, ficha.animal)}"
+                                th:value="${ficha.animal}" th:text="${ficha.animal}" selected></option>
+                    </select>
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <select class="celda" data-campo="tipo" th:attr="data-url=${url}, aria-label=|Tipo de ${ficha.nombre}|">
+                        <option value=""></option>
+                        <option th:each="t : ${tipos}" th:value="${t}" th:text="${t}" th:selected="${t == ficha.tipo}"></option>
+                        <option th:if="${!ficha.tipo.isEmpty() and !#lists.contains(tipos, ficha.tipo)}"
+                                th:value="${ficha.tipo}" th:text="${ficha.tipo}" selected></option>
+                    </select>
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda c-numero" data-campo="grueso" th:value="${fila.grueso()}"
+                           placeholder="1,1-1,3" th:attr="data-url=${url}, aria-label=|Grueso de ${ficha.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda c-numero" data-campo="superficie" th:value="${fila.superficie()}"
+                           placeholder="4-5" th:attr="data-url=${url}, aria-label=|Superficie de ${ficha.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <select class="celda" data-campo="stockService"
+                            th:attr="data-url=${url}, aria-label=|Stock service de ${ficha.nombre}|">
+                        <option value="" th:selected="${ficha.stockService == null}"></option>
+                        <option value="true" th:selected="${ficha.stockService == true}">Sí</option>
+                        <option value="false" th:selected="${ficha.stockService == false}">No</option>
+                    </select>
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda c-numero" data-campo="plazoEntregaDias" inputmode="numeric"
+                           th:value="${ficha.plazoEntregaDias}"
+                           th:attr="data-url=${url}, aria-label=|Plazo de entrega de ${ficha.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td class="c-precios">
+                    <span th:each="tramo : ${fila.tramosTexto()}" class="tramo-precio" th:text="${tramo}"></span>
+                    <a th:if="${#lists.isEmpty(fila.precios)}" class="sin-foto"
+                       th:href="@{/biblioteca-pieles/{id}(id=${ficha.id})}">sin precios</a>
+                </td>
+                <td>
+                    <select class="celda" data-campo="calidad" th:attr="data-url=${url}, aria-label=|Calidad de ${ficha.nombre}|">
+                        <option value="" th:selected="${ficha.calidad == null}"></option>
+                        <option th:each="n : ${#numbers.sequence(1, 5)}" th:value="${n}" th:text="${n}"
+                                th:selected="${ficha.calidad != null and ficha.calidad == n}"></option>
+                    </select>
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <span class="etiqueta" th:each="piel : ${fila.enlazadas}"
+                          th:text="|${piel.cliente} ${piel.refPiel}|">AMI AL0103</span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    <!-- Las pieles de cliente que entraron desde producción (un excel, el corte) con
+         solo su referencia y su nombre. Se ven aquí para poder completarlas, y el
+         enlace nunca se hace solo: si una se llama como una piel de la biblioteca se
+         propone, y lo acepta una persona. -->
+    <section class="tarjeta" th:if="${!#lists.isEmpty(sueltas)}">
+        <h3 class="titulo-seccion" th:text="|Pieles de cliente sin ficha (${#lists.size(sueltas)})|">Pieles de cliente sin ficha</h3>
+        <p class="ayuda">
+            Han entrado desde un excel o desde el corte, con su referencia y poco más. Siguen sirviendo
+            igual para las automatizaciones; aquí se les puede decir qué piel de qué proveedor son.
+        </p>
+        <table class="tabla-sin-ficha">
+            <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Ref. piel</th>
+                <th>Nombre</th>
+                <th>Es esta piel de la biblioteca</th>
+                <th>O crear su ficha</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="suelta : ${sueltas}" th:with="piel=${suelta.piel}">
+                <td th:text="${piel.cliente}">AMI</td>
+                <td class="codigo-color" th:text="${piel.refPiel}">AL0103</td>
+                <td th:text="${piel.nombre}" th:classappend="${piel.nombre.isEmpty()} ? 'sin-foto'">ALPACA TOUCH</td>
+                <td>
+                    <!-- La propuesta: se llama igual que una ficha. Se acepta con un clic o se ignora. -->
+                    <form th:each="propuesta : ${suelta.propuestas}" th:action="@{/biblioteca-pieles/enlazar}"
+                          method="post" class="propuesta-enlace">
+                        <input type="hidden" name="cliente" th:value="${piel.cliente}">
+                        <input type="hidden" name="refPiel" th:value="${piel.refPiel}">
+                        <input type="hidden" name="ficha" th:value="${propuesta.fichaId}">
+                        <span th:text="|¿Es ${propuesta.nombre} de ${propuesta.proveedor}?|">¿Es ALPACA TOUCH de CURTIDOS?</span>
+                        <button type="submit" class="mini">Sí, enlazar</button>
+                    </form>
+                    <form th:if="${!#lists.isEmpty(todasLasFichas)}" th:action="@{/biblioteca-pieles/enlazar}"
+                          method="post" class="form-tara enlazar-con">
+                        <input type="hidden" name="cliente" th:value="${piel.cliente}">
+                        <input type="hidden" name="refPiel" th:value="${piel.refPiel}">
+                        <select name="ficha" required th:attr="aria-label=|Piel de la biblioteca para ${piel.refPiel}|">
+                            <option value="">-- elige una piel --</option>
+                            <option th:each="f : ${todasLasFichas}" th:value="${f.ficha.id}"
+                                    th:text="|${f.ficha.nombre} · ${f.proveedor != null ? f.proveedor.nombre : ''}|"></option>
+                        </select>
+                        <button type="submit" class="mini">Enlazar</button>
+                    </form>
+                    <span class="sin-foto" th:if="${#lists.isEmpty(todasLasFichas)}">la biblioteca está vacía</span>
+                </td>
+                <td>
+                    <form th:action="@{/biblioteca-pieles/nueva}" method="post" class="form-tara crear-ficha">
+                        <input type="hidden" name="enlazarCliente" th:value="${piel.cliente}">
+                        <input type="hidden" name="enlazarRef" th:value="${piel.refPiel}">
+                        <input type="hidden" name="buscadaPara" value="">
+                        <input type="text" name="nombre" th:value="${piel.nombre}" placeholder="Nombre de la piel" required
+                               th:attr="aria-label=|Nombre de la piel ${piel.refPiel}|">
+                        <input type="text" name="proveedor" list="proveedoresConocidos" placeholder="Proveedor" required
+                               autocomplete="off" th:attr="aria-label=|Proveedor de la piel ${piel.refPiel}|">
+                        <button type="submit" class="mini">Crear ficha</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="tarjeta" th:if="${filtroSoloDeFichas}">
+        <p class="ayuda">
+            Con un filtro de proveedor, animal, tipo, grueso o stock service no se enseñan las pieles de
+            cliente sin ficha: de ellas no se sabe ninguno de esos datos.
+        </p>
+    </section>
+
+    <script th:src="@{/celdas-pieles.js}"></script>
+</main>
+</body>
+</html>

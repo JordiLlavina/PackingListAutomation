@@ -8,4 +8,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PielRepository extends JpaRepository<Piel, PielId> {
 
     List<Piel> findByClienteOrderByRefPiel(String cliente);
+
+    /** Las pieles de cliente enlazadas a una ficha de la biblioteca. */
+    List<Piel> findByFichaPielIdOrderByClienteAscRefPielAsc(Long fichaPielId);
+
+    List<Piel> findByFichaPielIdIsNotNull();
+
+    /** Las que aún no se sabe qué piel de qué proveedor son. */
+    List<Piel> findByFichaPielIdIsNullOrderByClienteAscRefPielAsc();
 }

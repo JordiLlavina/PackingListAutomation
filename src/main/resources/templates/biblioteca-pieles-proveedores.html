@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Proveedores de pieles')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Proveedores de pieles')}"></header>
+<main class="catalogo biblioteca-pieles">
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <p class="ayuda"><a th:href="@{/biblioteca-pieles}">← Todas las pieles</a></p>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Nuevo proveedor</h3>
+        <form th:action="@{/biblioteca-pieles/proveedores/nuevo}" method="post" class="form-tara">
+            <label>Nombre
+                <input type="text" name="nombre" required autocomplete="off">
+            </label>
+            <button type="submit">Añadir proveedor</button>
+        </form>
+        <p class="ayuda">También se crea solo al dar de alta una piel con un proveedor que no existía.</p>
+    </section>
+
+    <section class="tarjeta" th:if="${#lists.isEmpty(proveedores)}">
+        <p class="ayuda">Todavía no hay ningún proveedor.</p>
+    </section>
+
+    <!-- La valoración es UNA nota por proveedor que se va corrigiendo, sin histórico:
+         responsabilidad (calidad del servicio, cuánto tarda en responder) y entrega a
+         tiempo, de 1 a 5. Cada casilla se guarda sola al salir de ella. -->
+    <section class="tarjeta tabla-catalogo-tarjeta" th:unless="${#lists.isEmpty(proveedores)}">
+        <h3 class="titulo-seccion" th:text="|Proveedores (${#lists.size(proveedores)})|">Proveedores</h3>
+        <div class="scroll-tabla">
+        <table class="tabla-catalogo tabla-pieles tabla-proveedores">
+            <thead>
+            <tr>
+                <th>Proveedor</th>
+                <th>Pieles</th>
+                <th title="Calidad del servicio, cuánto tarda en responder: de 1 a 5">Responsabilidad</th>
+                <th title="De 1 a 5">Entrega a tiempo</th>
+                <th>Nota de la valoración</th>
+                <th>Contacto</th>
+                <th>Email</th>
+                <th>Teléfono</th>
+                <th>País</th>
+                <th title="Pago, Incoterm, portes">Condiciones</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="p : ${proveedores}" th:with="url=|/biblioteca-pieles/proveedores/${p.id}/campo|,
+                    suyas=${pielesPorProveedor.containsKey(p.id) ? pielesPorProveedor.get(p.id) : 0}">
+                <td>
+                    <input type="text" class="celda c-nombre" data-campo="nombre" th:value="${p.nombre}"
+                           th:attr="data-url=${url}, aria-label=|Nombre de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <a th:if="${suyas > 0}" th:href="@{/biblioteca-pieles(proveedor=${p.id})}" th:text="${suyas}">3</a>
+                    <span th:if="${suyas == 0}" class="sin-foto">ninguna</span>
+                </td>
+                <td>
+                    <select class="celda" data-campo="responsabilidad"
+                            th:attr="data-url=${url}, aria-label=|Responsabilidad de ${p.nombre}|">
+                        <option value="" th:selected="${p.responsabilidad == null}"></option>
+                        <option th:each="n : ${#numbers.sequence(1, 5)}" th:value="${n}" th:text="${n}"
+                                th:selected="${p.responsabilidad != null and p.responsabilidad == n}"></option>
+                    </select>
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <select class="celda" data-campo="entregaATiempo"
+                            th:attr="data-url=${url}, aria-label=|Entrega a tiempo de ${p.nombre}|">
+                        <option value="" th:selected="${p.entregaATiempo == null}"></option>
+                        <option th:each="n : ${#numbers.sequence(1, 5)}" th:value="${n}" th:text="${n}"
+                                th:selected="${p.entregaATiempo != null and p.entregaATiempo == n}"></option>
+                    </select>
+                    <span class="estado-celda" aria-live="polite"></span>
+                    <span class="fecha-tara" th:if="${p.fechaValoracion != null}"
+                          th:text="|valorado el ${#temporals.format(p.fechaValoracion, 'dd/MM/yyyy')}|"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda c-nota" data-campo="notaValoracion" th:value="${p.notaValoracion}"
+                           th:attr="data-url=${url}, aria-label=|Nota de la valoración de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda" data-campo="contacto" th:value="${p.contacto}"
+                           th:attr="data-url=${url}, aria-label=|Contacto de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda" data-campo="email" th:value="${p.email}"
+                           th:attr="data-url=${url}, aria-label=|Email de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda" data-campo="telefono" th:value="${p.telefono}"
+                           th:attr="data-url=${url}, aria-label=|Teléfono de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda" data-campo="pais" th:value="${p.pais}"
+                           th:attr="data-url=${url}, aria-label=|País de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td>
+                    <input type="text" class="celda c-nota" data-campo="condiciones" th:value="${p.condiciones}"
+                           th:attr="data-url=${url}, aria-label=|Condiciones de ${p.nombre}|">
+                    <span class="estado-celda" aria-live="polite"></span>
+                </td>
+                <td class="c-acciones">
+                    <!-- Un proveedor con pieles no se borra: el servidor lo rechaza y dice por qué. -->
+                    <form th:if="${suyas == 0}" method="post"
+                          th:action="@{/biblioteca-pieles/proveedores/{id}/borrar(id=${p.id})}"
+                          th:attr="data-confirmar=|¿Borrar el proveedor ${p.nombre}?|"
+                          onsubmit="return confirm(this.dataset.confirmar)">
+                        <button type="submit" class="mini">Borrar</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        </div>
+    </section>
+
+    <script th:src="@{/celdas-pieles.js}"></script>
+</main>
+</body>
+</html>

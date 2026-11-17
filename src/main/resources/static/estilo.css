@@ -1815,3 +1815,100 @@ button.enlace:hover { background: none; color: var(--acento); }
 dialog.emergente .lista-avisos { margin-top: 0.8rem; padding: 0.6rem 0.8rem 0.6rem 1.8rem; }
 .quitar-temporada { margin: 0.6rem 0 0; }
 .quitar-temporada button { margin: 0; }
+
+/* --- Biblioteca de pieles --- */
+/* La tabla reutiliza la del catálogo (casillas sin borde hasta que se entra
+   en ellas, cabecera fija); aquí va solo lo que es suyo. */
+.alta-piel input[type="text"] { min-width: 14rem; }
+.biblioteca-pieles .fila-filtros { align-items: flex-end; }
+.biblioteca-pieles .fila-filtros button { margin: 0; }
+.biblioteca-pieles .fila-filtros .filtro-corto { width: 8rem; }
+.biblioteca-pieles .fila-filtros .casilla-filtro {
+    flex-direction: row; align-items: center; gap: 0.4rem; font-weight: 400; margin: 0 0 0.5rem;
+}
+.tabla-pieles td { vertical-align: middle; }
+.tabla-pieles .ref-proveedor { display: block; font-weight: 400; font-size: 0.8rem; color: var(--texto-tenue); }
+.tabla-pieles .c-precios { white-space: nowrap; }
+.tabla-pieles .tramo-precio { display: block; }
+.tabla-pieles input.c-numero { max-width: 7rem; }
+.tabla-proveedores input.celda { min-width: 9rem; }
+.tabla-proveedores input.c-nombre { min-width: 16rem; font-weight: 600; }
+.tabla-proveedores input.c-nota { min-width: 24rem; }
+.tabla-proveedores .fecha-tara { display: block; }
+
+/* Las pieles de cliente sin ficha: una fila por piel, con la propuesta (se
+   llama como una piel de la biblioteca) en los colores de aviso, que es lo
+   que hay que mirar, y los dos formularios en línea. */
+.tabla-sin-ficha td { vertical-align: top; }
+.tabla-sin-ficha .codigo-color { font-weight: 600; white-space: nowrap; }
+.tabla-sin-ficha form { margin: 0 0 0.3rem; }
+.tabla-sin-ficha .form-tara { align-items: center; }
+.tabla-sin-ficha .form-tara button { margin: 0; }
+.tabla-sin-ficha select { max-width: 22rem; }
+.tabla-sin-ficha .crear-ficha input[type="text"] { width: 11rem; }
+.propuesta-enlace {
+    display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.3rem 0.6rem;
+    border: 1px solid var(--aviso-borde); border-radius: 4px; background: var(--aviso-fondo);
+}
+
+/* La ficha de una piel: los campos en rejilla, de dos a cuatro por fila según
+   el ancho; la nota de calidad y los comentarios ocupan la fila entera. */
+.rejilla-ficha { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0 1.2rem; }
+.rejilla-ficha label { margin-top: 0.6rem; }
+.rejilla-ficha input[type="text"], .rejilla-ficha select, .rejilla-ficha textarea { width: 100%; }
+.rejilla-ficha .ancha { grid-column: 1 / -1; }
+.subtitulo-ficha { margin: 1.4rem 0 0.2rem; font-size: 1rem; }
+.precios-ficha { display: flex; flex-wrap: wrap; gap: 0.6rem 2.5rem; align-items: flex-start; margin-bottom: 1rem; }
+.tabla-tramos { width: auto; }
+.tabla-tramos input[type="text"] { width: 8rem; }
+.valoracion-proveedor { margin-top: 1rem; }
+.texto-tenue { color: var(--texto-tenue); }
+.lista-documentos, .lista-enlazadas { list-style: none; margin: 0 0 0.8rem; padding: 0; }
+.lista-documentos li, .lista-enlazadas li {
+    display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; padding: 0.3rem 0;
+    border-bottom: 1px solid var(--borde);
+}
+.lista-documentos form, .lista-enlazadas form { margin: 0 0 0 auto; }
+.lista-enlazadas .etiqueta, .recorrido .etiqueta, .tabla-pieles .etiqueta {
+    display: inline-block; padding: 0.05rem 0.5rem; margin: 0 0.2rem 0.2rem 0; border-radius: 999px;
+    background: var(--acento-suave-ini); color: var(--acento); font-size: 0.8rem; white-space: nowrap;
+}
+
+/* El recorrido de la piel entre clientes: una línea por paso, con el día a
+   la izquierda. Lo que sale del catálogo no tiene día (solo se sabe la
+   temporada) y va en cursiva y sin botón de borrar. */
+.recorrido { list-style: none; margin: 0 0 1rem; padding: 0; border-left: 2px solid var(--borde-tarjeta-fuerte); }
+.recorrido li {
+    display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; padding: 0.35rem 0 0.35rem 0.9rem;
+}
+.recorrido li + li { border-top: 1px solid var(--borde); }
+.recorrido .recorrido-fecha { min-width: 6.5rem; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+.recorrido li.del-catalogo .recorrido-fecha { font-style: italic; color: var(--texto-tenue); }
+.recorrido form { margin: 0 0 0 auto; }
+.apuntar-evento .nota-evento { flex: 1 1 16rem; }
+.apuntar-evento .nota-evento input { width: 100%; }
+.borrar-ficha { margin-top: 1.2rem; }
+
+/* Los formularios de la biblioteca mezclan casillas de texto, desplegables y
+   fechas en la misma fila: el rótulo va siempre encima de su campo y los tres
+   tienen el mismo alto y la misma letra, o el desplegable se queda pequeño al
+   lado del rótulo mientras la casilla de texto baja a la línea siguiente. */
+.biblioteca-pieles .form-tara label, .biblioteca-pieles .rejilla-ficha label,
+.biblioteca-pieles .precios-ficha label {
+    display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 0;
+}
+.biblioteca-pieles .form-tara select, .biblioteca-pieles .rejilla-ficha select,
+.biblioteca-pieles .precios-ficha select, .biblioteca-pieles .fila-filtros select,
+.biblioteca-pieles .tabla-sin-ficha select {
+    font: inherit; padding: calc(0.45rem + 1px) 2em calc(0.45rem + 1px) 0.6rem;
+}
+.biblioteca-pieles input[type="date"], .biblioteca-pieles input[type="search"] {
+    font: inherit; padding: 0.45rem 0.6rem; border: 1px solid var(--borde); border-radius: 4px;
+    background-color: var(--campo); color: var(--tinta);
+}
+.biblioteca-pieles .form-tara > button, .biblioteca-pieles .fila-filtros > button { margin: 0; }
+.biblioteca-pieles .fila-filtros input[type="text"] { width: 9rem; }
+.biblioteca-pieles .fila-filtros input[type="search"] { min-width: 16rem; }
+.biblioteca-pieles .fila-filtros > a { padding-bottom: 0.6rem; }
+.biblioteca-pieles .precios-ficha > div { display: flex; flex-direction: column; gap: 0.6rem; }
+.biblioteca-pieles .tabla-sin-ficha .form-tara label { margin: 0; }
