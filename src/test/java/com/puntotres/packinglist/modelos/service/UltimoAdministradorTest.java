@@ -18,8 +18,13 @@ import com.puntotres.packinglist.modelos.persistence.Usuario;
  * configura nada: solo da a esta clase su propio contexto y, con él, su propia
  * base en memoria (con nombre aleatorio), donde se sabe cuántos admins hay;
  * en la base compartida de la suite otros tests crean los suyos.
+ *
+ * <p>La contraseña de administración va vacía aquí y no en
+ * {@code application-test.yml}: la variable {@code MODELOS_ADMIN_PASSWORD} se
+ * llama igual que la propiedad, así que gana a cualquier yml, y con ella
+ * definida en la máquina el arranque crearía el {@code admin} y habría dos.
  */
-@SpringBootTest(properties = "prueba.contexto-propio=ultimo-administrador")
+@SpringBootTest(properties = {"prueba.contexto-propio=ultimo-administrador", "modelos.admin-password="})
 class UltimoAdministradorTest {
 
     @Autowired
