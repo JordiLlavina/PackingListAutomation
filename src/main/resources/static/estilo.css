@@ -790,30 +790,27 @@ header.cabecera .enlace-menu:hover {
     cursor: not-allowed;
 }
 
-/* Lo que hace falta para empezar, en un bloque suave de esquinas apenas redondeadas, en
-   un gris claro, en vez de una barra lateral: queda dentro de la tarjeta sin
-   recortarla con una línea más. */
+/* Lo que hace falta para empezar, o lo que genera la tarjeta. Sin recuadro ni
+   fondo propio: va sobre el color de la tarjeta, que es el botón entero, y una
+   zona más clara dentro la partía en dos colores. */
 .menu-entrada {
     margin: 0 0 0.9rem;
-    padding: 0.6rem 0.85rem;
-    border-radius: 4px;
-    background: var(--entrada);
+    padding: 0;
     font-size: 0.9rem;
     font-weight: 500;
     line-height: 1.45;
 }
 
-/* En el menú principal la zona clara es la lista de lo que genera la tarjeta:
-   las viñetas van dentro del recuadro, no colgando por fuera. */
+/* En el menú principal es la lista de lo que genera la tarjeta: las viñetas
+   van dentro de la tarjeta, no colgando por fuera. */
 ul.menu-entrada {
-    padding-left: 1.9rem;
+    padding-left: 1.2rem;
     line-height: 1.6;
 }
 
 /* Todos los textos a la misma altura: el título se reserva siempre dos
-   líneas (con una sola va centrado en ese hueco), así que la zona clara
-   arranca en el mismo sitio en todas las tarjetas. En vertical la zona
-   clara se ciñe a su texto (con su padding de margen) y no se estira. */
+   líneas (con una sola va centrado en ese hueco), así que el texto de
+   debajo arranca en el mismo sitio en todas las tarjetas. */
 .menu-principal .menu-titulo {
     min-height: 2.6em;
     align-items: center;
@@ -828,23 +825,49 @@ ul.menu-entrada {
    de la celda. Los paneles pequeños comparten celda de cuatro en cuatro y van
    más justos para no obligar a crecer a la fila entera. */
 .menu-principal {
-    grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     grid-auto-rows: 1fr;
     align-items: stretch;
-    gap: 0.9rem;
+    gap: clamp(0.9rem, 0.3rem + 0.8vw, 1.5rem);
 }
 .menu-principal > .menu-tarjeta {
     height: auto;
     margin-top: 0;
-    padding: 1.05rem 1.1rem;
+    padding: clamp(1.05rem, 0.4rem + 0.9vw, 1.8rem) clamp(1.1rem, 0.4rem + 1vw, 1.9rem);
 }
-.menu-principal .menu-titulo { font-size: 1.1rem; gap: 0.5rem; margin-bottom: 0.5rem; }
-.menu-principal .menu-icono { width: 1.3rem; height: 1.3rem; }
-.menu-principal .menu-entrada { font-size: 0.85rem; padding: 0.5rem 0.75rem; }
-.menu-principal ul.menu-entrada { padding-left: 1.6rem; line-height: 1.5; }
-.menu-principal > .menu-paneles { margin-top: 0; gap: 0.6rem; }
-.menu-principal .menu-panel { padding: 0.5rem 0.85rem; gap: 0.6rem; font-size: 0.92rem; }
-.menu-principal .menu-panel-icono { width: 1.2rem; height: 1.2rem; }
+/* Letra e iconos crecen con el ancho de la ventana: en un monitor de 21"
+   (1920 px) el menú se quedaba pequeño en medio de la pantalla. */
+.menu-principal .menu-titulo {
+    font-size: clamp(1.1rem, 0.55rem + 0.7vw, 1.5rem);
+    gap: 0.5em;
+    margin-bottom: 0.5em;
+}
+.menu-principal .menu-icono { width: 1.2em; height: 1.2em; }
+.menu-principal .menu-entrada { font-size: clamp(0.85rem, 0.45rem + 0.5vw, 1.1rem); }
+.menu-principal ul.menu-entrada { padding-left: 1.3em; line-height: 1.5; }
+.menu-principal > .menu-paneles { margin-top: 0; gap: clamp(0.6rem, 0.2rem + 0.5vw, 0.9rem); }
+.menu-principal .menu-panel {
+    padding: 0.5em 0.9em;
+    gap: 0.65em;
+    font-size: clamp(0.92rem, 0.5rem + 0.5vw, 1.2rem);
+}
+.menu-principal .menu-panel-icono { width: 1.3em; height: 1.3em; }
+
+/* El menú usa casi todo el ancho de la pantalla, con menos margen a los
+   lados que el resto de pantallas (72rem), y la cabecera le sigue para que
+   el título quede alineado con la primera tarjeta. */
+main.menu-ancho,
+header.cabecera-menu .titulo { max-width: 120rem; }
+main.menu-ancho { padding-left: clamp(1rem, 2vw, 2.5rem); padding-right: clamp(1rem, 2vw, 2.5rem); }
+header.cabecera-menu { padding-left: clamp(1rem, 2vw, 2.5rem); padding-right: clamp(1rem, 2vw, 2.5rem); }
+
+/* Cuatro por fila siempre que quepan; en una ventana estrecha, dos o una. */
+@media (max-width: 62rem) {
+    .menu-principal { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 36rem) {
+    .menu-principal { grid-template-columns: minmax(0, 1fr); }
+}
 
 .menu-lista {
     margin: 0 0 1.2rem;

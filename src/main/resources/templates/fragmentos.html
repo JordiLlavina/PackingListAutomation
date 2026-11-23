@@ -42,7 +42,7 @@
      derecha. Es otro fragmento y no un parámetro de `cabecera` porque Thymeleaf
      exige pasar todos los parámetros declarados y habría que tocar las quince
      pantallas que la usan. -->
-<header class="cabecera" th:fragment="cabeceraMenu(titulo)">
+<header class="cabecera cabecera-menu" th:fragment="cabeceraMenu(titulo)">
     <div class="titulo">
         <a th:href="@{/menu}" class="enlace-menu" title="Volver al menú"
            aria-label="Volver al menú">

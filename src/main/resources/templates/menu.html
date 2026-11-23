@@ -3,11 +3,11 @@
 <head th:replace="~{fragmentos :: head('Inicio')}"></head>
 <body>
 <header th:replace="~{fragmentos :: cabeceraMenu('Automatizaciones de Puntotres')}"></header>
-<main>
-    <!-- Cada tarjeta dice solo lo que genera, en la zona clara y en pocas
+<main class="menu-ancho">
+    <!-- Cada tarjeta dice solo lo que genera, debajo del título y en pocas
          palabras: aquí solo se elige por dónde empezar. En menu-principal
-         las zonas claras empiezan a la misma altura y llegan hasta abajo,
-         aunque un título ocupe dos líneas y otro una. -->
+         esos textos empiezan a la misma altura, aunque un título ocupe dos
+         líneas y otro una. Toda la tarjeta va de un solo color. -->
     <div class="menu-tarjetas menu-principal">
         <a class="tarjeta menu-tarjeta" th:href="@{/packing-list}">
             <h2 class="menu-titulo">
