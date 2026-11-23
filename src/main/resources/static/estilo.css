@@ -820,6 +820,32 @@ ul.menu-entrada {
 }
 .menu-principal .menu-entrada { margin-bottom: 0; }
 
+/* Menú principal compacto y con todas las tarjetas iguales: cuatro columnas
+   en lugar de tres y todas las filas al alto de la más alta (`grid-auto-rows:
+   1fr`), así que una tarjeta con más texto no deja su fila más alta que las
+   demás. Las tarjetas se estiran a su celda en vez de pedir `height: 100%`,
+   y sin el `margin-top` de `.tarjeta`, que con el 100% las hacía sobresalir
+   de la celda. Los paneles pequeños comparten celda de cuatro en cuatro y van
+   más justos para no obligar a crecer a la fila entera. */
+.menu-principal {
+    grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
+    grid-auto-rows: 1fr;
+    align-items: stretch;
+    gap: 0.9rem;
+}
+.menu-principal > .menu-tarjeta {
+    height: auto;
+    margin-top: 0;
+    padding: 1.05rem 1.1rem;
+}
+.menu-principal .menu-titulo { font-size: 1.1rem; gap: 0.5rem; margin-bottom: 0.5rem; }
+.menu-principal .menu-icono { width: 1.3rem; height: 1.3rem; }
+.menu-principal .menu-entrada { font-size: 0.85rem; padding: 0.5rem 0.75rem; }
+.menu-principal ul.menu-entrada { padding-left: 1.6rem; line-height: 1.5; }
+.menu-principal > .menu-paneles { margin-top: 0; gap: 0.6rem; }
+.menu-principal .menu-panel { padding: 0.5rem 0.85rem; gap: 0.6rem; font-size: 0.92rem; }
+.menu-principal .menu-panel-icono { width: 1.2rem; height: 1.2rem; }
+
 .menu-lista {
     margin: 0 0 1.2rem;
     padding-left: 1.2rem;
