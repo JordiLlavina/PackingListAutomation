@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -180,6 +181,23 @@ public class ModelosController {
             subidas.add(new Modelos.FotoSubida(fichero.getOriginalFilename(), fichero.getBytes()));
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(modelos.subirFotos(id, subidas));
+    }
+
+    /** El orden de las fotos: todas las del modelo, la primera es la principal. */
+    public record OrdenFotos(List<Long> ids) {
+    }
+
+    /**
+     * Ordena las fotos del modelo (las arrastra el despacho en la ficha o al
+     * elegir las de un PDF). Es el orden en que salen en la orden de corte y en
+     * el Word de fotos, y la primera pasa a ser la principal. Un 400 si no
+     * vienen exactamente las fotos del modelo.
+     */
+    @PutMapping("/modelos/{id}/fotos/orden")
+    @PreAuthorize(DESPACHO)
+    public List<ResumenFoto> ordenarFotos(@PathVariable Long id, @RequestBody OrdenFotos orden) {
+        modeloQueExiste(id);
+        return fotos.ordenar(id, orden == null ? null : orden.ids());
     }
 
     @PostMapping("/modelos/{id}/fotos/{fotoId}/principal")

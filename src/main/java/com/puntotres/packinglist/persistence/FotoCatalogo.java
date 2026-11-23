@@ -99,6 +99,12 @@ public class FotoCatalogo {
         this.fechaActualizacion = LocalDateTime.now();
     }
 
+    /** Su puesto entre las fotos del modelo y si es la principal, que es la primera. */
+    public void colocar(int orden, boolean principal) {
+        this.orden = orden;
+        setPrincipal(principal);
+    }
+
     /**
      * Pasa a otro modelo al juntar dos: con el nombre libre que le toca allí,
      * detrás de las fotos que ya tenía y siendo la principal solo si se le dice.

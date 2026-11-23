@@ -2,10 +2,11 @@
 // (foto principal, referencia, nombre editable, cliente, etapa, temporadas y
 // los nombres que ha tenido), las acciones (una orden nueva para el taller,
 // cambiar de etapa, subir fotos, asignar la referencia a un prototipo o, en
-// uno importado, juntarlo con el prototipo que ya teníamos), la galería con
-// la principal marcada, los documentos y el historial. Al subir un PDF, se
-// eligen sus imágenes que son fotos del modelo (ElegirImagenesPdf); las demás no
-// se guardan. Juntar dos modelos deja el de menor id,
+// uno importado, juntarlo con el prototipo que ya teníamos), la galería
+// (que se ordena arrastrando: es el orden del corte y la primera es la
+// principal), los documentos y el historial. Al subir un PDF, se eligen sus
+// imágenes que son fotos del modelo y se pueden añadir otras del PC
+// (ElegirImagenesPdf); las demás no se guardan. Juntar dos modelos deja el de menor id,
 // que puede no ser este: entonces se navega a la ficha del superviviente.
 // Tras cada cambio se vuelve a pedir la ficha y se avisa a la lista para que
 // repinte su fila.
@@ -16,6 +17,7 @@ import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
 import Historial from '../comun/Historial';
 import ElegirImagenesPdf from './ElegirImagenesPdf';
+import FotosOrdenables from './FotosOrdenables';
 import { Icono } from '../comun/iconos';
 import {
   ETAPAS,
@@ -31,6 +33,7 @@ import {
   type Fusion,
   type ModeloFicha,
   type ModeloResumen,
+  type ResumenFoto,
   type Subida,
 } from '../comun/modelos';
 import { toast } from '../comun/toast';
@@ -49,6 +52,7 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [nombre, setNombre] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [ordenando, setOrdenando] = useState(false);
   // Documentos: el que se está subiendo, las candidatas del PDF recién subido
   // (abre la elección de imágenes) y el que se va a quitar (pide confirmación).
   const [subiendoDocumento, setSubiendoDocumento] = useState(false);
@@ -279,13 +283,22 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
     }
   };
 
-  const hacerPrincipal = async (fotoId: number) => {
+  // Se ve en su sitio al soltarla, sin esperar al servidor; si no se puede
+  // guardar, se dice y se vuelve a pedir la ficha con el orden que había.
+  const ordenarFotos = async (claves: string[]) => {
+    const porClave = new Map(ficha.fotos.map((f) => [String(f.id), f]));
+    const nuevas = claves.map((c) => porClave.get(c)).filter((f): f is ResumenFoto => f !== undefined);
+    setFicha({ ...ficha, fotos: nuevas });
+    setOrdenando(true);
     setErrorAccion(null);
     try {
-      await api(`/api/modelos/${m.id}/fotos/${fotoId}/principal`, { method: 'POST' });
+      await api(`/api/modelos/${m.id}/fotos/orden`, { method: 'PUT', body: JSON.stringify({ ids: nuevas.map((f) => f.id) }) });
       await trasCambiar();
     } catch (err) {
-      setErrorAccion(mensaje(err, 'No se ha podido cambiar la foto principal'));
+      setErrorAccion(mensaje(err, 'No se ha podido cambiar el orden de las fotos'));
+      await cargar();
+    } finally {
+      setOrdenando(false);
     }
   };
 
@@ -415,22 +428,18 @@ export default function FichaModelo({ id, onCambiado }: { id: number; onCambiado
       {ficha.fotos.length === 0 ? (
         <p className="ayuda">Este modelo aún no tiene fotos. Súbelas con «Subir fotos».</p>
       ) : (
-        <div className="miniaturas galeria">
-          {ficha.fotos.map((f) => (
-            <figure key={f.id}>
-              <img src={fotoUrl(f.id)} alt={f.nombreFichero} loading="lazy" />
-              <figcaption>
-                {f.principal ? (
-                  <span className="principal">Principal</span>
-                ) : (
-                  <button className="chip" type="button" onClick={() => void hacerPrincipal(f.id)}>
-                    Hacer principal
-                  </button>
-                )}
-              </figcaption>
-            </figure>
-          ))}
-        </div>
+        <>
+          {ficha.fotos.length > 1 && (
+            <p className="ayuda">
+              Arrástralas para cambiar el orden: es el de la orden de corte y el Word de fotos. La primera es la principal.
+            </p>
+          )}
+          <FotosOrdenables
+            fotos={ficha.fotos.map((f) => ({ clave: String(f.id), src: fotoUrl(f.id), alt: f.nombreFichero }))}
+            ocupada={ordenando}
+            onOrdenar={(claves) => void ordenarFotos(claves)}
+          />
+        </>
       )}
 
       <div className="fila-titulo">

@@ -150,8 +150,8 @@ class DocumentosControllerTest {
                 .andExpect(jsonPath("$", hasSize(2)));
 
         List<ResumenFoto> suyas = fotos.de(modelo);
-        assertEquals(List.of("ficha-" + claves.get(0) + ".jpg", "ficha-" + claves.get(2) + ".jpg"),
-                suyas.stream().map(ResumenFoto::nombreFichero).toList());
+        assertEquals(List.of("ficha-" + claves.get(2) + ".jpg", "ficha-" + claves.get(0) + ".jpg"),
+                suyas.stream().map(ResumenFoto::nombreFichero).toList(), "la principal pasa a ser la primera");
         assertEquals(List.of("ficha-" + claves.get(2) + ".jpg"), suyas.stream().filter(ResumenFoto::principal)
                 .map(ResumenFoto::nombreFichero).toList());
     }

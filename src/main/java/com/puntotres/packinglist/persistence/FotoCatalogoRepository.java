@@ -20,7 +20,7 @@ public interface FotoCatalogoRepository extends JpaRepository<FotoCatalogo, Long
                 f.id, f.modeloId, f.nombreFichero, f.principal, f.orden)
             from FotoCatalogo f
             where f.modeloId in :modelos
-            order by f.modeloId, f.orden, f.id""")
+            order by f.modeloId, f.principal desc, f.orden, f.id""")
     List<ResumenFoto> resumenes(@Param("modelos") Collection<Long> modelos);
 
     Optional<FotoCatalogo> findByModeloIdAndNombreFichero(Long modeloId, String nombreFichero);

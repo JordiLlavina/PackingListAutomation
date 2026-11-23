@@ -1,22 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import {
-  alternarMarcada,
+  alternarEnTira,
   antesEra,
   candidataUrl,
-  clavesMarcadas,
+  conOSinCinturones,
   documentoUrl,
-  elegirPrincipal,
+  enTira,
   etapaTexto,
   filtrarRejilla,
   fotoUrl,
+  idsEnOrden,
+  idsNuevos,
+  mismoOrden,
   prototiposCandidatos,
   puntoEvento,
   tamanoTexto,
+  textoCinturones,
   textoFotosAnadidas,
   textoFusion,
-  type CandidataImagen,
-  type EleccionImagenes,
   type ModeloResumen,
+  type ResumenFoto,
 } from './modelos';
 
 function modelo(id: number, cliente: string, etapa: ModeloResumen['etapa']): ModeloResumen {
@@ -46,7 +49,7 @@ const modelos = [
 const ids = (lista: ModeloResumen[]) => lista.map((m) => m.id);
 
 describe('filtrarRejilla', () => {
-  const sin = { texto: '', cliente: '', etapa: '' } as const;
+  const sin = { texto: '', cliente: '', etapa: '', cinturones: false } as const;
 
   it('sin filtros devuelve todos los modelos', () => {
     expect(ids(filtrarRejilla(modelos, sin))).toEqual([1, 2, 3, 4, 5]);
@@ -89,6 +92,28 @@ describe('filtrarRejilla', () => {
 
   it('un texto que no está en ningún modelo no devuelve ninguno', () => {
     expect(filtrarRejilla(modelos, { ...sin, texto: 'XYZ' })).toEqual([]);
+  });
+
+  it('los cinturones solo salen si se piden, también buscándolos', () => {
+    const lista = [...modelos, { ...modelo(6, 'AMI', 'PRODUCCION'), tipo: 'CINTURON' as const, codigo: 'UBL029', referencia: 'UBL029' }];
+    expect(ids(filtrarRejilla(lista, sin))).toEqual([1, 2, 3, 4, 5]);
+    expect(ids(filtrarRejilla(lista, { ...sin, texto: 'UBL029' }))).toEqual([]);
+    expect(ids(filtrarRejilla(lista, { ...sin, cinturones: true }))).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(ids(filtrarRejilla(lista, { ...sin, cinturones: true, texto: 'UBL' }))).toEqual([6]);
+  });
+});
+
+describe('cinturones', () => {
+  const cinturon = { ...modelo(6, 'AMI', 'PRODUCCION'), tipo: 'CINTURON' as const };
+
+  it('sin cinturones se quitan solo los cinturones', () => {
+    expect(ids(conOSinCinturones([...modelos, cinturon], false))).toEqual([1, 2, 3, 4, 5]);
+    expect(ids(conOSinCinturones([...modelos, cinturon], true))).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('la etiqueta dice cómo está el filtro', () => {
+    expect(textoCinturones(false)).toBe('Cinturones: no');
+    expect(textoCinturones(true)).toBe('Cinturones: sí');
   });
 });
 
@@ -139,13 +164,6 @@ describe('asignar referencia y juntar', () => {
 });
 
 describe('documentos e imágenes de un PDF', () => {
-  const candidatas: CandidataImagen[] = [
-    { clave: 'imagen-1', ancho: 400, alto: 400, origen: 'imagen' },
-    { clave: 'imagen-2', ancho: 400, alto: 400, origen: 'imagen' },
-    { clave: 'pagina-1', ancho: 826, alto: 1169, origen: 'página 1' },
-  ];
-  const nada: EleccionImagenes = { marcadas: [], principal: null };
-
   it('las direcciones del documento y de cada candidata', () => {
     expect(documentoUrl(5)).toBe('/api/documentos/5');
     expect(candidataUrl(3, 'a1-b2', 'pagina-1')).toBe('/api/modelos/3/documentos/candidatas/a1-b2/pagina-1');
@@ -157,18 +175,35 @@ describe('documentos e imágenes de un PDF', () => {
     expect(tamanoTexto(2.4 * 1024 * 1024)).toBe('2,4 MB');
   });
 
-  it('la principal solo puede ser una marcada y se pierde al desmarcarla', () => {
-    expect(elegirPrincipal(nada, 'imagen-1')).toEqual(nada);
-    const dos = alternarMarcada(alternarMarcada(nada, 'pagina-1'), 'imagen-1');
-    const conPrincipal = elegirPrincipal(dos, 'imagen-1');
-    expect(conPrincipal.principal).toBe('imagen-1');
-    expect(alternarMarcada(conPrincipal, 'pagina-1')).toEqual({ marcadas: ['imagen-1'], principal: 'imagen-1' });
-    expect(alternarMarcada(conPrincipal, 'imagen-1')).toEqual({ marcadas: ['pagina-1'], principal: null });
+  it('marcar una imagen la pone al final de la tira y desmarcarla la quita', () => {
+    const tira = [enTira.guardada(7)];
+    const conDos = alternarEnTira(alternarEnTira(tira, enTira.delPdf('pagina-1')), enTira.delPc(0));
+    expect(conDos).toEqual(['g:7', 'p:pagina-1', 'f:0']);
+    expect(alternarEnTira(conDos, 'p:pagina-1')).toEqual(['g:7', 'f:0']);
   });
 
-  it('las marcadas se mandan en el orden de las candidatas', () => {
-    const marcadas = alternarMarcada(alternarMarcada(nada, 'pagina-1'), 'imagen-1');
-    expect(clavesMarcadas(candidatas, marcadas)).toEqual(['imagen-1', 'pagina-1']);
+  it('las fotos nuevas son las que no estaban, en el orden en que se guardaron', () => {
+    const foto = (id: number, orden: number, principal = false): ResumenFoto => ({ id, modeloId: 1, nombreFichero: `${id}.jpg`, principal, orden });
+    // La principal viene delante aunque su orden sea mayor: el orden de guardado es el que manda.
+    expect(idsNuevos([5], [foto(9, 3, true), foto(5, 0), foto(8, 2), foto(7, 1)])).toEqual([7, 8, 9]);
+    expect(idsNuevos([5], [foto(5, 0)])).toEqual([]);
+  });
+
+  it('el orden a guardar es el de la tira, con las que falten al final', () => {
+    const idDe = new Map([
+      ['g:5', 5],
+      ['p:pagina-1', 8],
+      ['f:0', 9],
+    ]);
+    expect(idsEnOrden(['f:0', 'g:5', 'p:pagina-1'], idDe, [5, 8, 9])).toEqual([9, 5, 8]);
+    // Una que alguien ha subido mientras tanto (11) no se pierde; una clave sin id (no guardada) se salta.
+    expect(idsEnOrden(['f:0', 'f:1', 'g:5'], idDe, [5, 9, 11])).toEqual([9, 5, 11]);
+  });
+
+  it('mismo orden solo si son los mismos ids en el mismo sitio', () => {
+    expect(mismoOrden([1, 2, 3], [1, 2, 3])).toBe(true);
+    expect(mismoOrden([1, 2, 3], [2, 1, 3])).toBe(false);
+    expect(mismoOrden([1, 2], [1, 2, 3])).toBe(false);
   });
 
   it('el aviso de las fotos añadidas va en singular o plural', () => {

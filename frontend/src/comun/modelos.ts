@@ -108,8 +108,25 @@ export function fotoUrl(id: number): string {
   return `/api/fotos/${id}`;
 }
 
-/** Los filtros de la rejilla del taller: texto libre, cliente y etapa; vacío = sin ese filtro. */
-export type FiltroRejilla = { texto: string; cliente: string; etapa: Etapa | '' };
+/**
+ * Los filtros de la rejilla del taller: texto libre, cliente y etapa (vacío =
+ * sin ese filtro) y si se enseñan los cinturones, que por defecto no.
+ */
+export type FiltroRejilla = { texto: string; cliente: string; etapa: Etapa | ''; cinturones: boolean };
+
+/**
+ * Los cinturones no salen en las listas de modelos salvo que se pidan con la
+ * etiqueta «Cinturones: sí» (decisión del usuario: de momento no se trabaja
+ * con ellos).
+ */
+export function conOSinCinturones(modelos: ModeloResumen[], cinturones: boolean): ModeloResumen[] {
+  return cinturones ? modelos : modelos.filter((m) => m.tipo !== 'CINTURON');
+}
+
+/** El texto de la etiqueta de los cinturones, que dice cómo está el filtro. */
+export function textoCinturones(cinturones: boolean): string {
+  return cinturones ? 'Cinturones: sí' : 'Cinturones: no';
+}
 
 /**
  * Para buscar: en mayúsculas, sin acentos y solo letras y cifras, así
@@ -127,11 +144,12 @@ function paraBuscar(texto: string): string {
  * El filtro de la rejilla del taller, como el de despacho: el texto se busca
  * DENTRO de la referencia (el código o el nombre de prototipo, también el
  * prototipo de un modelo que ya tiene código) y del nombre, así «77» o «770»
- * encuentran «ULL770»; y además, si se eligen, el cliente y la etapa.
+ * encuentran «ULL770»; y además, si se eligen, el cliente y la etapa. Los
+ * cinturones, solo si se piden.
  */
 export function filtrarRejilla(modelos: ModeloResumen[], filtro: FiltroRejilla): ModeloResumen[] {
   const buscado = paraBuscar(filtro.texto);
-  return modelos.filter(
+  return conOSinCinturones(modelos, filtro.cinturones).filter(
     (m) =>
       (filtro.cliente === '' || m.cliente === filtro.cliente) &&
       (filtro.etapa === '' || m.etapa === filtro.etapa) &&
@@ -193,31 +211,51 @@ export function tamanoTexto(bytes: number): string {
 }
 
 /**
- * Qué candidatas de un PDF ha marcado el despacho como fotos del modelo y
- * cuál de ellas es la principal (o ninguna: entonces la principal del modelo
- * no cambia).
+ * La tira de fotos que se ordena arrastrando al elegir las imágenes de un PDF:
+ * una clave por foto, con un prefijo que dice de dónde sale. `g:<id>` es una
+ * que el modelo ya tiene, `p:<clave>` una imagen del PDF y `f:<n>` una que se
+ * ha añadido desde el PC. La primera de la tira será la principal.
  */
-export type EleccionImagenes = { marcadas: string[]; principal: string | null };
+export const enTira = {
+  guardada: (id: number) => `g:${id}`,
+  delPdf: (clave: string) => `p:${clave}`,
+  delPc: (n: number) => `f:${n}`,
+};
 
-/** Marca o desmarca una candidata; si se desmarca la principal, deja de haber principal. */
-export function alternarMarcada(eleccion: EleccionImagenes, clave: string): EleccionImagenes {
-  if (eleccion.marcadas.includes(clave)) {
-    return {
-      marcadas: eleccion.marcadas.filter((c) => c !== clave),
-      principal: eleccion.principal === clave ? null : eleccion.principal,
-    };
+/** Pone la clave al final de la tira si no estaba y la quita si estaba (marcar y desmarcar). */
+export function alternarEnTira(tira: string[], clave: string): string[] {
+  return tira.includes(clave) ? tira.filter((c) => c !== clave) : [...tira, clave];
+}
+
+/**
+ * Las fotos que acaba de guardar el servidor: las de `despues` que no
+ * estaban `antes`, en el orden en que se guardaron (su `orden`), que es el
+ * de lo que se le mandó. Así se sabe qué id le ha tocado a cada una.
+ */
+export function idsNuevos(antes: number[], despues: ResumenFoto[]): number[] {
+  return despues
+    .filter((f) => !antes.includes(f.id))
+    .sort((a, b) => a.orden - b.orden || a.id - b.id)
+    .map((f) => f.id);
+}
+
+/**
+ * Los ids de las fotos del modelo en el orden de la tira, para guardarlo. El
+ * servidor pide todas las del modelo: una que no está en la tira (la ha subido
+ * alguien mientras tanto) va al final antes que perderla.
+ */
+export function idsEnOrden(tira: string[], idDe: ReadonlyMap<string, number>, todas: number[]): number[] {
+  const ids: number[] = [];
+  for (const clave of tira) {
+    const id = idDe.get(clave);
+    if (id !== undefined && todas.includes(id) && !ids.includes(id)) ids.push(id);
   }
-  return { marcadas: [...eleccion.marcadas, clave], principal: eleccion.principal };
+  return [...ids, ...todas.filter((id) => !ids.includes(id))];
 }
 
-/** La principal solo puede ser una de las marcadas: con otra, no cambia nada. */
-export function elegirPrincipal(eleccion: EleccionImagenes, clave: string): EleccionImagenes {
-  return eleccion.marcadas.includes(clave) ? { ...eleccion, principal: clave } : eleccion;
-}
-
-/** Las claves marcadas en el orden de las candidatas, que es como se guardan en la galería. */
-export function clavesMarcadas(candidatas: CandidataImagen[], eleccion: EleccionImagenes): string[] {
-  return candidatas.map((c) => c.clave).filter((clave) => eleccion.marcadas.includes(clave));
+/** Si dos listas de ids van en el mismo orden (no hace falta guardar nada). */
+export function mismoOrden(a: number[], b: number[]): boolean {
+  return a.length === b.length && a.every((id, i) => id === b[i]);
 }
 
 /** «1 foto añadida al modelo», «3 fotos añadidas al modelo». */

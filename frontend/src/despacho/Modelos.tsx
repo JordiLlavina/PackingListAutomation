@@ -1,5 +1,6 @@
 // Los modelos en despacho, en dos paneles: a la izquierda los filtros
-// (cliente, etapa, temporada y texto) y la lista, con una casilla por modelo
+// (cliente, etapa, temporada, texto y «Cinturones: no / sí», que por defecto
+// deja fuera los cinturones) y la lista, con una casilla por modelo
 // para elegir varios (los elegidos van a la hoja de etiquetas de patrones,
 // /app/etiquetas-patrones); a la derecha la ficha del elegido o el alta de uno
 // nuevo. El elegido va en la dirección (/app/modelos/12), así que un enlace o
@@ -11,7 +12,7 @@ import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
 import FotoModelo from '../comun/FotoModelo';
 import { Icono } from '../comun/iconos';
-import type { Cliente, Etapa as TipoEtapa, ModeloResumen, Temporada } from '../comun/modelos';
+import { conOSinCinturones, textoCinturones, type Cliente, type Etapa as TipoEtapa, type ModeloResumen, type Temporada } from '../comun/modelos';
 import AltaModelo from './AltaModelo';
 import FichaModelo from './FichaModelo';
 
@@ -23,10 +24,10 @@ const CHIPS_ETAPA: [TipoEtapa | '', string][] = [
   ['INACTIVO', 'Inactivos'],
 ];
 
-type Filtros = { cliente: string; etapa: TipoEtapa | ''; temporada: string; texto: string; sinEtiqueta: boolean };
+type Filtros = { cliente: string; etapa: TipoEtapa | ''; temporada: string; texto: string; sinEtiqueta: boolean; cinturones: boolean };
 
 const CLAVE_FILTROS = 'despacho-modelos-filtros';
-const SIN_FILTROS: Filtros = { cliente: '', etapa: '', temporada: '', texto: '', sinEtiqueta: false };
+const SIN_FILTROS: Filtros = { cliente: '', etapa: '', temporada: '', texto: '', sinEtiqueta: false, cinturones: false };
 
 /**
  * Los filtros se recuerdan en la pestaña (sessionStorage): la hoja de
@@ -40,7 +41,14 @@ function filtrosGuardados(): Filtros {
     const f = guardado as Partial<Record<keyof Filtros, unknown>>;
     const texto = (v: unknown) => (typeof v === 'string' ? v : '');
     const etapa = CHIPS_ETAPA.some(([clave]) => clave === f.etapa) ? (f.etapa as TipoEtapa | '') : '';
-    return { cliente: texto(f.cliente), etapa, temporada: texto(f.temporada), texto: texto(f.texto), sinEtiqueta: f.sinEtiqueta === true };
+    return {
+      cliente: texto(f.cliente),
+      etapa,
+      temporada: texto(f.temporada),
+      texto: texto(f.texto),
+      sinEtiqueta: f.sinEtiqueta === true,
+      cinturones: f.cinturones === true,
+    };
   } catch {
     return SIN_FILTROS;
   }
@@ -60,6 +68,7 @@ export default function Modelos() {
   const [texto, setTexto] = useState(inicial.texto);
   const [busqueda, setBusqueda] = useState(inicial.texto.trim());
   const [sinEtiqueta, setSinEtiqueta] = useState(inicial.sinEtiqueta);
+  const [cinturones, setCinturones] = useState(inicial.cinturones);
   const [modelos, setModelos] = useState<ModeloResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [marcados, setMarcados] = useState<Set<number>>(new Set());
@@ -115,11 +124,11 @@ export default function Modelos() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem(CLAVE_FILTROS, JSON.stringify({ cliente, etapa, temporada, texto, sinEtiqueta } satisfies Filtros));
+      sessionStorage.setItem(CLAVE_FILTROS, JSON.stringify({ cliente, etapa, temporada, texto, sinEtiqueta, cinturones } satisfies Filtros));
     } catch {
       // Sin almacenamiento (ventana privada, bloqueado) los filtros simplemente no se recuerdan.
     }
-  }, [cliente, etapa, temporada, texto, sinEtiqueta]);
+  }, [cliente, etapa, temporada, texto, sinEtiqueta, cinturones]);
 
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
 
@@ -128,7 +137,9 @@ export default function Modelos() {
     setTemporada('');
   };
 
-  const elegidos = (modelos ?? []).filter((m) => marcados.has(m.id));
+  // Los cinturones se quitan aquí y no en el servidor: un cinturón elegido por su dirección sigue abriendo su ficha.
+  const visibles = modelos === null ? null : conOSinCinturones(modelos, cinturones);
+  const elegidos = (visibles ?? []).filter((m) => marcados.has(m.id));
 
   const imprimirEtiquetas = () => navegar(`/etiquetas-patrones?ids=${elegidos.map((m) => m.id).join(',')}`);
 
@@ -160,7 +171,8 @@ export default function Modelos() {
   };
 
   const nombreCliente = clientes.find((c) => c.clave === cliente)?.nombre ?? cliente;
-  const otrosFiltros = Boolean(etapa || temporada || busqueda || sinEtiqueta);
+  // Sin cinturones, una lista que solo los tenía a ellos no está vacía: está filtrada.
+  const otrosFiltros = Boolean(etapa || temporada || busqueda || sinEtiqueta || (modelos ?? []).length > 0);
 
   const vacio = () => {
     if (otrosFiltros) return <p className="ayuda">Ningún modelo con estos filtros.</p>;
@@ -233,11 +245,20 @@ export default function Modelos() {
           <button className="chip" type="button" aria-pressed={sinEtiqueta} onClick={() => setSinEtiqueta((s) => !s)}>
             Sin etiqueta impresa
           </button>
+          <button
+            className="chip"
+            type="button"
+            aria-pressed={cinturones}
+            title={cinturones ? 'Se ven también los cinturones' : 'Los cinturones no se ven: pulsa para verlos'}
+            onClick={() => setCinturones((c) => !c)}
+          >
+            {textoCinturones(cinturones)}
+          </button>
         </div>
 
-        {marcados.size > 0 && (
+        {elegidos.length > 0 && (
           <p className="ayuda">
-            {marcados.size === 1 ? '1 modelo elegido' : `${marcados.size} modelos elegidos`}
+            {elegidos.length === 1 ? '1 modelo elegido' : `${elegidos.length} modelos elegidos`}
           </p>
         )}
 
@@ -248,11 +269,11 @@ export default function Modelos() {
               Reintentar
             </button>
           </div>
-        ) : modelos === null ? null : modelos.length === 0 ? (
+        ) : visibles === null ? null : visibles.length === 0 ? (
           vacio()
         ) : (
           <ul className="lista-modelos">
-            {modelos.map((m) => (
+            {visibles.map((m) => (
               <li key={m.id} className="fila-modelo" aria-current={m.id === elegido ? 'true' : undefined}>
                 <input type="checkbox" aria-label={`Elegir ${m.referencia}`} checked={marcados.has(m.id)} onChange={() => marcar(m.id)} />
                 <button className="abrir" type="button" onClick={() => abrir(m.id)}>

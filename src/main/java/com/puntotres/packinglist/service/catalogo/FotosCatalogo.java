@@ -33,9 +33,13 @@ import com.puntotres.packinglist.service.corte.FotosTemporada;
  * temporada nueva del mismo modelo no necesita volver a subir sus fotos.
  *
  * Una foto se identifica por su nombre de fichero dentro del modelo: la
- * misma carpeta subida dos veces no duplica nada. Como mucho una por modelo
- * es la principal (la de la orden de corte); la primera que entra lo es
- * hasta que alguien marca otra.
+ * misma carpeta subida dos veces no duplica nada. Las fotos de un modelo
+ * tienen un orden, que el despacho cambia arrastrándolas en la app de modelos
+ * ({@link #ordenar}), y la PRIMERA es la principal (la de la orden de corte):
+ * ese orden es el de las fotos en la orden de corte y en el Word de fotos.
+ * Una foto que se marca principal pasa a ser la primera. Los listados ponen
+ * la principal delante aunque su {@code orden} diga otra cosa, que es como
+ * quedaron las fotos guardadas antes de que el orden se pudiera cambiar.
  *
  * Las fotos cuelgan del id del modelo. Las versiones por (cliente, código)
  * se conservan para el corte, el embalaje y la pantalla, que hablan en
@@ -128,6 +132,7 @@ public class FotosCatalogo {
         }
         List<ResumenFoto> fotos = new ArrayList<>(repositorio.resumenes(codigoDe.keySet()));
         fotos.sort(Comparator.comparing((ResumenFoto foto) -> codigoDe.get(foto.modeloId()))
+                .thenComparing(foto -> !foto.principal())
                 .thenComparingInt(ResumenFoto::orden)
                 .thenComparing(ResumenFoto::id));
         for (ResumenFoto foto : fotos) {
@@ -180,13 +185,54 @@ public class FotosCatalogo {
         catalogo.modelo(cliente, codigoModelo).ifPresent(modelo -> marcarPrincipal(modelo.getId(), fotoId));
     }
 
+    /** La marca principal y la pasa a ser la primera; las demás conservan su orden detrás. */
     @Transactional
     public void marcarPrincipal(Long modeloId, Long fotoId) {
         if (modeloId == null || fotoId == null) {
             return;
         }
-        for (FotoCatalogo foto : repositorio.findByModeloIdOrderByOrdenAscIdAsc(modeloId)) {
-            foto.setPrincipal(foto.getId().equals(fotoId));
+        List<FotoCatalogo> enOrden = enOrdenVisible(modeloId);
+        if (enOrden.stream().noneMatch(foto -> foto.getId().equals(fotoId))) {
+            return;
+        }
+        List<FotoCatalogo> nuevo = new ArrayList<>();
+        enOrden.stream().filter(foto -> foto.getId().equals(fotoId)).forEach(nuevo::add);
+        enOrden.stream().filter(foto -> !foto.getId().equals(fotoId)).forEach(nuevo::add);
+        colocar(nuevo);
+    }
+
+    /**
+     * Pone las fotos del modelo en el orden de {@code ids} y la primera pasa a
+     * ser la principal. Tienen que venir TODAS las del modelo y ninguna más:
+     * si alguien ha subido o quitado una mientras tanto, se rechaza en vez de
+     * colocar las que falten donde caigan. Contesta con las fotos ya ordenadas.
+     */
+    @Transactional
+    public List<ResumenFoto> ordenar(Long modeloId, List<Long> ids) {
+        if (modeloId == null || ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("Di en qué orden van las fotos");
+        }
+        Map<Long, FotoCatalogo> porId = new LinkedHashMap<>();
+        enOrdenVisible(modeloId).forEach(foto -> porId.put(foto.getId(), foto));
+        if (ids.size() != porId.size() || !porId.keySet().equals(Set.copyOf(ids))) {
+            throw new IllegalArgumentException(
+                    "Las fotos del modelo han cambiado mientras las ordenabas: vuelve a cargarlo y ordénalas otra vez");
+        }
+        colocar(ids.stream().map(porId::get).toList());
+        repositorio.flush();
+        return de(modeloId);
+    }
+
+    /** Las fotos como se enseñan: la principal delante y después por orden. */
+    private List<FotoCatalogo> enOrdenVisible(Long modeloId) {
+        List<FotoCatalogo> fotos = new ArrayList<>(repositorio.findByModeloIdOrderByOrdenAscIdAsc(modeloId));
+        fotos.sort(Comparator.comparing((FotoCatalogo foto) -> !foto.isPrincipal()));
+        return fotos;
+    }
+
+    private static void colocar(List<FotoCatalogo> enOrden) {
+        for (int i = 0; i < enOrden.size(); i++) {
+            enOrden.get(i).colocar(i, i == 0);
         }
     }
 

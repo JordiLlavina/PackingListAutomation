@@ -1,7 +1,8 @@
 // La rejilla de modelos del taller: arriba los filtros (FiltrosModelos, los
 // mismos que en la Bandeja de Entrada) y una tarjeta por modelo con su foto.
 // Carga ella misma la lista, así Inicio y Modelos solo tienen que ponerla, y
-// filtra en el navegador (son pocos y ya están todos).
+// filtra en el navegador (son pocos y ya están todos). Los cinturones no se
+// ven salvo con la etiqueta «Cinturones: sí».
 import { useCallback, useEffect, useState } from 'react';
 import { ErrorApi, api } from '../comun/api';
 import Etapa from '../comun/Etapa';
@@ -48,7 +49,7 @@ export default function RejillaModelos({ onElegir }: { onElegir: (id: number, mo
 
   return (
     <>
-      <FiltrosModelos filtros={filtros} clientes={clientes} onCambiar={poner} />
+      <FiltrosModelos filtros={filtros} clientes={clientes} conCinturones onCambiar={poner} />
       {lista.length === 0 ? (
         <p className="ayuda">Ningún modelo con estos filtros.</p>
       ) : (

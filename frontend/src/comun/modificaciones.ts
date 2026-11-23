@@ -294,7 +294,7 @@ export function moverEnCola(ids: number[], id: number, movimiento: Movimiento): 
  * ella si venía de más abajo y detrás si venía de más arriba, que es donde
  * se ve el hueco al arrastrar. La misma lista si alguna no está.
  */
-export function soltarSobre(ids: number[], arrastrada: number, sobre: number): number[] {
+export function soltarSobre<T>(ids: T[], arrastrada: T, sobre: T): T[] {
   const desde = ids.indexOf(arrastrada);
   const hasta = ids.indexOf(sobre);
   if (desde < 0 || hasta < 0 || desde === hasta) return ids;

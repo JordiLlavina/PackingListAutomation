@@ -2,6 +2,7 @@ package com.puntotres.packinglist.service.catalogo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Color;
@@ -99,6 +100,65 @@ class FotosCatalogoTest {
         assertEquals(b.id(), fotos.principalDe(modeloId).orElseThrow());
         assertEquals(List.of("ULL944"), List.copyOf(fotos.de("AMI", List.of("ULL944")).keySet()),
                 "el mapa por modelos sigue con clave código");
+    }
+
+    @Test
+    void ordenarDejaLasFotosEnEseOrdenYLaPrimeraEsLaPrincipal() {
+        Long modeloId = catalogo.asegurarModelo("AMI", "ORD901", "").getId();
+        ResumenFoto a = fotos.guardar(modeloId, "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
+        ResumenFoto b = fotos.guardar(modeloId, "b.jpg", FotosDePrueba.jpeg(20, 20, Color.BLUE));
+        ResumenFoto c = fotos.guardar(modeloId, "c.jpg", FotosDePrueba.jpeg(20, 20, Color.GREEN));
+
+        List<ResumenFoto> ordenadas = fotos.ordenar(modeloId, List.of(c.id(), a.id(), b.id()));
+
+        assertEquals(List.of(c.id(), a.id(), b.id()), ordenadas.stream().map(ResumenFoto::id).toList());
+        assertEquals(List.of(true, false, false), ordenadas.stream().map(ResumenFoto::principal).toList());
+        assertEquals(ordenadas, fotos.de(modeloId), "el orden queda guardado");
+        assertEquals(c.id(), fotos.principalDe(modeloId).orElseThrow());
+    }
+
+    @Test
+    void ordenarSinTodasLasFotosDelModeloSeRechazaYNoTocaNada() {
+        Long modeloId = catalogo.asegurarModelo("AMI", "ORD902", "").getId();
+        ResumenFoto a = fotos.guardar(modeloId, "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
+        ResumenFoto b = fotos.guardar(modeloId, "b.jpg", FotosDePrueba.jpeg(20, 20, Color.BLUE));
+        Long deOtro = fotos.guardar(catalogo.asegurarModelo("AMI", "ORD903", "").getId(), "x.jpg",
+                FotosDePrueba.jpeg(20, 20, Color.RED)).id();
+
+        assertThrows(IllegalArgumentException.class, () -> fotos.ordenar(modeloId, List.of(b.id())));
+        assertThrows(IllegalArgumentException.class, () -> fotos.ordenar(modeloId, List.of(b.id(), deOtro)));
+        assertThrows(IllegalArgumentException.class, () -> fotos.ordenar(modeloId, List.of(b.id(), a.id(), a.id())));
+
+        assertEquals(List.of(a.id(), b.id()), fotos.de(modeloId).stream().map(ResumenFoto::id).toList());
+    }
+
+    @Test
+    void marcarPrincipalLaPasaDelanteYLasDemasConservanSuOrden() {
+        Long modeloId = catalogo.asegurarModelo("AMI", "ORD904", "").getId();
+        ResumenFoto a = fotos.guardar(modeloId, "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
+        ResumenFoto b = fotos.guardar(modeloId, "b.jpg", FotosDePrueba.jpeg(20, 20, Color.BLUE));
+        ResumenFoto c = fotos.guardar(modeloId, "c.jpg", FotosDePrueba.jpeg(20, 20, Color.GREEN));
+
+        fotos.marcarPrincipal(modeloId, c.id());
+
+        assertEquals(List.of(c.id(), a.id(), b.id()), fotos.de(modeloId).stream().map(ResumenFoto::id).toList());
+    }
+
+    @Test
+    void elCorteRecibeLasFotosDelCatalogoEnSuOrden() throws IOException {
+        Long modeloId = catalogo.asegurarModelo("AMI", "ORD905", "").getId();
+        ResumenFoto a = fotos.guardar(modeloId, "a.jpg", FotosDePrueba.jpeg(20, 20, Color.RED));
+        ResumenFoto b = fotos.guardar(modeloId, "b.jpg", FotosDePrueba.jpeg(20, 20, Color.BLUE));
+        ResumenFoto c = fotos.guardar(modeloId, "c.jpg", FotosDePrueba.jpeg(20, 20, Color.GREEN));
+        fotos.ordenar(modeloId, List.of(b.id(), c.id(), a.id()));
+
+        FotosTemporada temporada = fotos.comoFotosTemporada("AMI", List.of("ORD905"),
+                Files.createTempDirectory("fotos-catalogo-test-"));
+
+        assertEquals(List.of("principal.jpg", "c.jpg", "a.jpg"),
+                temporada.de("ORD905").stream().map(FotoModelo::nombreOriginal).toList(),
+                "el orden del catálogo es el de la orden de corte y el Word de fotos");
+        assertEquals(0, temporada.indicePorDefecto("ORD905"));
     }
 
     @Test

@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -252,13 +253,53 @@ class ModelosControllerTest {
         mvc.perform(post("/api/modelos/" + id + "/fotos/" + segunda + "/principal")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].principal").value(false))
-                .andExpect(jsonPath("$[1].principal").value(true));
+                .andExpect(jsonPath("$[0].id").value(segunda))
+                .andExpect(jsonPath("$[0].principal").value(true))
+                .andExpect(jsonPath("$[1].principal").value(false));
 
         long otro = alta("T9-API-OTRO");
         mvc.perform(post("/api/modelos/" + otro + "/fotos/" + segunda + "/principal")
                         .with(comoUsuario(despacho())).with(csrf()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void ordenarLasFotosDejaEseOrdenYLaPrimeraEsLaPrincipal() throws Exception {
+        long id = alta("T9-API-ORDEN");
+        JsonNode subidas = JSON.readTree(mvc.perform(multipart("/api/modelos/" + id + "/fotos")
+                        .file(new MockMultipartFile("fotos", "a.png", MediaType.IMAGE_PNG_VALUE, png(40, 30, Color.RED)))
+                        .file(new MockMultipartFile("fotos", "b.png", MediaType.IMAGE_PNG_VALUE, png(40, 30, Color.BLUE)))
+                        .file(new MockMultipartFile("fotos", "c.png", MediaType.IMAGE_PNG_VALUE, png(40, 30, Color.GREEN)))
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString());
+        long a = subidas.get(0).get("id").asLong();
+        long b = subidas.get(1).get("id").asLong();
+        long c = subidas.get(2).get("id").asLong();
+
+        mvc.perform(put("/api/modelos/" + id + "/fotos/orden")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + c + "," + a + "," + b + "]}")
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(c))
+                .andExpect(jsonPath("$[0].principal").value(true))
+                .andExpect(jsonPath("$[1].id").value(a))
+                .andExpect(jsonPath("$[2].id").value(b))
+                .andExpect(jsonPath("$[2].principal").value(false));
+        mvc.perform(get("/api/modelos").param("q", "T9-API-ORDEN").with(comoUsuario(despacho())))
+                .andExpect(jsonPath("$[0].fotoPrincipalId").value(c));
+
+        mvc.perform(put("/api/modelos/" + id + "/fotos/orden")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + a + "," + b + "]}")
+                        .with(comoUsuario(despacho())).with(csrf()))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/modelos/" + id + "/fotos/orden")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + a + "," + b + "," + c + "]}")
+                        .with(comoUsuario(usuarioDePrueba(usuarios, Rol.TALLER))).with(csrf()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
