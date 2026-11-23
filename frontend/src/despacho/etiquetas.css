@@ -1,13 +1,16 @@
-/* La hoja de etiquetas de patrones. En pantalla, cada hoja se ve como un A4
-   blanco con sus márgenes de 10 mm y, encima, la barra con las acciones; en
-   el papel solo salen las etiquetas. Ocho por hoja (2 × 4) de 95 × 69 mm,
-   que llenan los 190 × 277 mm útiles del A4. La etiqueta es negro sobre
-   blanco en los dos temas y no lleva fondos, así que se imprime igual con
-   «Gráficos de fondo» apagado. Las líneas de corte son un trazo discontinuo
-   gris de 0,3 pt, una sola vez entre dos etiquetas vecinas.
+/* La hoja de etiquetas de patrones. En pantalla, cada etiqueta se ve como un
+   A4 blanco con sus márgenes de 8 mm y, encima, la barra con las acciones; en
+   el papel solo salen las etiquetas, una por hoja, a página entera y sin
+   líneas de corte. La etiqueta es negro sobre blanco en los dos temas y no
+   lleva fondos, así que se imprime igual con «Gráficos de fondo» apagado.
 
-   En alto, cada etiqueta suma 2 + 45 + 1 + 11,7 + 1 + 5,4 + 2 = 68,1 mm de
-   los 69 de su fila: lo de abajo queda a más de 1,5 mm de la línea de corte.
+   Lo útil del A4 son 194 × 281 mm. En ancho, arriba: la foto en un marco de
+   135 mm (el triple de los 45 de la etiqueta de ocho por hoja), 3 mm de aire
+   y el QR de 56 mm (45 + 25 %). En alto, 140 de la foto + 24 del nombre +
+   10,8 de la referencia + 10 del cliente + 9,2 del rótulo de mano de obra
+   + 2 + 4 × 4 de separación = 212 mm; el recuadro de mano de obra se queda
+   con lo que sobra, unos 68 mm. La hoja impresa mide 280 y no 281 para que el
+   redondeo del navegador no saque una página en blanco detrás.
 
    Lo que solo vale al imprimir va colgado de body.imprimiendo-etiquetas, la
    clase que pone la vista mientras está montada, y la página es una página
@@ -15,7 +18,7 @@
    va en el bundle de toda la app y no debe cambiar cómo se imprime otra
    pantalla. */
 
-@page etiquetas { size: A4; margin: 10mm; }
+@page etiquetas { size: A4; margin: 8mm; }
 
 .etiquetas-patrones { min-height: 100%; padding-bottom: 32px; }
 
@@ -30,37 +33,40 @@
 
 .hojas { display: grid; justify-items: center; gap: 24px; padding: 24px 16px 0; overflow-x: auto; }
 
-.hoja-etiquetas { box-sizing: border-box; width: 210mm; min-height: 297mm; padding: 10mm; background: #fff; color: #000;
-  box-shadow: var(--shadow); display: grid; grid-template-columns: repeat(2, 95mm); grid-auto-rows: 69mm; align-content: start; }
+.hoja-etiquetas { box-sizing: border-box; width: 210mm; height: 297mm; padding: 8mm; background: #fff; color: #000;
+  box-shadow: var(--shadow); display: flex; }
 
-.etiqueta-patron { position: relative; box-sizing: border-box; display: flex; flex-direction: column; gap: 1mm; min-width: 0;
-  padding: 2mm; overflow: hidden; break-inside: avoid; color: #000; font-family: var(--font);
-  border-right: .3pt dashed #8c8c8c; border-bottom: .3pt dashed #8c8c8c; }
-/* La primera fila lleva además la línea de arriba y la columna de la izquierda la suya. */
-.etiqueta-patron:nth-child(-n+2) { border-top: .3pt dashed #8c8c8c; }
-.etiqueta-patron:nth-child(odd) { border-left: .3pt dashed #8c8c8c; }
+.etiqueta-patron { position: relative; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; gap: 4mm;
+  min-width: 0; min-height: 0; overflow: hidden; break-inside: avoid; color: #000; font-family: var(--font); }
 
-.etiqueta-patron .arriba { display: flex; gap: 1mm; height: 45mm; flex: none; }
-/* El PNG ya trae su zona muda: se pinta a 45 mm sin margen alrededor. */
-.etiqueta-patron .qr { width: 45mm; height: 45mm; flex: none; display: block; image-rendering: pixelated; }
-/* La foto, cuadrada y del mismo lado que el QR: 45 + 1 + 45 llenan los 91 mm de dentro de la etiqueta. */
-.etiqueta-patron .foto-etiqueta { width: 45mm; height: 45mm; aspect-ratio: 1; flex: none; display: block; object-fit: cover; }
+.etiqueta-patron .arriba { display: flex; justify-content: space-between; align-items: flex-start; gap: 3mm; height: 140mm; flex: none; }
+/* La foto entera, nunca recortada: se encaja en el marco por su lado largo y se pega arriba a la izquierda. */
+.etiqueta-patron .marco-foto { width: 135mm; height: 140mm; flex: none; }
+.etiqueta-patron img.foto-etiqueta { display: block; width: 100%; height: 100%; object-fit: contain; object-position: left top; }
+/* Sin foto, la silueta de la maqueta: cuadrada, del ancho del marco. */
+.etiqueta-patron svg.foto-etiqueta { display: block; width: 135mm; height: 135mm; }
+/* El PNG ya trae su zona muda: se pinta a 56 mm sin margen alrededor. */
+.etiqueta-patron .qr { width: 56mm; height: 56mm; flex: none; display: block; image-rendering: pixelated; }
 
 .etiqueta-patron p { margin: 0; }
-/* El nombre: lo más grande de la etiqueta, en un hueco fijo de dos líneas. 11,7 mm es lo que ocupa
-   el cuerpo de la letra a 28 pt (la Atkinson mide 1,18 em de alto, más que su line-height). */
-.etiqueta-patron .nombre { height: 11.7mm; flex: none; display: flex; align-items: center; font-weight: 700; line-height: 1.05; overflow: hidden; overflow-wrap: anywhere; }
-.etiqueta-patron .nombre-grande { font-size: 28pt; white-space: nowrap; }
-.etiqueta-patron .nombre-medio { font-size: 21pt; white-space: nowrap; }
-.etiqueta-patron .nombre-pequeno { font-size: 15pt; text-wrap: balance; }
-.etiqueta-patron .nombre-minimo { font-size: 14pt; text-wrap: balance; }
+/* El nombre: lo más grande de la etiqueta, en un hueco fijo de dos líneas. 24 mm es lo que ocupa
+   el cuerpo de la letra a 56 pt (la Atkinson mide 1,18 em de alto, más que su line-height). */
+.etiqueta-patron .nombre { height: 24mm; flex: none; display: flex; align-items: center; font-weight: 700; line-height: 1.05; overflow: hidden; overflow-wrap: anywhere; }
+.etiqueta-patron .nombre-grande { font-size: 56pt; white-space: nowrap; }
+.etiqueta-patron .nombre-medio { font-size: 42pt; white-space: nowrap; }
+.etiqueta-patron .nombre-pequeno { font-size: 30pt; text-wrap: balance; }
+.etiqueta-patron .nombre-minimo { font-size: 28pt; text-wrap: balance; }
 
-.etiqueta-patron .datos { display: flex; justify-content: space-between; align-items: baseline; gap: 3mm; font-size: 14pt; line-height: 1.1; white-space: nowrap; }
-.etiqueta-patron .datos .cliente { flex: none; }
-.etiqueta-patron .datos .referencia { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.etiqueta-patron .referencia { flex: none; font-size: 26pt; font-weight: 700; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.etiqueta-patron .cliente { flex: none; font-size: 24pt; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Solo en pantalla: una etiqueta que ya se imprimió otra vez. */
-.etiqueta-patron .ya-impresa { position: absolute; top: 3.5mm; right: 3.5mm; padding: .15em .55em; border-radius: 6px;
+/* El recuadro donde el técnico escribe a boli la mano de obra: se queda con todo el alto que sobra. */
+.etiqueta-patron .mano-de-obra { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2mm; }
+.etiqueta-patron .mano-de-obra .rotulo { flex: none; font-size: 22pt; font-weight: 700; line-height: 1.15; }
+.etiqueta-patron .mano-de-obra .recuadro { flex: 1; border: 1.5pt solid #000; border-radius: 3mm; }
+
+/* Solo en pantalla: una etiqueta que ya se imprimió otra vez. Va debajo del QR para no taparlo. */
+.etiqueta-patron .ya-impresa { position: absolute; top: 60mm; right: 0; padding: .15em .55em; border-radius: 6px;
   background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 700; }
 
 @media print {
@@ -71,7 +77,7 @@
   body.imprimiendo-etiquetas .toast { display: none !important; }
   body.imprimiendo-etiquetas .etiquetas-patrones { padding: 0; }
   body.imprimiendo-etiquetas .hojas { display: block; padding: 0; gap: 0; overflow: visible; }
-  /* Una hoja de papel por cada ocho; el margen ya lo pone @page etiquetas. */
-  body.imprimiendo-etiquetas .hoja-etiquetas { page: etiquetas; width: auto; min-height: 0; padding: 0; box-shadow: none; break-after: page; }
+  /* Una hoja de papel por etiqueta; el margen ya lo pone @page etiquetas. */
+  body.imprimiendo-etiquetas .hoja-etiquetas { page: etiquetas; width: auto; height: 280mm; padding: 0; box-shadow: none; break-after: page; }
   body.imprimiendo-etiquetas .hoja-etiquetas:last-child { break-after: auto; }
 }

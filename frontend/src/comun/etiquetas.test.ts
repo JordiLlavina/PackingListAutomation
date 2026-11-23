@@ -2,14 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { POR_HOJA, fechaDia, hojasDe, idsDe, recuento, tamanoNombre } from './etiquetas';
 
 describe('hojasDe', () => {
-  it('reparte de 8 en 8: 9 etiquetas son una hoja de 8 y otra de 1', () => {
-    const hojas = hojasDe([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(POR_HOJA).toBe(8);
-    expect(hojas).toEqual([[1, 2, 3, 4, 5, 6, 7, 8], [9]]);
+  it('una etiqueta por hoja: 3 etiquetas son 3 hojas', () => {
+    expect(POR_HOJA).toBe(1);
+    expect(hojasDe([1, 2, 3])).toEqual([[1], [2], [3]]);
   });
 
-  it('8 justas son una hoja y ninguna, ninguna hoja', () => {
-    expect(hojasDe([1, 2, 3, 4, 5, 6, 7, 8])).toHaveLength(1);
+  it('ninguna etiqueta, ninguna hoja', () => {
     expect(hojasDe([])).toEqual([]);
   });
 });
@@ -44,9 +42,8 @@ describe('tamanoNombre', () => {
 
 describe('recuento', () => {
   it('dice las etiquetas y las hojas', () => {
-    expect(recuento(9)).toBe('9 etiquetas · 2 hojas');
+    expect(recuento(3)).toBe('3 etiquetas · 3 hojas');
     expect(recuento(1)).toBe('1 etiqueta · 1 hoja');
-    expect(recuento(8)).toBe('8 etiquetas · 1 hoja');
   });
 });
 

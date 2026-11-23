@@ -1,10 +1,12 @@
 // La hoja de etiquetas de patrones (/app/etiquetas-patrones?ids=1,2,3): una
 // vista de impresión de la propia PWA, fuera del marco de despacho para que
-// en el papel no salga nada más. Ocho etiquetas por A4 (2 × 4) en papel
-// normal, para recortar; cada una con el QR del modelo (lo pinta el servidor,
-// /m/{id}), su foto principal, el nombre lo más grande y debajo el cliente y
-// la referencia. En pantalla, encima, una barra para volver, imprimir y
-// marcarlas como impresas, que en el papel no sale (etiquetas.css).
+// en el papel no salga nada más. Una etiqueta por A4, a página entera y sin
+// líneas de corte: arriba a la izquierda la foto principal en grande (entera,
+// nunca recortada), a la derecha el QR del modelo (lo pinta el servidor,
+// /m/{id}) y debajo, uno bajo otro, el nombre lo más grande, la referencia, el
+// cliente y el recuadro de «Mano de obra», que el técnico rellena a boli. En
+// pantalla, encima, una barra para volver, imprimir y marcarlas como
+// impresas, que en el papel no sale (etiquetas.css).
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { ErrorApi, api } from '../comun/api';
@@ -31,18 +33,22 @@ function Etiqueta({ modelo }: { modelo: ModeloResumen }) {
   return (
     <article className="etiqueta-patron">
       <div className="arriba">
+        <div className="marco-foto">
+          {modelo.fotoPrincipalId !== null ? (
+            <img className="foto-etiqueta" src={fotoUrl(modelo.fotoPrincipalId)} alt="" />
+          ) : (
+            <FotoModelo modelo={modelo} className="foto-etiqueta" />
+          )}
+        </div>
         <img className="qr" src={`/api/modelos/${modelo.id}/qr.png`} alt={`QR de ${modelo.referencia}`} />
-        {modelo.fotoPrincipalId !== null ? (
-          <img className="foto-etiqueta" src={fotoUrl(modelo.fotoPrincipalId)} alt="" />
-        ) : (
-          <FotoModelo modelo={modelo} className="foto-etiqueta" />
-        )}
       </div>
       <p className={`nombre ${tamanoNombre(modelo.nombre)}`}>{modelo.nombre}</p>
-      <p className="datos">
-        <span className="cliente">{modelo.cliente}</span>
-        <b className="referencia">{modelo.referencia}</b>
-      </p>
+      <p className="referencia">{modelo.referencia}</p>
+      <p className="cliente">{modelo.cliente}</p>
+      <div className="mano-de-obra">
+        <span className="rotulo">Mano de obra</span>
+        <div className="recuadro" />
+      </div>
       {modelo.etiquetaImpresaEn && <span className="ya-impresa">Ya impresa el {fechaDia(modelo.etiquetaImpresaEn)}</span>}
     </article>
   );
@@ -143,7 +149,7 @@ export default function EtiquetasPatrones() {
         </Link>
         <div className="texto">
           <b>{carga === null ? 'Cargando las etiquetas…' : recuento(modelos.length)}</b>
-          <span>Papel A4 normal, 8 etiquetas por hoja; recorta por las líneas.</span>
+          <span>Papel A4 normal, una etiqueta por hoja.</span>
         </div>
         <div className="acciones">
           <button className="boton" type="button" disabled={!hayEtiquetas || marcando || marcadas} onClick={() => void marcarComoImpresas()}>

@@ -1,12 +1,12 @@
 // Lo que se calcula para la hoja de etiquetas de patrones (despacho): qué
-// modelos pide la dirección, cómo se reparten en hojas A4 de ocho y a qué
+// modelos pide la dirección, cómo se reparten en hojas A4 (una por hoja) y a qué
 // tamaño va el nombre según lo largo que sea. Funciones puras, para poder
 // probarlas sin navegador.
 
-/** Etiquetas por hoja A4: dos columnas por cuatro filas. */
-export const POR_HOJA = 8;
+/** Etiquetas por hoja A4: una, a página entera. */
+export const POR_HOJA = 1;
 
-/** Las etiquetas en hojas de ocho; la última lleva las que sobren. */
+/** Las etiquetas repartidas en hojas de POR_HOJA; la última lleva las que sobren. */
 export function hojasDe<T>(etiquetas: T[]): T[][] {
   const hojas: T[][] = [];
   for (let i = 0; i < etiquetas.length; i += POR_HOJA) hojas.push(etiquetas.slice(i, i + POR_HOJA));
@@ -30,9 +30,10 @@ export type TamanoNombre = 'nombre-grande' | 'nombre-medio' | 'nombre-pequeno' |
 
 /**
  * El tamaño del nombre en la etiqueta, por su número de letras: el nombre es
- * lo más grande (28 pt) mientras quepa en una línea, y encoge cuando no. El
- * hueco es de 9 cm de ancho y dos líneas de alto; los umbrales están medidos
- * con nombres en mayúsculas, que es como los escriben los clientes.
+ * lo más grande (56 pt) mientras quepa en una línea, y encoge cuando no. El
+ * hueco es de 19 cm de ancho y dos líneas de alto; los umbrales se midieron
+ * en la etiqueta antigua (9 cm, letra a la mitad), que guarda la misma
+ * proporción, con nombres en mayúsculas, que es como los escriben los clientes.
  */
 export function tamanoNombre(nombre: string): TamanoNombre {
   const letras = nombre.trim().replace(/\s+/g, ' ').length;
