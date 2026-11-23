@@ -93,6 +93,8 @@ El test end-to-end `flujoCompletoGeneraExcelsAbribles` deja excels reales en `ta
 
 ## Distribuir la aplicación: un `.jar` para otro ordenador
 
+> Para instalarlo **como servicio en el servidor Linux** de Puntotres (systemd, variables de entorno, claves, actualizaciones y copias), ver [INSTALACION-SERVIDOR.md](INSTALACION-SERVIDOR.md).
+
 El proyecto empaqueta un **jar ejecutable** con el servidor web embebido, todas las dependencias y todos los recursos dentro (plantillas Excel de packing list y de etiquetas, vistas Thymeleaf, CSS y el propio `application.yml`). En el ordenador de destino **no hace falta Maven, ni el código fuente, ni copiar las plantillas aparte**: solo Java y ese fichero.
 
 ### 1. Construirlo (en el ordenador de desarrollo)
@@ -290,5 +292,6 @@ Las plantillas de packing list viven en `src/main/resources/client-packinglist/`
 - [ESTADO_ANTES_VACACIONES.md](ESTADO_ANTES_VACACIONES.md) — foto del estado del proyecto a 2026-08-08.
 - [docs/superpowers/specs/2026-11-01-catalogo-modelos-design.md](docs/superpowers/specs/2026-11-01-catalogo-modelos-design.md) — el catálogo de modelos (pantalla `/catalogo`), la memoria única de la que leen el taller y el corte.
 - [docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md](docs/superpowers/specs/2026-11-08-modelos-y-modificaciones-design.md) — la app de modelos y modificaciones (`/app/`); su maqueta clicable está en `docs/Modelos/maqueta-tablet.html` y lo que hay que pedir a informática, en [la guía para el informático](docs/Modelos/modelos.puntotres.com%20-%20guia%20para%20el%20informatico.md).
+- [INSTALACION-SERVIDOR.md](INSTALACION-SERVIDOR.md) — instalación en el servidor Linux como servicio de systemd, variables de entorno y actualizaciones.
 - [TODO](TODO) — pendientes (lo mantiene Jordi).
 - [docs/](docs/) — ejemplos de plantillas por cliente, análisis de las hojas manuscritas y prompts de extracción.
