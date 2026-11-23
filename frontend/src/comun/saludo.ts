@@ -44,7 +44,7 @@ export const DIVERTIDAS: Frase[] = [
   { texto: 'Segunda parte del partido, ¡y vamos ganando!', vale: (_d, m) => m >= h(15) },
   { texto: '¿En qué andamos hoy?' },
   { texto: '¡Hoy llevas el guapo subido!' },
-  { texto: 'Esto huele a obra maestra, Bachir' },
+  { texto: 'Esto huele a obra maestra!' },
   
 ];
 
