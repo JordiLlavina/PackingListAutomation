@@ -99,7 +99,19 @@ AZURE_SPEECH_KEY=...
 AZURE_SPEECH_REGION=westeurope
 ```
 
-Formato: `NOMBRE=valor`, sin espacios alrededor del `=` y sin comillas. Protegerlo
+Formato: `NOMBRE=valor`, sin espacios alrededor del `=` y sin comillas.
+
+> ⚠️ **Nada de comentarios detrás del valor.** systemd solo ignora las líneas
+> que **empiezan** por `#`; un comentario al final de una línea pasa a formar
+> parte del valor. Con `MODELOS_ADMIN_PASSWORD=admin   # solo el primer arranque`
+> la contraseña de `admin` es esa línea entera, comentario incluido, y no se
+> puede entrar; con la clave de Anthropic, la clave deja de valer. Los
+> comentarios, siempre en su propia línea. Para comprobar el fichero:
+> `sudo cat -A /etc/packinglist.env` — cada línea tiene que acabar justo
+> después del valor, en `$` (un `^M$` es un fin de línea de Windows, y también
+> sobra).
+
+Protegerlo
 para que solo lo lea root (systemd lo lee como root al arrancar y le pasa las
 variables a la aplicación):
 
@@ -339,6 +351,7 @@ desde un cron (`stop`, copiar, `start`), o se usa la copia en caliente de H2
 | Funciona desde el servidor (`curl`) pero no desde los PCs | Cortafuegos: apartado 7. |
 | `/app/` está en blanco o da 404 | El jar se construyó con `-Dskip.frontend=true`. Volver a construirlo sin esa opción. |
 | Nadie puede entrar en `/app/` | Base vacía sin `MODELOS_ADMIN_PASSWORD`: ponerla y reiniciar. |
+| `admin` existe (el log dice «creado el usuario admin») pero su contraseña no entra | La línea de `MODELOS_ADMIN_PASSWORD` llevaba algo detrás (un comentario, espacios, `^M`) y eso es parte de la contraseña. Corregir el fichero (apartado 4) y, como la variable solo se usa con la base sin usuarios: `stop`, `mv /opt/packinglist/datos /opt/packinglist/datos-mala`, `start`. Eso empieza la base de cero. |
 | La tablet no pide cámara ni micrófono | Falta HTTPS: apartado 7 («Mientras no haya HTTPS»). |
 | `WARN` sobre las claves VAPID en el log | Una clave pegada cortada o con espacios: volver a pegarlas. |
 | El QR de una etiqueta abre `localhost` | Falta `MODELOS_URL_PUBLICA` (o tenía otro valor al imprimir). |
