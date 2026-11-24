@@ -16,7 +16,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
 
@@ -38,7 +38,7 @@ class EjemplosJsonTest {
     @Autowired
     private PackingListGenerationService generador;
     @Autowired
-    private ClientesProperties clientes;
+    private CatalogoClientes clientes;
 
     private List<ExcelGenerado> importarYGenerar(String fichero) throws Exception {
         EnvioInput envio;

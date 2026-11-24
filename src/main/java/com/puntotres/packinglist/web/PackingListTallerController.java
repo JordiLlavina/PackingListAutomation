@@ -22,7 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
@@ -69,7 +69,7 @@ public class PackingListTallerController {
     private final ConversionFormatoTallerService conversionService;
     private final GeneradorPackingTaller generadorTaller;
     private final PreparacionRevisionService preparacion;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final CatalogoTaras catalogoTaras;
     private final ArchivoTemporadas archivoTemporadas;
     private final TablaColores tablaColores;
@@ -81,7 +81,7 @@ public class PackingListTallerController {
                                        ConversionFormatoTallerService conversionService,
                                        GeneradorPackingTaller generadorTaller,
                                        PreparacionRevisionService preparacion,
-                                       ClientesProperties clientesProperties,
+                                       CatalogoClientes catalogoClientes,
                                        CatalogoTaras catalogoTaras,
                                        ArchivoTemporadas archivoTemporadas,
                                        TablaColores tablaColores,
@@ -92,7 +92,7 @@ public class PackingListTallerController {
         this.conversionService = conversionService;
         this.generadorTaller = generadorTaller;
         this.preparacion = preparacion;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.catalogoTaras = catalogoTaras;
         this.archivoTemporadas = archivoTemporadas;
         this.tablaColores = tablaColores;
@@ -106,7 +106,7 @@ public class PackingListTallerController {
     @PostMapping("/packing-list/taller/digerir")
     public String digerir(@Valid @ModelAttribute EnvioForm envioForm,
                           BindingResult errores, Model model) {
-        ClienteConfig cliente = clientesProperties.clientePara(envioForm.getCliente()).orElse(null);
+        ClienteConfig cliente = catalogoClientes.clientePara(envioForm.getCliente()).orElse(null);
         if (cliente == null) {
             errores.rejectValue("cliente", "cliente.desconocido",
                     "Cliente desconocido: " + envioForm.getCliente());
@@ -206,7 +206,7 @@ public class PackingListTallerController {
     @PostMapping(value = "/packing-list/taller/convertir", produces = MediaType.APPLICATION_JSON_VALUE)
     @ResponseBody
     public ResponseEntity<Map<String, Object>> convertir(@ModelAttribute EnvioForm envioForm) {
-        ClienteConfig cliente = clientesProperties.clientePara(envioForm.getCliente()).orElse(null);
+        ClienteConfig cliente = catalogoClientes.clientePara(envioForm.getCliente()).orElse(null);
         if (cliente == null) {
             return error("Elige primero el cliente: la conversión depende de cómo escribe "
                     + "cada cliente sus referencias y destinaciones");
@@ -349,7 +349,7 @@ public class PackingListTallerController {
         // un ajuste que después no se ha generado daría por buena una prueba.
         digestionService.memorizar(tallerEnCurso.getClaveCliente(), digestion);
 
-        ClienteConfig cliente = clientesProperties
+        ClienteConfig cliente = catalogoClientes
                 .clientePara(tallerEnCurso.getClaveCliente()).orElseThrow();
         List<String> avisosPrevios = new ArrayList<>();
         avisosPrevios.add("Packing generado a partir del fichero del taller '"
@@ -418,13 +418,13 @@ public class PackingListTallerController {
     private String pintarAjuste(Model model, ResultadoPackingTaller packing) {
         DigestionTaller digestion = tallerEnCurso.getDigestion();
         model.addAttribute("digestion", digestion);
-        model.addAttribute("cliente", clientesProperties
+        model.addAttribute("cliente", catalogoClientes
                 .clientePara(tallerEnCurso.getClaveCliente())
                 .map(ClienteConfig::getNombre).orElse(tallerEnCurso.getClaveCliente()));
         model.addAttribute("nombreExcelTaller", tallerEnCurso.getNombreExcelTaller());
         // Cada cliente llama a su número de pedido de otra forma, y quien
         // teclea tiene delante el documento del cliente, no el del programa.
-        model.addAttribute("etiquetaPedido", clientesProperties
+        model.addAttribute("etiquetaPedido", catalogoClientes
                 .clientePara(tallerEnCurso.getClaveCliente())
                 .map(ClienteConfig::getEtiquetaPedido).orElse("Nº pedido"));
         model.addAttribute("destinos", digestion.getDestinosActivos());

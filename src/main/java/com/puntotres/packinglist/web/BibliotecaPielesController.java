@@ -34,7 +34,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.BibliotecaPielesProperties;
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.DocumentoPiel;
 import com.puntotres.packinglist.persistence.FichaPiel;
 import com.puntotres.packinglist.persistence.PrecioPiel;
@@ -147,14 +147,14 @@ public class BibliotecaPielesController {
 
     private final BibliotecaPieles biblioteca;
     private final BibliotecaPielesProperties listas;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final ConversorFotos conversor;
 
     public BibliotecaPielesController(BibliotecaPieles biblioteca, BibliotecaPielesProperties listas,
-                                      ClientesProperties clientesProperties, ConversorFotos conversor) {
+                                      CatalogoClientes catalogoClientes, ConversorFotos conversor) {
         this.biblioteca = biblioteca;
         this.listas = listas;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.conversor = conversor;
     }
 
@@ -553,7 +553,7 @@ public class BibliotecaPielesController {
             redirect.addFlashAttribute("mensajeError", "Elige con qué piel de la biblioteca se enlaza.");
             return "redirect:" + BASE;
         }
-        if (clientesProperties.clientePara(cliente).isEmpty()) {
+        if (catalogoClientes.clientePara(cliente).isEmpty()) {
             redirect.addFlashAttribute("mensajeError", "Cliente desconocido: " + cliente + ".");
             return aLaFicha ? volverA(ficha) : "redirect:" + BASE;
         }
@@ -634,7 +634,7 @@ public class BibliotecaPielesController {
     /** Clave → nombre de todos los clientes del catálogo, en su orden. */
     private Map<String, String> clientes() {
         Map<String, String> clientes = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> clientes.put(clave, nombreDe(config, clave)));
+        catalogoClientes.getClientes().forEach((clave, config) -> clientes.put(clave, nombreDe(config, clave)));
         return clientes;
     }
 

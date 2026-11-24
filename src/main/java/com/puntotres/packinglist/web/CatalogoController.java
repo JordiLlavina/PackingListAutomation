@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.puntotres.packinglist.config.CatalogoTaras;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.Articulo;
 import com.puntotres.packinglist.persistence.ArticuloColor;
@@ -59,7 +59,7 @@ public class CatalogoController {
     private final CatalogoModelos catalogo;
     private final FotosCatalogo fotos;
     private final ArchivoTemporadas temporadas;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final CatalogoTaras taras;
     private final TablaColores tablaColores;
     private final DocumentosCorteService reglas;
@@ -67,13 +67,13 @@ public class CatalogoController {
     private final com.puntotres.packinglist.service.corte.ConversorFotos conversor;
 
     public CatalogoController(CatalogoModelos catalogo, FotosCatalogo fotos, ArchivoTemporadas temporadas,
-                              ClientesProperties clientesProperties, CatalogoTaras taras, TablaColores tablaColores,
+                              CatalogoClientes catalogoClientes, CatalogoTaras taras, TablaColores tablaColores,
                               DocumentosCorteService reglas, com.puntotres.packinglist.persistence.MemoriaPieles pieles,
                               com.puntotres.packinglist.service.corte.ConversorFotos conversor) {
         this.catalogo = catalogo;
         this.fotos = fotos;
         this.temporadas = temporadas;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.taras = taras;
         this.tablaColores = tablaColores;
         this.reglas = reglas;
@@ -85,7 +85,7 @@ public class CatalogoController {
     public String catalogo(@RequestParam(required = false) String cliente,
                            @RequestParam(required = false) Long temporada, Model model) {
         Map<String, String> clientes = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> clientes.put(clave, config.getNombre()));
+        catalogoClientes.getClientes().forEach((clave, config) -> clientes.put(clave, config.getNombre()));
         String elegido = cliente == null || cliente.isBlank() ? null : cliente.trim().toUpperCase(Locale.ROOT);
         if (elegido != null && !clientes.containsKey(elegido)) {
             elegido = null;

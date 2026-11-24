@@ -25,7 +25,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.Incorporacion;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
@@ -93,15 +93,15 @@ public class ColoresController {
 
     private final TablaColores tabla;
     private final MemoriaPieles pieles;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final DocumentosCorteService lectores;
     private final ArchivoTemporadas archivoTemporadas;
 
-    public ColoresController(TablaColores tabla, MemoriaPieles pieles, ClientesProperties clientesProperties,
+    public ColoresController(TablaColores tabla, MemoriaPieles pieles, CatalogoClientes catalogoClientes,
                              DocumentosCorteService lectores, ArchivoTemporadas archivoTemporadas) {
         this.tabla = tabla;
         this.pieles = pieles;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.lectores = lectores;
         this.archivoTemporadas = archivoTemporadas;
     }
@@ -146,7 +146,7 @@ public class ColoresController {
                               @RequestParam(defaultValue = "todo") String que,
                               RedirectAttributes redirect) {
         Optional<ClienteCorte> lector = lectores.clientePara(cliente);
-        if (clientesProperties.clientePara(cliente).isEmpty() || lector.isEmpty()) {
+        if (catalogoClientes.clientePara(cliente).isEmpty() || lector.isEmpty()) {
             redirect.addFlashAttribute("mensajeError", "Del cliente " + clave(cliente)
                     + " todavía no se sabe leer el excel de pedido: solo de AMI y APC.");
             return volver(cliente);
@@ -270,7 +270,7 @@ public class ColoresController {
                               RedirectAttributes redirect) {
         validarTabla(tablaElegida);
         String cliente = form.getCliente() == null ? "" : form.getCliente();
-        if (clientesProperties.clientePara(cliente).isEmpty()) {
+        if (catalogoClientes.clientePara(cliente).isEmpty()) {
             redirect.addFlashAttribute("mensajeError", "Cliente desconocido: " + cliente + ".");
             return "redirect:/colores";
         }
@@ -293,7 +293,7 @@ public class ColoresController {
                          @RequestParam String codigo, @RequestParam(required = false) String valor,
                          RedirectAttributes redirect) {
         validarTabla(tablaElegida);
-        if (clientesProperties.clientePara(cliente).isEmpty()) {
+        if (catalogoClientes.clientePara(cliente).isEmpty()) {
             redirect.addFlashAttribute("mensajeError", "Cliente desconocido: " + cliente + ".");
             return "redirect:/colores";
         }
@@ -321,7 +321,7 @@ public class ColoresController {
     /** El motivo por el que no se puede guardar, o null si se puede. */
     private String comprobar(String tablaElegida, String cliente, String codigo) {
         validarTabla(tablaElegida);
-        if (clientesProperties.clientePara(cliente).isEmpty()) {
+        if (catalogoClientes.clientePara(cliente).isEmpty()) {
             return "Cliente desconocido: " + cliente + ".";
         }
         if (codigo == null || codigo.isBlank()) {
@@ -342,7 +342,7 @@ public class ColoresController {
     /** Clave → nombre de todos los clientes del catálogo, en su orden. */
     private Map<String, String> clientes() {
         Map<String, String> clientes = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> clientes.put(clave, nombreDe(config, clave)));
+        catalogoClientes.getClientes().forEach((clave, config) -> clientes.put(clave, nombreDe(config, clave)));
         return clientes;
     }
 

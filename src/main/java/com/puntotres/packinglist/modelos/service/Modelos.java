@@ -22,7 +22,7 @@ import javax.imageio.ImageIO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.modelos.api.dto.CodigoHistorico;
 import com.puntotres.packinglist.modelos.api.dto.Evento;
 import com.puntotres.packinglist.modelos.api.dto.Fusion;
@@ -94,7 +94,7 @@ public class Modelos {
     private final CatalogoModelos catalogo;
     private final FotosCatalogo fotos;
     private final ArchivoTemporadas temporadas;
-    private final ClientesProperties clientes;
+    private final CatalogoClientes clientes;
     private final CambioEtapaRepository cambiosEtapa;
     private final ModeloCodigoHistoricoRepository codigos;
     private final UsuarioRepository usuarios;
@@ -103,7 +103,7 @@ public class Modelos {
     private final List<FuenteEventos> fuentes;
 
     public Modelos(ModeloRepository repositorio, CatalogoModelos catalogo, FotosCatalogo fotos,
-                   ArchivoTemporadas temporadas, ClientesProperties clientes, CambioEtapaRepository cambiosEtapa,
+                   ArchivoTemporadas temporadas, CatalogoClientes clientes, CambioEtapaRepository cambiosEtapa,
                    ModeloCodigoHistoricoRepository codigos, UsuarioRepository usuarios,
                    ModificacionRepository modificaciones, DocumentoModeloRepository documentos,
                    List<FuenteEventos> fuentes) {

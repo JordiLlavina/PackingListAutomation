@@ -156,9 +156,11 @@ packing-list:
           "[RETAIL]":        { altura-max-cm: 168, prioridad: 3, mezcla: LIBRE }
           "[WHOLESALE]":     { altura-max-cm: 168, prioridad: 4, mezcla: LIBRE }
 
-  # Catálogo de clientes. Añadir un cliente nuevo de plantilla GENERIC =
-  # añadir aquí su bloque (nombre-legal + direccion-entrega), sin tocar Java.
-  # El orden de este bloque es el orden del desplegable de la web.
+  # Los clientes PROGRAMADOS: los que tienen su packing list hecho en código
+  # (AMI y APC). Los de plantilla genérica ya no van aquí: viven en la base
+  # de datos y se dan de alta, se corrigen y se eliminan en la pantalla
+  # /clientes (los siete que había los trajo la migración V12). Estos salen
+  # primero en los desplegables, en este orden; detrás, los genéricos.
   clientes:
     "[AMI]":
       nombre: AMI
@@ -225,48 +227,6 @@ packing-list:
           nombre-cliente: I.D.LOOK. LTD.
           direccion: 6TH FL. PUREUN BLDG. 581, GANGNAMDE-RO, SEOCHO-GU, 06530 SEOUL,SOUTH KOREA
           abreviatura: KRT
-
-    "[ACKERMANN]":
-      nombre: Ackermann
-      plantilla: GENERIC
-      nombre-legal: ACKERMANN HOHMANN UND SEDLACEK OHG
-      direccion-entrega: Goseburgstraße 27, 21339 Lüneburg, Germany
-
-    "[DROLE DU MONSIEUR]":
-      nombre: Drole du Monsieur
-      plantilla: GENERIC
-      nombre-legal: MSDS
-      direccion-entrega: ENTREPOT LOGISTIQUE NC; 17 Rue du noyer à la malice; 95380 LOUVRES, France
-
-    "[KAMI]":
-      nombre: Kami
-      plantilla: GENERIC
-      nombre-legal: KAMI SAS
-      direccion-entrega: Ploiesti West Park DN72 PLOIESTI Targoviste-Road; 107025 Aricestii Rahtivani communne; ROMANIA
-
-    "[LGN]":
-      nombre: LGN
-      plantilla: GENERIC
-      nombre-legal: LGN C/O - STELLAE INTERNATIONAL FRANCE
-      direccion-entrega: 47 BIS RUE ERNEST RENAN; 94200 IVRY SUR SEINE
-
-    "[PALOMA WOOL]":
-      nombre: Paloma Wool
-      plantilla: GENERIC
-      nombre-legal: PURO PASEO, S.L.
-      direccion-entrega: GRUPO SEVICA - C/ DEL PROGRES, 4-6, POL.IND. LA POST- NAVE 3, 08850 GAVÀ (BARCELONA)
-
-    "[PAUL & JOE]":
-      nombre: Paul & Joe
-      plantilla: GENERIC
-      nombre-legal: MANEKI SAS
-      direccion-entrega: PAUL&JOE; 14 RUE COMMINES, 75003 PARIS
-
-    "[SONIA RYKIEL]":
-      nombre: Sonia Rykiel
-      plantilla: GENERIC
-      nombre-legal: SONIA RYKIEL INTERNATIONAL
-      direccion-entrega: BLECKMANN - TRB INTERNATIONAL; INDUSTRIEWEG 38C; QUAI B12; 2280 GROBBENDONK, BELGIUM
 
 # La carpeta de fotos del corte también se puede subir sin comprimir, y
 # entonces el navegador manda una parte por foto. Tomcat solo admite 10 por

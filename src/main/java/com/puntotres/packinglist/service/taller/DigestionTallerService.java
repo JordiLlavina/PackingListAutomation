@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.persistence.MemoriaReferencias;
 
@@ -42,14 +42,14 @@ public class DigestionTallerService {
     private final List<ObjetivosPedido> objetivosPorCliente;
     private final MemoriaReferencias memoria;
     private final ReglasTallerProperties reglas;
-    private final ClientesProperties clientes;
+    private final CatalogoClientes clientes;
     /** Para pasar de peso bruto (lo que se teclea) a neto (lo que se recuerda). */
     private final CatalogoTaras taras;
 
     public DigestionTallerService(List<ObjetivosPedido> objetivosPorCliente,
                                   MemoriaReferencias memoria,
                                   ReglasTallerProperties reglas,
-                                  ClientesProperties clientes,
+                                  CatalogoClientes clientes,
                                   CatalogoTaras taras) {
         this.objetivosPorCliente = objetivosPorCliente;
         this.memoria = memoria;

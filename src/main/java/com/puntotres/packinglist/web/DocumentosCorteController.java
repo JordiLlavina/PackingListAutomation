@@ -27,7 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
 import com.puntotres.packinglist.persistence.TablaColores;
@@ -93,7 +93,7 @@ public class DocumentosCorteController {
 
     private final DocumentosCorteService servicio;
     private final ConversorFotos conversor;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final ArchivoTemporadas archivoTemporadas;
     private final MemoriaPieles memoria;
     private final TablaColores tablaColores;
@@ -101,13 +101,13 @@ public class DocumentosCorteController {
     private final CorteEnCurso enCurso;
 
     public DocumentosCorteController(DocumentosCorteService servicio, ConversorFotos conversor,
-                                     ClientesProperties clientesProperties,
+                                     CatalogoClientes catalogoClientes,
                                      ArchivoTemporadas archivoTemporadas, MemoriaPieles memoria,
                                      TablaColores tablaColores, FotosCatalogo fotosCatalogo,
                                      CorteEnCurso enCurso) {
         this.servicio = servicio;
         this.conversor = conversor;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.archivoTemporadas = archivoTemporadas;
         this.memoria = memoria;
         this.tablaColores = tablaColores;
@@ -150,7 +150,7 @@ public class DocumentosCorteController {
         List<String> avisosLectura = new ArrayList<>();
         if (deProduccion) {
             // El excel de producción vale para todos los clientes del catálogo.
-            if (clientesProperties.clientePara(cliente).isEmpty()) {
+            if (catalogoClientes.clientePara(cliente).isEmpty()) {
                 return error(redirect, "El cliente '" + cliente + "' no está en el catálogo");
             }
             clienteCorte = servicio.reglasDeProduccion(cliente);
@@ -717,14 +717,14 @@ public class DocumentosCorteController {
 
     private Map<String, OpcionCliente> opcionesDeCliente() {
         Map<String, OpcionCliente> opciones = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> opciones.put(clave,
+        catalogoClientes.getClientes().forEach((clave, config) -> opciones.put(clave,
                 new OpcionCliente(nombreDe(config, clave), servicio.clientePara(clave).isPresent(),
                         config.isPedidoCliente())));
         return opciones;
     }
 
     private String nombreDe(String clave) {
-        return clientesProperties.clientePara(clave)
+        return catalogoClientes.clientePara(clave)
                 .map(config -> nombreDe(config, clave))
                 .orElse(clave);
     }

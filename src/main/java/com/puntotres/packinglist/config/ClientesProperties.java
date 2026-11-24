@@ -2,12 +2,11 @@ package com.puntotres.packinglist.config;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Catálogo de clientes cargado desde application.yml:
+ * Los clientes PROGRAMADOS, cargados desde application.yml:
  *
  * <pre>
  * packing-list:
@@ -16,21 +15,23 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *       nombre: AMI
  *       plantilla: AMI
  *       placeholder-temporada: H26
- *     "[ACKERMANN]":
- *       plantilla: GENERIC
- *       nombre-legal: ACKERMANN HOHMANN UND SEDLACEK OHG
- *       direccion-entrega: Goseburgstraße 27, 21339 Lüneburg, Germany
  * </pre>
  *
+ * Solo quedan aquí AMI y APC, cuyo packing list es código. Los clientes de
+ * plantilla genérica viven en la base de datos y se dan de alta desde
+ * /clientes (ver {@link CatalogoClientes}); en la aplicación arrancada manda
+ * {@code CatalogoClientesJpa}, que junta los dos orígenes.
+ *
  * Las claves van entre [] y comillas para que Spring respete espacios y
- * signos ("PAUL &amp; JOE", "D. USA"). Se conserva el orden del yml, que es
- * el orden del desplegable de la pantalla de entrada.
+ * signos ("D. USA"). Se conserva el orden del yml, que es el orden con el que
+ * empiezan los desplegables.
  */
 @ConfigurationProperties(prefix = "packing-list")
-public class ClientesProperties {
+public class ClientesProperties implements CatalogoClientes {
 
     private Map<String, ClienteConfig> clientes = new LinkedHashMap<>();
 
+    @Override
     public Map<String, ClienteConfig> getClientes() {
         return clientes;
     }
@@ -39,13 +40,5 @@ public class ClientesProperties {
         this.clientes = new LinkedHashMap<>();
         clientes.forEach((clave, cliente) ->
                 this.clientes.put(ClienteConfig.normalizar(clave), cliente));
-    }
-
-    /** Configuración del cliente indicado, o vacío si no está en el catálogo. */
-    public Optional<ClienteConfig> clientePara(String clave) {
-        if (clave == null) {
-            return Optional.empty();
-        }
-        return Optional.ofNullable(clientes.get(ClienteConfig.normalizar(clave)));
     }
 }

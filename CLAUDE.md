@@ -43,6 +43,7 @@ MODELOS_ADMIN_PASSWORD=prueba mvn spring-boot:run   # con la app de modelos: htt
 - [docs/superpowers/specs/2026-11-02-info-embalaje-taller-design.md](docs/superpowers/specs/2026-11-02-info-embalaje-taller-design.md) — diseño de la hoja de info de embalaje para el taller; el plan ejecutado está en `docs/superpowers/plans/2026-11-02-info-embalaje-taller.md`. Las fotos de las hojas que se escribían a mano están en `docs/Info Embalaje Taller/`.
 - [docs/superpowers/specs/2026-11-15-biblioteca-pieles-design.md](docs/superpowers/specs/2026-11-15-biblioteca-pieles-design.md) — diseño de la biblioteca de pieles (`/biblioteca-pieles`): las decisiones del usuario y los límites conocidos.
 - [docs/superpowers/specs/2026-11-23-carga-modelos-en-bateria-design.md](docs/superpowers/specs/2026-11-23-carga-modelos-en-bateria-design.md) — diseño de la carga de modelos en batería (`/carga-modelos`): qué decidió el usuario y qué el asistente; el plan ejecutado está en `docs/superpowers/plans/2026-11-23-carga-modelos-en-bateria.md`.
+- [docs/superpowers/specs/2026-11-24-pantalla-clientes-design.md](docs/superpowers/specs/2026-11-24-pantalla-clientes-design.md) — diseño de la pantalla de clientes (`/clientes`): alta, corrección y eliminación con contraseña.
 - [TODO](TODO) — lista de pendientes que mantiene **el usuario**; consultarla al empezar, no reescribirla por tu cuenta.
 - [SESSION_HANDOFF.md](SESSION_HANDOFF.md) — traspaso de la última sesión ("stop the session" lo regenera, no es un log).
 
@@ -108,7 +109,7 @@ Tres capas de modelo, separadas a propósito (ver ARCHITECTURE.md):
 2. `model/CajaData`, `DestinoData`, `PaletData` — dominio: una caja física por objeto; los servicios trabajan solo contra esto.
 3. `PackingListData` — vocabulario de la plantilla Excel de un cliente concreto.
 
-**Multi-cliente**: `GeneradorPackingListCliente` es la interfaz; `AmiGenerador`/`AmiExcelBuilder`, `ApcExcelBuilder` y `GenericoExcelBuilder` la implementan, y `PackingListGenerationService` despacha según `ClienteConfig.getPlantilla()` (`TipoPlantilla`: AMI, APC, GENERIC). El catálogo de clientes vive en `application.yml` (bloque `packing-list.clientes`): **añadir un cliente de plantilla GENERIC es solo configuración** (nombre-legal + direccion-entrega), sin tocar Java. Igual con las taras: un tamaño de caja nuevo es una línea en `packing-list.taras`.
+**Multi-cliente**: `GeneradorPackingListCliente` es la interfaz; `AmiGenerador`/`AmiExcelBuilder`, `ApcExcelBuilder` y `GenericoExcelBuilder` la implementan, y `PackingListGenerationService` despacha según `ClienteConfig.getPlantilla()` (`TipoPlantilla`: AMI, APC, GENERIC). El catálogo de clientes es `CatalogoClientes`: AMI y APC (los **programados**) siguen en `application.yml` (`packing-list.clientes`) y los de plantilla GENERIC viven en la tabla `cliente` y **se dan de alta desde la pantalla `/clientes`**, sin tocar Java ni el yml (ver `.claude/rules/clientes.md`). Inyectar siempre `CatalogoClientes`, nunca `ClientesProperties`, que solo ve el yml. Las taras igual: se pesan en `/taras`.
 
 **Nombre de los excels de packing list**: APC y GENERIC usan `PKL_<destino>_<factura>.xlsx`, pero **AMI tiene el formato que exige el cliente** y vive en `AmiNombreFichero`: `<fecha envío yyyy.MM.dd>_PUN_<product order>_<referencia>.<color>_<temporada>_<destinación abreviada>.xlsx`. La destinación se abrevia (FRANCE/FRANCIA/PARIS → FR, CHINA, JAPAN) y una destinación desconocida no bloquea: va en mayúsculas y sin espacios. Los campos que falten se omiten en vez de dejar separadores sueltos.
 
@@ -142,6 +143,7 @@ El detalle de cada función vive en un fichero de `.claude/rules/` que **se carg
 | [app-modelos.md](.claude/rules/app-modelos.md) | App de modelos y modificaciones (taller y despacho, PWA en /app/) |
 | [carga-modelos.md](.claude/rules/carga-modelos.md) | Carga de modelos en batería |
 | [biblioteca-pieles.md](.claude/rules/biblioteca-pieles.md) | Biblioteca de pieles |
+| [clientes.md](.claude/rules/clientes.md) | Pantalla de clientes: alta, corrección y eliminación |
 
 Cómo se cruzan: el taller usa los destinos padre de APC, las taras y la memoria de `packing-list.md`; etiquetas y revisión dependen también de `packing-list.md`; corte, carga de modelos y app de modelos escriben en el catálogo (`catalogo.md`). Cada fichero lo dice en su primera línea.
 

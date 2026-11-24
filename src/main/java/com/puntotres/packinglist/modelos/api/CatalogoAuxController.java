@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.modelos.ModelosProperties;
 import com.puntotres.packinglist.modelos.ModelosProperties.TipoCambio;
 import com.puntotres.packinglist.modelos.service.TextosDestino;
@@ -29,11 +29,11 @@ import com.puntotres.packinglist.persistence.TemporadaGuardada;
 @RequestMapping("/api")
 public class CatalogoAuxController {
 
-    private final ClientesProperties clientes;
+    private final CatalogoClientes clientes;
     private final ArchivoTemporadas temporadas;
     private final ModelosProperties props;
 
-    public CatalogoAuxController(ClientesProperties clientes, ArchivoTemporadas temporadas,
+    public CatalogoAuxController(CatalogoClientes clientes, ArchivoTemporadas temporadas,
                                  ModelosProperties props) {
         this.clientes = clientes;
         this.temporadas = temporadas;

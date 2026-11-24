@@ -5,9 +5,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Configuración estática de un cliente cargada desde application.yml
- * (ver {@link ClientesProperties}). Añadir un cliente nuevo de plantilla
- * genérica = añadir su bloque al yml, sin tocar Java.
+ * Configuración de un cliente del catálogo ({@link CatalogoClientes}): la de
+ * AMI y APC sale de application.yml y la de un cliente de plantilla genérica,
+ * de la tabla {@code cliente}, que se edita desde /clientes sin tocar Java.
  *
  * No todos los campos aplican a todas las plantillas: nombreLegal y
  * direccionEntrega los usa la plantilla GENERIC; destinos con dirección
@@ -166,7 +166,8 @@ public class ClienteConfig {
         return Optional.empty();
     }
 
-    static String normalizar(String clave) {
+    /** Clave canónica de un cliente o un destino: mayúsculas y sin espacios a los lados. */
+    public static String normalizar(String clave) {
         return clave.trim().toUpperCase();
     }
 }

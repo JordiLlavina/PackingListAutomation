@@ -35,8 +35,8 @@ import com.puntotres.packinglist.model.PaletData;
  * palet ("PALET n" + peso/medidas) y una fila por caja física.
  *
  * Vale para cualquier cliente nuevo que no tenga plantilla propia: solo
- * hace falta darlo de alta en application.yml (nombreLegal +
- * direccionEntrega) con plantilla GENERIC, sin tocar código.
+ * hace falta darlo de alta en la pantalla /clientes (nombre legal +
+ * dirección de entrega), sin tocar código.
  *
  * A diferencia de la plantilla real del cliente (que colapsa rangos de
  * cajas idénticas en una sola fila, p. ej. "1 - 16"), esta primera versión

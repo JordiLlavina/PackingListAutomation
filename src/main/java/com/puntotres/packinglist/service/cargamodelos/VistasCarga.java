@@ -8,7 +8,7 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.config.CatalogoTaras;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.Etapa;
 import com.puntotres.packinglist.service.cargamodelos.ModeloEnCarga.ColorEnCarga;
@@ -74,10 +74,10 @@ public class VistasCarga {
 
     private final ConstructorLote constructor;
     private final ArchivoTemporadas temporadas;
-    private final ClientesProperties clientes;
+    private final CatalogoClientes clientes;
     private final CatalogoTaras taras;
 
-    public VistasCarga(ConstructorLote constructor, ArchivoTemporadas temporadas, ClientesProperties clientes,
+    public VistasCarga(ConstructorLote constructor, ArchivoTemporadas temporadas, CatalogoClientes clientes,
                        CatalogoTaras taras) {
         this.constructor = constructor;
         this.temporadas = temporadas;

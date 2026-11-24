@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.service.corte.CorteSmsService;
 import com.puntotres.packinglist.service.corte.CorteSmsService.ResultadoSms;
 
@@ -43,20 +43,20 @@ public class CorteSmsController {
     }
 
     private final CorteSmsService servicio;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final CorteSmsEnCurso enCurso;
 
-    public CorteSmsController(CorteSmsService servicio, ClientesProperties clientesProperties,
+    public CorteSmsController(CorteSmsService servicio, CatalogoClientes catalogoClientes,
                               CorteSmsEnCurso enCurso) {
         this.servicio = servicio;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.enCurso = enCurso;
     }
 
     @GetMapping("/documentos-corte/sms")
     public String entrada(Model model) {
         Map<String, OpcionCliente> clientes = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) ->
+        catalogoClientes.getClientes().forEach((clave, config) ->
                 clientes.put(clave, new OpcionCliente(nombreDe(config, clave), servicio.admite(clave))));
         model.addAttribute("clientes", clientes);
         // Arranca en el primero que funciona, no en el primero de la lista; tras
@@ -77,7 +77,7 @@ public class CorteSmsController {
         // Si algo falla, la pantalla vuelve con lo elegido y lo escrito; el fichero hay que volver a elegirlo.
         redirect.addFlashAttribute("clienteElegido", cliente);
         redirect.addFlashAttribute("temporada", temporada);
-        String nombreCliente = clientesProperties.clientePara(cliente)
+        String nombreCliente = catalogoClientes.clientePara(cliente)
                 .map(config -> nombreDe(config, cliente)).orElse(cliente);
         if (!servicio.admite(cliente)) {
             return error(redirect, "Las hojas de corte de SMS de " + nombreCliente + " todavía están en desarrollo");

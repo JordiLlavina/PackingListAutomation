@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.modelos.api.dto.Evento;
 import com.puntotres.packinglist.modelos.api.dto.ModeloFicha;
 import com.puntotres.packinglist.modelos.api.dto.ModeloResumen;
@@ -74,7 +74,7 @@ class ModelosTest {
     private FotosCatalogo fotos;
 
     @Autowired
-    private ClientesProperties clientes;
+    private CatalogoClientes clientes;
 
     @Autowired
     private UsuarioRepository repositorioUsuarios;

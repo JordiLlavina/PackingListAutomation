@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Clientes')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Clientes')}"></header>
+<main>
+    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
+
+    <!-- Alta y corrección en el mismo formulario, arriba del todo: es lo que
+         se viene a hacer aquí. Con ?editar=CLAVE sale cargado con ese cliente. -->
+    <section class="tarjeta" id="formulario">
+        <h3 class="titulo-seccion"
+            th:text="${claveEditada} ? |Corregir ${formulario.nombre}| : 'Añadir un cliente'">Añadir un cliente</h3>
+        <p class="ayuda">
+            Un cliente nuevo usa la plantilla de packing list estándar de Puntotres. Sale en los
+            desplegables de todas las pantallas en cuanto se guarda.
+        </p>
+
+        <form th:action="@{/clientes}" method="post" class="form-cliente">
+            <input type="hidden" name="clave" th:value="${claveEditada}">
+            <div class="campos-cliente">
+                <div>
+                    <label for="nombre">Nombre</label>
+                    <input type="text" id="nombre" name="nombre" maxlength="60" required
+                           placeholder="Paloma Wool" th:value="${formulario.nombre}">
+                    <span class="ayuda">Como sale en los desplegables.</span>
+                </div>
+                <div>
+                    <label for="nombreLegal">Nombre legal</label>
+                    <input type="text" id="nombreLegal" name="nombreLegal" maxlength="200" required
+                           placeholder="PURO PASEO, S.L." th:value="${formulario.nombreLegal}">
+                    <span class="ayuda">El de la empresa, tal cual sale en el packing list.</span>
+                </div>
+                <div class="campo-ancho">
+                    <label for="direccionEntrega">Dirección de entrega</label>
+                    <input type="text" id="direccionEntrega" name="direccionEntrega" maxlength="500" required
+                           placeholder="C/ DEL PROGRES, 4-6; 08850 GAVÀ (BARCELONA)"
+                           th:value="${formulario.direccionEntrega}">
+                    <span class="ayuda">Sale en el packing list en una sola celda; las líneas se separan con «;».</span>
+                </div>
+                <div>
+                    <label for="placeholderTemporada">Temporada de ejemplo <span class="opcional">(opcional)</span></label>
+                    <input type="text" id="placeholderTemporada" name="placeholderTemporada" maxlength="20"
+                           placeholder="H26" th:value="${formulario.placeholderTemporada}">
+                    <span class="ayuda">La pista gris del campo temporada.</span>
+                </div>
+                <div>
+                    <label for="etiquetaPedido">Cómo llama a su nº de pedido <span class="opcional">(opcional)</span></label>
+                    <input type="text" id="etiquetaPedido" name="etiquetaPedido" maxlength="60"
+                           placeholder="Nº pedido" th:value="${formulario.etiquetaPedido}">
+                    <span class="ayuda">Sin rellenar, «Nº pedido».</span>
+                </div>
+            </div>
+            <button type="submit" th:text="${claveEditada} ? 'Guardar' : 'Añadir'">Añadir</button>
+            <a class="boton neutro" th:if="${claveEditada}" th:href="@{/clientes}">Cancelar</a>
+        </form>
+    </section>
+
+    <section class="tarjeta">
+        <h3 class="titulo-seccion">Clientes</h3>
+        <table class="tabla-clientes">
+            <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Nombre legal</th>
+                <th>Dirección de entrega</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- AMI y APC: su packing list es código, así que ni se corrigen ni
+                 se eliminan desde aquí. -->
+            <tr th:each="entrada : ${programados}">
+                <td th:text="${entrada.value.nombre}">AMI</td>
+                <td colspan="2" class="ayuda">Plantilla propia del cliente</td>
+                <td></td>
+            </tr>
+            <tr th:each="cliente : ${guardados}">
+                <td th:text="${cliente.nombre}">Paloma Wool</td>
+                <td th:text="${cliente.nombreLegal}">PURO PASEO, S.L.</td>
+                <td th:text="${cliente.direccionEntrega}">GRUPO SEVICA</td>
+                <td class="acciones-cliente">
+                    <a class="boton secundario boton-fila"
+                       th:href="@{/clientes(editar=${cliente.clave})} + '#formulario'">Corregir</a>
+                    <button type="button" class="secundario boton-fila" th:unless="${bloqueos[cliente.clave]}"
+                            th:attr="data-clave=${cliente.clave}, data-nombre=${cliente.nombre}"
+                            data-eliminar>Eliminar</button>
+                    <!-- Con algo guardado no se elimina: se dice qué, para que no
+                         parezca que falta el botón por error. -->
+                    <span class="ayuda bloqueo-cliente" th:if="${bloqueos[cliente.clave]}"
+                          th:text="|No se puede eliminar: tiene ${bloqueos[cliente.clave]}.|"></span>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <p class="menu-ajustes">
+        <a class="boton neutro" th:href="@{/menu}">← Volver al menú</a>
+    </p>
+
+    <!-- Eliminar pide la contraseña. Solo la comprueba el servidor, para que
+         no quede escrita en el código de la página. -->
+    <dialog class="emergente" id="dialogoEliminar">
+        <form th:action="@{/clientes/eliminar}" method="post">
+            <h3>Eliminar <span id="nombreEliminar"></span></h3>
+            <p class="ayuda">Para eliminar el cliente, escribe la contraseña.</p>
+            <input type="hidden" name="clave" id="claveEliminar">
+            <label for="contrasenaEliminar">Contraseña</label>
+            <input type="password" id="contrasenaEliminar" name="contrasena" autocomplete="off" required>
+            <div class="acciones-emergente">
+                <button type="button" class="secundario" id="cancelarEliminar">Cancelar</button>
+                <button type="submit">Eliminar</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script>
+        (function () {
+            const dialogo = document.getElementById('dialogoEliminar');
+            const contrasena = document.getElementById('contrasenaEliminar');
+            document.querySelectorAll('[data-eliminar]').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    document.getElementById('claveEliminar').value = boton.dataset.clave;
+                    document.getElementById('nombreEliminar').textContent = boton.dataset.nombre;
+                    contrasena.value = '';
+                    dialogo.showModal();
+                    contrasena.focus();
+                });
+            });
+            document.getElementById('cancelarEliminar').addEventListener('click', function () {
+                dialogo.close();
+            });
+        })();
+    </script>
+</main>
+</body>
+</html>

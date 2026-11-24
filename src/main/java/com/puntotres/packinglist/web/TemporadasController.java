@@ -19,7 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.FicheroExcel;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
@@ -54,13 +54,13 @@ public class TemporadasController {
     static final String ROTULO_PRODUCCION = "Excel de Producción de Puntotres";
 
     private final ArchivoTemporadas archivo;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final CatalogoModelos catalogo;
 
-    public TemporadasController(ArchivoTemporadas archivo, ClientesProperties clientesProperties,
+    public TemporadasController(ArchivoTemporadas archivo, CatalogoClientes catalogoClientes,
                                 CatalogoModelos catalogo) {
         this.archivo = archivo;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.catalogo = catalogo;
     }
 
@@ -72,7 +72,7 @@ public class TemporadasController {
     @GetMapping("/temporadas")
     public String temporadas(@RequestParam(required = false) Long editar, Model model) {
         model.addAttribute("temporadas", archivo.todas());
-        model.addAttribute("clientes", clientesProperties.getClientes());
+        model.addAttribute("clientes", catalogoClientes.getClientes());
         model.addAttribute("conPedido", conPedidoPorCliente());
         archivo.todas().stream()
                 .filter(temporada -> temporada.id().equals(editar))
@@ -93,7 +93,7 @@ public class TemporadasController {
                           @RequestParam(required = false) MultipartFile pedido,
                           @RequestParam(required = false) MultipartFile produccion,
                           RedirectAttributes redirect) {
-        ClienteConfig config = clientesProperties.clientePara(cliente).orElse(null);
+        ClienteConfig config = catalogoClientes.clientePara(cliente).orElse(null);
         if (config == null) {
             return error(redirect, "Cliente desconocido: " + cliente + ".", id);
         }
@@ -193,7 +193,7 @@ public class TemporadasController {
     /** Clave de cliente → si trabaja con excel de pedido, para que la pantalla pinte el obligatorio. */
     private Map<String, Boolean> conPedidoPorCliente() {
         Map<String, Boolean> conPedido = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> conPedido.put(clave, config.isPedidoCliente()));
+        catalogoClientes.getClientes().forEach((clave, config) -> conPedido.put(clave, config.isPedidoCliente()));
         return conPedido;
     }
 

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.ClientesProperties;
 import com.puntotres.packinglist.config.TaraProperties;
@@ -29,6 +30,9 @@ class PackingListApplicationTest {
 
     @Autowired
     private ClientesProperties clientes;
+
+    @Autowired
+    private CatalogoClientes catalogo;
 
     /**
      * Las taras son DATOS DEL ALMACÉN: entran tamaños de caja nuevos y los
@@ -105,14 +109,34 @@ class PackingListApplicationTest {
         // Solo APC y AMI piden el excel de pedido en la pantalla de entrada.
         assertTrue(apc.isPedidoCliente());
         assertTrue(clientes.clientePara("AMI").orElseThrow().isPedidoCliente());
-        assertFalse(clientes.clientePara("ACKERMANN").orElseThrow().isPedidoCliente());
 
-        ClienteConfig sonia = clientes.clientePara("SONIA RYKIEL").orElseThrow();
+        // En el yml solo quedan los programados: los genéricos viven en la
+        // base de datos (V12) y se gestionan desde /clientes.
+        assertEquals(List.of("AMI", "APC"), List.copyOf(clientes.getClientes().keySet()));
+    }
+
+    /**
+     * Los siete clientes genéricos que había en el yml los trae la migración
+     * V12, y el catálogo que manda en la aplicación los junta detrás de los
+     * programados. Si la migración no los trajera, sus temporadas, modelos y
+     * colores ya guardados se quedarían sin cliente en los desplegables.
+     */
+    @Test
+    void elCatalogoJuntaLosProgramadosDelYmlConLosGenericosDeLaBaseDeDatos() {
+        assertEquals(List.of("AMI", "APC"), catalogo.getClientes().keySet().stream().limit(2).toList());
+        for (String clave : List.of("ACKERMANN", "DROLE DU MONSIEUR", "KAMI", "LGN", "PALOMA WOOL",
+                "PAUL & JOE", "SONIA RYKIEL")) {
+            assertTrue(catalogo.clientePara(clave).isPresent(), clave);
+        }
+
+        ClienteConfig sonia = catalogo.clientePara("sonia rykiel").orElseThrow();
         assertEquals(TipoPlantilla.GENERIC, sonia.getPlantilla());
+        assertEquals("Sonia Rykiel", sonia.getNombre());
         assertEquals("SONIA RYKIEL INTERNATIONAL", sonia.getNombreLegal());
         assertTrue(sonia.getDireccionEntrega().contains("GROBBENDONK"));
-
-        // 1 AMI + 1 APC + 7 genéricos.
-        assertEquals(9, clientes.getClientes().size());
+        assertFalse(sonia.isPedidoCliente());
+        assertEquals("Nº pedido", sonia.getEtiquetaPedido());
+        assertTrue(catalogo.clientePara("ACKERMANN").orElseThrow().getDireccionEntrega().contains("Lüneburg"),
+                "los acentos de la migración llegan bien");
     }
 }

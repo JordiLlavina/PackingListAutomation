@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.service.etiquetasarticulo.EtiquetasSmsService;
 import com.puntotres.packinglist.service.etiquetasarticulo.EtiquetasSmsService.ResultadoEtiquetasSms;
 
@@ -40,20 +40,20 @@ public class EtiquetasSmsController {
     }
 
     private final EtiquetasSmsService servicio;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final EtiquetasSmsEnCurso enCurso;
 
-    public EtiquetasSmsController(EtiquetasSmsService servicio, ClientesProperties clientesProperties,
+    public EtiquetasSmsController(EtiquetasSmsService servicio, CatalogoClientes catalogoClientes,
                                   EtiquetasSmsEnCurso enCurso) {
         this.servicio = servicio;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.enCurso = enCurso;
     }
 
     @GetMapping("/etiquetas-articulo-sms")
     public String entrada(Model model) {
         Map<String, OpcionCliente> clientes = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) ->
+        catalogoClientes.getClientes().forEach((clave, config) ->
                 clientes.put(clave, new OpcionCliente(nombreDe(config, clave), servicio.admite(clave))));
         model.addAttribute("clientes", clientes);
         // Arranca en el primero que funciona, no en el primero de la lista; tras
@@ -74,7 +74,7 @@ public class EtiquetasSmsController {
         // Si algo falla, la pantalla vuelve con lo elegido y lo escrito; el fichero hay que volver a elegirlo.
         redirect.addFlashAttribute("clienteElegido", cliente);
         redirect.addFlashAttribute("temporada", temporada);
-        String nombreCliente = clientesProperties.clientePara(cliente)
+        String nombreCliente = catalogoClientes.clientePara(cliente)
                 .map(config -> nombreDe(config, cliente)).orElse(cliente);
         if (!servicio.admite(cliente)) {
             return error(redirect, "Las etiquetas de SMS de " + nombreCliente + " todavía están en desarrollo");

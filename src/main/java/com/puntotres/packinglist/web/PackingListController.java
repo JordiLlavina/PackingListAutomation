@@ -35,7 +35,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.CajaData;
@@ -98,7 +98,7 @@ public class PackingListController {
     private final PackingPuntotresDocBuilder constructorPackingPuntotres;
     private final PedidoCompletionService completadorPedidos;
     private final EtiquetasGenerationService etiquetasService;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final CatalogoTaras catalogoTaras;
     private final ObjectMapper mapper;
     private final ArchivoTemporadas archivoTemporadas;
@@ -115,7 +115,7 @@ public class PackingListController {
                                  PackingPuntotresDocBuilder constructorPackingPuntotres,
                                  PedidoCompletionService completadorPedidos,
                                  EtiquetasGenerationService etiquetasService,
-                                 ClientesProperties clientesProperties,
+                                 CatalogoClientes catalogoClientes,
                                  CatalogoTaras catalogoTaras,
                                  ObjectMapper mapper,
                                  ArchivoTemporadas archivoTemporadas,
@@ -131,7 +131,7 @@ public class PackingListController {
         this.constructorPackingPuntotres = constructorPackingPuntotres;
         this.completadorPedidos = completadorPedidos;
         this.etiquetasService = etiquetasService;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.catalogoTaras = catalogoTaras;
         this.mapper = mapper;
         this.archivoTemporadas = archivoTemporadas;
@@ -183,7 +183,7 @@ public class PackingListController {
             return "entrada";
         }
 
-        ClienteConfig cliente = clientesProperties.clientePara(envioForm.getCliente()).orElse(null);
+        ClienteConfig cliente = catalogoClientes.clientePara(envioForm.getCliente()).orElse(null);
         if (cliente == null) {
             errores.rejectValue("cliente", "cliente.desconocido", "Cliente desconocido: " + envioForm.getCliente());
             anadirAtributosDeClientes(model);
@@ -395,7 +395,7 @@ public class PackingListController {
         aplicarEdicionesYReinferir(revisionForm);
 
         DatosEnvio cabecera = envioEnCurso.getCabecera();
-        String nombreCliente = clientesProperties.clientePara(cabecera.getClaveCliente())
+        String nombreCliente = catalogoClientes.clientePara(cabecera.getClaveCliente())
                 .map(ClienteConfig::getNombre)
                 .orElse(cabecera.getClaveCliente());
         List<PackingPuntotresDocBuilder.Destino> destinos = envioEnCurso.getImportado().getDestinos()
@@ -452,7 +452,7 @@ public class PackingListController {
         VolcadoErpData volcado;
         try {
             DatosEnvio cabecera = envioEnCurso.getCabecera();
-            ClienteConfig cliente = clientesProperties.clientePara(cabecera.getClaveCliente())
+            ClienteConfig cliente = catalogoClientes.clientePara(cabecera.getClaveCliente())
                     .orElseThrow(() -> new IllegalStateException(
                             "Cliente desconocido: " + cabecera.getClaveCliente()));
             // El MODÈLE de APC sale de la Désignation del excel de pedido. Se

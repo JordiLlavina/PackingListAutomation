@@ -21,7 +21,7 @@ import javax.imageio.ImageIO;
 
 import org.springframework.stereotype.Service;
 
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.modelos.api.dto.CandidataImagen;
 import com.puntotres.packinglist.modelos.service.ImagenesDePdf;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
@@ -84,14 +84,14 @@ public class ConstructorLote {
     private final PielRepository pieles;
     private final TablaColores tablaColores;
     private final ArchivoTemporadas temporadas;
-    private final ClientesProperties clientes;
+    private final CatalogoClientes clientes;
     private final LectorOrigenes lectores;
     private final ConversorFotos conversor;
     private final ImagenesDePdf imagenesDePdf;
 
     public ConstructorLote(CatalogoModelos catalogo, FotosCatalogo fotosCatalogo, ModeloRepository modelos,
                            PielRepository pieles, TablaColores tablaColores, ArchivoTemporadas temporadas,
-                           ClientesProperties clientes, LectorOrigenes lectores, ConversorFotos conversor,
+                           CatalogoClientes clientes, LectorOrigenes lectores, ConversorFotos conversor,
                            ImagenesDePdf imagenesDePdf) {
         this.catalogo = catalogo;
         this.fotosCatalogo = fotosCatalogo;

@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.config.NumeracionCajas;
 import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.model.EnvioInput;
@@ -48,14 +48,14 @@ import com.puntotres.packinglist.model.EnvioInput;
 public class GeneradorPackingTaller {
 
     private final ReglasTallerProperties reglas;
-    private final ClientesProperties clientes;
+    private final CatalogoClientes clientes;
     private final RepartoDestinaciones reparto;
     private final AgrupadorCajas agrupador;
     private final ApiladorPalets apilador;
     /** Para repartir el peso declarado entre cartón y mercancía. */
     private final CatalogoTaras taras;
 
-    public GeneradorPackingTaller(ReglasTallerProperties reglas, ClientesProperties clientes,
+    public GeneradorPackingTaller(ReglasTallerProperties reglas, CatalogoClientes clientes,
                                   RepartoDestinaciones reparto, AgrupadorCajas agrupador,
                                   ApiladorPalets apilador, CatalogoTaras taras) {
         this.reglas = reglas;

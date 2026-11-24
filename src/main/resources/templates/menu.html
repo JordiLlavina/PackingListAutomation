@@ -102,11 +102,27 @@
             </ul>
         </a>
 
+        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 3h9l5 5v13H5z"/>
+                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
+                </svg>
+                Escandallos para ClickUp
+            </h2>
+            <ul class="menu-entrada">
+                <li>Pasa Escandallos ICSUITE → ClickUp</li>
+            </ul>
+        </a>
+
         <!-- Los ajustes no son un flujo con pantallas, sino un dato que se
              guarda una vez y vale para todos los envíos, así que van en paneles
-             pequeños y no en una tarjeta. En la columna caben cinco (la
-             rejilla de .menu-paneles tiene cinco filas, y las tarjetas grandes
-             son más altas para que quepan); un sexto la reparte.
+             pequeños y no en una tarjeta, y al final de la rejilla, abajo a la
+             derecha (decisión del usuario): primero lo que se viene a hacer.
+             En la columna caben cinco (la rejilla de .menu-paneles tiene cinco
+             filas, y las tarjetas grandes son más altas para que quepan); un
+             sexto la reparte, por eso Clientes va en el pie, debajo.
              Los comentarios de embalaje no tienen panel: se editan desde
              /info-embalaje, que es donde se usan. -->
         <div class="menu-paneles">
@@ -161,19 +177,19 @@
                 <span class="menu-panel-titulo">Taras de los cartones</span>
             </a>
         </div>
+    </div>
 
-        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
-            <h2 class="menu-titulo">
-                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M5 3h9l5 5v13H5z"/>
-                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
-                </svg>
-                Escandallos para ClickUp
-            </h2>
-            <ul class="menu-entrada">
-                <li>Pasa Escandallos ICSUITE → ClickUp</li>
-            </ul>
+    <!-- El pie: Clientes, debajo de los cinco paneles y del alto de uno. Es
+         un ajuste más, pero se toca menos que los de arriba. -->
+    <div class="menu-tarjetas menu-principal menu-pie">
+        <a class="menu-panel" th:href="@{/clientes}">
+            <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="9" cy="8" r="3.2"/>
+                <path d="M3 19.5c.6-3.3 3-5.2 6-5.2s5.4 1.9 6 5.2"/>
+                <path d="M15.5 5.2a3 3 0 0 1 0 5.6M17.5 14.6c1.7.6 2.9 2.4 3.3 4.9"/>
+            </svg>
+            <span class="menu-panel-titulo">Clientes</span>
         </a>
     </div>
 </main>

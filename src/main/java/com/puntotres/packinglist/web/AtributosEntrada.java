@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.ui.Model;
 
 import com.puntotres.packinglist.config.CatalogoTaras;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 
 /**
@@ -22,19 +22,19 @@ import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 @Component
 public class AtributosEntrada {
 
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final CatalogoTaras catalogoTaras;
     private final ArchivoTemporadas archivoTemporadas;
 
-    public AtributosEntrada(ClientesProperties clientesProperties, CatalogoTaras catalogoTaras,
+    public AtributosEntrada(CatalogoClientes catalogoClientes, CatalogoTaras catalogoTaras,
                             ArchivoTemporadas archivoTemporadas) {
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.catalogoTaras = catalogoTaras;
         this.archivoTemporadas = archivoTemporadas;
     }
 
     public void anadir(Model model) {
-        model.addAttribute("clientes", clientesProperties.getClientes());
+        model.addAttribute("clientes", catalogoClientes.getClientes());
         // Tamaños de caja con tara conocida, para el datalist del modo
         // FORMULARIO (evita teclear un tamaño que luego no tendría tara).
         model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
@@ -44,7 +44,7 @@ public class AtributosEntrada {
 
     private Map<String, Map<String, String>> clientesJs() {
         Map<String, Map<String, String>> clientesJs = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> {
+        catalogoClientes.getClientes().forEach((clave, config) -> {
             Map<String, String> datos = new LinkedHashMap<>();
             datos.put("plantilla", config.getPlantilla().name());
             datos.put("placeholderTemporada",

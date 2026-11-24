@@ -825,12 +825,18 @@ ul.menu-entrada {
    de la celda. Los paneles pequeños comparten celda de cuatro en cuatro y van
    más justos para no obligar a crecer a la fila entera. */
 .menu-principal {
+    /* Alto mínimo de una fila y huecos, con nombre porque el pie del menú
+       (.menu-pie) los necesita para que su panel mida lo mismo que uno de los
+       cinco de arriba. */
+    --menu-fila: clamp(15rem, 9rem + 7.5vw, 21rem);
+    --menu-hueco: clamp(0.9rem, 0.3rem + 0.8vw, 1.5rem);
+    --menu-hueco-paneles: clamp(0.6rem, 0.2rem + 0.5vw, 0.9rem);
     grid-template-columns: repeat(4, minmax(0, 1fr));
     /* Las filas, más altas de lo que pide el texto de una tarjeta: en la celda
        de los paneles pequeños tienen que caber cinco. */
-    grid-auto-rows: minmax(clamp(15rem, 9rem + 7.5vw, 21rem), 1fr);
+    grid-auto-rows: minmax(var(--menu-fila), 1fr);
     align-items: stretch;
-    gap: clamp(0.9rem, 0.3rem + 0.8vw, 1.5rem);
+    gap: var(--menu-hueco);
     /* El margen lateral de las tarjetas grandes, con nombre porque los
        paneles pequeños lo necesitan para sangrar lo mismo que ellas. */
     --menu-relleno: clamp(1.1rem, 0.4rem + 1vw, 1.9rem);
@@ -861,7 +867,7 @@ ul.menu-entrada {
     margin-left: 10%;
 }
 .menu-principal ul.menu-entrada { padding-left: 1.3em; line-height: 1.5; }
-.menu-principal > .menu-paneles { margin-top: 0; gap: clamp(0.6rem, 0.2rem + 0.5vw, 0.9rem); }
+.menu-principal > .menu-paneles { margin-top: 0; gap: var(--menu-hueco-paneles); }
 .menu-principal .menu-panel {
     padding: 0.5em 0.9em;
     /* El icono, a la misma distancia del borde que el de una tarjeta grande:
@@ -873,6 +879,21 @@ ul.menu-entrada {
     font-size: clamp(0.92rem, 0.5rem + 0.5vw, 1.2rem);
 }
 .menu-principal .menu-panel-icono { width: 1.3em; height: 1.3em; }
+
+/* El pie del menú: una fila aparte, debajo de la rejilla, con el panel de
+   Clientes en la última columna, justo debajo de los cinco paneles
+   pequeños y del alto de uno de ellos (una quinta parte de la celda, menos
+   sus huecos). Es otra rejilla y no una fila más de .menu-principal porque
+   allí todas las filas miden lo de una tarjeta grande. Hereda sus columnas
+   y sus @media, así que en dos columnas sigue debajo de los paneles. */
+.menu-principal.menu-pie {
+    grid-auto-rows: auto;
+    margin-top: var(--menu-hueco);
+}
+.menu-pie > .menu-panel {
+    grid-column: -2 / -1;
+    height: calc((var(--menu-fila) - 4 * var(--menu-hueco-paneles)) / 5);
+}
 
 /* El menú usa casi todo el ancho de la pantalla, con menos margen a los
    lados que el resto de pantallas (72rem), y la cabecera le sigue para que
@@ -2247,3 +2268,29 @@ dialog.emergente-ficha { width: min(64rem, 94vw); max-width: none; }
 .bateria .tabla-colores-carga td input[type="text"] { width: 100%; }
 .bateria .tabla-colores-carga td input.color-codigo { width: 6rem; }
 .bateria button.bateria-modelo[data-estado="PENDIENTE"][data-gris]:not(.elegido) { background: var(--fondo-suave); }
+
+/* --- Pantalla de clientes ------------------------------------------------
+   El formulario en rejilla de dos columnas; la dirección, que es larga,
+   ocupa las dos. */
+.campos-cliente {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 1.4rem;
+}
+.campos-cliente .campo-ancho { grid-column: 1 / -1; }
+.campos-cliente .ayuda { display: block; }
+.campos-cliente .opcional { font-weight: 400; color: var(--texto-tenue); }
+@media (max-width: 36rem) {
+    .campos-cliente { grid-template-columns: minmax(0, 1fr); }
+}
+.tabla-clientes td { vertical-align: middle; }
+.acciones-cliente { white-space: nowrap; text-align: right; }
+.acciones-cliente .boton-fila { margin: 0 0 0 0.4rem; padding: 0.35rem 0.8rem; font-size: 0.9rem; }
+.acciones-cliente .bloqueo-cliente { display: inline-block; max-width: 18rem; white-space: normal; text-align: left; margin: 0; }
+dialog.emergente input[type="password"] {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+}

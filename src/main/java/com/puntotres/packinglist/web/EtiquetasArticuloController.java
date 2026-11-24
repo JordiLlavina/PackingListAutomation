@@ -23,7 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.etiquetasarticulo.EtiquetasArticuloGenerationService;
@@ -73,17 +73,17 @@ public class EtiquetasArticuloController {
             "el fichero no tiene el formato esperado: revisa que sea el excel de pedido del cliente";
 
     private final EtiquetasArticuloGenerationService etiquetasArticuloService;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final EtiquetasArticuloEnCurso enCurso;
     private final ArchivoTemporadas archivoTemporadas;
 
     public EtiquetasArticuloController(
             EtiquetasArticuloGenerationService etiquetasArticuloService,
-            ClientesProperties clientesProperties,
+            CatalogoClientes catalogoClientes,
             EtiquetasArticuloEnCurso enCurso,
             ArchivoTemporadas archivoTemporadas) {
         this.etiquetasArticuloService = etiquetasArticuloService;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.enCurso = enCurso;
         this.archivoTemporadas = archivoTemporadas;
     }
@@ -228,7 +228,7 @@ public class EtiquetasArticuloController {
      */
     private Map<String, Map<String, String>> vistaDeClientes() {
         Map<String, Map<String, String>> vista = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> {
+        catalogoClientes.getClientes().forEach((clave, config) -> {
             GeneradorEtiquetasArticuloCliente generador =
                     etiquetasArticuloService.generadorPara(clave).orElse(null);
             Map<String, String> datos = new LinkedHashMap<>();

@@ -32,7 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.modelos.service.ImagenesDePdf;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
@@ -102,7 +102,7 @@ public class CargaModelosController {
     }
 
     private final CargaModelosEnCurso enCurso;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final ArchivoTemporadas temporadas;
     private final LectorOrigenes lectores;
     private final ConstructorLote constructor;
@@ -110,12 +110,12 @@ public class CargaModelosController {
     private final VistasCarga vistas;
     private final ImagenesDePdf imagenesDePdf;
 
-    public CargaModelosController(CargaModelosEnCurso enCurso, ClientesProperties clientesProperties,
+    public CargaModelosController(CargaModelosEnCurso enCurso, CatalogoClientes catalogoClientes,
                                   ArchivoTemporadas temporadas, LectorOrigenes lectores,
                                   ConstructorLote constructor, CargadorModelos cargador, VistasCarga vistas,
                                   ImagenesDePdf imagenesDePdf) {
         this.enCurso = enCurso;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.temporadas = temporadas;
         this.lectores = lectores;
         this.constructor = constructor;
@@ -134,7 +134,7 @@ public class CargaModelosController {
     public String origen(@RequestParam(required = false) String cliente,
                          @RequestParam(required = false) Long temporada, Model model) {
         Map<String, OpcionCliente> clientes = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> clientes.put(clave, new OpcionCliente(
+        catalogoClientes.getClientes().forEach((clave, config) -> clientes.put(clave, new OpcionCliente(
                 config.getNombre(), lectores.admite(OrigenCarga.TEMPORADA, clave),
                 lectores.admite(OrigenCarga.SMS, clave))));
         model.addAttribute("clientes", clientes);
@@ -168,7 +168,7 @@ public class CargaModelosController {
             return error(redirect, "Elige de dónde salen los modelos.", OrigenCarga.TEMPORADA.name(), cliente,
                     temporadaId);
         }
-        ClienteConfig config = clientesProperties.clientePara(cliente).orElse(null);
+        ClienteConfig config = catalogoClientes.clientePara(cliente).orElse(null);
         if (config == null) {
             return error(redirect, "Cliente desconocido: " + cliente + ".", origen, cliente, temporadaId);
         }
@@ -228,7 +228,7 @@ public class CargaModelosController {
                                             @RequestParam(required = false) Long temporadaId,
                                             @RequestParam(required = false) MultipartFile excel) throws IOException {
         OrigenCarga elOrigen = OrigenCarga.valueOf(origen);
-        ClienteConfig config = clientesProperties.clientePara(cliente).orElseThrow(
+        ClienteConfig config = catalogoClientes.clientePara(cliente).orElseThrow(
                 () -> new IllegalArgumentException("Cliente desconocido: " + cliente));
         if (!elOrigen.conExcel()) {
             throw new IllegalArgumentException("El esqueleto sale de un excel: en este origen la carpeta la haces tú");

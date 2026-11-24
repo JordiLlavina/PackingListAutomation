@@ -17,7 +17,7 @@ public class DatosEnvio {
     private String fechaFactura;
     private String fechaEnvio;
     // Cliente seleccionado en la pantalla de entrada (clave del catálogo
-    // de ClientesProperties) y ciudad/país del proveedor, editables solo
+    // de CatalogoClientes) y ciudad/país del proveedor, editables solo
     // para clientes AMI (por defecto BADALONA/SPAIN).
     private String claveCliente;
     private String ciudadProveedor;

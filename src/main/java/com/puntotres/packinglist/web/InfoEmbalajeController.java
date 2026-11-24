@@ -24,7 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.puntotres.packinglist.config.ClienteConfig;
-import com.puntotres.packinglist.config.ClientesProperties;
+import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.model.DatosHojaEmbalaje;
 import com.puntotres.packinglist.persistence.ArchivoComentariosEmbalaje;
 import com.puntotres.packinglist.persistence.ArchivoHojasEmbalaje;
@@ -67,20 +67,20 @@ public class InfoEmbalajeController {
     private final InfoEmbalajeDocBuilder docBuilder;
     private final FotosCatalogo fotos;
     private final ArchivoTemporadas temporadas;
-    private final ClientesProperties clientesProperties;
+    private final CatalogoClientes catalogoClientes;
     private final EmbalajeEnCurso enCurso;
 
     public InfoEmbalajeController(PedidoEmbalajeService pedidoEmbalaje, ArchivoHojasEmbalaje archivo,
                                   ArchivoComentariosEmbalaje comentarios, InfoEmbalajeDocBuilder docBuilder,
                                   FotosCatalogo fotos, ArchivoTemporadas temporadas,
-                                  ClientesProperties clientesProperties, EmbalajeEnCurso enCurso) {
+                                  CatalogoClientes catalogoClientes, EmbalajeEnCurso enCurso) {
         this.pedidoEmbalaje = pedidoEmbalaje;
         this.archivo = archivo;
         this.comentarios = comentarios;
         this.docBuilder = docBuilder;
         this.fotos = fotos;
         this.temporadas = temporadas;
-        this.clientesProperties = clientesProperties;
+        this.catalogoClientes = catalogoClientes;
         this.enCurso = enCurso;
     }
 
@@ -357,7 +357,7 @@ public class InfoEmbalajeController {
      */
     private Map<String, Map<String, String>> vistaDeClientes() {
         Map<String, Map<String, String>> vista = new LinkedHashMap<>();
-        clientesProperties.getClientes().forEach((clave, config) -> {
+        catalogoClientes.getClientes().forEach((clave, config) -> {
             Map<String, String> datos = new LinkedHashMap<>();
             datos.put("nombre", nombreDe(config, clave));
             datos.put("disponible", String.valueOf(pedidoEmbalaje.soporta(clave)));
@@ -369,7 +369,7 @@ public class InfoEmbalajeController {
     }
 
     private String nombreDe(String clave) {
-        ClienteConfig config = clientesProperties.getClientes().get(clave);
+        ClienteConfig config = catalogoClientes.getClientes().get(clave);
         return config == null ? clave : nombreDe(config, clave);
     }
 

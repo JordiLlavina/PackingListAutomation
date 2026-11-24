@@ -146,26 +146,20 @@ Los excels generados se sirven al navegador y se descargan a la carpeta de desca
 
 **Antes de arrancar por primera vez la versión con la app de modelos, copiar la carpeta `datos/`**: su migración (la V4) rehace la tabla `modelo` y recoloca sus hijos, y H2 confirma cada cambio de esquema según lo hace, así que un fallo a medias no se deshace solo.
 
-### 4. Cambiar taras o clientes sin recompilar
+### 4. Cambiar la configuración sin recompilar
 
 El `application.yml` **sigue estando dentro del jar** y sigue siendo el que manda por defecto: el jar arranca solo, sin ningún fichero al lado. Lo que hace Spring Boot es leer *además* un `application.yml` que esté **junto al jar** (o en una subcarpeta `config/`) y **fusionar los dos, propiedad a propiedad**, ganando el de fuera. No es "o uno u otro": el de fuera no sustituye al de dentro, solo añade lo que no está y pisa lo que repite.
 
-Así se añade una tara o un cliente en el ordenador donde corre la aplicación sin volver a compilar, con un fichero que solo tenga lo nuevo:
+**Los clientes de plantilla genérica ya no van aquí**: se dan de alta, se corrigen y se eliminan en la pantalla **Clientes** del menú (`/clientes`), y viven en la base de datos. En el yml solo quedan AMI y APC, que tienen su packing list programado. Las taras también se pesan en su pantalla (`/taras`); el yml solo las siembra la primera vez.
+
+Lo que sí sigue en el yml se cambia sin volver a compilar con un fichero que solo tenga lo nuevo, por ejemplo los separadores de cartón:
 
 ```yaml
 # application.yml junto al jar: solo lo que se añade o se cambia
 packing-list:
-  taras:
-    "[50x40x30]": 0.92
-  clientes:
-    "[CLIENTE NUEVO]":
-      nombre: Cliente Nuevo
-      plantilla: GENERIC
-      nombre-legal: CLIENTE NUEVO SL
-      direccion-entrega: Calle Tal 1; 08000 Barcelona, Spain
+  separadores-carton:
+    peso-kg: 0.09
 ```
-
-Con eso, el desplegable de clientes y el de tamaños salen con los internos **más** los añadidos (los de fuera aparecen primero).
 
 Y para **cambiar** algo que ya existe basta con nombrar el campo concreto: un fichero externo con solo
 
@@ -222,7 +216,7 @@ src/main/resources/
     templates/, static/              Vistas Thymeleaf y CSS
 ```
 
-**Multi-cliente**: `GeneradorPackingListCliente` es la interfaz; `AmiExcelBuilder`, `ApcExcelBuilder` y `GenericoExcelBuilder` la implementan y `PackingListGenerationService` despacha según la plantilla del cliente. **Añadir un cliente de plantilla GENERIC es solo configuración** en `application.yml` (nombre-legal + direccion-entrega), sin tocar Java.
+**Multi-cliente**: `GeneradorPackingListCliente` es la interfaz; `AmiExcelBuilder`, `ApcExcelBuilder` y `GenericoExcelBuilder` la implementan y `PackingListGenerationService` despacha según la plantilla del cliente. **Añadir un cliente de plantilla GENERIC se hace en la pantalla `/clientes`** (nombre legal + dirección de entrega), sin tocar Java ni el yml.
 
 ## Formato del JSON de envío
 
