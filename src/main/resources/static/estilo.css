@@ -826,14 +826,19 @@ ul.menu-entrada {
    más justos para no obligar a crecer a la fila entera. */
 .menu-principal {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    grid-auto-rows: 1fr;
+    /* Las filas, más altas de lo que pide el texto de una tarjeta: en la celda
+       de los paneles pequeños tienen que caber cinco. */
+    grid-auto-rows: minmax(clamp(15rem, 9rem + 7.5vw, 21rem), 1fr);
     align-items: stretch;
     gap: clamp(0.9rem, 0.3rem + 0.8vw, 1.5rem);
+    /* El margen lateral de las tarjetas grandes, con nombre porque los
+       paneles pequeños lo necesitan para sangrar lo mismo que ellas. */
+    --menu-relleno: clamp(1.1rem, 0.4rem + 1vw, 1.9rem);
 }
 .menu-principal > .menu-tarjeta {
     height: auto;
     margin-top: 0;
-    padding: clamp(1.05rem, 0.4rem + 0.9vw, 1.8rem) clamp(1.1rem, 0.4rem + 1vw, 1.9rem);
+    padding: clamp(1.05rem, 0.4rem + 0.9vw, 1.8rem) var(--menu-relleno);
 }
 /* Letra e iconos crecen con el ancho de la ventana: en un monitor de 21"
    (1920 px) el menú se quedaba pequeño en medio de la pantalla. */
@@ -841,13 +846,29 @@ ul.menu-entrada {
     font-size: clamp(1.1rem, 0.55rem + 0.7vw, 1.5rem);
     gap: 0.5em;
     margin-bottom: 0.5em;
+    /* El título (icono y texto) va corrido a la derecha, un décimo del ancho
+       de la tarjeta, para que no quede pegado al borde izquierdo. Es sangría
+       y no `text-align: center`: centrado, la segunda línea de un título
+       largo quedaría centrada bajo la primera en vez de alineada con ella. */
+    padding-left: 10%;
 }
 .menu-principal .menu-icono { width: 1.2em; height: 1.2em; }
-.menu-principal .menu-entrada { font-size: clamp(0.85rem, 0.45rem + 0.5vw, 1.1rem); }
+/* El texto de debajo se corre lo mismo que el título, así que arranca bajo
+   su icono. No más: con otro poco, la línea más larga («Pasa Escandallos
+   ICSUITE → ClickUp») ya no cabe en una en un portátil de 1366 px. */
+.menu-principal .menu-entrada {
+    font-size: clamp(0.85rem, 0.45rem + 0.5vw, 1.1rem);
+    margin-left: 10%;
+}
 .menu-principal ul.menu-entrada { padding-left: 1.3em; line-height: 1.5; }
 .menu-principal > .menu-paneles { margin-top: 0; gap: clamp(0.6rem, 0.2rem + 0.5vw, 0.9rem); }
 .menu-principal .menu-panel {
     padding: 0.5em 0.9em;
+    /* El icono, a la misma distancia del borde que el de una tarjeta grande:
+       su margen más un décimo de lo que queda entre márgenes. El porcentaje
+       aquí es del ancho entero del panel y allí del interior de la tarjeta,
+       de ahí el 0.8. */
+    padding-left: calc(0.8 * var(--menu-relleno) + 10%);
     gap: 0.65em;
     font-size: clamp(0.92rem, 0.5rem + 0.5vw, 1.2rem);
 }
@@ -885,7 +906,7 @@ header.cabecera-menu { padding-left: clamp(1rem, 2vw, 2.5rem); padding-right: cl
    el que `.tarjeta` le da a las de al lado, para arrancar a la misma altura. */
 .menu-paneles {
     display: grid;
-    grid-template-rows: repeat(4, 1fr);
+    grid-template-rows: repeat(5, 1fr);
     gap: 1rem;
     align-self: stretch;
     margin-top: 1rem;
@@ -1961,3 +1982,268 @@ dialog.emergente .lista-avisos { margin-top: 0.8rem; padding: 0.6rem 0.8rem 0.6r
 .biblioteca-pieles .fila-filtros > a { padding-bottom: 0.6rem; }
 .biblioteca-pieles .precios-ficha > div { display: flex; flex-direction: column; gap: 0.6rem; }
 .biblioteca-pieles .tabla-sin-ficha .form-tara label { margin: 0; }
+
+/* --- Carga de modelos (/carga-modelos y su batería) -----------------------
+   La pantalla de origen reutiliza los botones de formato del corte; la
+   batería es una lista a la izquierda y el panel del modelo a la derecha,
+   con la barra de «Cargar modelos al Sistema» siempre encima de los dos.
+   Todo con las variables de la paleta: sigue al estilo elegido en el menú. */
+#formOrigen [hidden], .bateria [hidden] { display: none !important; }
+.selector-origen-carga { grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); }
+.carga-en-marcha { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+.carga-en-marcha form { margin: 0; }
+.carga-en-marcha button, .carga-en-marcha a.boton { margin: 0; }
+.carga-en-marcha > span { flex: 1 1 18rem; }
+.cabecera-carpeta { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem 1rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.cabecera-carpeta .rotulo-fotos { margin: 0; }
+button.boton-esqueleto { display: inline-flex; align-items: center; gap: 0.45rem; margin: 0; }
+button.boton-esqueleto .icono { width: 1.25em; height: 1.25em; margin: 0; }
+
+main.bateria { max-width: 120rem; padding-top: 0; padding-left: clamp(1rem, 2vw, 2.5rem); padding-right: clamp(1rem, 2vw, 2.5rem); }
+.bateria button, .bateria a.boton { margin: 0; }
+.bateria svg.icono { width: 1.1em; height: 1.1em; flex: none; }
+
+/* La barra: pegada arriba al desplazarse, sobre el fondo de la página. */
+.bateria-barra {
+    position: sticky; top: 0; z-index: 6;
+    display: flex; justify-content: space-between; align-items: center; gap: 0.6rem 1.5rem; flex-wrap: wrap;
+    padding: 0.8rem 0; background: var(--fondo-suave); border-bottom: 1px solid var(--borde);
+}
+.bateria-barra-estado { display: flex; align-items: baseline; gap: 0.3rem 1.2rem; flex-wrap: wrap; }
+.bateria-barra-estado p { margin: 0; }
+.bateria-recuento { font-size: 1.05rem; }
+.bateria-recuento .cuenta-aceptados { color: var(--ok-borde); }
+.bateria-pendientes {
+    padding: 0.15rem 0.6rem; border: 1px solid var(--aviso-borde); border-left-width: 4px;
+    border-radius: 4px; background: var(--aviso-fondo); font-size: 0.9rem; color: #1c2733;
+}
+.bateria-fotos { color: var(--texto-suave); font-size: 0.9rem; }
+.bateria-barra-acciones { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-left: auto; }
+.bateria-avisos { margin-top: 0.8rem; }
+.bateria .alerta { color: #1c2733; }
+.bateria-pie { margin-top: 1.2rem; }
+
+.bateria-cuerpo {
+    display: grid; grid-template-columns: minmax(15rem, 20rem) minmax(0, 1fr);
+    gap: 1rem; align-items: start; margin-top: 1rem;
+}
+
+/* La lista se queda a la vista mientras se baja por un panel largo. */
+.bateria-lista {
+    position: sticky; top: 4.4rem; display: flex; flex-direction: column; gap: 0.5rem;
+    max-height: calc(100vh - 5.6rem); min-height: 12rem;
+}
+.bateria-filtro { flex: none; }
+.bateria-modelos {
+    list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1 1 auto;
+    border: 1px solid var(--borde); border-radius: 6px; background: var(--superficie);
+}
+.bateria-modelos > li + li { border-top: 1px solid var(--borde); }
+.bateria-separador {
+    padding: 0.45rem 0.7rem; font-size: 0.8rem; color: var(--texto-tenue); background: var(--fondo-suave);
+}
+.bateria button.bateria-modelo {
+    display: flex; align-items: center; gap: 0.55rem; width: 100%; padding: 0.5rem 0.7rem;
+    border: 0; border-left: 4px solid transparent; border-radius: 0; background: none;
+    color: var(--tinta); font-weight: 400; text-align: left;
+}
+.bateria button.bateria-modelo:hover { background: var(--acento-suave-fin); }
+.bateria button.bateria-modelo:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; }
+.bateria button.bateria-modelo.elegido {
+    border-left-color: var(--acento); background: var(--acento-suave-ini);
+    box-shadow: inset 0 0 0 1px rgba(var(--acento-rgb), 0.35);
+}
+/* La marca: un círculo vacío mientras está pendiente, lleno al decidir. */
+.bateria-marca {
+    flex: none; width: 1.25rem; height: 1.25rem; border-radius: 50%; border: 1.5px solid var(--borde-tarjeta-fuerte);
+    display: inline-flex; align-items: center; justify-content: center; color: #fff;
+}
+.bateria .bateria-marca svg.icono { width: 0.85rem; height: 0.85rem; stroke-width: 3; }
+.bateria-modelo-texto { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.bateria-modelo-ref { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bateria-modelo-nombre {
+    font-size: 0.8rem; color: var(--texto-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bateria-sin-fotos { flex: none; display: inline-flex; color: var(--texto-tenue); }
+.bateria-falta, .bateria-existe { flex: none; font-size: 0.75rem; color: var(--texto-tenue); white-space: nowrap; }
+.bateria-falta { color: #8a6200; }
+/* Verde: aceptado. Rojo: cancelado, no se cargará. Gris: ya existe y no trae nada. */
+.bateria button.bateria-modelo[data-estado="ACEPTADO"] { background: var(--ok-fondo); color: #1c2733; }
+.bateria-modelo[data-estado="ACEPTADO"] .bateria-marca { background: var(--ok-borde); border-color: var(--ok-borde); }
+.bateria-modelo[data-estado="ACEPTADO"] .bateria-modelo-nombre { color: #33523f; }
+.bateria button.bateria-modelo[data-estado="CANCELADO"] { background: var(--error-fondo); color: #1c2733; }
+.bateria-modelo[data-estado="CANCELADO"] .bateria-marca { background: var(--error-borde); border-color: var(--error-borde); }
+.bateria-modelo[data-estado="CANCELADO"] .bateria-modelo-ref { text-decoration: line-through; }
+.bateria-modelo[data-estado="CANCELADO"] .bateria-modelo-nombre { color: #6b4a48; }
+.bateria button.bateria-modelo[data-estado="PENDIENTE"][data-gris] { color: var(--texto-tenue); }
+.bateria-modelo[data-estado="PENDIENTE"][data-gris] .bateria-modelo-nombre { color: var(--texto-tenue); }
+.bateria-modelo[data-estado="PENDIENTE"][data-gris] .bateria-marca { border-style: dashed; }
+.bateria button.bateria-modelo.elegido[data-estado="ACEPTADO"] { border-left-color: var(--ok-borde); }
+.bateria button.bateria-modelo.elegido[data-estado="CANCELADO"] { border-left-color: var(--error-borde); }
+
+/* El panel del modelo. */
+.bateria-panel { margin-top: 0; padding: 0; min-width: 0; }
+.panel-cabecera {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem 1.5rem; flex-wrap: wrap;
+    padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--borde); border-top: 4px solid transparent;
+    border-radius: 6px 6px 0 0;
+}
+.panel-cabecera[data-estado="ACEPTADO"] { border-top-color: var(--ok-borde); }
+.panel-cabecera[data-estado="CANCELADO"] { border-top-color: var(--error-borde); }
+.panel-titulo { min-width: 0; }
+.panel-titulo h2 { margin: 0; font-size: 1.7rem; line-height: 1.15; letter-spacing: 0.01em; overflow-wrap: anywhere; }
+.panel-nombre { margin: 0.15rem 0 0; color: var(--texto-suave); font-size: 1.05rem; }
+.panel-chips { margin: 0.55rem 0 0; display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.chip {
+    display: inline-block; padding: 0.1rem 0.55rem; border: 1px solid var(--borde-tarjeta-fuerte);
+    border-radius: 999px; font-size: 0.8rem; background: var(--campo); color: var(--tinta);
+}
+.chip-aceptado { border-color: var(--ok-borde); background: var(--ok-fondo); color: #1c2733; font-weight: 600; }
+.chip-cancelado { border-color: var(--error-borde); background: var(--error-fondo); color: #1c2733; font-weight: 600; }
+.chip-existe { border-style: dashed; }
+.chip-novedad { border-color: var(--acento); background: var(--acento-suave-ini); }
+.panel-acciones { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-left: auto; }
+.bateria button.boton-aceptar-modelo { background: var(--ok-borde); border-color: var(--ok-borde); color: #fff; }
+.bateria button.boton-cancelar-modelo { color: var(--error-borde); border-color: var(--error-borde); }
+.bateria-panel > .alerta, .bateria-panel > .ayuda, .bateria-panel > p, .bateria-panel > .titulo-seccion {
+    margin: 1rem 1.25rem;
+}
+.bateria-panel > .lista-avisos { padding-left: 2rem; }
+
+/* Obligatorio a la izquierda y las fotos a la derecha, a la misma altura: lo
+   que hay que rellenar y lo que más se mira, sin bajar por la página. */
+.panel-arriba { display: grid; grid-template-columns: minmax(18rem, 5fr) minmax(0, 7fr); }
+.bloque { padding: 1.1rem 1.25rem; min-width: 0; }
+.bloque-obligatorio { border-right: 1px solid var(--borde); background: var(--acento-suave-fin); }
+.bloque-opcional { border-top: 1px solid var(--borde); }
+.bloque-titulo { margin: 0 0 0.7rem; font-size: 1.05rem; display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
+.bloque-nota { font-size: 0.85rem; font-weight: 400; color: var(--texto-suave); }
+.bloque-subtitulo { margin: 0 0 0.5rem; font-size: 0.95rem; }
+.rejilla-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.7rem 1rem; align-items: start; }
+.rejilla-campos.rejilla-temporada { grid-template-columns: minmax(11rem, 18rem); margin-bottom: 1rem; }
+.rejilla-campos.rejilla-embalaje { grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); }
+.bateria .campo { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; min-width: 0; font-weight: 400; }
+.bateria .campo-ancho { grid-column: 1 / -1; }
+.campo-rotulo { font-weight: 600; font-size: 0.9rem; }
+.campo-ayuda { font-size: 0.8rem; color: var(--texto-suave); }
+.campo-fijo { padding: 0.45rem 0; font-size: 1.05rem; }
+.bateria .campo select { font: inherit; padding: calc(0.45rem + 1px) 2em calc(0.45rem + 1px) 0.6rem; width: 100%; }
+.bateria input[type="text"].falta { border-color: var(--aviso-borde); background-color: var(--aviso-fondo); color: #1c2733; }
+.faltan { margin: 0.9rem 0 0; padding-left: 1.2rem; font-size: 0.88rem; color: #8a6200; }
+
+.segmentos { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--borde-tarjeta-fuerte); border-radius: 6px; overflow: hidden; align-self: flex-start; }
+.bateria button.segmento {
+    padding: 0.4rem 0.8rem; border: 0; border-radius: 0; background: var(--campo); color: var(--tinta); font-weight: 400;
+}
+.bateria button.segmento + .segmento { border-left: 1px solid var(--borde-tarjeta-fuerte); }
+.bateria button.segmento.activo { background: var(--acento); color: #fff; font-weight: 600; }
+.bateria button.segmento:focus-visible { outline: 2px solid var(--acento); outline-offset: -2px; }
+
+/* La tira de fotos: la primera seleccionada es la principal y va más grande. */
+.tira-fotos { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: flex-end; }
+.foto {
+    position: relative; margin: 0; width: 7.5rem; border: 1px solid var(--borde); border-radius: 6px;
+    background: var(--campo); overflow: hidden; cursor: grab;
+}
+.foto img, .foto .foto-hueco { display: block; width: 100%; height: 7.5rem; object-fit: contain; background: #fff; }
+.foto .foto-hueco {
+    display: flex; align-items: center; justify-content: center; padding: 0.4rem; text-align: center;
+    font-size: 0.8rem; color: var(--texto-tenue); background: var(--fondo-suave);
+}
+.foto.principal { width: 10.5rem; border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento); }
+.foto.principal img, .foto.principal .foto-hueco { height: 10.5rem; }
+.foto.sin-elegir img { opacity: 0.35; filter: grayscale(1); }
+.foto.arrastrando { opacity: 0.4; }
+.foto.destino { outline: 2px dashed var(--acento); outline-offset: 2px; }
+.foto-principal {
+    position: absolute; left: 0; top: 0; padding: 0.1rem 0.5rem; border-radius: 0 0 6px 0;
+    background: var(--acento); color: #fff; font-size: 0.75rem; font-weight: 600;
+}
+.bateria .foto-elegir {
+    position: absolute; right: 0.25rem; top: 0.25rem; display: inline-flex; align-items: center; gap: 0.25rem;
+    margin: 0; padding: 0.1rem 0.4rem; border-radius: 999px; background: rgba(255, 255, 255, 0.92);
+    color: #1c2733; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+}
+.foto-elegir input { margin: 0; }
+.foto figcaption { display: flex; align-items: center; gap: 0.2rem; border-top: 1px solid var(--borde); }
+.foto-nombre {
+    flex: 1 1 auto; min-width: 0; font-size: 0.72rem; color: var(--texto-suave); text-align: center;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bateria button.foto-mover {
+    flex: none; padding: 0 0.45rem; border: 0; border-radius: 0; background: none; color: var(--acento);
+    font-size: 1.1rem; line-height: 1.5;
+}
+.bateria button.foto-mover:hover:not(:disabled) { background: var(--acento-suave-ini); }
+.bateria button.foto-anadir {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem;
+    width: 7.5rem; height: 9.2rem; padding: 0.5rem; border: 1.5px dashed var(--borde-tarjeta-fuerte); background: none;
+    color: var(--texto-suave); font-size: 0.8rem; font-weight: 400; line-height: 1.25; cursor: pointer;
+}
+.bateria button.foto-anadir:hover { border-color: var(--acento); color: var(--acento); }
+.bateria svg.icono-grande { width: 1.6rem; height: 1.6rem; }
+.bloque-fotos .bloque-subtitulo { margin-top: 1rem; }
+.fichas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.ficha { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.ficha-nombre { overflow-wrap: anywhere; }
+
+/* Las pieles, en pestañas: una piel es un artículo entero. */
+.pestanas { display: flex; align-items: flex-end; gap: 0.25rem; flex-wrap: wrap; border-bottom: 1px solid var(--borde-tarjeta-fuerte); }
+.bateria button.pestana {
+    padding: 0.4rem 0.9rem; border: 1px solid var(--borde); border-bottom: 0; border-radius: 6px 6px 0 0;
+    background: var(--fondo-suave); color: var(--texto-suave); font-weight: 400; margin-bottom: -1px;
+}
+.bateria button.pestana.activa {
+    background: var(--superficie); color: var(--tinta); font-weight: 600; border-color: var(--borde-tarjeta-fuerte);
+    border-bottom: 1px solid var(--superficie);
+}
+.pestana-nueva {
+    margin-left: 0.4rem; padding: 0 0.35rem; border-radius: 999px; background: var(--acento-suave-ini);
+    border: 1px solid var(--acento); color: var(--tinta); font-size: 0.7rem; font-weight: 400;
+}
+.pestana-anadir { display: inline-flex; align-items: center; gap: 0.4rem; margin: 0 0 0.3rem auto; }
+.bateria input[type="text"].piel-nueva { width: 15rem; padding: 0.25rem 0.5rem; font-size: 0.9rem; }
+.piel { padding-top: 0.9rem; }
+.piel-referencia { margin: 0 0 0.9rem; font-size: 0.9rem; color: var(--texto-suave); }
+.piel-referencia strong { color: var(--tinta); }
+.piel-referencia button.enlace { margin-left: 0.6rem; }
+.piel-columnas { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.2rem 2rem; }
+.piel-embalaje { padding-left: 2rem; border-left: 1px solid var(--borde); }
+.piel-colores { margin-top: 1.3rem; overflow-x: auto; }
+.tabla-colores-carga { border-collapse: collapse; width: 100%; }
+.tabla-colores-carga th, .tabla-colores-carga td { padding: 0.25rem 0.4rem; text-align: left; vertical-align: middle; }
+.tabla-colores-carga thead th { font-size: 0.85rem; border-bottom: 1px solid var(--borde-tarjeta-fuerte); white-space: nowrap; }
+.tabla-colores-carga tbody th { white-space: nowrap; font-weight: 600; }
+.tabla-colores-carga tbody tr + tr td, .tabla-colores-carga tbody tr + tr th { border-top: 1px solid var(--borde); }
+.bateria .tabla-colores-carga input[type="text"] { padding: 0.3rem 0.5rem; min-width: 7rem; }
+.bateria .tabla-colores-carga input.color-codigo { min-width: 5rem; width: 6rem; }
+.celda-quitar { width: 1.5rem; text-align: right; }
+.fila-color-nuevo td { padding-top: 0.6rem; }
+
+/* El emergente de una ficha técnica. */
+dialog.emergente-ficha { width: min(64rem, 94vw); max-width: none; }
+.candidatas { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.7rem; max-height: 62vh; overflow-y: auto; padding: 0.2rem; }
+.candidata {
+    position: relative; display: flex; flex-direction: column; margin: 0; border: 2px solid var(--borde);
+    border-radius: 6px; overflow: hidden; background: #fff; cursor: pointer; font-weight: 400;
+}
+.candidata:has(input:checked) { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento); }
+.candidata input { position: absolute; left: 0.4rem; top: 0.4rem; width: 1.15rem; height: 1.15rem; margin: 0; }
+.candidata img { width: 100%; height: 10rem; object-fit: contain; background: #fff; }
+.candidata-pie { padding: 0.2rem 0.5rem; font-size: 0.78rem; color: #5a6673; border-top: 1px solid var(--borde); background: #fff; }
+
+@media (max-width: 70rem) {
+    .panel-arriba, .piel-columnas { grid-template-columns: minmax(0, 1fr); }
+    .bloque-obligatorio { border-right: 0; border-bottom: 1px solid var(--borde); }
+    .piel-embalaje { padding-left: 0; border-left: 0; }
+}
+@media (max-width: 48rem) {
+    .bateria-cuerpo { grid-template-columns: minmax(0, 1fr); }
+    .bateria-lista { position: static; max-height: 16rem; }
+    .bateria-barra { position: static; }
+}
+.bateria button.boton-aceptar-modelo:disabled { background: var(--superficie); border-color: var(--borde-tarjeta-fuerte); color: var(--texto-tenue); cursor: not-allowed; }
+.bateria button:disabled { cursor: not-allowed; }
+.bateria .tabla-colores-carga td input[type="text"] { width: 100%; }
+.bateria .tabla-colores-carga td input.color-codigo { width: 6rem; }
+.bateria button.bateria-modelo[data-estado="PENDIENTE"][data-gris]:not(.elegido) { background: var(--fondo-suave); }

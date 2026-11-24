@@ -104,8 +104,9 @@
 
         <!-- Los ajustes no son un flujo con pantallas, sino un dato que se
              guarda una vez y vale para todos los envíos, así que van en paneles
-             pequeños y no en una tarjeta. En la columna caben cuatro (la
-             rejilla de .menu-paneles tiene cuatro filas); un quinto la reparte.
+             pequeños y no en una tarjeta. En la columna caben cinco (la
+             rejilla de .menu-paneles tiene cinco filas, y las tarjetas grandes
+             son más altas para que quepan); un sexto la reparte.
              Los comentarios de embalaje no tienen panel: se editan desde
              /info-embalaje, que es donde se usan. -->
         <div class="menu-paneles">
@@ -116,6 +117,19 @@
                     <path d="M10 12h4"/>
                 </svg>
                 <span class="menu-panel-titulo">Guarda Temporadas y Ficheros</span>
+            </a>
+
+            <!-- Debajo de las temporadas, porque es lo que sigue a guardarlas:
+                 los modelos ya no entran solos al guardar una temporada, se
+                 cargan aquí, revisados uno a uno. El icono: fichas apiladas
+                 con la flecha de entrada. -->
+            <a class="menu-panel" th:href="@{/carga-modelos}">
+                <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M4 13.5 12 18l8-4.5M4 17.5 12 22l8-4.5"/>
+                    <path d="M12 2.5v9M8.6 8.3 12 11.7l3.4-3.4"/>
+                </svg>
+                <span class="menu-panel-titulo">Carga de modelos</span>
             </a>
 
             <a class="menu-panel" th:href="@{/catalogo}">

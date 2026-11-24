@@ -61,7 +61,7 @@ public record ProduccionCorte(PedidoCorte pedido, Map<String, String> pielDe,
      * Como {@link PedidoCorte} agrupa los colores: por código, y sin él por
      * descripción; la prensa de un color, aparte.
      */
-    static String claveDe(ColorCorte color) {
+    public static String claveDe(ColorCorte color) {
         return (color.prensa() ? "PRENSA " : "") + (color.codigo().isEmpty() ? color.descripcion() : color.codigo());
     }
 }

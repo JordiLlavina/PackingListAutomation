@@ -1,9 +1,7 @@
 package com.puntotres.packinglist.web;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -17,7 +15,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
@@ -27,15 +24,16 @@ import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.FicheroExcel;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
-import com.puntotres.packinglist.service.catalogo.CatalogoModelos.ResumenAlta;
-import com.puntotres.packinglist.service.catalogo.ImportacionFotosTemporada;
-import com.puntotres.packinglist.service.corte.LectorFotos;
 
 /**
- * Pantalla del archivo de temporadas: la puerta de entrada de lo que se sabe
- * de una temporada. Se guardan una vez sus excels y sus fotos, y de aquí
- * salen el desplegable de la entrada del envío, del corte y de las etiquetas,
- * y el catálogo de modelos.
+ * Pantalla del archivo de temporadas: aquí se guardan, una vez, los FICHEROS
+ * de una temporada (sus excels), y de aquí sale el desplegable de la entrada
+ * del envío, del corte, de las etiquetas y de la carga de modelos.
+ *
+ * Solo guarda ficheros. Hasta noviembre de 2026 guardar una temporada metía
+ * además sus modelos y sus fotos en el catálogo, sin revisión; el usuario lo
+ * quitó: los modelos y sus fotos entran por la Carga de modelos
+ * (/carga-modelos), donde se revisan uno a uno.
  *
  * Cada temporada guarda dos excels, y cuál es obligatorio lo decide el
  * cliente ({@code pedido-cliente} en application.yml):
@@ -46,12 +44,6 @@ import com.puntotres.packinglist.service.corte.LectorFotos;
  *   <li>Los genéricos no tienen excel de pedido: el de producción es el
  *       obligatorio.</li>
  * </ul>
- *
- * Al guardar, lo que traen los excels subidos entra solo en el catálogo, las
- * fotos (carpeta o zip, opcionales) se guardan en los modelos en segundo
- * plano, y un aviso emergente dice qué ha entrado. Un excel o unas fotos que
- * no se dejan leer no impiden guardar la temporada: se guarda y se avisa
- * (regla del proyecto: no bloquear por algo que se arregla después).
  */
 @Controller
 public class TemporadasController {
@@ -61,27 +53,21 @@ public class TemporadasController {
     static final String ROTULO_PEDIDO = "Excel de Pedido de Cliente";
     static final String ROTULO_PRODUCCION = "Excel de Producción de Puntotres";
 
-    /** Lo que ha entrado al catálogo desde uno de los excels, para el emergente. */
-    public record AltaExcel(String origen, ResumenAlta alta) {
-    }
-
     private final ArchivoTemporadas archivo;
     private final ClientesProperties clientesProperties;
     private final CatalogoModelos catalogo;
-    private final ImportacionFotosTemporada fotos;
 
     public TemporadasController(ArchivoTemporadas archivo, ClientesProperties clientesProperties,
-                                CatalogoModelos catalogo, ImportacionFotosTemporada fotos) {
+                                CatalogoModelos catalogo) {
         this.archivo = archivo;
         this.clientesProperties = clientesProperties;
         this.catalogo = catalogo;
-        this.fotos = fotos;
     }
 
     /**
      * Con {@code editar}, el formulario de arriba sale con esa temporada
      * cargada: corregir el nombre, adjuntar el excel que falta o sustituir
-     * uno, y añadir fotos, todo desde el mismo sitio que el alta.
+     * uno, todo desde el mismo sitio que el alta.
      */
     @GetMapping("/temporadas")
     public String temporadas(@RequestParam(required = false) Long editar, Model model) {
@@ -106,8 +92,6 @@ public class TemporadasController {
                           @RequestParam String temporada,
                           @RequestParam(required = false) MultipartFile pedido,
                           @RequestParam(required = false) MultipartFile produccion,
-                          @RequestParam(name = "fotos", required = false) MultipartFile zipFotos,
-                          @RequestParam(required = false) List<MultipartFile> carpeta,
                           RedirectAttributes redirect) {
         ClienteConfig config = clientesProperties.clientePara(cliente).orElse(null);
         if (config == null) {
@@ -154,19 +138,9 @@ public class TemporadasController {
                     + config.getNombre() + " es obligatorio, porque no tiene excel de pedido.", id);
         }
 
-        boolean conZip = zipFotos != null && !zipFotos.isEmpty();
-        // Un selector de carpeta sin elegir manda igual una parte sin nombre.
-        List<MultipartFile> ficherosFotos = carpeta == null ? List.of() : carpeta.stream()
-                .filter(fichero -> fichero.getOriginalFilename() != null
-                        && !fichero.getOriginalFilename().isBlank())
-                .toList();
-        if (conZip && !ficherosFotos.isEmpty()) {
-            return error(redirect, "Sube la carpeta de fotos o su zip, no los dos.", id);
-        }
-
         // Si una temporada cambia de cliente, sus vínculos con los modelos del
-        // cliente viejo no pueden quedarse: se sueltan y se vuelven a leer los
-        // excels para el nuevo.
+        // cliente viejo no pueden quedarse: se sueltan. Los del nuevo se hacen
+        // en la carga de modelos, como todos.
         boolean cambiaDeCliente = anterior.map(vieja -> !vieja.getCliente().equals(cliente)).orElse(false);
         Long guardadaId = archivo.guardar(id, cliente, nombreTemporada, excelPedido, excelProduccion).getId();
         TemporadaGuardada recienGuardada = archivo.conFichero(guardadaId).orElseThrow();
@@ -174,82 +148,15 @@ public class TemporadasController {
             // Ha pasado a un genérico: guardado, su packing list lo leería como pedido.
             archivo.quitarPedido(guardadaId);
         }
-        TemporadaGuardada guardada = archivo.conFichero(guardadaId).orElseThrow();
+        if (cambiaDeCliente) {
+            catalogo.desvincularTemporada(guardadaId);
+        }
         redirect.addFlashAttribute("mensaje", "Guardada la temporada " + nombreTemporada
                 + " de " + config.getNombre() + ".");
-        if (cambiaDeCliente) {
-            catalogo.desvincularTemporada(guardada.getId());
-        }
-
-        List<AltaExcel> altas = new ArrayList<>();
-        List<String> avisos = new ArrayList<>();
-        if (excelPedido != null || (cambiaDeCliente && guardada.tienePedido())) {
-            incorporar(ROTULO_PEDIDO, () -> catalogo.incorporarPedido(guardada),
-                    altas, avisos);
-        }
-        if (excelProduccion != null || (cambiaDeCliente && guardada.tieneProduccion())) {
-            incorporar(ROTULO_PRODUCCION,
-                    () -> catalogo.incorporarProduccion(guardada),
-                    altas, avisos);
-        }
-        ImportacionFotosTemporada.Estado estadoFotos = null;
-        if (conZip || !ficherosFotos.isEmpty()) {
-            estadoFotos = importarFotos(guardada, conZip ? zipFotos : null, ficherosFotos, avisos);
-        }
-
-        if (!altas.isEmpty() || estadoFotos != null || !avisos.isEmpty()) {
-            redirect.addFlashAttribute("altas", altas);
-            redirect.addFlashAttribute("avisosAlta", avisos);
-            redirect.addFlashAttribute("fotosAlta", estadoFotos);
-            redirect.addFlashAttribute("altaTemporada", guardada.getTemporada());
-            redirect.addFlashAttribute("altaTemporadaId", guardada.getId());
-            redirect.addFlashAttribute("altaCliente", guardada.getCliente());
-        }
+        // Para el enlace «Cargar sus modelos» del mensaje.
+        redirect.addFlashAttribute("guardadaCliente", cliente);
+        redirect.addFlashAttribute("guardadaId", guardadaId);
         return "redirect:/temporadas";
-    }
-
-    @FunctionalInterface
-    private interface Alta {
-        ResumenAlta hacer() throws IOException;
-    }
-
-    /**
-     * Mete un excel en el catálogo. Si no se deja leer, la temporada ya está
-     * guardada y se avisa: el catálogo se puede rellenar a mano o
-     * sustituyendo el excel.
-     */
-    private static void incorporar(String origen, Alta alta, List<AltaExcel> altas, List<String> avisos) {
-        try {
-            altas.add(new AltaExcel(origen, alta.hacer()));
-        } catch (IOException | RuntimeException e) {
-            avisos.add("Del " + origen.toLowerCase() + " no se ha podido extraer nada al catálogo: "
-                    + (e.getMessage() != null ? e.getMessage() : "no tiene el formato esperado") + ".");
-        }
-    }
-
-    private ImportacionFotosTemporada.Estado importarFotos(TemporadaGuardada guardada, MultipartFile zip,
-                                                           List<MultipartFile> ficheros, List<String> avisos) {
-        try {
-            if (zip != null) {
-                return fotos.importarZip(guardada.getCliente(), guardada.getId(), zip::getInputStream);
-            }
-            return fotos.importarCarpeta(guardada.getCliente(), guardada.getId(), ficheros.stream()
-                    .map(fichero -> new LectorFotos.Fichero(fichero.getOriginalFilename(), fichero::getInputStream))
-                    .toList());
-        } catch (IllegalArgumentException e) {
-            avisos.add("No se han podido usar las fotos: " + e.getMessage() + ".");
-        } catch (IOException | RuntimeException e) {
-            avisos.add(zip != null ? "No se ha podido abrir el zip de fotos: ¿es un fichero .zip?"
-                    : "No se han podido leer las fotos de la carpeta: vuelve a elegirla.");
-        }
-        return null;
-    }
-
-    /** Cómo van las fotos de la temporada: el emergente pregunta hasta que acaban. */
-    @GetMapping("/temporadas/{id}/fotos")
-    @ResponseBody
-    public ResponseEntity<ImportacionFotosTemporada.Estado> estadoFotos(@PathVariable Long id) {
-        return fotos.estado(id).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/temporadas/borrar")

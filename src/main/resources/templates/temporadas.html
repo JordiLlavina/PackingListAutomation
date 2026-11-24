@@ -4,50 +4,13 @@
 <body>
 <header th:replace="~{fragmentos :: cabecera('Temporadas y ficheros')}"></header>
 <main>
-    <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
+    <div class="alerta ok" th:if="${mensaje}">
+        <span th:text="${mensaje}"></span>
+        <!-- Guardar una temporada ya no da de alta sus modelos: se cargan, revisados, desde aquí. -->
+        <a th:if="${guardadaId != null}"
+           th:href="@{/carga-modelos(cliente=${guardadaCliente}, temporada=${guardadaId})}">Cargar sus modelos</a>
+    </div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
-
-    <!-- Lo que ha entrado al catálogo al guardar la temporada: una línea por
-         excel subido y, si se subieron fotos, cómo va su guardado (en segundo
-         plano: el script pregunta hasta que acaba). Un <dialog> abierto desde
-         el servidor: se ve nada más volver. -->
-    <dialog class="emergente" id="altaCatalogo" open th:if="${altas != null}">
-        <h3>Artículos guardados en el catálogo</h3>
-        <p th:if="${#lists.isEmpty(altas)}">
-            Guardada la temporada <strong th:text="${altaTemporada}">H26</strong>.
-        </p>
-        <div class="alta-excel" th:each="unaAlta : ${altas}">
-            <p>
-                <strong th:text="${unaAlta.origen}">Excel de Pedido de Cliente</strong>
-                de la temporada <strong th:text="${altaTemporada}">H26</strong>:
-                <span th:text="${unaAlta.alta.articulos}">38</span> artículos
-                (<span th:text="${unaAlta.alta.articulosNuevos}">12</span> nuevos,
-                <span th:text="${unaAlta.alta.modelosNuevos}">4</span> modelos nuevos)
-                y <span th:text="${unaAlta.alta.colores}">13</span> colores
-                (<span th:text="${unaAlta.alta.coloresNuevos}">2</span> nuevos en la tabla de colores)<span
-                    th:if="${unaAlta.alta.pielesNombradas > 0}">; <span
-                    th:text="${unaAlta.alta.pielesNombradas}">5</span> pieles han cogido su nombre</span>.
-            </p>
-            <ul class="ayuda" th:if="${!#lists.isEmpty(unaAlta.alta.avisos)}">
-                <li th:each="unAviso : ${unaAlta.alta.avisos}" th:text="${unAviso}"></li>
-            </ul>
-        </div>
-        <div class="estado-fotos" id="estadoFotos" th:if="${fotosAlta != null}"
-             th:attr="data-url=@{/temporadas/{id}/fotos(id=${altaTemporadaId})}">
-            <p><strong>Fotos:</strong> <span class="texto-fotos"
-                    th:text="|Guardando en el catálogo (${fotosAlta.hechas} de ${fotosAlta.total} preparadas)…|">…</span></p>
-            <ul class="ayuda avisos-fotos"></ul>
-        </div>
-        <ul class="alerta aviso lista-avisos" th:if="${avisosAlta != null and !#lists.isEmpty(avisosAlta)}">
-            <li th:each="unAviso : ${avisosAlta}" th:text="${unAviso}"></li>
-        </ul>
-        <div class="acciones-emergente">
-            <form method="dialog"><button type="submit" class="secundario">Cerrar</button></form>
-            <a class="boton" th:href="@{/catalogo(cliente=${altaCliente}, temporada=${altaTemporadaId})}">
-                Ver en el catálogo
-            </a>
-        </div>
-    </dialog>
 
     <!-- Alta y edición en el mismo formulario, arriba del todo: es lo que se
          viene a hacer aquí. Con ?editar=id sale cargado con esa temporada y
@@ -57,9 +20,10 @@
             Añadir una temporada
         </h3>
         <p class="ayuda">
-            Los excels y las fotos de una temporada se guardan aquí una vez. Luego se elige la
-            temporada en un desplegable en el packing list, en los documentos del corte y en las
-            etiquetas, y todo lo que traen entra solo al catálogo de modelos.
+            Los excels de una temporada se guardan aquí una vez. Luego se elige la
+            temporada en un desplegable en el packing list, en los documentos del corte, en las
+            etiquetas y en la carga de modelos. Aquí solo se guardan los ficheros: los modelos y
+            sus fotos se dan de alta en <a th:href="@{/carga-modelos}">Carga de modelos</a>.
         </p>
 
         <form th:action="@{/temporadas}" method="post" enctype="multipart/form-data" id="formTemporada"
@@ -109,43 +73,28 @@
                 <!-- Lo que de verdad sale de cada excel, por cliente. Ningún
                      pedido trae el nombre de la piel: solo el excel de producción. -->
                 <p class="ayuda texto-cliente" data-texto-cliente="AMI">
-                    Con el excel de Pedido Cliente se importan: modelos, sus pieles (solo la referencia,
+                    El excel de Pedido Cliente trae: modelos, sus pieles (solo la referencia,
                     como AL0103) y sus colores.<br>
-                    Si adjuntas el excel Producción Puntotres también se guardarán el nombre del bolso y el
-                    de la piel; ya que el excel de Cliente no los contiene.
+                    El nombre del bolso y el de la piel solo los trae el excel Producción Puntotres: si lo
+                    adjuntas, la carga de modelos los coge de él.
                 </p>
                 <p class="ayuda texto-cliente" data-texto-cliente="APC">
-                    Con el excel de pedido se importan los modelos con su nombre, sus pieles (solo la
+                    El excel de pedido trae los modelos con su nombre, sus pieles (solo la
                     referencia, como PXCBC) y los códigos de color (LZZ), sin su nombre. El nombre de la
                     piel y el de los colores que aún no lo tienen salen del excel de producción.
                 </p>
                 <p class="ayuda texto-cliente" data-texto-cliente="GENERICO">
-                    Este cliente no tiene excel de pedido: se trabaja con el excel de producción, del que
-                    se importan los modelos con su nombre y sus colores.
+                    Este cliente no tiene excel de pedido: se trabaja con el excel de producción, que
+                    trae los modelos con su nombre y sus colores.
                 </p>
             </div>
-
-            <div class="fila-excel fila-fotos">
-                <span class="marca-campo">Opcional</span>
-                <span class="rotulo-fila">Fotos de la temporada</span>
-                <th:block th:with="fotosEnLinea=true">
-                    <div th:replace="~{fragmentos :: campoFotos}"></div>
-                </th:block>
-            </div>
-            <p class="ayuda ayuda-fotos">
-                <strong>Estructura</strong>: una carpeta con el nombre de la temporada y dentro una
-                subcarpeta por modelo, con la referencia completa o parcial del modelo (ULL712 o
-                ULL712.AL0103, F67008 o PXCBC-F67008). Dentro de cada subcarpeta, las fotos del modelo; la
-                que se llame <em>principal</em> es la que sale primero. Las fotos se guardan en el catálogo
-                y los documentos del corte las usan sin volver a subirlas.
-            </p>
 
             <button type="submit" id="botonGuardar"
                     th:text="${editando} ? 'Guardar cambios' : 'Añadir temporada'">Añadir temporada</button>
             <a class="boton secundario" th:if="${editando}" th:href="@{/temporadas}">Cancelar</a>
         </form>
         <p id="avisoSubiendo" class="aviso-procesando" hidden>
-            Subiendo… con muchas fotos tarda un rato; no cierres la página.
+            Subiendo…
         </p>
     </section>
 
@@ -196,7 +145,6 @@
         <a class="boton secundario" th:href="@{/packing-list}">← Volver</a>
     </p>
 
-    <script th:src="@{/campo-fotos.js}"></script>
     <script>
         // Qué excel es obligatorio y qué texto de ayuda sale lo dice el
         // cliente: con excel de pedido (AMI, APC) el obligatorio es el pedido
@@ -238,42 +186,6 @@
             formulario.addEventListener('submit', function () {
                 document.getElementById('avisoSubiendo').hidden = false;
             });
-
-            // El emergente pregunta cómo van las fotos hasta que acaban.
-            const estado = document.getElementById('estadoFotos');
-            if (estado) {
-                const texto = estado.querySelector('.texto-fotos');
-                const avisos = estado.querySelector('.avisos-fotos');
-                (function preguntar() {
-                    fetch(estado.dataset.url).then(function (respuesta) {
-                        return respuesta.ok ? respuesta.json() : null;
-                    }).then(function (fotos) {
-                        if (!fotos) {
-                            texto.textContent = 'no se sabe cómo han ido: la aplicación se ha reiniciado. '
-                                + 'Míralo en el catálogo.';
-                            return;
-                        }
-                        if (!fotos.terminada) {
-                            texto.textContent = 'Guardando en el catálogo (' + fotos.hechas + ' de '
-                                + fotos.total + ' preparadas)…';
-                            setTimeout(preguntar, 1500);
-                            return;
-                        }
-                        texto.textContent = fotos.guardadas === 0
-                            ? 'no se ha guardado ninguna.'
-                            : fotos.guardadas + (fotos.guardadas === 1 ? ' foto guardada' : ' fotos guardadas')
-                                + ' en el catálogo.';
-                        avisos.innerHTML = '';
-                        fotos.avisos.forEach(function (aviso) {
-                            const linea = document.createElement('li');
-                            linea.textContent = aviso;
-                            avisos.appendChild(linea);
-                        });
-                    }).catch(function () {
-                        setTimeout(preguntar, 3000);
-                    });
-                })();
-            }
         })();
     </script>
 </main>

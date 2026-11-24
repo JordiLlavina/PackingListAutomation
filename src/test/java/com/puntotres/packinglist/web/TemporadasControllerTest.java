@@ -1,8 +1,6 @@
 package com.puntotres.packinglist.web;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.hasSize;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -14,18 +12,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
-
-import javax.imageio.ImageIO;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,13 +30,12 @@ import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.ResumenTemporada;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
-import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
-import com.puntotres.packinglist.service.catalogo.ImportacionFotosTemporada;
 
 /**
  * El archivo de temporadas: guardar los excels de una temporada (el de pedido
- * del cliente y el de producción de Puntotres) y sus fotos una vez, y lo que
- * eso hace por el envío y por el catálogo de modelos.
+ * del cliente y el de producción de Puntotres) una vez, y lo que eso hace por el
+ * envío. Guardar una temporada NO toca el catálogo de modelos: los modelos
+ * entran por la carga de modelos (/carga-modelos).
  *
  * Lo que de verdad hay que anclar no es la pantalla, sino que el envío acabe
  * trabajando con el excel guardado —y con el del cliente correcto—: un envío
@@ -66,12 +56,6 @@ class TemporadasControllerTest {
 
     @Autowired
     private CatalogoModelos catalogo;
-
-    @Autowired
-    private FotosCatalogo fotosCatalogo;
-
-    @Autowired
-    private ImportacionFotosTemporada importacionFotos;
 
     private static byte[] recurso(String ruta) throws Exception {
         try (var entrada = TemporadasControllerTest.class.getResourceAsStream(ruta)) {
@@ -128,7 +112,7 @@ class TemporadasControllerTest {
                 .andExpect(content().string(containsString("EAN H29.xlsx")))
                 .andExpect(content().string(containsString("Excel de Pedido de Cliente")))
                 .andExpect(content().string(containsString("Excel de Producción de Puntotres")))
-                .andExpect(content().string(containsString("data-campo-fotos")))
+                .andExpect(content().string(containsString("/carga-modelos")))
                 .andReturn().getResponse().getContentAsString();
         assertTrue(pagina.indexOf("Añadir una temporada") < pagina.indexOf("Temporadas guardadas"),
                 "el alta va arriba del todo");
@@ -189,29 +173,25 @@ class TemporadasControllerTest {
                         .param("id", String.valueOf(id))
                         .param("cliente", "APC")
                         .param("temporada", "PROD-DESPUES"))
-                .andExpect(redirectedUrl("/temporadas"))
-                .andExpect(flash().attribute("altas", hasSize(1)));
+                .andExpect(redirectedUrl("/temporadas"));
 
         TemporadaGuardada guardada = archivo.conFichero(id).orElseThrow();
         assertArrayEquals("pedido de PROD-DESPUES".getBytes(), guardada.getExcelPedido());
         assertEquals("PROD_APC_SPRING27.xlsx", guardada.getNombreFicheroProduccion());
-        assertFalse(catalogo.codigosDeModeloEn("APC", id).isEmpty(),
-                "los modelos del excel de producción entran al catálogo y a la temporada");
         mvc.perform(get("/temporadas/descargar/{id}/produccion", id))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition", containsString("PROD_APC_SPRING27.xlsx")));
     }
 
     @Test
-    void conLosDosExcelsElEmergenteDiceLoQueHaEntradoDeCadaUno() throws Exception {
+    void conLosDosExcelsSeGuardanLosDos() throws Exception {
         mvc.perform(multipart("/temporadas")
                         .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx", TIPO_XLSX,
                                 recurso("/ejemplos/EAN PUNTOTRES H26.xlsx")))
                         .file(produccion("prod.xlsx", recurso("/ejemplos/corte/PROD_APC_SPRING27.xlsx")))
                         .param("cliente", "AMI")
                         .param("temporada", "CAT-DOS-EXCELS"))
-                .andExpect(redirectedUrl("/temporadas"))
-                .andExpect(flash().attribute("altas", hasSize(2)));
+                .andExpect(redirectedUrl("/temporadas"));
 
         TemporadaGuardada guardada = archivo.conFichero(idDe("AMI", "CAT-DOS-EXCELS")).orElseThrow();
         assertTrue(guardada.tienePedido());
@@ -371,31 +351,29 @@ class TemporadasControllerTest {
     // --- Lo que hace por el catálogo de modelos ---
 
     @Test
-    void guardarUnaTemporadaConExcelRealDejaElAvisoEmergente() throws Exception {
+    void guardarUnaTemporadaNoTocaElCatalogo() throws Exception {
         mvc.perform(multipart("/temporadas")
                         .file(new MockMultipartFile("pedido", "EAN PUNTOTRES H26.xlsx", TIPO_XLSX,
                                 recurso("/ejemplos/EAN PUNTOTRES H26.xlsx")))
                         .param("cliente", "AMI")
                         .param("temporada", "CAT-H26"))
                 .andExpect(redirectedUrl("/temporadas"))
-                .andExpect(flash().attribute("altas", hasSize(1)))
-                .andExpect(flash().attribute("altaCliente", "AMI"));
+                .andExpect(flash().attribute("guardadaCliente", "AMI"));
 
         Long id = idDe("AMI", "CAT-H26");
-        assertTrue(!catalogo.codigosDeModeloEn("AMI", id).isEmpty(), "los modelos del pedido entran al catálogo");
+        assertTrue(catalogo.codigosDeModeloEn("AMI", id).isEmpty(),
+                "guardar la temporada solo guarda sus ficheros: los modelos entran por la carga de modelos");
     }
 
     @Test
-    void unExcelQueNoSeDejaLeerGuardaLaTemporadaYAvisa() throws Exception {
-        // La regla del proyecto: no bloquear por algo que se arregla después.
-        // Se guarda, y el aviso dice que el catálogo no ha cogido nada.
+    void unExcelQueNoSeDejaLeerSeGuardaIgual() throws Exception {
+        // Aquí solo se guarda el fichero: si no se deja leer, lo dirá quien lo lea.
         mvc.perform(multipart("/temporadas")
                         .file(pedido("raro.xlsx", "esto no es un excel"))
                         .param("cliente", "AMI")
                         .param("temporada", "CAT-ILEGIBLE"))
                 .andExpect(redirectedUrl("/temporadas"))
-                .andExpect(flash().attribute("mensaje", containsString("Guardada")))
-                .andExpect(flash().attribute("avisosAlta", hasItem(containsString("no se ha podido extraer"))));
+                .andExpect(flash().attribute("mensaje", containsString("Guardada")));
 
         assertTrue(archivo.de("AMI").stream().anyMatch(t -> t.temporada().equals("CAT-ILEGIBLE")));
     }
@@ -409,7 +387,8 @@ class TemporadasControllerTest {
                         .param("temporada", "CAT-BORRABLE"))
                 .andExpect(redirectedUrl("/temporadas"));
         Long id = idDe("AMI", "CAT-BORRABLE");
-        String modelo = catalogo.codigosDeModeloEn("AMI", id).iterator().next();
+        String modelo = "CMT900";
+        catalogo.vincularTemporada(catalogo.asegurarModelo("AMI", modelo, "").getId(), id);
 
         mvc.perform(post("/temporadas/borrar").param("id", String.valueOf(id)))
                 .andExpect(redirectedUrl("/temporadas"));
@@ -427,6 +406,7 @@ class TemporadasControllerTest {
                         .param("temporada", "CAT-MUDA"))
                 .andExpect(redirectedUrl("/temporadas"));
         Long id = idDe("AMI", "CAT-MUDA");
+        catalogo.vincularTemporada(catalogo.asegurarModelo("AMI", "CMT901", "").getId(), id);
         assertTrue(!catalogo.codigosDeModeloEn("AMI", id).isEmpty());
 
         // Un genérico no tiene pedido: pide el excel de producción, y el de
@@ -449,7 +429,6 @@ class TemporadasControllerTest {
         assertFalse(mudada.tienePedido());
         assertTrue(mudada.tieneProduccion());
         assertTrue(catalogo.codigosDeModeloEn("AMI", id).isEmpty(), "los modelos de AMI ya no son de esta temporada");
-        assertFalse(catalogo.codigosDeModeloEn("KAMI", id).isEmpty());
     }
 
     @Test
@@ -469,91 +448,5 @@ class TemporadasControllerTest {
         assertTrue(archivo.conPedidoParaElEnvio(id, "KAMI").isEmpty());
         assertTrue(archivo.conProduccionParaElEnvio(id, "KAMI").isPresent());
         assertTrue(archivo.paraElEnvio(id, "KAMI").isPresent(), "por el nombre sí sigue valiendo");
-    }
-
-    // --- Las fotos de la temporada ---
-
-    @Test
-    void lasFotosDeUnZipEntranAlCatalogoEnSuModelo() throws Exception {
-        catalogo.asegurarArticulo("AMI", "ULL940.AL0001");
-
-        mvc.perform(multipart("/temporadas")
-                        .file(pedido("p.xlsx", "x"))
-                        .file(new MockMultipartFile("fotos", "fotos.zip", "application/zip",
-                                zip("H26/ULL940/otra.jpg", "H26/ULL940.AL0001/principal.jpg")))
-                        .param("cliente", "AMI")
-                        .param("temporada", "FOTOS-ZIP"))
-                .andExpect(redirectedUrl("/temporadas"))
-                .andExpect(flash().attributeExists("fotosAlta"));
-        Long id = idDe("AMI", "FOTOS-ZIP");
-
-        ImportacionFotosTemporada.Estado estado = esperarFotos(id);
-        assertEquals(2, estado.guardadas(), "avisos: " + estado.avisos());
-        var fotos = fotosCatalogo.de("AMI", "ULL940");
-        assertEquals(2, fotos.size());
-        assertTrue(fotos.stream().anyMatch(foto -> foto.principal() && foto.nombreFichero().equals("principal.jpg")),
-                "la que se llama principal es la principal");
-        mvc.perform(get("/temporadas/{id}/fotos", id))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.terminada").value(true))
-                .andExpect(jsonPath("$.guardadas").value(2));
-    }
-
-    @Test
-    void lasFotosDeUnaCarpetaEntranIgualQueLasDelZip() throws Exception {
-        catalogo.asegurarArticulo("AMI", "ULL941.AL0001");
-
-        mvc.perform(multipart("/temporadas")
-                        .file(pedido("p.xlsx", "x"))
-                        .file(new MockMultipartFile("carpeta", "H26/ULL941/a.jpg", "image/jpeg", jpeg()))
-                        .param("cliente", "AMI")
-                        .param("temporada", "FOTOS-CARPETA"))
-                .andExpect(redirectedUrl("/temporadas"));
-
-        esperarFotos(idDe("AMI", "FOTOS-CARPETA"));
-        assertEquals(1, fotosCatalogo.de("AMI", "ULL941").size());
-    }
-
-    @Test
-    void unZipQueNoLoEsGuardaLaTemporadaYAvisa() throws Exception {
-        mvc.perform(multipart("/temporadas")
-                        .file(pedido("p.xlsx", "x"))
-                        .file(new MockMultipartFile("fotos", "fotos.zip", "application/zip", "no".getBytes()))
-                        .param("cliente", "AMI")
-                        .param("temporada", "FOTOS-MAL"))
-                .andExpect(redirectedUrl("/temporadas"))
-                .andExpect(flash().attribute("mensaje", containsString("Guardada")))
-                .andExpect(flash().attribute("avisosAlta", hasItem(containsString("zip"))));
-    }
-
-    private ImportacionFotosTemporada.Estado esperarFotos(Long id) throws InterruptedException {
-        long limite = System.currentTimeMillis() + 30_000;
-        while (System.currentTimeMillis() < limite) {
-            ImportacionFotosTemporada.Estado estado = importacionFotos.estado(id).orElseThrow();
-            if (estado.terminada()) {
-                return estado;
-            }
-            Thread.sleep(50);
-        }
-        throw new AssertionError("las fotos no han acabado en 30 s");
-    }
-
-    private static byte[] jpeg() throws Exception {
-        BufferedImage imagen = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
-        ByteArrayOutputStream salida = new ByteArrayOutputStream();
-        ImageIO.write(imagen, "jpg", salida);
-        return salida.toByteArray();
-    }
-
-    private static byte[] zip(String... rutas) throws Exception {
-        ByteArrayOutputStream salida = new ByteArrayOutputStream();
-        try (ZipOutputStream zip = new ZipOutputStream(salida)) {
-            for (String ruta : rutas) {
-                zip.putNextEntry(new ZipEntry(ruta));
-                zip.write(jpeg());
-                zip.closeEntry();
-            }
-        }
-        return salida.toByteArray();
     }
 }

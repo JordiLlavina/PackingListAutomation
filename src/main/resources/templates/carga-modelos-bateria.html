@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Carga de modelos en batería')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Carga de modelos en batería')}"></header>
+<!-- Toda la pantalla la pinta /carga-modelos.js desde /carga-modelos/estado:
+     el lote vive en la sesión del servidor y cada cambio se le manda por
+     fetch, así que recargar no pierde nada. Aquí solo está el armazón. -->
+<main class="bateria" id="bateria" th:attr="data-base=@{/carga-modelos}, data-foto-catalogo=@{/catalogo/foto/},
+                                             data-catalogo=@{/catalogo}">
+
+    <!-- Siempre encima de los dos paneles: lo que se carga y lo que falta. -->
+    <div class="bateria-barra" id="barra">
+        <div class="bateria-barra-estado">
+            <p class="bateria-recuento" id="recuento">Cargando…</p>
+            <p class="bateria-pendientes" id="pendientes" hidden></p>
+            <p class="bateria-fotos" id="progresoFotos" hidden></p>
+        </div>
+        <div class="bateria-barra-acciones">
+            <button type="button" class="secundario" id="botonAnadir" hidden>+ Añadir otro</button>
+            <button type="button" class="secundario" id="botonAceptarCompletos"
+                    title="Marca en verde todos los modelos pendientes que ya tienen los datos obligatorios">
+                Aceptar todos los completos
+            </button>
+            <button type="button" id="botonCargar" disabled>Cargar modelos al Sistema</button>
+        </div>
+    </div>
+
+    <div class="alerta error" id="errorGeneral" hidden></div>
+    <details class="avisos-plegables bateria-avisos" id="avisosLote" hidden>
+        <summary></summary>
+        <ul class="alerta aviso lista-avisos"></ul>
+    </details>
+
+    <div class="bateria-cuerpo">
+        <aside class="bateria-lista" aria-label="Modelos de la carga">
+            <input type="text" id="filtro" class="bateria-filtro" placeholder="Buscar un modelo…"
+                   aria-label="Buscar un modelo">
+            <ul id="lista" class="bateria-modelos"></ul>
+        </aside>
+        <section class="bateria-panel tarjeta" id="panel" aria-live="polite">
+            <p class="ayuda">Cargando los modelos…</p>
+        </section>
+    </div>
+
+    <p class="menu-ajustes bateria-pie">
+        <a class="boton secundario" th:href="@{/carga-modelos}">← Cambiar el origen</a>
+    </p>
+
+    <!-- Las imágenes de una ficha técnica: ninguna entra sin elegirla. -->
+    <dialog class="emergente emergente-ficha" id="dialogoFicha">
+        <h3 id="tituloFicha">Imágenes de la ficha técnica</h3>
+        <p class="ayuda">Marca las que son fotos del modelo. Las demás (logos, muestras de color, páginas de
+            texto) no se guardan.</p>
+        <div class="candidatas" id="candidatas"></div>
+        <div class="acciones-emergente">
+            <button type="button" class="secundario" id="cancelarFicha">Cancelar</button>
+            <button type="button" id="aceptarFicha">Usar las marcadas</button>
+        </div>
+    </dialog>
+
+    <!-- Lo que ha entrado al sistema. -->
+    <dialog class="emergente" id="dialogoResumen">
+        <h3>Modelos cargados al sistema</h3>
+        <div id="textoResumen"></div>
+        <div class="acciones-emergente">
+            <a class="boton secundario" id="verCatalogo" href="#">Ver en el catálogo</a>
+            <button type="button" id="cerrarResumen">Seguir</button>
+        </div>
+    </dialog>
+
+    <script th:src="@{/carga-modelos.js}"></script>
+</main>
+</body>
+</html>
