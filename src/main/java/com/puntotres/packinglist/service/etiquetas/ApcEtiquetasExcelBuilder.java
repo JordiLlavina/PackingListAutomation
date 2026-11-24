@@ -196,6 +196,9 @@ public class ApcEtiquetasExcelBuilder {
             libro.getSheetAt(i).setSelected(i == 0);
         }
         libro.setActiveSheet(0);
+        // Ninguna plantilla de APC guarda hoy firstSheet, pero si una lo trae
+        // a 1, con una sola hoja Excel da el libro por corrupto (pasó en AMI).
+        libro.setFirstVisibleTab(0);
     }
 
     private static void escribirHojaPalets(XSSFSheet hoja, ApcEtiquetaLayout layout,

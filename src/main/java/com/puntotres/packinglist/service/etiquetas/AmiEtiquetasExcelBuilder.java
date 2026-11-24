@@ -194,6 +194,12 @@ public class AmiEtiquetasExcelBuilder {
             libro.getSheetAt(i).setSelected(i == 0);
         }
         libro.setActiveSheet(0);
+        // La plantilla guarda firstSheet="1" (la primera pestaña visible) y
+        // POI no lo corrige al borrar hojas. Con la de palets fuera queda una
+        // sola hoja y ese 1 apunta a una que no existe: Excel da el libro por
+        // corrupto y al repararlo se lleva el dibujo con todas las imágenes
+        // («Parte quitada: /xl/drawings/drawing1.xml»).
+        libro.setFirstVisibleTab(0);
     }
 
     /**

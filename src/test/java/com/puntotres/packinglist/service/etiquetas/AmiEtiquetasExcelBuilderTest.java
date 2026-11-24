@@ -453,6 +453,30 @@ class AmiEtiquetasExcelBuilderTest {
         }
     }
 
+    /**
+     * La plantilla del cliente guarda firstSheet="1" (la primera pestaña
+     * visible es la segunda). Con la hoja de palets fuera queda una sola hoja
+     * y ese índice apunta a una que no existe: Excel da el libro por
+     * corrupto, no lo abre por COM y al repararlo descarta el dibujo
+     * («Parte quitada: /xl/drawings/drawing1.xml»), o sea todas las imágenes.
+     * Pasaba en cada destinación que iba sin palets (palet 0). Se comprobó
+     * abriendo los dos libros con Excel: con la hoja de palets, el mismo
+     * dibujo abre bien.
+     */
+    @Test
+    void laPrimeraPestanaVisibleExisteAunqueSeQuiteLaHojaDePalets() throws IOException {
+        for (AmiEtiquetaLayout layout : List.of(AmiEtiquetaLayout.CHINA, AmiEtiquetaLayout.JAPAN,
+                AmiEtiquetaLayout.FRANCE)) {
+            for (var palets : List.of(List.<AmiEtiquetasExcelBuilder.EtiquetaPaletAmi>of(), List.of(PALET_1))) {
+                try (XSSFWorkbook libro = abrir(conPalets(layout, palets))) {
+                    assertEquals(0, libro.getFirstVisibleTab(),
+                            layout.nombreHoja() + " con " + palets.size() + " palets");
+                    assertEquals(0, libro.getActiveSheetIndex());
+                }
+            }
+        }
+    }
+
     @Test
     void escribeElRangoDeCajasYElPesoDeCadaPalet() throws IOException {
         byte[] excel = conPalets(AmiEtiquetaLayout.JAPAN, List.of(PALET_1, PALET_2, PALET_3));
