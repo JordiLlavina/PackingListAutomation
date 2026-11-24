@@ -248,7 +248,16 @@
                  las dependencias exactas del package-lock.json (npm ci),
                  construye en generate-resources, antes de que Maven copie los
                  recursos, y pasa los tests de Vitest con los de Java en la
-                 fase test (-DskipTests también se los salta). -->
+                 fase test (-DskipTests también se los salta).
+
+                 Los <?m2e ignore?> de cada ejecución son para el IDE, no para
+                 Maven: el plugin trae de fábrica la orden de ejecutarse en
+                 cada compilación incremental de Eclipse/VS Code (m2e), así
+                 que el IDE lanzaba por su cuenta npm ci + build + vitest cada
+                 vez que veía cambiar el proyecto. Y npm ci BORRA node_modules:
+                 si coincidía con un mvn de la terminal, Vite fallaba con un
+                 ENOENT de un fichero cualquiera de node_modules. La PWA la
+                 construye solo Maven. -->
             <plugin>
                 <groupId>com.github.eirslett</groupId>
                 <artifactId>frontend-maven-plugin</artifactId>
@@ -260,6 +269,7 @@
                 </configuration>
                 <executions>
                     <execution>
+                        <?m2e ignore?>
                         <id>install-node-and-npm</id>
                         <goals>
                             <goal>install-node-and-npm</goal>
@@ -270,6 +280,7 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <?m2e ignore?>
                         <id>npm-ci</id>
                         <goals>
                             <goal>npm</goal>
@@ -280,6 +291,7 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <?m2e ignore?>
                         <id>npm-run-build</id>
                         <goals>
                             <goal>npm</goal>
@@ -290,6 +302,7 @@
                         </configuration>
                     </execution>
                     <execution>
+                        <?m2e ignore?>
                         <id>npm-test</id>
                         <goals>
                             <goal>npm</goal>
