@@ -1,6 +1,6 @@
 # Skills y plugins de Claude Code: qué hay en este PC y qué instalar en otro
 
-Inventario tomado el 2026-11-24 del PC de casa (`~/.claude/`). Sirve para dejar
+Inventario tomado el 2026-11-24 de este PC (`~/.claude/`). Sirve para dejar
 otro PC igual. Todo sale del marketplace oficial
 `claude-plugins-official` (https://github.com/anthropics/claude-plugins-official).
 
