@@ -5,6 +5,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
@@ -48,9 +49,11 @@ public record PackingFormatoPuntotres(
         notas = notas == null ? List.of()
                 : notas.stream().map(nota -> nota == null ? Nota.de() : nota).toList();
         resumen = resumen == null ? new Resumen(null, null) : resumen;
+        int totalFilas = filas.size();
         avisos = avisos == null ? List.of()
                 : avisos.stream().filter(a -> a != null && a.texto() != null
-                        && !a.texto().isBlank()).toList();
+                        && !a.texto().isBlank())
+                        .flatMap(a -> a.porFila(totalFilas).stream()).toList();
     }
 
     /** El membrete del taller, que va encima de la tabla como en el formato Puntotres. */
@@ -157,16 +160,44 @@ public record PackingFormatoPuntotres(
      */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Aviso(Integer fila, String columna, String texto, Boolean revisar,
-                        String consecuencia) {
+                        String consecuencia, Integer hastaFila) {
 
         /** Lo que se lee a la vista de un aviso del modelo: todos son dudas suyas. */
         public static final String DUDA_DE_LECTURA = "duda de lectura de la IA";
 
+        @JsonCreator
         public Aviso {
             columna = columna == null ? "" : columna.trim();
             revisar = revisar == null || revisar;
             consecuencia = consecuencia == null || consecuencia.isBlank() ? DUDA_DE_LECTURA
                     : consecuencia;
+            hastaFila = fila == null || hastaFila == null || hastaFila <= fila ? null : hastaFila;
+        }
+
+        /** Un aviso de una sola fila (o del fichero entero, con {@code fila} null). */
+        public Aviso(Integer fila, String columna, String texto, Boolean revisar,
+                     String consecuencia) {
+            this(fila, columna, texto, revisar, consecuencia, null);
+        }
+
+        /**
+         * El aviso repartido en uno por fila. El modelo da un RANGO
+         * ({@code fila}..{@code hastaFila}) cuando la misma interpretación
+         * vale para varias filas seguidas —el color que el taller escribe una
+         * vez y heredan las de debajo—, para no repetir el aviso quince veces;
+         * pero el amarillo y el comentario tienen que ir en CADA celda
+         * interpretada, por decisión del usuario, así que aquí se reparte. El
+         * rango se recorta a las filas que existen.
+         */
+        List<Aviso> porFila(int totalFilas) {
+            if (hastaFila == null) {
+                return List.of(this);
+            }
+            List<Aviso> repartidos = new ArrayList<>();
+            for (int f = fila; f <= Math.min(hastaFila, Math.max(fila, totalFilas)); f++) {
+                repartidos.add(new Aviso(f, columna, texto, revisar, consecuencia));
+            }
+            return repartidos;
         }
 
         public static Aviso general(String texto) {

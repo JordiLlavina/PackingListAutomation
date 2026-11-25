@@ -202,7 +202,7 @@ class ConversionFormatoTallerServiceTest {
                 "destinacion", "codigoCliente", "unidadesPorCaja", "cantidad", "cajas",
                 "pesoBrutoCaja", "medidaCaja"), nombres(fila.get("required")));
         assertFalse(fila.get("additionalProperties").asBoolean());
-        assertEquals(List.of("fila", "columna", "texto", "consecuencia"),
+        assertEquals(List.of("fila", "hastaFila", "columna", "texto", "consecuencia"),
                 nombres(esquema.at("/properties/avisos/items/required")));
         // Las columnas que el modelo puede nombrar son las de la tabla, por su campo.
         List<String> columnas = nombres(esquema.at("/properties/avisos/items/properties/columna/enum"));
@@ -210,7 +210,7 @@ class ConversionFormatoTallerServiceTest {
             assertTrue(columnas.contains(columna.campo()), columna.campo());
         }
         // Solo los números admiten null: la API limita a 16 los campos con unión.
-        assertEquals(6, ConversionFormatoTallerService.ESQUEMA.split("\"null\"").length - 1);
+        assertEquals(7, ConversionFormatoTallerService.ESQUEMA.split("\"null\"").length - 1);
         // Y el SDK lo acepta tal cual.
         assertTrue(ConversionFormatoTallerService.esquema()._additionalProperties()
                 .containsKey("required"));
@@ -254,6 +254,10 @@ class ConversionFormatoTallerServiceTest {
         // Los avisos, cortos; las notas, un solo aviso y con su color.
         assertTrue(apc.contains("Bien: \"Hay una tabla con cajas con problemas\""));
         assertTrue(apc.contains("[letra #RRGGBB]"));
+        // Toda celda interpretada se avisa, también las que heredan.
+        assertTrue(apc.contains("TODA CELDA INTERPRETADA LLEVA AVISO"));
+        assertTrue(apc.contains("son catorce celdas amarillas"));
+        assertTrue(apc.contains("\"CHINE\" → CHINE FRANCH"));
 
         String ami = ConversionFormatoTallerService.promptPara(TipoPlantilla.AMI)
                 .replaceAll("\\s+", " ");
@@ -262,6 +266,37 @@ class ConversionFormatoTallerServiceTest {
     }
 
     // --- La respuesta ---
+
+    /**
+     * Un aviso con rango ("AMARILLO" escrito una vez y heredado) se reparte
+     * en uno por fila, para que el amarillo vaya en cada celda; el rango se
+     * recorta a las filas que hay.
+     */
+    @Test
+    void unAvisoConRangoSeRepartePorFila() {
+        ConversionFormatoTallerService servicio = new ConversionFormatoTallerService(new ObjectMapper());
+        String fila = """
+                {"envio": "", "cliente": "APC", "motivo": "", "referencia": "67008",
+                 "color": "DAB", "talla": "U", "destinacion": "JAPAN", "codigoCliente": "915",
+                 "unidadesPorCaja": 10, "cantidad": 10, "cajas": "1", "pesoBrutoCaja": null,
+                 "medidaCaja": ""}""";
+        PackingFormatoPuntotres packing = servicio.parsear("""
+                {"hoja": "H", "hojasNoConvertidas": [], "cabecera": null,
+                 "filas": [%s, %s, %s],
+                 "notas": [], "resumen": null,
+                 "avisos": [{"fila": 1, "hastaFila": 9, "columna": "color",
+                             "texto": "AMARILLO es DAB", "consecuencia": "color aproximado"},
+                            {"fila": 2, "hastaFila": null, "columna": "destinacion",
+                             "texto": "CHINE", "consecuencia": "destinación interpretada"}]}
+                """.formatted(fila, fila, fila));
+
+        List<PackingFormatoPuntotres.Aviso> color = packing.avisos().stream()
+                .filter(a -> a.celda() == PackingFormatoPuntotres.Columna.COLOR).toList();
+        assertEquals(List.of(1, 2, 3), color.stream().map(PackingFormatoPuntotres.Aviso::fila).toList());
+        assertTrue(color.stream().allMatch(a -> a.texto().equals("AMARILLO es DAB")
+                && a.hastaFila() == null && "color aproximado".equals(a.consecuencia())));
+        assertEquals(4, packing.avisos().size());
+    }
 
     @Test
     void laRespuestaSeLeeConSusAvisosPorFilaYSuResumen() {

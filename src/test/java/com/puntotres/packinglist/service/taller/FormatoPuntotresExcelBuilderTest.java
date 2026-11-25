@@ -161,10 +161,12 @@ class FormatoPuntotresExcelBuilderTest {
     /**
      * El amarillo y el comentario van a LA CELDA de la columna con la duda,
      * nunca a la fila entera: la duda del envío se ve en PUNTOTRES ENVOI, la
-     * del color en COULEUR. Lo informativo lleva comentario pero no amarillo.
+     * del color en COULEUR. Lo informativo (lo que Java completa del pedido)
+     * va igual en amarillo: el amarillo marca todo lo que no es copia literal
+     * de la hoja del taller, por decisión del usuario.
      */
     @Test
-    void cadaAvisoVaASuCeldaYSoloLaDudaSePintaDeAmarillo() throws Exception {
+    void cadaAvisoVaASuCeldaYTodaCeldaConAvisoVaEnAmarillo() throws Exception {
         byte[] excel = FormatoPuntotresExcelBuilder.construir(packing(List.of(), List.of(
                 Aviso.deFila(2, Columna.COLOR, "el color no cuadra",
                         "El pedido 711 es en LZZ y la hoja dice KAN"),
@@ -197,13 +199,13 @@ class FormatoPuntotresExcelBuilderTest {
             assertEquals(FillPatternType.NO_FILL,
                     conDudas.getCell(colCantidad).getCellStyle().getFillPattern());
             assertNull(conDudas.getCell(colCantidad).getCellComment());
-            // La referencia de esa fila solo tiene lo informativo: comentario sin amarillo.
-            assertEquals(FillPatternType.NO_FILL,
+            // La referencia de esa fila solo tiene lo informativo: amarilla igual.
+            assertEquals(FillPatternType.SOLID_FOREGROUND,
                     conDudas.getCell(colReferencia).getCellStyle().getFillPattern());
             assertTrue(conDudas.getCell(colReferencia).getCellComment().getString().getString()
                     .contains("PXCBC-F67008"));
 
-            assertEquals(FillPatternType.NO_FILL,
+            assertEquals(FillPatternType.SOLID_FOREGROUND,
                     informativa.getCell(colReferencia).getCellStyle().getFillPattern());
             assertNotNull(informativa.getCell(colReferencia).getCellComment());
 

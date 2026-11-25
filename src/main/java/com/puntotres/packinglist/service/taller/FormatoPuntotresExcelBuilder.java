@@ -5,10 +5,8 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.poi.ss.usermodel.BorderStyle;
 import org.apache.poi.ss.usermodel.Cell;
@@ -138,22 +136,25 @@ public final class FormatoPuntotresExcelBuilder {
 
     /**
      * Devuelve la primera fila libre después de la tabla. Cada aviso va a LA
-     * CELDA de su columna: ahí el comentario y, si pide revisión, el
-     * amarillo. Nunca la fila entera, por decisión del usuario: una fila
-     * entera amarilla no dice qué dato es el dudoso, y la duda del envío
-     * tiene que verse en PUNTOTRES ENVOI, no en REFERENCE.
+     * CELDA de su columna, con su comentario y en amarillo. Nunca la fila
+     * entera, por decisión del usuario: una fila entera amarilla no dice qué
+     * dato es el dudoso, y la duda del envío tiene que verse en PUNTOTRES
+     * ENVOI, no en REFERENCE.
+     *
+     * TODA celda con aviso va en amarillo, también la que Java completa de
+     * forma unívoca desde el pedido (un aviso informativo): por decisión del
+     * usuario, el amarillo marca lo que NO es copia literal de la hoja del
+     * taller, que es lo que hay que revisar con cuidado. La diferencia entre
+     * informativo y para revisar queda para la pantalla, que solo enseña lo
+     * segundo.
      */
     private static int escribirFilas(Sheet hoja, PackingFormatoPuntotres packing,
                                      Estilos estilos) {
         Map<Celda, List<String>> avisosPorCelda = new HashMap<>();
-        Set<Celda> celdasARevisar = new HashSet<>();
         for (PackingFormatoPuntotres.Aviso aviso : packing.avisos()) {
             if (aviso.fila() != null) {
                 Celda celda = new Celda(aviso.fila(), aviso.celda());
                 avisosPorCelda.computeIfAbsent(celda, c -> new ArrayList<>()).add(aviso.texto());
-                if (aviso.revisar()) {
-                    celdasARevisar.add(celda);
-                }
             }
         }
         Drawing<?> dibujo = hoja.createDrawingPatriarch();
@@ -173,7 +174,7 @@ public final class FormatoPuntotresExcelBuilder {
             for (PackingFormatoPuntotres.Columna columna : PackingFormatoPuntotres.Columna.values()) {
                 Celda posicion = new Celda(f + 1, columna);
                 Cell celda = fila.createCell(COL_INICIO + columna.indice());
-                celda.setCellStyle(celdasARevisar.contains(posicion) ? estilos.datoConAviso
+                celda.setCellStyle(avisosPorCelda.containsKey(posicion) ? estilos.datoConAviso
                         : estilos.dato);
                 Object valor = valores[columna.indice()];
                 if (valor instanceof Number numero) {

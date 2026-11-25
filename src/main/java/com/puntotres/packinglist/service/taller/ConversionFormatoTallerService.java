@@ -202,12 +202,13 @@ public class ConversionFormatoTallerService {
                   "type": "array",
                   "items": {
                     "type": "object", "additionalProperties": false,
-                    "required": ["fila", "columna", "texto", "consecuencia"],
+                    "required": ["fila", "hastaFila", "columna", "texto", "consecuencia"],
                     "properties": {
                       "fila": {"type": ["integer", "null"], "description": "Posición (desde 1) en filas de la fila a la que se refiere; null si habla del fichero entero"},
+                      "hastaFila": {"type": ["integer", "null"], "description": "Si la MISMA interpretación vale para varias filas seguidas, la última de ellas (desde 1); null si es solo la de 'fila'"},
                       "columna": {"type": "string", "enum": ["", "envio", "cliente", "motivo", "referencia", "color", "talla", "destinacion", "codigoCliente", "unidadesPorCaja", "cantidad", "cajas", "pesoBrutoCaja", "medidaCaja"], "description": "El campo de la fila con la duda: ahí se pinta la celda y va el comentario. \\"\\" si es de la fila entera o del fichero"},
                       "texto": {"type": "string"},
-                      "consecuencia": {"type": "string", "description": "Etiqueta corta (3-6 palabras) de la clase de aviso, la misma para todos los de esa clase: 'envío tomado de la factura', 'caja mixta', 'color aproximado', 'celda resaltada por el taller', 'lectura dudosa'. \\"\\" si no encaja en ninguna"}
+                      "consecuencia": {"type": "string", "description": "Etiqueta corta (3-6 palabras) de la clase de aviso, la misma para todos los de esa clase: 'envío tomado de la factura', 'caja mixta', 'color traducido', 'color aproximado', 'destinación interpretada', 'celda resaltada por el taller', 'lectura dudosa'. \\"\\" si no encaja en ninguna"}
                     }
                   }
                 }
@@ -363,10 +364,29 @@ public class ConversionFormatoTallerService {
                del excel) el taller anota cajas con problemas: cajas 41-45 con la
                etiqueta mal, caja 62 con 10 mal y caja 43 con 5 mal. Revisarlo antes de
                enviar." Bien: "Hay una tabla con cajas con problemas".
-               Un aviso es para una DUDA o para algo que hay que mirar. Lo que has
-               leído sin dudar no se avisa: qué columna has tomado para cada campo,
-               que la hoja no traiga totales, membrete o pesos, o qué has heredado de
-               la fila de encima.
+               No avises de cómo has leído la hoja: qué columna has tomado para cada
+               campo, que no traiga totales, membrete o pesos.
+
+            8b. TODA CELDA INTERPRETADA LLEVA AVISO. La aplicación pinta de amarillo
+               cada celda con aviso, y quien prepara el envío revisa a fondo
+               justo esas: una celda interpretada sin aviso pasa por copia literal
+               y nadie la mira. Interpretar es poner en una celda algo distinto de
+               lo que escribe el taller: traducir un color ("Negro" → LZZ), elegir el
+               más parecido ("Amarillo" → JAUNE CLAIR), completar una destinación
+               ("CHINE" → CHINE FRANCH), corregir una errata ("WHOLSEAL",
+               "G7008"), poner un dato que la hoja no da en esa fila. NO es
+               interpretar, y no se avisa: separar una celda mezclada en sus partes,
+               mayúsculas y espacios, normalizar los números de caja, una
+               equivalencia que esté LITERALMENTE en la lista de destinaciones del
+               bloque del cliente, ni heredar de la fila de encima un
+               valor que no has cambiado.
+               Lo interpretado se avisa en TODAS las filas donde está, también en
+               las que lo heredan: si el taller escribe "AMARILLO" una vez y lo
+               heredan las trece filas de debajo, son catorce celdas amarillas. Para
+               no repetir el aviso, uno solo con "fila" en la primera y "hastaFila"
+               en la última del tramo, siempre que la interpretación sea la misma en
+               todas y las filas vayan seguidas; si no, un aviso por fila o por
+               tramo. "hastaFila" null cuando es una sola fila.
 
             9. EL PEDIDO DEL CLIENTE. Si viene, es la lista de lo que el cliente ha pedido
                esta temporada, con su tabla de colores. Sirve para dos cosas y solo dos:
@@ -435,15 +455,16 @@ public class ConversionFormatoTallerService {
               búscalo en la TABLA DE COLORES del pedido ("código = nombre") comparando
               el COLOR y no las letras: la tabla está en francés y el taller escribe
               en español, en inglés o a su manera.
-                * Es el mismo color en otro idioma o con otra grafía: pon su código,
-                  sin aviso. "Negro" → LZZ si la tabla dice "LZZ = NOIR".
+                * Es el mismo color en otro idioma o con otra grafía: pon su código
+                  y un aviso en "color" con consecuencia "color traducido". "Negro"
+                  → LZZ si la tabla dice "LZZ = NOIR".
                 * No hay uno igual pero sí UNO parecido, que solo añade o quita un
                   matiz: pon su código y un aviso en "color" con consecuencia "color
                   aproximado" que diga qué escribe el taller y qué color de la tabla
                   has puesto. "Amarillo" → el código de "JAUNE CLAIR" si es el único
-                  amarillo de la tabla. El aviso va UNA vez, en la fila donde el
-                  taller escribe el color: las filas de debajo que lo heredan llevan
-                  el mismo código sin aviso.
+                  amarillo de la tabla.
+                En los dos casos el aviso cubre también las filas que heredan ese
+                color (regla 8b).
                 * Hay VARIOS igual de parecidos ("Amarillo" con "JAUNE CLAIR" y "JAUNE
                   MOUTARDE" en la tabla) o ninguno se parece ("CEREZA" sin ningún rojo):
                   copia el nombre tal cual. No elijas a ojo entre dos.
@@ -463,7 +484,11 @@ public class ConversionFormatoTallerService {
                 Japan / Japon / JA / JPT -> JAPAN
                 Korea / Corée / KRT -> KOREA
                 Ivry -> IVRY
-              Si la hoja dice otra, cópiala tal cual y avisa. Una línea con DOS códigos
+              Si la hoja dice una que no está en la lista pero se reconoce ("CHINE"
+              → CHINE FRANCH, "WHOLSEAL" → WHOLESALE), pon la de la lista con un aviso
+              en "destinacion" con consecuencia "destinación interpretada" (en todas
+              sus filas, regla 8b); si no se reconoce, cópiala tal cual y avisa. Una
+              línea con DOS códigos
               de pedido ("WHOLSEAL 930/948", "DOUANES USA 711/WHO 723") se parte en dos
               filas, una por código, como dice la regla 2.
             - "codigoCliente": el código de pedido de TRES cifras SOLO si el taller lo

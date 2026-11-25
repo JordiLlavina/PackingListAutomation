@@ -249,17 +249,19 @@
     </form>
     <!-- «Cargar Sesión»: los envíos que llegaron a la revisión se guardan
          solos (menos los de CON TEXTO, que es de pruebas) y aquí se vuelve a
-         ellos. Van todas las sesiones en la página y el script enseña las
-         del cliente elegido arriba. Fuera del formulario de entrada porque
+         ellos. Van todas las sesiones en la página, la más reciente primero,
+         y el script enseña las del cliente elegido arriba; sin cliente, todas,
+         con la columna Cliente. Fuera del formulario de entrada porque
          cada fila lleva el suyo, y sin botón al pie: «Cargar» va directo a la
          revisión. -->
     <section id="bloqueSesiones" class="tarjeta sesiones-guardadas" style="display: none">
-        <p class="ayuda" id="sesionesSinCliente">Elige un cliente para ver sus sesiones guardadas.</p>
         <p class="ayuda" id="sesionesVacio" style="display: none">Este cliente no tiene ninguna sesión guardada.</p>
+        <p class="ayuda" id="sesionesNinguna" style="display: none">No hay ninguna sesión guardada.</p>
         <table id="tablaSesiones" style="display: none">
             <thead>
             <tr>
                 <th>Creada</th>
+                <th class="c-cliente-sesion">Cliente</th>
                 <th>Temporada</th>
                 <th>Factura</th>
                 <th>Destinaciones</th>
@@ -269,6 +271,8 @@
             <tbody>
             <tr th:each="sesion : ${sesiones}" th:data-cliente="${sesion.cliente}">
                 <td class="c-fecha-sesion" th:text="${#temporals.format(sesion.creada, 'dd/MM/yyyy HH:mm')}"></td>
+                <td class="c-cliente-sesion"
+                    th:text="${clientes[sesion.cliente] != null ? clientes[sesion.cliente].nombre : sesion.cliente}"></td>
                 <td th:text="${sesion.temporada}"></td>
                 <td th:text="${sesion.facturas}"></td>
                 <td th:text="${sesion.destinos}"></td>
@@ -436,21 +440,27 @@
 
         // --- Sesiones guardadas ---
 
-        // Enseña las sesiones del cliente elegido; sin cliente, o sin
-        // ninguna suya, lo dice en vez de dejar una tabla vacía.
+        // Enseña las sesiones del cliente elegido; sin cliente, todas (ya
+        // vienen la más reciente primero) con la columna Cliente, que con
+        // uno elegido sobra. Sin ninguna que enseñar lo dice en vez de dejar
+        // una tabla vacía.
         function pintarSesiones() {
             const cliente = document.getElementById('cliente').value;
             let visibles = 0;
             document.querySelectorAll('#tablaSesiones tbody tr').forEach(function (fila) {
-                const suya = cliente !== '' && fila.dataset.cliente === cliente;
+                const suya = cliente === '' || fila.dataset.cliente === cliente;
                 fila.style.display = suya ? '' : 'none';
                 if (suya) {
                     visibles++;
                 }
             });
-            document.getElementById('sesionesSinCliente').style.display = cliente === '' ? '' : 'none';
+            document.querySelectorAll('#tablaSesiones .c-cliente-sesion').forEach(function (celda) {
+                celda.style.display = cliente === '' ? '' : 'none';
+            });
             document.getElementById('sesionesVacio').style.display =
                 cliente !== '' && visibles === 0 ? '' : 'none';
+            document.getElementById('sesionesNinguna').style.display =
+                cliente === '' && visibles === 0 ? '' : 'none';
             document.getElementById('tablaSesiones').style.display = visibles > 0 ? '' : 'none';
         }
 
