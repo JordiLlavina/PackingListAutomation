@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Hojas de Producción')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Hojas de Producción')}"></header>
+<main class="hp">
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="hp-intro">
+        <p class="ayuda">
+            El excel que se manda al taller externo con lo que tiene que hacer de un modelo: un color por línea,
+            con pieles, hilo, marcados, fornitura, forro y tinta. La hoja queda guardada para volver a ella.
+            <span th:if="${importada != null}" th:text="|Abierta desde la hoja ${importada.numero()} de ${importada.taller()}.|"></span>
+        </p>
+        <a class="boton secundario" th:href="@{/hojas-produccion/antiguas}">Hojas guardadas</a>
+    </div>
+
+    <form id="formHoja" class="hp-formulario" th:action="@{/hojas-produccion/generar}" method="post"
+          enctype="multipart/form-data" th:object="${formulario}">
+
+        <!-- De dónde sale el modelo: cliente, temporada guardada y artículo,
+             como en la info de embalaje pero sin subir el excel de pedido.
+             Elegir el artículo rellena la cabecera de la hoja y el primer
+             color; nada de esto se guarda tal cual, es solo para cargar. -->
+        <div class="tarjeta hp-origen">
+            <div class="hp-o-cliente">
+                <label for="cliente">Cliente</label>
+                <select id="cliente" th:field="*{cliente}" required>
+                    <option value="">-- elige --</option>
+                    <option th:each="c : ${clientes}" th:value="${c.key}" th:text="${c.value}"></option>
+                </select>
+            </div>
+            <div class="hp-o-temporada campo-sugerido">
+                <label for="temporada" class="etiqueta-con-accion">
+                    <span>Temporada</span>
+                    <a class="lapiz" th:href="@{/temporadas}" target="_blank" rel="noopener"
+                       title="Añadir, editar o borrar temporadas guardadas (se abre en otra pestaña)"
+                       aria-label="Editar las temporadas guardadas">&#9998;</a>
+                </label>
+                <input type="text" th:field="*{temporada}" maxlength="60" placeholder="SMS FALL 27">
+                <select id="temporadaGuardada" class="hp-sugerencia" aria-label="Elegir una temporada guardada del cliente">
+                    <option value="">todo el catálogo del cliente</option>
+                </select>
+            </div>
+            <div class="hp-o-articulo">
+                <label for="articulo">Artículo</label>
+                <!-- El mismo desplegable que el de la info de embalaje: letra de
+                     ancho fijo y el nombre del bolso en columna. -->
+                <select id="articulo" class="hp-articulo-select" disabled>
+                    <option value="">Elige el cliente para ver sus artículos</option>
+                </select>
+                <p class="ayuda">Rellena el modelo, el nombre del bolso, la foto y el primer color con lo que ya sabe el catálogo.</p>
+            </div>
+        </div>
+
+        <!-- La cabecera de la hoja, en el orden del excel: la foto a la
+             izquierda y el modelo con sus datos a la derecha. -->
+        <div class="tarjeta hp-cabecera">
+            <div class="hp-foto" id="panelFoto">
+                <img id="foto" alt="Foto del modelo" hidden>
+                <div class="hp-foto-vacia" id="fotoVacia">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                         stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/>
+                        <circle cx="9" cy="10" r="1.8"/>
+                        <path d="m21 16-5-5-8 8"/>
+                    </svg>
+                    <span id="fotoVaciaTexto">Este modelo no tiene foto en el catálogo.</span>
+                    <button type="button" class="mini" id="subirFoto">Subir una foto</button>
+                </div>
+                <div class="hp-foto-acciones">
+                    <button type="button" class="enlace" id="cambiarFoto" hidden>Usar otra foto</button>
+                    <button type="button" class="enlace" id="quitarFotoSubida" hidden>Quitar la foto subida</button>
+                </div>
+                <input type="file" id="fotoSubida" name="fotoSubida" accept="image/*,.heic,.heif" hidden>
+                <input type="hidden" th:field="*{fotoId}">
+                <input type="hidden" th:field="*{fotoHojaId}">
+                <input type="hidden" th:field="*{codigoModelo}">
+            </div>
+
+            <div class="hp-datos">
+                <div class="hp-d-modelo">
+                    <label for="modelo">Modelo</label>
+                    <input type="text" th:field="*{modelo}" maxlength="80" class="hp-modelo" placeholder="F67104">
+                </div>
+                <div class="hp-d-bolso">
+                    <label for="nombreBolso">Nombre del bolso</label>
+                    <input type="text" th:field="*{nombreBolso}" maxlength="200" placeholder="LE NEIGE">
+                </div>
+                <div class="hp-d-taller campo-sugerido">
+                    <label for="taller">Taller</label>
+                    <input type="text" th:field="*{taller}" maxlength="60" required autocomplete="off">
+                    <select id="tallerSugerido" class="hp-sugerencia" aria-label="Elegir el taller">
+                        <option value="">elegir…</option>
+                        <option th:each="t : ${talleres}" th:value="${t}" th:text="${t}"></option>
+                    </select>
+                </div>
+                <div class="hp-d-numero">
+                    <label for="numero">Nº de hoja</label>
+                    <input type="number" th:field="*{numero}" min="1" step="1" class="hp-numero">
+                    <p class="ayuda" id="ayudaNumero" th:if="${importada != null}">
+                        El de la hoja importada. El siguiente libre de <span th:text="${importada.taller()}"></span>
+                        es el <span th:text="${siguienteNumero}"></span>.
+                        <button type="button" class="enlace" id="usarSiguiente">Usar el siguiente</button>
+                    </p>
+                </div>
+                <div class="hp-d-fecha">
+                    <label for="fechaSalida">Fecha de salida</label>
+                    <input type="date" th:field="*{fechaSalida}">
+                </div>
+            </div>
+        </div>
+
+        <div id="lineas">
+            <th:block th:each="l, estado : *{lineas}">
+                <div th:replace="~{hojas-produccion-fragmentos :: linea(${estado.index}, ${l})}"></div>
+            </th:block>
+        </div>
+        <template id="plantillaLinea">
+            <div th:replace="~{hojas-produccion-fragmentos :: linea(0, null)}"></div>
+        </template>
+        <button type="button" class="hp-anadir" id="anadirLinea">+ Añadir color</button>
+
+        <div class="hp-pie">
+            <button type="submit" id="botonGenerar">Generar hoja de producción</button>
+            <a class="boton neutro" th:href="@{/menu}">← Volver</a>
+            <div id="resultadoGenerar" role="status"></div>
+        </div>
+    </form>
+</main>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    window.HP = {
+        temporadas: /*[[${temporadasJs}]]*/ {},
+        tamanosPorCliente: /*[[${tamanosPorCliente}]]*/ {},
+        tamanoPorDefecto: /*[[${tamanoPorDefecto}]]*/ {},
+        siguientesPorTaller: /*[[${siguientesPorTaller}]]*/ {},
+        marcadoPorTaller: /*[[${marcadoPorTaller}]]*/ {},
+        conImportada: /*[[${importada != null}]]*/ false,
+        urlCatalogo: /*[[@{/hojas-produccion/catalogo}]]*/ '/hojas-produccion/catalogo',
+        urlFotoCatalogo: /*[[@{/catalogo/foto/}]]*/ '/catalogo/foto/',
+        urlFotoHoja: /*[[@{/hojas-produccion/antiguas/}]]*/ '/hojas-produccion/antiguas/'
+    };
+    /*]]>*/
+</script>
+<script th:src="@{/hoja-produccion.js}"></script>
+</body>
+</html>

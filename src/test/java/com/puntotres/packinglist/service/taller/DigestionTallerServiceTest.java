@@ -10,7 +10,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.persistence.MemoriaReferencias;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 import com.puntotres.packinglist.testutil.PackingTallerExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 
@@ -36,8 +38,23 @@ class DigestionTallerServiceTest {
                 PedidoAmiExcel.Fila.pedida(referencia, color, "U", "07001 CH", cantidad));
     }
 
+    @Autowired
+    private CatalogoModelos catalogo;
+
+    @Autowired
+    private CatalogoTaras taras;
+
     private DigestionTaller digerir(byte[] taller, byte[] pedido) throws Exception {
         return digestion.digerir("AMI", taller, pedido);
+    }
+
+    /**
+     * Lo que se aprendió en una entrega anterior. La memoria solo vale para
+     * los artículos del catálogo, así que primero se da de alta.
+     */
+    private void recordar(String referencia, String medidaCaja, int unidadesPorCaja) {
+        catalogo.asegurarArticulo("AMI", referencia);
+        memoria.recordarCaja("AMI", referencia, medidaCaja, unidadesPorCaja);
     }
 
     @Test
@@ -70,7 +87,7 @@ class DigestionTallerServiceTest {
 
     @Test
     void laMemoriaGanaALoQueSugiereElTaller() throws Exception {
-        memoria.recordar("AMI", "CON-MEMORIA", "60x40x30", 6);
+        recordar("CON-MEMORIA", "60x40x30", 6);
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "CON-MEMORIA", "NOIR", 20)
                         .conUnidadesPorCaja(10));
@@ -131,7 +148,7 @@ class DigestionTallerServiceTest {
         // el peso que alguien acaba de poner en la báscula; la memoria, el
         // envío anterior. Las unidades por caja no cambian de fuente: siguen
         // siendo las de la memoria, que es lo que una persona dio por bueno.
-        memoria.recordar("AMI", "CAJA-TALLER", "60x40x30", 6);
+        recordar("CAJA-TALLER", "60x40x30", 6);
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "CAJA-TALLER", "NOIR", 20)
                         .conUnidadesPorCaja(6)
@@ -148,7 +165,8 @@ class DigestionTallerServiceTest {
 
     @Test
     void siElTallerYLaMemoriaNoCuadranSeAvisaEnLaReferencia() throws Exception {
-        memoria.recordar("AMI", "NO-CUADRA", "60x40x30", 6, 5.0);
+        recordar("NO-CUADRA", "60x40x30", 6);
+        memoria.recordarPesoUnidad("AMI", "NO-CUADRA", 0.8);
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "NO-CUADRA", "NOIR", 20)
                         .conUnidadesPorCaja(6)
@@ -169,7 +187,7 @@ class DigestionTallerServiceTest {
     void siElTallerYLaMemoriaDicenLoMismoNoSeAvisaDeNada() throws Exception {
         // Lo normal es que coincidan, y un aviso que sale siempre entierra a
         // los que sí hay que leer.
-        memoria.recordar("AMI", "CUADRA", "60x40x40", 6);
+        recordar("CUADRA", "60x40x40", 6);
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "CUADRA", "NOIR", 20)
                         .conUnidadesPorCaja(6)
@@ -204,7 +222,7 @@ class DigestionTallerServiceTest {
         // El peso que se enseña es el de una caja LLENA y el programa escala
         // con él las que van a medias. Si la fila pesada llevaba otra
         // cantidad, no es un peso de menos: es el de otro bulto.
-        memoria.recordar("AMI", "PESO-A-MEDIAS", "60x40x40", 10);
+        recordar("PESO-A-MEDIAS", "60x40x40", 10);
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "PESO-A-MEDIAS", "NOIR", 6)
                         .conUnidadesPorCaja(6).conPesoBrutoCaja(9.0));
@@ -218,7 +236,8 @@ class DigestionTallerServiceTest {
 
     @Test
     void sinPesoEnLaHojaMandaElDeLaMemoria() throws Exception {
-        digestion.memorizar("AMI", pesada("SOLO-MEMORIA", 12.5));
+        recordar("SOLO-MEMORIA", "60x40x40", 10);
+        memoria.recordarPesoUnidad("AMI", "SOLO-MEMORIA", 1.1);
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "SOLO-MEMORIA", "NOIR", 20)
                         .conMedidaCaja("60x40x40"));
@@ -226,7 +245,7 @@ class DigestionTallerServiceTest {
         GrupoReferencia grupo = digerir(taller, pedidoDe("SOLO-MEMORIA", "NOIR", 20))
                 .getGrupos().get(0);
 
-        assertEquals(12.5, grupo.getPesoBrutoKg(), 0.011);
+        assertEquals(cajaLlena(1.1, 10, "60x40x40"), grupo.getPesoBrutoKg(), 0.011);
     }
 
     @Test
@@ -418,6 +437,25 @@ class DigestionTallerServiceTest {
                 .getObjetivos().get(0).pedido());
         assertEquals(30, resultado.getGrupos().get(0).getFilas().get(0).totalObjetivo(),
                 "la cantidad, en cambio, es la que ha mandado el taller");
+    }
+
+    /**
+     * La hoja del taller también puede traer la referencia al revés,
+     * artículo-piel: se le da la vuelta al leerla, así que encuentra su
+     * pedido y la pantalla de ajuste la enseña en el orden del cliente.
+     */
+    @Test
+    void enApcUnaReferenciaAlRevesEncuentraSuPedido() throws Exception {
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("APC", "F63024-PXCBC", "KAN", 12)
+                        .conCode("682").conUnidadesPorCaja(10));
+
+        DigestionTaller resultado = digestion.digerir("APC", taller, pedidoRealDeApc());
+
+        GrupoReferencia grupo = resultado.getGrupos().get(0);
+        assertEquals("PXCBC-F63024", grupo.getReferencia());
+        assertEquals(1, grupo.getFilas().get(0).getObjetivos().size(), resultado.getAvisos().toString());
+        assertEquals("4100128682", grupo.getFilas().get(0).getObjetivos().get(0).pedido());
     }
 
     @Test
@@ -660,6 +698,7 @@ class DigestionTallerServiceTest {
 
     @Test
     void generarMemorizaLoQueSeHaUsado() throws Exception {
+        catalogo.asegurarArticulo("AMI", "APRENDIDA");
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "APRENDIDA", "NOIR", 20).conUnidadesPorCaja(7));
         DigestionTaller resultado = digerir(taller, pedidoDe("APRENDIDA", "NOIR", 20));
@@ -669,77 +708,120 @@ class DigestionTallerServiceTest {
         assertEquals(7, memoria.buscar("AMI", "APRENDIDA").orElseThrow().unidadesPorCaja());
     }
 
-    // --- El peso se recuerda en neto ---
-
-    private DigestionTaller pesada(String referencia, double pesoBrutoKg) throws Exception {
+    @Test
+    void sinElArticuloEnElCatalogoNoSeMemorizaNiSeDaDeAlta() throws Exception {
+        // Decisión del usuario: el packing no da de alta modelos. Lo que no
+        // está en el catálogo no se recuerda, y se carga en /carga-modelos.
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("AMI", referencia, "NOIR", 20).conUnidadesPorCaja(10));
-        DigestionTaller resultado = digerir(taller, pedidoDe(referencia, "NOIR", 20));
-        resultado.getGrupos().get(0).corregir("60x40x40", 10, pesoBrutoKg);
-        return resultado;
+                PackingTallerExcel.Fila.de("AMI", "FUERA-CATALOGO", "NOIR", 20).conUnidadesPorCaja(7));
+        DigestionTaller resultado = digerir(taller, pedidoDe("FUERA-CATALOGO", "NOIR", 20));
+
+        digestion.memorizar("AMI", resultado);
+
+        assertTrue(memoria.buscar("AMI", "FUERA-CATALOGO").isEmpty());
+        assertTrue(catalogo.articulo("AMI", "FUERA-CATALOGO").isEmpty());
+    }
+
+    // --- El peso: se recuerda por unidad, y no desde el ajuste ---
+
+    /** El bruto de una caja llena con el peso por unidad recordado y el cartón de ahora. */
+    private double cajaLlena(double pesoUnidad, int unidades, String medida) {
+        return pesoUnidad * unidades + taras.taraPara(medida).orElseThrow();
     }
 
     @Test
-    void loQueSeRecuerdaEsElPesoNetoNoElBruto() throws Exception {
-        // El bruto lleva dentro la tara del cartón, que es un dato del almacén
-        // que se corrige cada vez que se vuelve a pesar y que cambia entero si
-        // la referencia pasa a otra caja. El neto es de la mercancía y no
-        // cambia. Se comprueba que le han quitado el cartón, y no contra el
-        // valor de la tara, que ningún test debe fijar.
-        digestion.memorizar("AMI", pesada("NETO-NO-BRUTO", 12.5));
-
-        Double neto = memoria.buscar("AMI", "NETO-NO-BRUTO").orElseThrow().pesoNetoKg();
-        assertTrue(neto != null && neto > 0 && neto < 12.5, "guardado sin el cartón");
-    }
-
-    @Test
-    void elPesoRecordadoVuelveComoBrutoEnLaSiguienteEntrega() throws Exception {
-        // Ida y vuelta: la tara se resta al guardar y se suma al recuperar, así
-        // que quien preparó el envío anterior ve el mismo peso que tecleó.
-        digestion.memorizar("AMI", pesada("IDA-Y-VUELTA", 12.5));
+    void elPesoPorUnidadRecordadoVuelveComoBrutoDeUnaCajaLlena() throws Exception {
+        // La memoria guarda el neto de UNA unidad: en pantalla se enseña el
+        // bruto de una caja llena, con las unidades por caja y la tara del
+        // cartón de ahora. Se compara contra la tara del catálogo, no contra
+        // un número fijo, que ningún test debe fijar.
+        recordar("IDA-Y-VUELTA", "60x40x40", 10);
+        memoria.recordarPesoUnidad("AMI", "IDA-Y-VUELTA", 1.15);
 
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "IDA-Y-VUELTA", "NOIR", 20));
         GrupoReferencia grupo = digerir(taller, pedidoDe("IDA-Y-VUELTA", "NOIR", 20))
                 .getGrupos().get(0);
 
-        assertEquals(12.5, grupo.getPesoBrutoKg(), 0.011);
+        assertEquals(cajaLlena(1.15, 10, "60x40x40"), grupo.getPesoBrutoKg(), 0.011);
         assertEquals(OrigenDato.MEMORIA, grupo.getOrigen());
     }
 
     @Test
-    void generarSinPesarNoBorraElPesoQueYaHabia() throws Exception {
-        digestion.memorizar("AMI", pesada("NO-SE-BORRA", 12.5));
+    void sinUnidadesPorCajaElPesoPorUnidadNoDaUnaCajaLlena() throws Exception {
+        catalogo.asegurarArticulo("AMI", "UNIDAD-SIN-CAJA");
+        memoria.recordarPesoUnidad("AMI", "UNIDAD-SIN-CAJA", 1.15);
+
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("AMI", "NO-SE-BORRA", "NOIR", 20)
-                        .conUnidadesPorCaja(10));
+                PackingTallerExcel.Fila.de("AMI", "UNIDAD-SIN-CAJA", "NOIR", 20));
+        GrupoReferencia grupo = digerir(taller, pedidoDe("UNIDAD-SIN-CAJA", "NOIR", 20))
+                .getGrupos().get(0);
 
-        // Segunda entrega, esta vez sin tocar la casilla del peso.
-        DigestionTaller sinPesar = digerir(taller, pedidoDe("NO-SE-BORRA", "NOIR", 20));
-        sinPesar.getGrupos().get(0).corregir("60x40x40", 10, null);
-        digestion.memorizar("AMI", sinPesar);
-
-        assertTrue(memoria.buscar("AMI", "NO-SE-BORRA").orElseThrow().pesoNetoKg() != null,
-                "pesar una caja cuesta bajarla a la báscula: no se tira por no repetirlo");
+        assertNull(grupo.getPesoBrutoKg(), "sin saber cuántas caben no hay caja llena que pesar");
     }
 
     @Test
-    void sinTaraConocidaNoSeRecuerdaUnPesoQueNoSeSabeSeparar() throws Exception {
-        // Sin tara no hay forma de separar cartón de mercancía. Antes que
-        // guardar un neto que en realidad es un bruto, no se guarda: la
-        // próxima vez se vuelve a pedir. (Ese cartón no está en el catálogo.)
+    void elPesoDeLaMemoriaNoLlegaALasCajas() throws Exception {
+        // Se enseña en el ajuste, pero no se escribe en las cajas: lo pondrá
+        // la revisión desde el catálogo, en gris. Si llegara a las cajas
+        // parecería pesado en este envío y se volvería a guardar como tal.
+        recordar("DE-MEMORIA", "60x40x40", 10);
+        memoria.recordarPesoUnidad("AMI", "DE-MEMORIA", 1.15);
         byte[] taller = PackingTallerExcel.crear(
-                PackingTallerExcel.Fila.de("AMI", "SIN-TARA", "NOIR", 20).conUnidadesPorCaja(10));
-        DigestionTaller resultado = digerir(taller, pedidoDe("SIN-TARA", "NOIR", 20));
-        resultado.getGrupos().get(0).corregir("77x77x77", 10, 12.5);
+                PackingTallerExcel.Fila.de("AMI", "DE-MEMORIA", "NOIR", 20));
+        DigestionTaller resultado = digerir(taller, pedidoDe("DE-MEMORIA", "NOIR", 20));
+        GrupoReferencia grupo = resultado.getGrupos().get(0);
+
+        // El formulario del ajuste devuelve el peso que enseñaba, sin tocarlo.
+        grupo.corregir("60x40x40", 10, grupo.getPesoBrutoKg());
+
+        assertNull(resultado.aFilasAjustadas().get(0).pesoBrutoKg());
+    }
+
+    @Test
+    void unPesoTecleadoEnElAjusteSiLlegaALasCajas() throws Exception {
+        recordar("TECLEADO", "60x40x40", 10);
+        memoria.recordarPesoUnidad("AMI", "TECLEADO", 1.15);
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "TECLEADO", "NOIR", 20));
+        DigestionTaller resultado = digerir(taller, pedidoDe("TECLEADO", "NOIR", 20));
+
+        resultado.getGrupos().get(0).corregir("60x40x40", 10, 15.0);
+
+        assertEquals(15.0, resultado.aFilasAjustadas().get(0).pesoBrutoKg());
+    }
+
+    @Test
+    void elPesoDeLaHojaDelTallerSiLlegaALasCajas() throws Exception {
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "PESO-HOJA", "NOIR", 20)
+                        .conUnidadesPorCaja(10).conMedidaCaja("60x40x40").conPesoBrutoCaja(12.0));
+
+        DigestionTaller resultado = digerir(taller, pedidoDe("PESO-HOJA", "NOIR", 20));
+
+        assertEquals(12.0, resultado.aFilasAjustadas().get(0).pesoBrutoKg());
+    }
+
+    @Test
+    void elAjusteYaNoGuardaElPeso() throws Exception {
+        // El peso se aprende al generar los excels en la revisión, que es
+        // donde se ve cada caja: así hay un solo sitio que lo guarda.
+        catalogo.asegurarArticulo("AMI", "SIN-PESO-EN-AJUSTE");
+        byte[] taller = PackingTallerExcel.crear(
+                PackingTallerExcel.Fila.de("AMI", "SIN-PESO-EN-AJUSTE", "NOIR", 20).conUnidadesPorCaja(10));
+        DigestionTaller resultado = digerir(taller, pedidoDe("SIN-PESO-EN-AJUSTE", "NOIR", 20));
+        resultado.getGrupos().get(0).corregir("60x40x40", 10, 12.5);
 
         digestion.memorizar("AMI", resultado);
 
-        assertNull(memoria.buscar("AMI", "SIN-TARA").orElseThrow().pesoNetoKg());
+        assertTrue(memoria.pesoNetoUnidad("AMI", "SIN-PESO-EN-AJUSTE").isEmpty());
+        assertEquals(10, memoria.buscar("AMI", "SIN-PESO-EN-AJUSTE").orElseThrow().unidadesPorCaja(),
+                "el cartón y las unidades sí");
     }
 
     @Test
     void noSeMemorizaUnaReferenciaQueSeHaQuedadoPendiente() throws Exception {
+        catalogo.asegurarArticulo("AMI", "NO-APRENDIDA");
         byte[] taller = PackingTallerExcel.crear(
                 PackingTallerExcel.Fila.de("AMI", "NO-APRENDIDA", "NOIR", 20));
         DigestionTaller resultado = digerir(taller, pedidoDe("NO-APRENDIDA", "NOIR", 20));

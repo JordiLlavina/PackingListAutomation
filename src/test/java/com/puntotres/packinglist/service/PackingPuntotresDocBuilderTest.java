@@ -140,8 +140,9 @@ class PackingPuntotresDocBuilderTest {
                     tabla.get(2));
             assertEquals(List.of("4", "1", "USL728", "221 DARK COFFEE", "", "4", "4", "60x40x40"),
                     tabla.get(3));
-            // El palet 2 no está declarado: sin medidas, y no pasa nada.
-            assertEquals(List.of("PALET 2 · cajas 5-6 · 2 cajas · 20 uds"), tabla.get(4));
+            // El palet 2 no está declarado: su medida sale de sus cajas, dos
+            // de 40 en un nivel más los 11 cm del palet vacío.
+            assertEquals(List.of("PALET 2 · cajas 5-6 · 2 cajas · 20 uds · 80x120x51"), tabla.get(4));
             assertEquals(List.of("5-6", "2", "USL728", "BLACK", "", "10", "20", "60x40x40"),
                     tabla.get(5));
             assertEquals(6, tabla.size());
@@ -159,7 +160,8 @@ class PackingPuntotresDocBuilderTest {
         try (XWPFDocument doc = generar(List.of(
                 new PackingPuntotresDocBuilder.Destino("CHINA", cajas, List.of())))) {
             List<List<String>> tabla = filas(doc.getTables().get(1));
-            assertEquals(List.of("PALET 1 · cajas 1-2 · 2 cajas · 28 uds"), tabla.get(1));
+            // La caja 1 ocupa tres líneas pero es un cartón: dos de 30 en un nivel.
+            assertEquals(List.of("PALET 1 · cajas 1-2 · 2 cajas · 28 uds · 80x120x41"), tabla.get(1));
             assertEquals(List.of("1", "1", "UBL029", "2221", "75", "6", "6", "60x40x30"), tabla.get(2));
             // Las líneas siguientes del mismo bulto no vuelven a contar la caja.
             assertEquals(List.of("1", "", "UBL029", "2221", "80", "6", "6", "60x40x30"), tabla.get(3));
@@ -178,7 +180,8 @@ class PackingPuntotresDocBuilderTest {
         try (XWPFDocument doc = generar(List.of(
                 new PackingPuntotresDocBuilder.Destino("CHINA", cajas, List.of())))) {
             List<List<String>> tabla = filas(doc.getTables().get(1));
-            assertEquals("PALET 1 · caja 3 · 1 caja · 10 uds", tabla.get(1).get(0));
+            // Las sueltas y las sin asignar no son un palet: sin medida.
+            assertEquals("PALET 1 · caja 3 · 1 caja · 10 uds · 80x120x51", tabla.get(1).get(0));
             assertEquals("SIN PALET (cajas sueltas) · caja 2 · 1 caja · 10 uds", tabla.get(3).get(0));
             assertEquals("SIN PALET ASIGNADO · caja 1 · 1 caja · 10 uds", tabla.get(5).get(0));
         }

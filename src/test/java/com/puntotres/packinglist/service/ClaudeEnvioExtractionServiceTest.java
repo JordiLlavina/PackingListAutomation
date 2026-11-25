@@ -76,6 +76,20 @@ class ClaudeEnvioExtractionServiceTest {
         assertTrue(ami.contains("CONTINUOS"));
     }
 
+    /**
+     * La referencia completa de APC es piel-artículo, y la operaria a veces
+     * la escribe al revés: el modelo tiene que darle la vuelta, y solo en
+     * APC (AMI tiene otra forma de referencia).
+     */
+    @Test
+    void elPromptDeApcEnsenaElOrdenPielArticulo() {
+        String apc = ClaudeEnvioExtractionService.promptPara(TipoPlantilla.APC).replaceAll("\\s+", " ");
+        assertTrue(apc.contains("REF.PIEL-REF.ARTÍCULO"));
+        assertTrue(apc.contains("\"F67008-PXCBC\" se escribe \"PXCBC-F67008\""));
+        String ami = ClaudeEnvioExtractionService.promptPara(TipoPlantilla.AMI);
+        assertFalse(ami.contains("REF.PIEL-REF.ARTÍCULO"));
+    }
+
     // --- adjuntos: PDF como documento, imagen como imagen ---
 
     @Test

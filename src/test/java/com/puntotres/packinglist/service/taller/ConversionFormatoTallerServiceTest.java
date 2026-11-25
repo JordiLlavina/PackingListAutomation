@@ -81,6 +81,22 @@ class ConversionFormatoTallerServiceTest {
     }
 
     /**
+     * El ejemplo de la caja con dos pedidos: el "930/948" llega tal cual, y
+     * las cajas con problemas de debajo van escritas en ROJO y sin fondo. Sin
+     * el color de la letra en el volcado esas notas saldrían en negro.
+     */
+    @Test
+    void laLetraDeColorDelTallerViajaEnElVolcado() throws Exception {
+        String texto = ConversionFormatoTallerService.textoDelLibro(
+                leer("/ejemplos/taller/packing taller caja con dos pedidos.xlsx"), null);
+
+        assertTrue(texto.contains("E11=WHOLSEAL 930/948"), texto);
+        assertTrue(texto.contains("C24=caja 62 [letra #FF0000] | D24=10 mal [letra #FF0000]"), texto);
+        // La letra negra de siempre no se anota.
+        assertTrue(texto.contains("G11=10\n"), texto);
+    }
+
+    /**
      * Lo que no es el valor y sí dice algo: un tachado (esa fila no va), un
      * fondo de color (así marcan algunos talleres las cajas malas), un
      * comentario y las celdas combinadas. Sin anotarlo, la única señal de
@@ -212,6 +228,9 @@ class ConversionFormatoTallerServiceTest {
         assertTrue(apc.contains("nunca las conviertas en filas"));
         assertTrue(apc.contains("Lo que NO debes hacer con él: elegir o deducir el código de pedido"));
         assertTrue(apc.contains("NO la completes con el prefijo del pedido"));
+        // Pero sí le da la vuelta a una referencia escrita al revés.
+        assertTrue(apc.contains("REF.PIEL-REF.ARTÍCULO"));
+        assertTrue(apc.contains("\"F67008-PXCBC\" se escribe \"PXCBC-F67008\""));
         assertTrue(apc.contains("NUNCA deduzcas el color por el código de pedido"));
         assertTrue(apc.contains("Son ORIENTATIVOS: la aplicación rehace el packing"));
         assertTrue(apc.contains("COPIANDO sus datos tal cual, sin normalizar ni avisar"));
@@ -221,6 +240,20 @@ class ConversionFormatoTallerServiceTest {
         // es el único dato que se toma de otra hoja.
         assertTrue(apc.contains("pon ese número en las filas de ese artículo y añade un aviso POR FILA"));
         assertTrue(apc.contains("Es el ÚNICO dato que se toma de otra hoja"));
+
+        // Una caja con dos pedidos se parte en dos filas sin cantidad, y el
+        // reparto y su aviso son de la aplicación.
+        assertTrue(apc.contains("LA ÚNICA LÍNEA QUE SE PARTE es la que lleva DOS PEDIDOS"));
+        assertTrue(apc.contains("null en todas esas filas"));
+        assertTrue(apc.contains("NO pongas aviso por partirla"));
+        // El color se busca en la tabla por parecido, no por letras, y nunca
+        // por el pedido.
+        assertTrue(apc.contains("comparando el COLOR y no las letras"));
+        assertTrue(apc.contains("\"ALPACA AMARILLO\" es AMARILLO"));
+        assertTrue(apc.contains("No elijas a ojo entre dos"));
+        // Los avisos, cortos; las notas, un solo aviso y con su color.
+        assertTrue(apc.contains("Bien: \"Hay una tabla con cajas con problemas\""));
+        assertTrue(apc.contains("[letra #RRGGBB]"));
 
         String ami = ConversionFormatoTallerService.promptPara(TipoPlantilla.AMI)
                 .replaceAll("\\s+", " ");
@@ -240,7 +273,8 @@ class ConversionFormatoTallerServiceTest {
                             "color": "LZZ", "talla": "U", "destinacion": "KOREA",
                             "codigoCliente": "690", "unidadesPorCaja": 10, "cantidad": 30,
                             "cajas": "1-3", "pesoBrutoCaja": null, "medidaCaja": null}],
-                 "notas": [["CAJA 27", "MAL"], [null, "x"]],
+                 "notas": [{"celdas": ["CAJA 27", "MAL"], "letra": "#ff0000", "fondo": ""},
+                           {"celdas": [null, "x"], "letra": null, "fondo": "rojo"}],
                  "resumen": {"unidadesTotales": 30, "cajasTotales": null},
                  "avisos": [{"fila": 1, "columna": "referencia", "texto": "El modelo pone G7008", "consecuencia": "lectura dudosa"},
                             {"fila": 1, "columna": "envio", "texto": "Envío 134 de la factura", "consecuencia": ""},
@@ -251,8 +285,12 @@ class ConversionFormatoTallerServiceTest {
         assertEquals(List.of("01-08"), packing.hojasNoConvertidas());
         assertEquals(1, packing.filas().size());
         assertEquals(30, packing.filas().get(0).cantidad());
-        assertEquals(List.of("CAJA 27", "MAL"), packing.notas().get(0));
-        assertEquals(List.of("", "x"), packing.notas().get(1));
+        assertEquals(List.of("CAJA 27", "MAL"), packing.notas().get(0).celdas());
+        assertEquals("#FF0000", packing.notas().get(0).letra());
+        assertEquals(List.of("", "x"), packing.notas().get(1).celdas());
+        // Lo que no es un color "#RRGGBB" se queda en nada.
+        assertEquals("", packing.notas().get(1).letra());
+        assertEquals("", packing.notas().get(1).fondo());
         assertEquals(30, packing.resumen().unidadesTotales());
         assertNull(packing.resumen().cajasTotales());
         // El aviso sin texto se descarta; el de fila conserva su fila y su

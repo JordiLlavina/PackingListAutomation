@@ -20,6 +20,20 @@
             </select>
             <noscript><button type="submit" class="mini">Ver</button></noscript>
         </form>
+        <!-- Las dos tablas del cliente en un excel para rellenarlas fuera, y de vuelta.
+             Importar abre el selector de ficheros y envía al elegir uno. -->
+        <div class="acciones-excel-colores">
+            <a class="boton secundario" id="exportarColores" th:href="@{/colores/excel(cliente=${cliente})}"
+               title="Descargar los colores y las pieles de este cliente en un excel para rellenarlo">Exportar excel</a>
+            <form th:action="@{/colores/importar}" method="post" enctype="multipart/form-data" id="formImportar">
+                <input type="hidden" name="cliente" th:value="${cliente}">
+                <input type="file" id="excelImportar" name="excel" accept=".xlsx" hidden
+                       onchange="if (this.files.length) this.form.submit()">
+                <button type="button" class="secundario" id="importarColores"
+                        title="Subir el excel exportado ya rellenado: añade lo nuevo y corrige lo cambiado; una casilla vacía no borra nada"
+                        onclick="document.getElementById('excelImportar').click()">Importar excel</button>
+            </form>
+        </div>
     </section>
 
     <!-- Las dos tablas son el mismo fragmento. Cada una va dentro del formulario de

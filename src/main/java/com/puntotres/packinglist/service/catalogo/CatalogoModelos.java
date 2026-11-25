@@ -85,11 +85,11 @@ public class CatalogoModelos {
 
     /** Los campos del artículo que se editan celda a celda. */
     public enum CampoArticulo {
-        MEDIDA_CAJA, UNIDADES_POR_CAJA, PESO_NETO_KG, FORRO, COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4;
+        MEDIDA_CAJA, UNIDADES_POR_CAJA, PESO_NETO_UNIDAD_KG, FORRO, COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4;
 
         /** El peso es de la piel y no se copia a las hermanas. */
         public boolean sePropaga() {
-            return this != PESO_NETO_KG;
+            return this != PESO_NETO_UNIDAD_KG;
         }
 
         /** Lo que vale ahora en el artículo, como texto: lo que la pantalla enseña y lo que se compara al propagar. */
@@ -98,7 +98,7 @@ public class CatalogoModelos {
                 case MEDIDA_CAJA -> articulo.getMedidaCaja();
                 case UNIDADES_POR_CAJA -> articulo.getUnidadesPorCaja() == null ? ""
                         : String.valueOf(articulo.getUnidadesPorCaja());
-                case PESO_NETO_KG -> articulo.getPesoNetoKg() == null ? "" : String.valueOf(articulo.getPesoNetoKg());
+                case PESO_NETO_UNIDAD_KG -> articulo.getPesoNetoUnidadKg() == null ? "" : String.valueOf(articulo.getPesoNetoUnidadKg());
                 case FORRO -> articulo.getForro();
                 case COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4 ->
                         articulo.getCasillasCombinacion().get(indiceCombinacion());
@@ -110,7 +110,7 @@ public class CatalogoModelos {
             switch (this) {
                 case MEDIDA_CAJA -> articulo.setMedidaCaja(valor);
                 case UNIDADES_POR_CAJA -> articulo.setUnidadesPorCaja(valor.isEmpty() ? null : Integer.valueOf(valor));
-                case PESO_NETO_KG -> articulo.setPesoNetoKg(valor.isEmpty() ? null : Double.valueOf(valor));
+                case PESO_NETO_UNIDAD_KG -> articulo.setPesoNetoUnidadKg(valor.isEmpty() ? null : Double.valueOf(valor));
                 case FORRO -> articulo.setForro(valor);
                 case COMBINACION1, COMBINACION2, COMBINACION3, COMBINACION4 ->
                         articulo.setCombinacion(indiceCombinacion(), valor);
@@ -144,7 +144,7 @@ public class CatalogoModelos {
                                 "Las unidades por caja son un número entero mayor que cero");
                     }
                 }
-                case PESO_NETO_KG -> {
+                case PESO_NETO_UNIDAD_KG -> {
                     try {
                         double peso = Double.parseDouble(limpio.replace(',', '.'));
                         if (!(peso > 0)) {

@@ -398,7 +398,7 @@ class CargadorModelosTest {
         Articulo articulo = catalogo.articulo("KAMI", "CMK540").orElseThrow();
         assertEquals("60x40x40", articulo.getMedidaCaja());
         assertEquals(10, articulo.getUnidadesPorCaja());
-        assertEquals(4.5, articulo.getPesoNetoKg());
+        assertEquals(4.5, articulo.getPesoNetoUnidadKg());
     }
 
     @Test

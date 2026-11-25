@@ -23,6 +23,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.springframework.stereotype.Service;
 
 import com.anthropic.client.AnthropicClient;
@@ -177,7 +178,18 @@ public class ConversionFormatoTallerService {
                     }
                   }
                 },
-                "notas": {"type": "array", "items": {"type": "array", "items": {"type": "string"}}},
+                "notas": {
+                  "type": "array",
+                  "items": {
+                    "type": "object", "additionalProperties": false,
+                    "required": ["celdas", "letra", "fondo"],
+                    "properties": {
+                      "celdas": {"type": "array", "items": {"type": "string"}, "description": "Las celdas no vacías de la fila, en orden, copiadas tal cual"},
+                      "letra": {"type": "string", "description": "El #RRGGBB de [letra ...] de sus celdas; \\"\\" si no lo llevan"},
+                      "fondo": {"type": "string", "description": "El #RRGGBB de [fondo ...] de sus celdas; \\"\\" si no lo llevan"}
+                    }
+                  }
+                },
                 "resumen": {
                   "type": "object", "additionalProperties": false,
                   "required": ["unidadesTotales", "cajasTotales"],
@@ -195,7 +207,7 @@ public class ConversionFormatoTallerService {
                       "fila": {"type": ["integer", "null"], "description": "Posición (desde 1) en filas de la fila a la que se refiere; null si habla del fichero entero"},
                       "columna": {"type": "string", "enum": ["", "envio", "cliente", "motivo", "referencia", "color", "talla", "destinacion", "codigoCliente", "unidadesPorCaja", "cantidad", "cajas", "pesoBrutoCaja", "medidaCaja"], "description": "El campo de la fila con la duda: ahí se pinta la celda y va el comentario. \\"\\" si es de la fila entera o del fichero"},
                       "texto": {"type": "string"},
-                      "consecuencia": {"type": "string", "description": "Etiqueta corta (3-6 palabras) de la clase de aviso, la misma para todos los de esa clase: 'envío tomado de la factura', 'caja mixta', 'celda resaltada por el taller', 'lectura dudosa'. \\"\\" si no encaja en ninguna"}
+                      "consecuencia": {"type": "string", "description": "Etiqueta corta (3-6 palabras) de la clase de aviso, la misma para todos los de esa clase: 'envío tomado de la factura', 'caja mixta', 'color aproximado', 'celda resaltada por el taller', 'lectura dudosa'. \\"\\" si no encaja en ninguna"}
                     }
                   }
                 }
@@ -217,8 +229,9 @@ public class ConversionFormatoTallerService {
             El excel del taller viene volcado como texto, hoja a hoja, una línea por fila
             con cada celda no vacía como "LETRA=valor" ("B7=ULL163AL052 | C7=SAC MARRON
             PA"). Las fórmulas vienen ya calculadas. Una celda tachada va como ~~valor~~,
-            una con fondo de color lleva [fondo #RRGGBB], una con comentario lleva
-            [nota: ...], y al principio de cada hoja se listan las celdas combinadas.
+            una con fondo de color lleva [fondo #RRGGBB], una escrita en un color que
+            no es el negro lleva [letra #RRGGBB], una con comentario lleva [nota: ...],
+            y al principio de cada hoja se listan las celdas combinadas.
             Delante puede venir el PEDIDO del cliente (ver regla 9).
 
             ## Cómo es el formato Puntotres
@@ -252,6 +265,21 @@ public class ConversionFormatoTallerService {
                Una línea es un grupo de cajas seguidas con el mismo artículo, las mismas
                unidades por caja y la misma destinación. No fusiones líneas ni las partas.
                Lo TACHADO no existe: una fila tachada no se convierte.
+
+               LA ÚNICA LÍNEA QUE SE PARTE es la que lleva DOS PEDIDOS a la vez. Cuando
+               el taller junta en una misma caja mercancía de dos pedidos del cliente lo
+               deja ver escribiendo los dos códigos juntos: "WHOLSEAL 930/948" es una
+               caja de Wholesale con unidades del pedido 930 y del pedido 948; si cada
+               código lleva delante su destinación, son dos pedidos de dos sitios. Esa
+               línea se
+               convierte en TANTAS FILAS SEGUIDAS como pedidos nombre, una por pedido,
+               iguales en todo —las mismas "cajas", las mismas "unidadesPorCaja" (lo
+               que lleva la caja entera, como lo escribe el taller)— salvo
+               "codigoCliente" y, si también cambia, "destinacion". En "cantidad" va lo
+               que la hoja diga de CADA pedido; si no lo dice, null en todas esas filas:
+               no la repartas a partes iguales ni la calcules tú. NO pongas aviso por
+               partirla: la aplicación reconoce esas filas, intenta repartir la caja
+               con las cantidades del pedido del cliente y avisa ella.
 
             3. CELDAS VACÍAS QUE HEREDAN. Muchos talleres escriben el envío, el modelo, el
                color o la destinación solo en la primera fila de un bloque y dejan vacías
@@ -299,6 +327,15 @@ public class ConversionFormatoTallerService {
                orden, COPIADAS TAL CUAL (no traduzcas, no corrijas, no resumas). El
                membrete del taller va a "cabecera", y los títulos de columna no son notas.
                Estas notas solo se enseñan al usuario: nunca las conviertas en filas.
+               Cada nota lleva además el color con que el taller la resalta, porque es
+               parte del mensaje (en rojo van las cajas que están mal): en "letra" el
+               #RRGGBB de [letra ...] y en "fondo" el de [fondo ...] de sus celdas, o ""
+               si no lo llevan; esas marcas no se copian dentro de "celdas".
+               Si entre las notas hay algo que quien prepara el envío tiene que mirar
+               (cajas con defectos, cosas que faltan), añade UN SOLO aviso del fichero
+               entero ("fila" null) que diga que está ahí y nada más: "Hay una tabla
+               con cajas con problemas". No cuentes lo que dice ni cites sus filas: el
+               contenido ya va copiado en "notas". Unos totales no necesitan aviso.
 
             7. CABECERA y RESUMEN. "cabecera": "taller" (nombre del taller, el membrete),
                "direccion", "factura" (el número, sin la palabra "Facture") y "fecha", si
@@ -320,6 +357,16 @@ public class ConversionFormatoTallerService {
                recuento. Los avisos van en español y los lee quien prepara el envío, no un
                programador: nada de "JSON" ni de nombres de campo; cita la fila del excel
                del taller ("fila 24 del excel") para que se encuentre.
+               Los avisos son CORTOS: una frase con el hecho, sin explicar cómo has
+               llegado a él, sin repetir lo que ya se ve en el excel y sin coletillas
+               como "revisarlo antes de enviar". Mal: "Debajo de la tabla (filas 23 a 25
+               del excel) el taller anota cajas con problemas: cajas 41-45 con la
+               etiqueta mal, caja 62 con 10 mal y caja 43 con 5 mal. Revisarlo antes de
+               enviar." Bien: "Hay una tabla con cajas con problemas".
+               Un aviso es para una DUDA o para algo que hay que mirar. Lo que has
+               leído sin dudar no se avisa: qué columna has tomado para cada campo,
+               que la hoja no traiga totales, membrete o pesos, o qué has heredado de
+               la fila de encima.
 
             9. EL PEDIDO DEL CLIENTE. Si viene, es la lista de lo que el cliente ha pedido
                esta temporada, con su tabla de colores. Sirve para dos cosas y solo dos:
@@ -327,9 +374,12 @@ public class ConversionFormatoTallerService {
                  el resto del bloque dice "67008"), un color mal escrito. Corrige solo
                  cuando lo escrito casa con UNA sola entrada y dilo en "avisos" (qué
                  ponía, qué has puesto).
-               - TRADUCIR un nombre de color a su código, SOLO si la tabla de colores lo
-                 dice (ver el bloque del cliente). Si la tabla no tiene ese nombre, copia
-                 el nombre tal cual: la aplicación avisará de que falta en la tabla.
+               - TRADUCIR un nombre de color a su código con la TABLA DE COLORES del
+                 cliente (ver el bloque del cliente). El taller casi nunca escribe el
+                 nombre como la tabla: lo pone en otro idioma o lo describe a su manera.
+                 Si en la tabla hay un color que es el mismo, o claramente el más
+                 parecido, usa el de la tabla. Solo si ninguno se le parece copia el
+                 nombre tal cual: la aplicación avisará de que falta en la tabla.
                Lo que NO debes hacer con él: elegir o deducir el código de pedido, ni
                completar una referencia con su prefijo, ni cambiar un color porque "el
                pedido de ese código es en otro color". Eso lo cruza la aplicación después,
@@ -375,12 +425,32 @@ public class ConversionFormatoTallerService {
             - "referencia": como la escriba el taller ("67008", "F63023", "PXCEI-F67043"),
               en mayúsculas. NO la completes con el prefijo del pedido: lo hace la
               aplicación. Sí corrige un carácter que claramente es un error de lectura
-              ("G7008" en un bloque que dice "67008"), con aviso.
-            - "color": el CÓDIGO de color de APC (LZZ, LAW, GAU, CAB, KAN...) cuando el
-              taller lo escribe o cuando la TABLA DE COLORES del pedido traduce el nombre
-              que escribe ("Negro" → LZZ si la tabla dice "LZZ = NOIR"; "LAW GRIS" → LAW).
-              Si la tabla no tiene ese nombre, copia el nombre tal cual ("CEREZA"). NUNCA
-              deduzcas el color por el código de pedido.
+              ("G7008" en un bloque que dice "67008"), con aviso. Y si la escribe con
+              la piel, va SIEMPRE en el orden REF.PIEL-REF.ARTÍCULO, el del pedido
+              ("PXCBC-F67008": la piel son solo letras, el artículo lleva cifras); el
+              taller a veces la pone al revés: "F67008-PXCBC" se escribe "PXCBC-F67008",
+              sin aviso.
+            - "color": el CÓDIGO de color de APC (LZZ, LAW, GAU, CAB, KAN...). Si el
+              taller escribe el código, ese ("LAW GRIS" → LAW). Si escribe un nombre,
+              búscalo en la TABLA DE COLORES del pedido ("código = nombre") comparando
+              el COLOR y no las letras: la tabla está en francés y el taller escribe
+              en español, en inglés o a su manera.
+                * Es el mismo color en otro idioma o con otra grafía: pon su código,
+                  sin aviso. "Negro" → LZZ si la tabla dice "LZZ = NOIR".
+                * No hay uno igual pero sí UNO parecido, que solo añade o quita un
+                  matiz: pon su código y un aviso en "color" con consecuencia "color
+                  aproximado" que diga qué escribe el taller y qué color de la tabla
+                  has puesto. "Amarillo" → el código de "JAUNE CLAIR" si es el único
+                  amarillo de la tabla. El aviso va UNA vez, en la fila donde el
+                  taller escribe el color: las filas de debajo que lo heredan llevan
+                  el mismo código sin aviso.
+                * Hay VARIOS igual de parecidos ("Amarillo" con "JAUNE CLAIR" y "JAUNE
+                  MOUTARDE" en la tabla) o ninguno se parece ("CEREZA" sin ningún rojo):
+                  copia el nombre tal cual. No elijas a ojo entre dos.
+              Las palabras que nombran la PIEL o el material y no el color ("ALPACA",
+              "CUIR", "LISSE", "GRAINÉ") no cuentan: "ALPACA AMARILLO" es AMARILLO.
+              NUNCA deduzcas el color por el código de pedido ni por los colores en que
+              el pedido tiene ese artículo: solo por el parecido del nombre.
             - "talla": "U" en bolsos; el número (75, 80, 85...) en cinturones.
             - "destinacion": el nombre de la destinación de APC, uno de estos:
                 Wholesale / WSALES / WHO / WH -> WHOLESALE
@@ -393,12 +463,13 @@ public class ConversionFormatoTallerService {
                 Japan / Japon / JA / JPT -> JAPAN
                 Korea / Corée / KRT -> KOREA
                 Ivry -> IVRY
-              Si la hoja dice otra, cópiala tal cual y avisa. Si una línea va a DOS
-              destinaciones a la vez ("DOUANES USA 711/WHO 723") sin decir cuánto a cada
-              una, pon la primera con su código y avisa de que hay que repartirla a mano.
+              Si la hoja dice otra, cópiala tal cual y avisa. Una línea con DOS códigos
+              de pedido ("WHOLSEAL 930/948", "DOUANES USA 711/WHO 723") se parte en dos
+              filas, una por código, como dice la regla 2.
             - "codigoCliente": el código de pedido de TRES cifras SOLO si el taller lo
               escribe, normalmente junto a la destinación ("Korea 690" → "690"). Cópialo
-              exacto. Si el taller no lo escribe, "": lo resuelve la aplicación con el
+              exacto. Dos códigos en la misma celda ("930/948") son dos filas, cada una
+              con el suyo (regla 2). Si el taller no lo escribe, "": lo resuelve la aplicación con el
               pedido. Si el pedido dice que ese código no existe para ese artículo, deja
               lo escrito y avisa.
             """;
@@ -416,7 +487,8 @@ public class ConversionFormatoTallerService {
     static final String MENSAJE_USUARIO = """
             Convierte el packing list de este excel de taller. Antes de responder, \
             comprueba línea a línea que la suma de "cantidad" cuadra con los totales que \
-            trae la hoja, que no has convertido en filas ninguna nota y que no has \
+            trae la hoja (las filas de una caja con dos pedidos van sin cantidad y no \
+            suman), que no has convertido en filas ninguna nota y que no has \
             inventado ningún dato.""";
 
     private final ObjectMapper mapper;
@@ -555,7 +627,8 @@ public class ConversionFormatoTallerService {
      *
      * Lo que no es el valor y sí es información del taller se anota: una
      * celda tachada (~~valor~~: lo tachado no existe), un fondo de color
-     * ([fondo #RRGGBB]: hay talleres que marcan en rojo las cajas malas) y un
+     * ([fondo #RRGGBB]), una letra de color ([letra #RRGGBB]: en Libro1.xlsx
+     * las cajas que van mal están escritas en rojo y sin fondo, medido) y un
      * comentario ([nota: ...]). Sin esto, la única señal de "esta fila no va"
      * se perdería en el volcado.
      */
@@ -627,10 +700,12 @@ public class ConversionFormatoTallerService {
         StringBuilder anotado = new StringBuilder();
         CellStyle estilo = celda.getCellStyle();
         boolean tachado = false;
+        String letra = null;
         if (estilo != null) {
             try {
                 Font fuente = celda.getSheet().getWorkbook().getFontAt(estilo.getFontIndex());
                 tachado = fuente != null && fuente.getStrikeout();
+                letra = letraDe(fuente);
             } catch (RuntimeException e) {
                 tachado = false;
             }
@@ -640,6 +715,9 @@ public class ConversionFormatoTallerService {
         if (fondo != null) {
             anotado.append(" [fondo ").append(fondo).append(']');
         }
+        if (letra != null) {
+            anotado.append(" [letra ").append(letra).append(']');
+        }
         Comment comentario = celda.getCellComment();
         if (comentario != null && comentario.getString() != null) {
             String nota = comentario.getString().getString();
@@ -648,6 +726,23 @@ public class ConversionFormatoTallerService {
             }
         }
         return anotado.toString();
+    }
+
+    /**
+     * "#RRGGBB" de la letra, o null si es la de siempre: negra, automática o
+     * de un libro que no es xlsx. Solo se anota la que se sale de lo normal,
+     * que es la que el taller ha elegido para decir algo.
+     */
+    private static String letraDe(Font fuente) {
+        if (!(fuente instanceof XSSFFont xssf) || xssf.getXSSFColor() == null) {
+            return null;
+        }
+        String argb = xssf.getXSSFColor().getARGBHex();
+        if (argb == null || argb.length() < 6) {
+            return null;
+        }
+        String rgb = argb.substring(argb.length() - 6).toUpperCase();
+        return "000000".equals(rgb) ? null : "#" + rgb;
     }
 
     /** "#RRGGBB" del relleno de la celda, o null si no tiene o es blanco. */

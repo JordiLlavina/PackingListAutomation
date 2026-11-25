@@ -113,6 +113,9 @@ class CorteSmsControllerTest {
             assertTrue(textos.contains("F67008") && textos.contains("LE NEIGE"), textos.toString());
             assertTrue(textos.contains("Cantidad  2"), textos.toString());
             assertTrue(textos.stream().anyMatch(texto -> texto.contains("ALPACA TOUCH")), textos.toString());
+            // El color de la piel es el del bolso, de COLORIS A.P.C., y no el «VERT FONCE»
+            // de COLORIS FOURNISSEURS (decisión del usuario).
+            assertTrue(textos.contains("COLOR\nKAF VERT FONCÉ"), textos.toString());
         }
     }
 

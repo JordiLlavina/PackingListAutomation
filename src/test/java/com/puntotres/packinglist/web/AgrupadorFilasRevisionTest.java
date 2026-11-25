@@ -10,6 +10,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.OrigenPeso;
 
 /**
  * Compactación de la tabla de revisión: cajas consecutivas equivalentes se
@@ -60,6 +61,20 @@ class AgrupadorFilasRevisionTest {
         // El peso tecleado en esta fila tiene que llegar a las cinco cajas.
         assertEquals(List.of(0, 1, 2, 3, 4), fila.indicesEnDestino());
         assertTrue(fila.esLider());
+    }
+
+    @Test
+    void unPesoDelCatalogoNoSeCompactaConUnoPesado() {
+        // Los mismos números, pero uno se pinta en gris y el otro no: una
+        // fila compactada nunca enseña algo que no es cierto de todas.
+        List<CajaData> cajas = cajas4a8();
+        cajas.get(2).setOrigenPeso(OrigenPeso.CATALOGO);
+
+        List<FilaCaja> filas = AgrupadorFilasRevision.agrupar(cajas, 0);
+
+        assertEquals(List.of("4-5", "6", "7-8"),
+                filas.stream().map(FilaCaja::rangoCajas).toList());
+        assertTrue(filas.get(1).pesoDelCatalogo());
     }
 
     @Test

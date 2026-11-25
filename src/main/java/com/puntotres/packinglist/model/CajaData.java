@@ -44,6 +44,8 @@ public class CajaData {
     private int cantidad;
     private Double pesoNetoKg;
     private Double pesoBrutoKg;
+    /** De dónde salen los dos pesos de arriba; null = medidos, o sin peso (ver {@link OrigenPeso}). */
+    private OrigenPeso origenPeso;
     private Integer numeroPalet;
     // Opcionales según cliente (null si el JSON no los trae): talla del
     // artículo (cinturones AMI, SIZE de APC), nombre comercial del modelo,
@@ -90,6 +92,19 @@ public class CajaData {
 
     public Double getPesoBrutoKg() { return pesoBrutoKg; }
     public void setPesoBrutoKg(Double pesoBrutoKg) { this.pesoBrutoKg = pesoBrutoKg; }
+
+    public OrigenPeso getOrigenPeso() { return origenPeso; }
+    public void setOrigenPeso(OrigenPeso origenPeso) { this.origenPeso = origenPeso; }
+
+    /**
+     * Lleva algún peso y alguien lo ha pesado: tecleado en la revisión o
+     * llegado con el envío. Lo que la inferencia ha calculado no cuenta, sea
+     * con pesos del envío o del catálogo.
+     */
+    public boolean tienePesoMedido() {
+        return (pesoNetoKg != null || pesoBrutoKg != null)
+                && (origenPeso == null || origenPeso == OrigenPeso.MEDIDO);
+    }
 
     public Integer getNumeroPalet() { return numeroPalet; }
     public void setNumeroPalet(Integer numeroPalet) { this.numeroPalet = numeroPalet; }

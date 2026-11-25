@@ -58,6 +58,30 @@ class PedidoCompletionServiceTest {
     }
 
     @Test
+    void unaReferenciaAlRevesSeCompletaConLaDelExcel() throws IOException {
+        CajaData linea = caja(1, "721", "H65077-PXBHZ", "LZZ-NOIR", 3, null, 4.2);
+
+        ResultadoPedidos resultado = servicio.completar(envioCon(linea), pedidoReal());
+
+        assertEquals("4100128721", linea.getNumeroPedido());
+        assertEquals("PXBHZ-H65077", linea.getReferencia());
+        assertTrue(resultado.getAvisos().isEmpty());
+    }
+
+    /**
+     * Sin excel de pedido no hay nada con qué completar, pero la referencia
+     * se da la vuelta igual: la revisión la enseña en el orden del cliente.
+     */
+    @Test
+    void sinExcelDePedidoUnaReferenciaAlRevesSaleEnSuOrden() {
+        CajaData linea = caja(1, "721", "H65077-PXBHZ", "LZZ-NOIR", 3, null, 4.2);
+
+        servicio.completar(envioCon(linea), null);
+
+        assertEquals("PXBHZ-H65077", linea.getReferencia());
+    }
+
+    @Test
     void sinExcelDePedidoAvisaUnaVezYNoTocaNada() {
         CajaData linea = caja(1, "721", "PXBHZ-H65077", "LZZ-NOIR", 3, null, 4.2);
 

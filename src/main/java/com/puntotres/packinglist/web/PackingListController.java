@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -42,10 +43,12 @@ import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
 import com.puntotres.packinglist.model.EnvioInput;
+import com.puntotres.packinglist.model.OrigenPeso;
 import com.puntotres.packinglist.model.PaletData;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.service.AprendizajePesos;
 import com.puntotres.packinglist.service.CatalogoPedido;
 import com.puntotres.packinglist.service.ClaudeEnvioExtractionService;
 import com.puntotres.packinglist.service.EnvioImportado;
@@ -105,6 +108,8 @@ public class PackingListController {
     private final AtributosEntrada atributosEntrada;
     private final EnvioEnCurso envioEnCurso;
     private final TallerEnCurso tallerEnCurso;
+    private final AprendizajePesos aprendizajePesos;
+    private final SesionesGuardadas sesiones;
 
     public PackingListController(PreparacionRevisionService preparacion,
                                  ClaudeEnvioExtractionService extractorClaude,
@@ -121,7 +126,10 @@ public class PackingListController {
                                  ArchivoTemporadas archivoTemporadas,
                                  AtributosEntrada atributosEntrada,
                                  EnvioEnCurso envioEnCurso,
-                                 TallerEnCurso tallerEnCurso) {
+                                 TallerEnCurso tallerEnCurso,
+                                 AprendizajePesos aprendizajePesos,
+                                 SesionesGuardadas sesiones) {
+        this.sesiones = sesiones;
         this.preparacion = preparacion;
         this.extractorClaude = extractorClaude;
         this.validadorResumen = validadorResumen;
@@ -138,6 +146,7 @@ public class PackingListController {
         this.atributosEntrada = atributosEntrada;
         this.envioEnCurso = envioEnCurso;
         this.tallerEnCurso = tallerEnCurso;
+        this.aprendizajePesos = aprendizajePesos;
     }
 
     // --- Paso 1: entrada ---
@@ -145,14 +154,9 @@ public class PackingListController {
     @GetMapping("/packing-list")
     public String entrada(Model model) {
         if (!model.containsAttribute("envioForm")) {
-            EnvioForm form = new EnvioForm();
             // La entrada abre en "CON IMAGEN": es la vía por la que llegan
             // casi todos los envíos, así que no hay que elegirla cada vez.
-            form.setModo("CLAUDE");
-            String hoy = LocalDate.now().format(FORMATO_FECHA);
-            form.setFechaFactura(hoy);
-            form.setFechaEnvio(hoy);
-            model.addAttribute("envioForm", form);
+            model.addAttribute("envioForm", formularioNuevo("CLAUDE", null));
         }
         anadirAtributosDeClientes(model);
         return "entrada";
@@ -284,7 +288,56 @@ public class PackingListController {
         tallerEnCurso.reiniciar();
         preparacion.preparar(envio, cabecera, cliente, pedido.excel(), pedido.nombre(),
                 avisosPrevios, envioEnCurso);
+        // «CON TEXTO» es la vía de pruebas: ni sesión guardada ni pesos
+        // aprendidos.
+        envioEnCurso.setDePrueba("JSON".equals(envioForm.getModo()));
+        sesiones.guardar(envioEnCurso);
         return "redirect:/revision";
+    }
+
+    // --- Sesiones guardadas («Cargar Sesión») ---
+
+    /** Carga una sesión guardada y va directo a la revisión. */
+    @PostMapping("/packing-list/sesiones/{id}/cargar")
+    public String cargarSesion(@PathVariable Long id, RedirectAttributes redirect) {
+        boolean cargada;
+        try {
+            cargada = sesiones.cargar(id, envioEnCurso);
+        } catch (RuntimeException e) {
+            redirect.addFlashAttribute("errorJson", "No se ha podido cargar la sesión: " + e.getMessage());
+            redirect.addFlashAttribute("envioForm", formularioNuevo("SESION", null));
+            return "redirect:/packing-list";
+        }
+        if (!cargada) {
+            redirect.addFlashAttribute("errorJson", "Esa sesión ya no existe: se ha eliminado");
+            redirect.addFlashAttribute("envioForm", formularioNuevo("SESION", null));
+            return "redirect:/packing-list";
+        }
+        // Los excels del taller no se guardan con la sesión: si quedaba una
+        // entrega a medias, "volver al ajuste" llevaría a la de otro envío.
+        tallerEnCurso.reiniciar();
+        return "redirect:/revision";
+    }
+
+    /** Elimina una sesión guardada y vuelve a la lista del mismo cliente. */
+    @PostMapping("/packing-list/sesiones/{id}/eliminar")
+    public String eliminarSesion(@PathVariable Long id, RedirectAttributes redirect) {
+        Optional<String> cliente = sesiones.eliminar(id, envioEnCurso);
+        redirect.addFlashAttribute("mensaje", cliente.isPresent()
+                ? "Sesión eliminada" : "Esa sesión ya estaba eliminada");
+        redirect.addFlashAttribute("envioForm", formularioNuevo("SESION", cliente.orElse(null)));
+        return "redirect:/packing-list";
+    }
+
+    /** El formulario de entrada en blanco, con las fechas de hoy, en el modo y el cliente dados. */
+    private static EnvioForm formularioNuevo(String modo, String cliente) {
+        EnvioForm form = new EnvioForm();
+        form.setModo(modo);
+        form.setCliente(cliente);
+        String hoy = LocalDate.now().format(FORMATO_FECHA);
+        form.setFechaFactura(hoy);
+        form.setFechaEnvio(hoy);
+        return form;
     }
 
     /** El excel de pedido del envío, de donde salga, con lo que haya que avisar. */
@@ -349,6 +402,14 @@ public class PackingListController {
         // Si el envío viene de una entrega de taller se puede volver a su
         // pantalla de ajuste sin resubir los excels.
         model.addAttribute("vieneDeTaller", !tallerEnCurso.estaVacio());
+        // El Packing Puntotres también en una sesión cargada de un envío de
+        // taller: los excels del taller ya no están, pero el reparto sí.
+        model.addAttribute("ofrecePackingPuntotres",
+                !tallerEnCurso.estaVacio() || envioEnCurso.isDeTaller());
+        // Con qué clave recuerda el navegador las destinaciones plegadas.
+        model.addAttribute("claveEnvio", envioEnCurso.getSesionId() == null
+                ? "prueba" : String.valueOf(envioEnCurso.getSesionId()));
+        model.addAttribute("avisoGuardado", envioEnCurso.getAvisoGuardado());
         return "revision";
     }
 
@@ -358,6 +419,7 @@ public class PackingListController {
             return sinEnvio(redirect);
         }
         aplicarEdicionesYReinferir(revisionForm);
+        sesiones.guardar(envioEnCurso);
         return "redirect:/revision";
     }
 
@@ -375,6 +437,7 @@ public class PackingListController {
         }
         aplicarEdicionesYReinferir(revisionForm);
         envioEnCurso.alternarFilaDesplegada(destino, indice);
+        sesiones.guardar(envioEnCurso);
         return "redirect:/revision";
     }
 
@@ -393,6 +456,7 @@ public class PackingListController {
             return sinEnvio(redirect);
         }
         aplicarEdicionesYReinferir(revisionForm);
+        sesiones.guardar(envioEnCurso);
 
         DatosEnvio cabecera = envioEnCurso.getCabecera();
         String nombreCliente = catalogoClientes.clientePara(cabecera.getClaveCliente())
@@ -446,6 +510,7 @@ public class PackingListController {
             return sinEnvio(redirect);
         }
         aplicarEdicionesYReinferir(revisionForm);
+        sesiones.guardar(envioEnCurso);
 
         List<ExcelGenerado> excels = new ArrayList<>();
         List<String> avisosGeneracion = new ArrayList<>();
@@ -501,6 +566,7 @@ public class PackingListController {
                     + String.join(" · ", avisosGeneracion));
             return "redirect:/revision";
         }
+        avisosGeneracion.addAll(aprenderPesos());
         envioEnCurso.getExcels().clear();
         envioEnCurso.getExcels().addAll(excels);
         envioEnCurso.getAvisosGeneracion().clear();
@@ -510,6 +576,33 @@ public class PackingListController {
         // ya hechas de todos modos (pesos y cajas pueden haber cambiado).
         generarEtiquetasDelEnvio();
         return "redirect:/resultados";
+    }
+
+    /**
+     * Guarda en el catálogo lo que pesa una unidad de cada referencia pesada
+     * en el envío (ver {@link AprendizajePesos}). Se hace al generar y no al
+     * recalcular porque es cuando el envío se da por bueno: aprender de una
+     * prueba a medias dejaría un peso que nadie ha confirmado.
+     *
+     * Los excels ya están hechos: si guardar falla, se dice y el envío sale
+     * igual, que es lo que importa ahora.
+     */
+    private List<String> aprenderPesos() {
+        // «CON TEXTO» es de pruebas: sus pesos no son de ningún envío real y
+        // no pueden quedarse en el catálogo.
+        if (envioEnCurso.isDePrueba()) {
+            return List.of();
+        }
+        List<List<CajaData>> cajasPorDestino = new ArrayList<>();
+        for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
+            cajasPorDestino.add(destino.getDestino().getCajas());
+        }
+        try {
+            return aprendizajePesos.aprender(envioEnCurso.getCabecera().getClaveCliente(), cajasPorDestino);
+        } catch (RuntimeException e) {
+            return List.of("No se ha podido guardar el peso de los artículos en el catálogo: "
+                    + e.getMessage());
+        }
     }
 
     /**
@@ -782,7 +875,7 @@ public class PackingListController {
             caja.setReferencia(edicion.getReferencia().trim());
         }
         if (tieneTexto(edicion.getCodigoColor())) {
-            caja.setCodigoColor(edicion.getCodigoColor().trim());
+            caja.setCodigoColor(edicion.getCodigoColor().trim().toUpperCase(Locale.ROOT));
         }
         if (tieneTexto(edicion.getNumeroPedido())) {
             caja.setNumeroPedido(edicion.getNumeroPedido().trim());
@@ -799,12 +892,35 @@ public class PackingListController {
         if (edicion.getNumeroPalet() != null) {
             caja.setNumeroPalet(edicion.getNumeroPalet());
         }
-        if (edicion.getPesoNetoKg() != null) {
-            caja.setPesoNetoKg(edicion.getPesoNetoKg());
+        aplicarPesos(caja, edicion.getPesoNetoKg(), edicion.getPesoBrutoKg());
+    }
+
+    /**
+     * Los pesos de una caja. El formulario devuelve SIEMPRE los que enseñaba,
+     * también los calculados, así que un valor igual al que ya tenía no es
+     * una edición: lo que vino del catálogo sigue siendo del catálogo (y gris)
+     * y lo inferido se sigue recalculando. Solo un número distinto es un peso
+     * que alguien ha tecleado, y la caja pasa a medida.
+     *
+     * Si cambia uno solo de los dos, el otro se deja en blanco para que la
+     * inferencia lo vuelva a sacar del nuevo (bruto − tara o neto + tara): si
+     * no, un neto viejo se quedaría al lado de un bruto nuevo, y el peso que
+     * se aprende al generar saldría del viejo.
+     */
+    private static void aplicarPesos(CajaData caja, Double neto, Double bruto) {
+        boolean cambiaNeto = neto != null && !mismoPeso(neto, caja.getPesoNetoKg());
+        boolean cambiaBruto = bruto != null && !mismoPeso(bruto, caja.getPesoBrutoKg());
+        if (!cambiaNeto && !cambiaBruto) {
+            return;
         }
-        if (edicion.getPesoBrutoKg() != null) {
-            caja.setPesoBrutoKg(edicion.getPesoBrutoKg());
-        }
+        caja.setPesoNetoKg(cambiaNeto ? neto : null);
+        caja.setPesoBrutoKg(cambiaBruto ? bruto : null);
+        caja.setOrigenPeso(OrigenPeso.MEDIDO);
+    }
+
+    /** A los dos decimales que admite la pantalla. */
+    private static boolean mismoPeso(double tecleado, Double actual) {
+        return actual != null && Math.round(tecleado * 100) == Math.round(actual * 100);
     }
 
     private static boolean tieneTexto(String valor) {

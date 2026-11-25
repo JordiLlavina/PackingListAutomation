@@ -64,6 +64,26 @@ public interface CatalogoTaras {
     }
 
     /**
+     * Lo que se teclea en /taras para un cartón que todavía no se ha pesado:
+     * le da una tara para que el programa funcione, pero no es la de verdad.
+     */
+    double TARA_SIN_PESAR_KG = 0.01;
+
+    /**
+     * Si el cartón de ese tamaño se ha pesado de verdad: está en la tabla y
+     * con más que la tara de relleno. Con la de relleno el programa infiere
+     * igual, pero un neto calculado con ella es casi un bruto, y guardarlo
+     * como peso del artículo dejaría en el catálogo un número que sobra en
+     * cuanto alguien pese ese cartón.
+     */
+    default boolean cartonPesado(String tamanoCaja) {
+        if (tamanoCaja == null || tamanoCaja.isBlank()) {
+            return false;
+        }
+        return taraCartonPara(tamanoCaja).filter(carton -> carton > TARA_SIN_PESAR_KG).isPresent();
+    }
+
+    /**
      * Los tamaños conocidos, de la caja más grande a la más pequeña, para los
      * desplegables de la web. El orden es por VOLUMEN y no alfabético:
      * "100x40x40" es la caja más grande y como texto iría antes que

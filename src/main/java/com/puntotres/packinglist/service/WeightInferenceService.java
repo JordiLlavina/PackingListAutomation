@@ -1,11 +1,13 @@
 package com.puntotres.packinglist.service;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import com.puntotres.packinglist.VolumenUtil;
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
+import com.puntotres.packinglist.model.OrigenPeso;
 
 /**
  * Completa los pesos que faltan a partir de las cajas con algún peso
@@ -33,7 +36,10 @@ import com.puntotres.packinglist.model.CajaFisica;
  * producto). Se promedia sobre las cajas con peso conocido que llevan una
  * sola referencia, prefiriendo el neto (neto / unidades) y usando el bruto
  * como alternativa ((bruto - tara) / unidades). Un solo peso introducido a
- * mano — neto o bruto — desbloquea el resto de su referencia.
+ * mano — neto o bruto — desbloquea el resto de su referencia. Una referencia
+ * sin ninguna caja pesada en el envío tira del peso por unidad que recuerda
+ * el catálogo de modelos, si se le pasa, y esas cajas quedan marcadas
+ * {@link OrigenPeso#CATALOGO}.
  *
  * Lo que no se puede inferir se queda a null (nunca se inventa un número),
  * pero no en silencio: los tamaños de caja sin tara configurada y las cajas
@@ -80,7 +86,31 @@ public class WeightInferenceService {
      * la caja 5 de CHINA y la 5 de JAPAN son cajas distintas.
      */
     public ResultadoInferencia inferirPesosDelEnvio(List<List<CajaData>> cajasPorDestino) {
+        return inferirPesosDelEnvio(cajasPorDestino, referencia -> Optional.empty());
+    }
+
+    /**
+     * Lo mismo, con el peso neto por unidad que el catálogo recuerda de cada
+     * referencia como ÚLTIMO recurso: solo se usa para una referencia sin
+     * ninguna caja pesada en este envío, y lo que sale de él se marca
+     * {@link OrigenPeso#CATALOGO} para que la revisión lo pinte en gris.
+     *
+     * Lo calculado (inferido o del catálogo) se olvida al empezar y se vuelve
+     * a calcular: así sigue a lo que se acaba de pesar o de corregir —un
+     * cartón cambiado, una caja pesada que deja atrás el peso del catálogo—
+     * en vez de quedarse con el número de la vez anterior. Lo medido no se
+     * toca nunca.
+     *
+     * La consulta al catálogo se hace una vez por referencia y llamada.
+     */
+    public ResultadoInferencia inferirPesosDelEnvio(List<List<CajaData>> cajasPorDestino,
+                                                    Function<String, Optional<Double>> pesoUnidadCatalogo) {
+        olvidarLoCalculado(cajasPorDestino);
         Map<String, Double> unitarioPorReferencia = pesoUnitarioPorReferencia(cajasPorDestino);
+        Map<String, Optional<Double>> consultadas = new HashMap<>();
+        Function<String, Optional<Double>> catalogo = referencia -> referencia == null
+                ? Optional.empty()
+                : consultadas.computeIfAbsent(referencia, pesoUnidadCatalogo);
         // Un mismo tamaño sin tara puede aparecer en varias cajas: el aviso
         // se emite una sola vez.
         Set<String> tamanosSinTara = new LinkedHashSet<>();
@@ -90,7 +120,7 @@ public class WeightInferenceService {
                 if (!tieneMedida(caja.lider())) {
                     cajasSinMedida.add(caja.lider().getNumeroCaja());
                 }
-                completarPesos(caja, unitarioPorReferencia, tamanosSinTara);
+                completarPesos(caja, unitarioPorReferencia, catalogo, tamanosSinTara);
             }
         }
 
@@ -117,6 +147,7 @@ public class WeightInferenceService {
      * línea que lleve dentro.
      */
     private void completarPesos(CajaFisica caja, Map<String, Double> unitarioPorReferencia,
+                                Function<String, Optional<Double>> catalogo,
                                 Set<String> tamanosSinTara) {
         CajaData lider = caja.lider();
         Optional<Double> tara = taras.taraPara(lider.getTamanoCaja());
@@ -144,7 +175,7 @@ public class WeightInferenceService {
         // Sin ningún peso: solo se puede inferir con peso unitario y tara. Si
         // no hay unitario la caja queda pendiente, pero eso ya se ve en la
         // tabla de revisión: no es un aviso de configuración.
-        Double neto = netoEstimado(caja, unitarioPorReferencia);
+        NetoEstimado neto = netoEstimado(caja, unitarioPorReferencia, catalogo);
         if (neto == null) {
             return;
         }
@@ -152,25 +183,56 @@ public class WeightInferenceService {
             anotarTamanoSinTara(lider, tamanosSinTara);
             return;
         }
-        lider.setPesoNetoKg(redondear2(neto));
-        lider.setPesoBrutoKg(redondear2(neto + tara.get()));
+        lider.setPesoNetoKg(redondear2(neto.kilos()));
+        lider.setPesoBrutoKg(redondear2(neto.kilos() + tara.get()));
+        lider.setOrigenPeso(neto.delCatalogo() ? OrigenPeso.CATALOGO : OrigenPeso.INFERIDO);
+    }
+
+    /** El neto calculado de una caja y si alguna de sus líneas ha tirado del catálogo. */
+    private record NetoEstimado(double kilos, boolean delCatalogo) {
     }
 
     /**
      * Peso neto estimado de la caja ENTERA: cada línea aporta sus unidades
-     * por el unitario de SU referencia. Null si alguna línea es de una
-     * referencia sin ninguna caja pesada en todo el envío.
+     * por el unitario de SU referencia, el del envío o, si no hay ninguna
+     * caja pesada de esa referencia, el del catálogo. Null si alguna línea
+     * no tiene ni uno ni otro.
      */
-    private static Double netoEstimado(CajaFisica caja, Map<String, Double> unitarioPorReferencia) {
+    private static NetoEstimado netoEstimado(CajaFisica caja, Map<String, Double> unitarioPorReferencia,
+                                             Function<String, Optional<Double>> catalogo) {
         double total = 0;
+        boolean delCatalogo = false;
         for (CajaData linea : caja.lineas()) {
             Double unitario = unitarioPorReferencia.get(linea.getReferencia());
             if (unitario == null) {
-                return null;
+                unitario = catalogo.apply(linea.getReferencia()).orElse(null);
+                if (unitario == null) {
+                    return null;
+                }
+                delCatalogo = true;
             }
             total += linea.getCantidad() * unitario;
         }
-        return total;
+        return new NetoEstimado(total, delCatalogo);
+    }
+
+    /**
+     * Deja sin peso las cajas cuyo peso calculó una pasada anterior, para que
+     * esta lo vuelva a calcular con lo de ahora. Los pesos viven en la línea
+     * líder, así que basta con mirar esa.
+     */
+    private static void olvidarLoCalculado(List<List<CajaData>> cajasPorDestino) {
+        for (List<CajaData> cajasDestino : cajasPorDestino) {
+            for (CajaFisica caja : CajaFisica.agrupar(cajasDestino)) {
+                CajaData lider = caja.lider();
+                if (lider.getOrigenPeso() == OrigenPeso.INFERIDO
+                        || lider.getOrigenPeso() == OrigenPeso.CATALOGO) {
+                    lider.setPesoNetoKg(null);
+                    lider.setPesoBrutoKg(null);
+                    lider.setOrigenPeso(null);
+                }
+            }
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ import org.springframework.ui.Model;
 
 import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.CatalogoClientes;
+import com.puntotres.packinglist.persistence.ArchivoSesionesPacking;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
 
 /**
@@ -25,9 +26,12 @@ public class AtributosEntrada {
     private final CatalogoClientes catalogoClientes;
     private final CatalogoTaras catalogoTaras;
     private final ArchivoTemporadas archivoTemporadas;
+    private final ArchivoSesionesPacking archivoSesiones;
 
     public AtributosEntrada(CatalogoClientes catalogoClientes, CatalogoTaras catalogoTaras,
-                            ArchivoTemporadas archivoTemporadas) {
+                            ArchivoTemporadas archivoTemporadas,
+                            ArchivoSesionesPacking archivoSesiones) {
+        this.archivoSesiones = archivoSesiones;
         this.catalogoClientes = catalogoClientes;
         this.catalogoTaras = catalogoTaras;
         this.archivoTemporadas = archivoTemporadas;
@@ -40,6 +44,9 @@ public class AtributosEntrada {
         model.addAttribute("tamanosCaja", catalogoTaras.tamanosDeMayorAMenor());
         model.addAttribute("clientesJs", clientesJs());
         model.addAttribute("temporadasJs", archivoTemporadas.paraElDesplegable());
+        // Las sesiones guardadas de todos los clientes: «Cargar Sesión»
+        // enseña las del cliente elegido sin volver al servidor.
+        model.addAttribute("sesiones", archivoSesiones.todas());
     }
 
     private Map<String, Map<String, String>> clientesJs() {

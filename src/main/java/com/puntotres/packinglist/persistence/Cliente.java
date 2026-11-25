@@ -45,6 +45,13 @@ public class Cliente {
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
 
+    /**
+     * Un cliente inactivo no sale en ningún desplegable ni filtro, pero no se
+     * borra: lo que tiene guardado sigue siendo suyo y se puede reactivar.
+     */
+    @Column(name = "activo", nullable = false)
+    private boolean activo = true;
+
     protected Cliente() {
         // Constructor para JPA.
     }
@@ -64,6 +71,16 @@ public class Cliente {
         this.placeholderTemporada = placeholderTemporada;
         this.etiquetaPedido = etiquetaPedido;
         this.fechaActualizacion = LocalDateTime.now();
+    }
+
+    /** Lo hace activo o inactivo; los datos del cliente no se tocan. */
+    public void cambiarActivo(boolean activo) {
+        this.activo = activo;
+        this.fechaActualizacion = LocalDateTime.now();
+    }
+
+    public boolean isActivo() {
+        return activo;
     }
 
     /** La configuración con la que lo ven el resto de pantallas y el builder genérico. */

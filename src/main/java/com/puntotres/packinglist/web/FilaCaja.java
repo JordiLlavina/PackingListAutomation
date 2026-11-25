@@ -3,6 +3,7 @@ package com.puntotres.packinglist.web;
 import java.util.List;
 
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.OrigenPeso;
 
 /**
  * Una fila de la tabla de revisión. Puede representar UNA caja o un tramo de
@@ -75,5 +76,15 @@ public record FilaCaja(int indiceGlobal, String rangoCajas, List<Integer> indice
      */
     public boolean puedeRecalcularPeso() {
         return esLider && !bultoMixto;
+    }
+
+    /**
+     * El peso de la fila sale del catálogo de modelos y no se ha pesado en
+     * este envío: la pantalla lo pinta en gris. Vale para todas las cajas de
+     * un tramo compactado, porque el agrupador no junta cajas de orígenes
+     * distintos.
+     */
+    public boolean pesoDelCatalogo() {
+        return caja.getOrigenPeso() == OrigenPeso.CATALOGO;
     }
 }

@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.DestinoClienteConfig;
 import com.puntotres.packinglist.config.TipoPlantilla;
+import com.puntotres.packinglist.service.ApcPedidoExcel;
+import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Columna;
 import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Aviso;
 import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Fila;
 import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Resumen;
@@ -69,6 +71,102 @@ class AjustadorConversionTest {
                              String code, Integer cantidad, String cajas) {
         return new Fila(null, cliente, null, referencia, color, "U", destino, code, 10, cantidad,
                 cajas, null, null);
+    }
+
+    /** Una fila de la caja que el taller llena con dos pedidos: sin cantidad. */
+    private static Fila partida(String referencia, String color, String code, String cajas) {
+        return fila("APC", referencia, color, "WHOLESALE", code, null, cajas);
+    }
+
+    /**
+     * Un artículo y un color del pedido real con dos Document d'achat, el
+     * los dos de al menos una caja: se busca en el fichero y no se escribe a
+     * mano para no fijar aquí cantidades del cliente.
+     */
+    private static List<ApcPedidoExcel.Comanda> dosPedidosDelMismoArticulo(String[] articulo) {
+        ApcPedidoExcel excel = apc.apc().get();
+        for (ApcPedidoExcel.LineaConCantidad linea : excel.lineasConCantidad()) {
+            List<ApcPedidoExcel.Comanda> comandas = excel.comandasDe(linea.referencia(), linea.color());
+            if (comandas.size() >= 2 && comandas.get(0).cantidad() >= 10
+                    && comandas.get(1).cantidad() >= 10
+                    && excel.filasPara(linea.referencia(), codigo(comandas.get(0))).size() == 1
+                    && excel.filasPara(linea.referencia(), codigo(comandas.get(1))).size() == 1) {
+                articulo[0] = linea.referencia();
+                articulo[1] = linea.color();
+                return comandas;
+            }
+        }
+        throw new IllegalStateException("El pedido de ejemplo no tiene un artículo con dos pedidos");
+    }
+
+    private static String codigo(ApcPedidoExcel.Comanda comanda) {
+        return IndiceCatalogoConversion.sufijo(comanda.pedido());
+    }
+
+    // --- Cajas con dos pedidos ---
+
+    /**
+     * "WHOLSEAL 930/948": el modelo la parte en dos filas sin cantidad. Si al
+     * primer pedido le faltan 3 unidades para completarse y la caja lleva 10,
+     * las otras 7 son del segundo; va escrito, en amarillo y con la cuenta.
+     */
+    @Test
+    void laCajaConDosPedidosSeReparteCuandoElPedidoDejaUnaSolaSalida() {
+        String[] articulo = new String[2];
+        List<ApcPedidoExcel.Comanda> comandas = dosPedidosDelMismoArticulo(articulo);
+        String primero = codigo(comandas.get(0));
+        String segundo = codigo(comandas.get(1));
+        int pedidas = comandas.get(0).cantidad();
+
+        PackingFormatoPuntotres ajustado = AjustadorConversion.ajustar(packing(null,
+                fila("APC", articulo[0], articulo[1], "WHOLESALE", primero, pedidas - 3, "1-5"),
+                partida(articulo[0], articulo[1], primero, "6"),
+                partida(articulo[0], articulo[1], segundo, "6")), apc);
+
+        assertEquals(3, ajustado.filas().get(1).cantidad());
+        assertEquals(7, ajustado.filas().get(2).cantidad());
+        List<Aviso> deducidos = ajustado.avisos().stream()
+                .filter(a -> AjustadorConversion.CANTIDAD_DEDUCIDA.equals(a.consecuencia())).toList();
+        assertEquals(List.of(2, 3), deducidos.stream().map(Aviso::fila).toList());
+        assertTrue(deducidos.stream().allMatch(a -> a.revisar() && a.celda() == Columna.CANTIDAD));
+        assertTrue(deducidos.get(0).texto().contains("al " + primero + " le faltan 3 para las "
+                + pedidas), deducidos.get(0).texto());
+    }
+
+    /**
+     * Si a los dos pedidos les falta más de una caja no hay forma de saber
+     * cuántas unidades son de cada uno: la cantidad se queda en blanco.
+     */
+    @Test
+    void laCajaConDosPedidosSeQuedaSinCantidadSiNoSePuedeDeducir() {
+        String[] articulo = new String[2];
+        List<ApcPedidoExcel.Comanda> comandas = dosPedidosDelMismoArticulo(articulo);
+
+        PackingFormatoPuntotres ajustado = AjustadorConversion.ajustar(packing(
+                new Resumen(1, null),
+                partida(articulo[0], articulo[1], codigo(comandas.get(0)), "6"),
+                partida(articulo[0], articulo[1], codigo(comandas.get(1)), "6")), apc);
+
+        assertNull(ajustado.filas().get(0).cantidad());
+        assertNull(ajustado.filas().get(1).cantidad());
+        List<Aviso> aMano = ajustado.avisos().stream()
+                .filter(a -> AjustadorConversion.CAJA_SIN_REPARTIR.equals(a.consecuencia())).toList();
+        assertEquals(List.of(1, 2), aMano.stream().map(Aviso::fila).toList());
+        assertTrue(aMano.get(0).texto().startsWith("La caja 6 lleva 10 unidades"), aMano.get(0).texto());
+        // Las 10 unidades de la caja cuentan para el total de la hoja aunque
+        // sus filas vayan sin cantidad: el descuadre es 1 contra 10, no contra 0.
+        assertTrue(avisos(ajustado).contains("declara 1 unidades y las filas convertidas suman 10"),
+                avisos(ajustado));
+    }
+
+    /** Una caja mixta de Fez (la misma caja en dos líneas CON cantidad) no se toca. */
+    @Test
+    void unaCajaMixtaConSusCantidadesNoEsUnaCajaPorRepartir() {
+        List<Fila> filas = List.of(
+                fila("APC", "F67008", "LZZ", "KOREA", "690", 4, "6"),
+                fila("APC", "F67008", "LAW", "KOREA", "690", 6, "6"));
+
+        assertTrue(AjustadorConversion.cajasCompartidas(filas).isEmpty());
     }
 
     private static PackingFormatoPuntotres packing(Resumen resumen, Fila... filas) {

@@ -14,11 +14,13 @@ import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.FillPatternType;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Aviso;
 import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Columna;
+import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Nota;
 
 /**
  * El excel que sale de una conversión tiene que leerse con
@@ -35,7 +37,7 @@ class FormatoPuntotresExcelBuilderTest {
                 destino, code, porCaja, cantidad, cajas, null, null);
     }
 
-    private static PackingFormatoPuntotres packing(List<List<String>> notas, List<Aviso> avisos) {
+    private static PackingFormatoPuntotres packing(List<Nota> notas, List<Aviso> avisos) {
         return new PackingFormatoPuntotres("11-07", List.of(),
                 new PackingFormatoPuntotres.Cabecera("SWEET BAG SARL", "FES", "336/26", "7/11/26"),
                 List.of(
@@ -80,12 +82,12 @@ class FormatoPuntotresExcelBuilderTest {
      */
     @Test
     void lasNotasEstanEnLaHojaPeroNoEntranEnElPacking() throws Exception {
-        List<String> notaConPintaDeArticulo = List.of(
+        Nota notaConPintaDeArticulo = Nota.de(
                 "CAJA 27", "MAL", "x", "ULL999.AL0001", "BLACK", "U", "CH", "", "8", "12", "27");
         byte[] excel = FormatoPuntotresExcelBuilder.construir(packing(List.of(
-                List.of("CAJA 27", "MAL"),
+                Nota.de("CAJA 27", "MAL"),
                 notaConPintaDeArticulo,
-                List.of("Poids Brut Total KG", "790,00")), List.of()));
+                Nota.de("Poids Brut Total KG", "790,00")), List.of()));
 
         TallerColisExcel leido = TallerColisExcel.desdeBytes(excel);
         assertEquals(3, leido.lineas().size());
@@ -97,6 +99,43 @@ class FormatoPuntotresExcelBuilderTest {
         assertTrue(textos.contains("CAJA 27"));
         assertTrue(textos.contains("MAL"));
         assertTrue(textos.contains("Poids Brut Total KG"));
+    }
+
+    /**
+     * Las notas van a tres filas del total, a la vista, y con el color del
+     * taller: la letra roja de las cajas que van mal sigue roja. Más abajo
+     * nadie las veía, por decisión del usuario.
+     */
+    @Test
+    void lasNotasVanATresFilasDelTotalYConElColorDelTaller() throws Exception {
+        byte[] excel = FormatoPuntotresExcelBuilder.construir(packing(List.of(
+                new Nota(List.of("caja 62", "10 mal"), "#ff0000", ""),
+                new Nota(List.of("caja 43", "5 mal"), "", "#FFFF00"),
+                new Nota(List.of("Soit : 3 Colis"), "rojo", null)), List.of()));
+        try (XSSFWorkbook libro = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            Sheet hoja = libro.getSheet(TallerColisExcel.HOJA_COLIS);
+            // Tres filas de datos (10 a 12 de Excel), una vacía y el total.
+            int filaTotal = FormatoPuntotresExcelBuilder.FILA_CABECERA + 5;
+            assertEquals("TOTALE", hoja.getRow(filaTotal).getCell(9).getStringCellValue());
+            int filaTitulo = filaTotal + 3;
+            assertNull(hoja.getRow(filaTotal + 1));
+            assertNull(hoja.getRow(filaTotal + 2));
+            assertEquals(FormatoPuntotresExcelBuilder.TITULO_NOTAS,
+                    hoja.getRow(filaTitulo).getCell(1).getStringCellValue());
+
+            XSSFCellStyle roja = (XSSFCellStyle) hoja.getRow(filaTitulo + 2).getCell(1).getCellStyle();
+            assertEquals("FFFF0000", roja.getFont().getXSSFColor().getARGBHex());
+            assertEquals(FillPatternType.NO_FILL, roja.getFillPattern());
+
+            XSSFCellStyle amarilla = (XSSFCellStyle) hoja.getRow(filaTitulo + 3).getCell(2).getCellStyle();
+            assertEquals(FillPatternType.SOLID_FOREGROUND, amarilla.getFillPattern());
+            assertEquals("FFFFFF00", amarilla.getFillForegroundXSSFColor().getARGBHex());
+
+            // Un color que no es "#RRGGBB" no pinta nada, en vez de fallar.
+            XSSFCellStyle sinColor = (XSSFCellStyle) hoja.getRow(filaTitulo + 4).getCell(1).getCellStyle();
+            assertEquals(FillPatternType.NO_FILL, sinColor.getFillPattern());
+            assertTrue(!sinColor.getFont().getBold(), "sin color no hay letra propia");
+        }
     }
 
     @Test

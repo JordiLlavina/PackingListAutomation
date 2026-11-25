@@ -22,16 +22,19 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.VolumenUtil;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.DestinoClienteConfig;
+import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.model.MedidaPalet;
 import com.puntotres.packinglist.model.PaletData;
 
 /**
@@ -48,13 +51,25 @@ import com.puntotres.packinglist.model.PaletData;
  *
  * La tara de cada palet es la que se teclea en la columna "Palet (Kg)" de
  * la revisión (o la del JSON, palets[].tara); si no hay ninguna se asume
- * {@link PaletData#TARA_DEFECTO_KG}. Para el GROSS VOLUME del pie cada
- * palet aporta {@link #VOLUMEN_PALET_M3_DEFECTO} (0.168 m3, la base del
- * palet, derivado del ejemplo real: sus "medidas" describen el palet
- * cargado y NO se usan para el volumen).
+ * {@link PaletData#TARA_DEFECTO_KG}. La medida de cada palet cargado (PALLETS
+ * y GROSS VOLUME del pie) la calcula {@link MedidaPalet} con sus cajas, salvo
+ * que el JSON traiga una escrita.
  */
 @Service
 public class ApcExcelBuilder implements GeneradorPackingListCliente {
+
+    /** Lo que mide el palet vacío, que se suma al alto de sus cajas. */
+    private final int alturaPaletCm;
+
+    /** Para los tests y {@code Main}: el alto de palet por defecto del programa. */
+    public ApcExcelBuilder() {
+        this(new ReglasTallerProperties());
+    }
+
+    @Autowired
+    public ApcExcelBuilder(ReglasTallerProperties reglas) {
+        this.alturaPaletCm = reglas.getAlturaPropiaPaletCm();
+    }
 
     private static final String RUTA_PLANTILLA = "/client-packinglist/apc-packing-list-template.xlsx";
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -66,7 +81,6 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
      * pocas cajas va sin palet de serie, así que ya no es un caso raro.
      */
     private static final String ETIQUETA_SIN_PALET = "NO PALLET";
-    private static final double VOLUMEN_PALET_M3_DEFECTO = 0.168;
 
     // Índices 0-based de fila de la plantilla limpia.
     private static final int IDX_FILA_PALET_MODELO = 16;  // fila 17
@@ -190,9 +204,9 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
     }
 
     /**
-     * Un palet y las cajas físicas que lleva encima. medidas es null en el
-     * bloque de las cajas que van sueltas (que no es un palet) y también en
-     * un palet cuyo JSON no las trae.
+     * Un palet y las cajas físicas que lleva encima. medidas es la del palet
+     * cargado ("80x120x91", o "80x120x?" si una caja no trae medida) y null
+     * en el bloque de las cajas que van sueltas, que no es un palet.
      */
     private record Bloque(String etiqueta, double taraKg, String medidas, List<CajaFisica> cajas) {
         int numeroDeFilas() {
@@ -240,11 +254,14 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
         }
 
         List<Bloque> bloques = new ArrayList<>();
-        porPaletYCaja.forEach((numeroPalet, porCaja) -> bloques.add(new Bloque(
-                "PALET " + numeroPalet,
-                taraPorPalet.getOrDefault(numeroPalet, PaletData.TARA_DEFECTO_KG),
-                medidasPorPalet.get(numeroPalet),
-                aCajasFisicas(porCaja))));
+        porPaletYCaja.forEach((numeroPalet, porCaja) -> {
+            List<CajaFisica> cajas = aCajasFisicas(porCaja);
+            bloques.add(new Bloque(
+                    "PALET " + numeroPalet,
+                    taraPorPalet.getOrDefault(numeroPalet, PaletData.TARA_DEFECTO_KG),
+                    MedidaPalet.deCajas(medidasPorPalet.get(numeroPalet), cajas, alturaPaletCm),
+                    cajas));
+        });
         if (!sinPaletPorCaja.isEmpty()) {
             // Sin palet físico no hay tara que sumar.
             bloques.add(new Bloque(ETIQUETA_SIN_PALET, 0, null, aCajasFisicas(sinPaletPorCaja)));
@@ -424,12 +441,14 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
      *     ({@link VolumenUtil#formulaVolumenM3}).</li>
      * <li>GROSS WEIGHT suma las filas "PALET n": cada una ya es sus cajas más
      *     su tara, y la de "NO PALLET" sus cajas solas.</li>
-     * <li>GROSS VOLUME es CARTONS VOLUME más la base de cada palet.</li>
+     * <li>GROSS VOLUME es el volumen de cada palet CARGADO (80x120 por su
+     *     alto, de {@link MedidaPalet}) más el de los cartones que van
+     *     sueltos. Un palet rotulado con "?" no suma: su alto no se sabe.</li>
      * </ul>
      *
      * <p>"GROSS" es siempre cartones + palets, en peso igual que en volumen:
-     * un envío que va suelto (sin palets) tiene el mismo peso bruto que el de
-     * sus cartones y ninguna tara inventada de por medio.
+     * un envío que va suelto (sin palets) tiene el mismo peso y volumen
+     * brutos que sus cartones, sin ningún palet inventado de por medio.
      */
     private void escribirResumen(Sheet hoja, ResultadoBloques resultado, DestinoData destino,
                                  List<Bloque> bloques) {
@@ -454,11 +473,23 @@ public class ApcExcelBuilder implements GeneradorPackingListCliente {
                 resultado.filasCabeceraBloque().stream()
                         .map(fila -> letraPeso + fila)
                         .reduce((a, b) -> a + "+" + b).orElse(null));
-        String volumenCartones = letraValor + (idx + 3 + 1);
-        resumen(hoja, idx + 5, "GROSS VOLUME", estilos).setCellFormula(medidasPalets.isEmpty()
-                ? volumenCartones
-                : volumenCartones + "+" + medidasPalets.size() + "*"
-                        + numeroParaFormula(VOLUMEN_PALET_M3_DEFECTO));
+        Cell volumenBruto = resumen(hoja, idx + 5, "GROSS VOLUME", estilos);
+        if (medidasPalets.isEmpty()) {
+            // Todo suelto: el bruto es el volumen de los cartones, que ya
+            // está en la celda de encima.
+            volumenBruto.setCellFormula(letraValor + (idx + 3 + 1));
+        } else {
+            List<String> medidasSueltas = bloques.stream().filter(bloque -> !bloque.esPalet())
+                    .flatMap(bloque -> bloque.cajas().stream())
+                    .map(caja -> caja.lider().getTamanoCaja())
+                    .toList();
+            List<String> partes = new ArrayList<>();
+            partes.add(VolumenUtil.formulaVolumenM3(medidasPalets.stream()
+                    .filter(MedidaPalet::tieneVolumen).toList()));
+            partes.add(VolumenUtil.formulaVolumenM3(medidasSueltas));
+            formulaOCero(volumenBruto, partes.stream().filter(parte -> parte != null)
+                    .reduce((a, b) -> a + "+" + b).orElse(null));
+        }
     }
 
     /** Sin nada que sumar, un cero: una fórmula vacía no es una fórmula. */

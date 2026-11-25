@@ -438,6 +438,13 @@ comprobar que no falta ninguna hoja.
                    detrás del código ("SJ", "SS") NO son parte de la
                    referencia: déjalas fuera y, si dudas de qué son,
                    una línea en "avisos".
+                   Si además escribe la PIEL, la referencia completa
+                   va SIEMPRE en el orden REF.PIEL-REF.ARTÍCULO, el del
+                   excel de pedido: "PXCBC-F67008" (la piel son solo
+                   letras, PXCBC; el artículo lleva cifras, F67008). La
+                   operaria a veces la escribe al revés: "F67008-PXCBC"
+                   se escribe "PXCBC-F67008". Darle la vuelta no es
+                   ampliarla, y no hace falta avisar por ello.
     "modelo"     = el nombre descriptivo -> "sac Le Neige",
                    "Pochette Neige", "Ceinture Rosette Antik"
     "color"      = el color como está, con su código si lo lleva ->

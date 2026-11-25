@@ -95,8 +95,8 @@ public class CorteSmsService {
                         modelo -> fotoDelCatalogo(claveCliente, modelo));
             }
             fichas.add(new OrdenCorte(nombreCliente, rotuloTemporada, linea.referencia(), linea.modelo(),
-                    linea.nombreModelo(), linea.color().nombre(), linea.muestras(), linea.pieles(),
-                    imagenes, false));
+                    linea.nombreModelo(), linea.color().nombre(), linea.muestras(), conColorDelBolso(linea),
+                    imagenes, false, linea.colorMuestra()));
             muestras += linea.muestras();
         }
         if (fichas.isEmpty()) {
@@ -111,6 +111,20 @@ public class CorteSmsService {
         // Con la clave y no con el nombre: "APC FALL 27 - Hojas de Corte.xlsx", no "A.P.C. FALL 27 …".
         String nombre = sanear(claveCliente + " " + temporada.trim() + " - Hojas de Corte.xlsx");
         return new ResultadoSms(nombre, ordenes.generar(fichas), fichas.size(), muestras, avisos);
+    }
+
+    /**
+     * En la hoja de corte, el color de la piel principal es el del bolso, el
+     * de COLORIS A.P.C. tal cual, y no el de COLORIS FOURNISSEURS (decisión
+     * del usuario): el cortador lee el mismo color arriba y en la piel. Las
+     * combinaciones y el forro se quedan como vienen. Las etiquetas de
+     * artículo de SMS siguen leyendo COLORIS FOURNISSEURS: por eso se cambia
+     * aquí y no en el lector.
+     */
+    private static PielesArticulo conColorDelBolso(LineaSms linea) {
+        PielesArticulo pieles = linea.pieles();
+        return new PielesArticulo(new PielCorte(pieles.principal().nombre(), linea.color().nombre()),
+                pieles.forro(), pieles.combinaciones());
     }
 
     /** La foto principal del modelo en el catálogo, o ninguna. */

@@ -27,18 +27,26 @@ final class OpcionesArticuloEmbalaje {
 
     /** Un texto por artículo, en el mismo orden, con el nombre del bolso en la misma columna. */
     static List<String> textos(List<ArticuloEmbalaje> articulos) {
-        int ancho = articulos.stream()
-                .mapToInt(a -> a.referenciaYColor().length())
-                .max().orElse(0);
-        return articulos.stream().map(a -> texto(a, ancho)).toList();
+        return alinear(articulos.stream().map(ArticuloEmbalaje::referenciaYColor).toList(),
+                articulos.stream().map(a -> a.tieneNombre() ? a.nombreBolso() : "").toList());
     }
 
-    private static String texto(ArticuloEmbalaje articulo, int ancho) {
-        String prefijo = articulo.referenciaYColor();
-        if (!articulo.tieneNombre()) {
-            return prefijo;
+    /**
+     * La misma columna para cualquier lista: cada {@code prefijo} («referencia ·
+     * color») rellenado con espacios duros hasta el más largo y, detrás, « — »
+     * y su nombre, si tiene. La usa también el desplegable de artículos de las
+     * Hojas de Producción, que es el mismo desplegable (petición del usuario).
+     */
+    static List<String> alinear(List<String> prefijos, List<String> nombres) {
+        int ancho = prefijos.stream().mapToInt(String::length).max().orElse(0);
+        List<String> textos = new java.util.ArrayList<>();
+        for (int i = 0; i < prefijos.size(); i++) {
+            String prefijo = prefijos.get(i);
+            String nombre = nombres.get(i);
+            textos.add(nombre == null || nombre.isBlank() ? prefijo
+                    : prefijo + String.valueOf(ESPACIO_DURO).repeat(ancho - prefijo.length())
+                            + ArticuloEmbalaje.SEPARADOR_NOMBRE.replace(' ', ESPACIO_DURO) + nombre);
         }
-        return prefijo + String.valueOf(ESPACIO_DURO).repeat(ancho - prefijo.length())
-                + ArticuloEmbalaje.SEPARADOR_NOMBRE.replace(' ', ESPACIO_DURO) + articulo.nombreBolso();
+        return textos;
     }
 }

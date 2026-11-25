@@ -24,8 +24,8 @@ import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.TipoPlantilla;
 
 /**
- * Los clientes de plantilla genérica se dan de alta, se corrigen y se
- * eliminan desde /clientes, sin tocar el yml ni reiniciar.
+ * Los clientes de plantilla genérica se dan de alta, se editan, se hacen
+ * inactivos y se eliminan desde /clientes, sin tocar el yml ni reiniciar.
  *
  * La base de datos es la misma para toda la suite: cada test usa su propio
  * nombre de cliente.
@@ -90,7 +90,7 @@ class ClientesControllerTest {
     }
 
     @Test
-    void corregirUnClienteCambiaSusDatosPeroNoSuClave() throws Exception {
+    void editarUnClienteCambiaSusDatosPeroNoSuClave() throws Exception {
         mvc.perform(alta("Corregible"));
 
         mvc.perform(post("/clientes")
@@ -161,16 +161,87 @@ class ClientesControllerTest {
     }
 
     @Test
+    void unClienteInactivoNoSaleEnLosDesplegablesPeroNoSePierde() throws Exception {
+        mvc.perform(alta("Cliente Dormido"));
+        jdbc.update("insert into color_cliente (cliente, codigo, descripcion, fecha_actualizacion) "
+                + "values ('CLIENTE DORMIDO', 'NE', 'NEGRO', current_timestamp)");
+
+        mvc.perform(post("/clientes/inactivar").param("clave", "CLIENTE DORMIDO"))
+                .andExpect(redirectedUrl("/clientes"))
+                .andExpect(flash().attribute("mensaje", containsString("Cliente Dormido")));
+
+        // Fuera de todos los desplegables y filtros, que salen de getClientes()…
+        assertFalse(catalogo.getClientes().containsKey("CLIENTE DORMIDO"));
+        assertFalse(mvc.perform(get("/temporadas")).andReturn().getResponse().getContentAsString()
+                .contains("Cliente Dormido"));
+        // …pero lo que tiene guardado sigue encontrando a su cliente.
+        assertEquals("Cliente Dormido", catalogo.clientePara("CLIENTE DORMIDO").orElseThrow().getNombre());
+
+        // En /clientes sigue en la lista, marcado y con el botón para reactivarlo.
+        String pagina = mvc.perform(get("/clientes")).andReturn().getResponse().getContentAsString();
+        assertTrue(pagina.contains("Cliente Dormido"));
+        assertTrue(pagina.contains("Inactivo"));
+        assertTrue(pagina.contains("Reactivar"));
+    }
+
+    @Test
+    void reactivarDevuelveElClienteALosDesplegables() throws Exception {
+        mvc.perform(alta("Cliente Vuelve"));
+        mvc.perform(post("/clientes/inactivar").param("clave", "CLIENTE VUELVE"));
+        assertFalse(catalogo.getClientes().containsKey("CLIENTE VUELVE"));
+
+        mvc.perform(post("/clientes/reactivar").param("clave", "CLIENTE VUELVE"))
+                .andExpect(redirectedUrl("/clientes"))
+                .andExpect(flash().attributeExists("mensaje"));
+
+        assertTrue(catalogo.getClientes().containsKey("CLIENTE VUELVE"));
+        mvc.perform(get("/temporadas")).andExpect(content().string(containsString("Cliente Vuelve")));
+    }
+
+    @Test
+    void unNombreDeUnClienteInactivoNoSeDaDeAltaOtraVez() throws Exception {
+        mvc.perform(alta("Cliente Repetido"));
+        mvc.perform(post("/clientes/inactivar").param("clave", "CLIENTE REPETIDO"));
+
+        mvc.perform(alta("cliente repetido"))
+                .andExpect(flash().attribute("mensajeError", containsString("inactivo")));
+    }
+
+    @Test
+    void losClientesProgramadosNoSeHacenInactivos() throws Exception {
+        mvc.perform(post("/clientes/inactivar").param("clave", "AMI"))
+                .andExpect(flash().attributeExists("mensajeError"));
+
+        assertTrue(catalogo.getClientes().containsKey("AMI"));
+    }
+
+    @Test
+    void laPantallaDiceEditarYNoCorregir() throws Exception {
+        mvc.perform(alta("Cliente Editable"));
+
+        String pagina = mvc.perform(get("/clientes")).andReturn().getResponse().getContentAsString();
+        assertTrue(pagina.contains(">Editar<"));
+        assertFalse(pagina.contains("Corregir"));
+        String editando = mvc.perform(get("/clientes").param("editar", "CLIENTE EDITABLE"))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(editando.contains("Editar Cliente Editable"));
+    }
+
+    @Test
     void elMenuLlevaClientesEnElPieYLosPanelesAlFinalDeLaRejilla() throws Exception {
         String menu = mvc.perform(get("/menu")).andReturn().getResponse().getContentAsString();
 
         // Los paneles pequeños, detrás de la última tarjeta grande (abajo a la
         // derecha), y Clientes en el pie, debajo de ellos.
-        int escandallos = menu.indexOf("href=\"/clickup\"");
+        int hojasProduccion = menu.indexOf("href=\"/hojas-produccion\"");
         int paneles = menu.indexOf("class=\"menu-paneles\"");
         int pie = menu.indexOf("menu-pie");
+        int escandallos = menu.indexOf("href=\"/clickup\"");
         int clientes = menu.indexOf("href=\"/clientes\"");
-        assertTrue(escandallos > 0 && escandallos < paneles, "los paneles van detrás de las tarjetas");
-        assertTrue(paneles < pie && pie < clientes, "Clientes va en el pie, debajo de los paneles");
+        assertTrue(hojasProduccion > 0 && hojasProduccion < paneles, "los paneles van detrás de las tarjetas");
+        // ClickUp bajó al pie para dejar su sitio a las Hojas de Producción, y
+        // Clientes sigue detrás, en la última columna.
+        assertTrue(paneles < pie && pie < escandallos && escandallos < clientes,
+                "ClickUp y Clientes van en el pie, debajo de los paneles");
     }
 }

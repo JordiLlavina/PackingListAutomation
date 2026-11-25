@@ -2,6 +2,7 @@ package com.puntotres.packinglist.web;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
+import com.puntotres.packinglist.persistence.MemoriaReferencias;
 import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.PaletAssignmentService;
@@ -46,17 +48,20 @@ public class PreparacionRevisionService {
     private final PedidoCompletionService completadorPedidos;
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
+    private final MemoriaReferencias memoria;
 
     public PreparacionRevisionService(EnvioImportService importador,
                                       ResolutorDestinosPadre resolutorDestinos,
                                       PedidoCompletionService completadorPedidos,
                                       PaletAssignmentService asignadorPalets,
-                                      WeightInferenceService inferidorPesos) {
+                                      WeightInferenceService inferidorPesos,
+                                      MemoriaReferencias memoria) {
         this.importador = importador;
         this.resolutorDestinos = resolutorDestinos;
         this.completadorPedidos = completadorPedidos;
         this.asignadorPalets = asignadorPalets;
         this.inferidorPesos = inferidorPesos;
+        this.memoria = memoria;
     }
 
     /**
@@ -74,6 +79,16 @@ public class PreparacionRevisionService {
                          List<String> avisosPrevios, EnvioEnCurso envioEnCurso) {
         EnvioImportado importado = importador.importar(envio);
         importado.getAvisos().addAll(0, avisosPrevios);
+        // El color va SIEMPRE en mayúsculas, llegue como llegue (la IA lo lee
+        // de hojas manuscritas y el taller lo teclea a su manera): «noir» y
+        // «NOIR» son el mismo color y partirían en dos una fila de la revisión.
+        for (EnvioImportado.DestinoImportado destino : importado.getDestinos()) {
+            for (CajaData caja : destino.getDestino().getCajas()) {
+                if (caja.getCodigoColor() != null) {
+                    caja.setCodigoColor(caja.getCodigoColor().toUpperCase(Locale.ROOT));
+                }
+            }
+        }
 
         envioEnCurso.reiniciar();
         envioEnCurso.setCabecera(cabecera);
@@ -109,15 +124,19 @@ public class PreparacionRevisionService {
      * Vuelve a inferir los pesos de todo el envío. Se llama tras cada edición
      * de la revisión porque corregir un tamaño de caja cambia su tara, y esa
      * tara puede propagarse a otras cajas de la misma referencia.
+     *
+     * Las referencias sin ninguna caja pesada en el envío toman el peso por
+     * unidad que recuerda el catálogo de modelos para el cliente del envío.
      */
     public void reinferir(EnvioEnCurso envioEnCurso) {
         List<List<CajaData>> cajasPorDestino = new ArrayList<>();
         for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {
             cajasPorDestino.add(destino.getDestino().getCajas());
         }
+        String cliente = envioEnCurso.getCabecera().getClaveCliente();
         envioEnCurso.getAvisosInferencia().clear();
-        envioEnCurso.getAvisosInferencia().addAll(
-                inferidorPesos.inferirPesosDelEnvio(cajasPorDestino).getAvisos());
+        envioEnCurso.getAvisosInferencia().addAll(inferidorPesos.inferirPesosDelEnvio(cajasPorDestino,
+                referencia -> memoria.pesoNetoUnidad(cliente, referencia)).getAvisos());
     }
 
 }

@@ -34,6 +34,15 @@ public class PedidoCompletionService {
     public ResultadoPedidos completar(List<EnvioImportado.DestinoImportado> destinos,
                                       byte[] excelPedido) {
         ResultadoPedidos resultado = new ResultadoPedidos();
+        // Antes que nada, y haya excel o no: una referencia escrita al revés
+        // ("F67008-PXCBC") se pone en el orden del cliente, piel-artículo.
+        // Sin esto no casa con ningún Article del pedido y la revisión la
+        // enseña al revés.
+        for (EnvioImportado.DestinoImportado destino : destinos) {
+            for (CajaData caja : destino.getDestino().getCajas()) {
+                caja.setReferencia(ReferenciaApc.normalizar(caja.getReferencia()));
+            }
+        }
         if (excelPedido == null || excelPedido.length == 0) {
             resultado.getAvisos().add("No se ha subido el excel de pedido del cliente: "
                     + "los números de pedido se quedan como llegaron (tres dígitos)");

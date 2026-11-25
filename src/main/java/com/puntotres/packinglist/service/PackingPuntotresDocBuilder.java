@@ -28,10 +28,14 @@ import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcBorders;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.CTTcPr;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STBorder;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.STStyleType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
+import com.puntotres.packinglist.model.MedidaPalet;
 import com.puntotres.packinglist.model.PaletData;
 
 /**
@@ -60,6 +64,19 @@ import com.puntotres.packinglist.model.PaletData;
  */
 @Service
 public class PackingPuntotresDocBuilder {
+
+    /** Lo que mide el palet vacío, que se suma al alto de sus cajas. */
+    private final int alturaPaletCm;
+
+    /** Para los tests: el alto de palet por defecto del programa. */
+    public PackingPuntotresDocBuilder() {
+        this(new ReglasTallerProperties());
+    }
+
+    @Autowired
+    public PackingPuntotresDocBuilder(ReglasTallerProperties reglas) {
+        this.alturaPaletCm = reglas.getAlturaPropiaPaletCm();
+    }
 
     /** A4 vertical en veinteavos de punto, con márgenes de 1,5 cm. */
     private static final int ANCHO_A4 = 11906;
@@ -113,7 +130,7 @@ public class PackingPuntotresDocBuilder {
             escribirCabecera(doc, cabecera, nombreCliente);
             escribirResumen(doc, destinos);
             for (Destino destino : destinos) {
-                escribirDestino(doc, destino);
+                escribirDestino(doc, destino, alturaPaletCm);
             }
             ByteArrayOutputStream salida = new ByteArrayOutputStream();
             doc.write(salida);
@@ -238,7 +255,7 @@ public class PackingPuntotresDocBuilder {
      * tabuladores, el recuento en letra normal y más pequeña. Sin guiones ni
      * separadores: el espacio y el peso de la letra ya separan.
      */
-    private static void escribirDestino(XWPFDocument doc, Destino destino) {
+    private static void escribirDestino(XWPFDocument doc, Destino destino, int alturaPaletCm) {
         Recuento recuento = Recuento.de(destino.cajas());
         XWPFParagraph titulo = doc.createParagraph();
         titulo.setSpacingBefore(320);
@@ -252,14 +269,29 @@ public class PackingPuntotresDocBuilder {
                 + recuento.unidades + " uds", TAMANO_RECUENTO, false);
 
         XWPFTable tabla = nuevaTabla(doc, CABECERAS, ANCHOS, NUMERICA);
-        Map<String, String> medidasPorPalet = medidasPorPalet(destino.palets());
+        Map<String, String> medidasDeclaradas = medidasPorPalet(destino.palets());
         for (Map.Entry<Integer, List<Linea>> palet : lineasPorPalet(destino.cajas()).entrySet()) {
             filaPalet(tabla.createRow(), rotuloPalet(palet.getKey(), palet.getValue(),
-                    medidasPorPalet.get(String.valueOf(palet.getKey()))));
+                    medidaDelPalet(palet.getKey(), destino.cajas(), medidasDeclaradas, alturaPaletCm)));
             for (Linea linea : palet.getValue()) {
                 filaSimple(tabla.createRow(), ANCHOS, NUMERICA, false, linea.celdas());
             }
         }
+    }
+
+    /**
+     * La medida del palet cargado (la escrita o la de sus cajas apiladas, ver
+     * {@link MedidaPalet}); null para las sueltas y las que no tienen palet,
+     * que no son un palet.
+     */
+    private static String medidaDelPalet(Integer palet, List<CajaData> cajas,
+                                         Map<String, String> declaradas, int alturaPaletCm) {
+        if (palet == null || CajaData.vaSuelta(palet)) {
+            return null;
+        }
+        List<CajaData> delPalet = cajas.stream().filter(caja -> palet.equals(caja.getNumeroPalet())).toList();
+        return MedidaPalet.deCajas(declaradas.get(String.valueOf(palet)), CajaFisica.agrupar(delPalet),
+                alturaPaletCm);
     }
 
     private static Map<String, String> medidasPorPalet(List<PaletData> palets) {

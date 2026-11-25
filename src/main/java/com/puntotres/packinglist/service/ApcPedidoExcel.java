@@ -266,14 +266,16 @@ public final class ApcPedidoExcel {
      * varias = ambigua (el mismo modelo con dos prefijos, p. ej.
      * PXBHZ-F65101 y PXCBT-F65101), y entonces quien llama avisa y no toca
      * nada. Si alguna fila casa EXACTA por referencia, las de solo-sufijo se
-     * descartan: una referencia completa nunca compite con recortes.
+     * descartan: una referencia completa nunca compite con recortes. Una
+     * referencia escrita al revés ("F67008-PXCBC") se busca en su orden
+     * ({@link ReferenciaApc}).
      */
     public List<FilaPedido> filasPara(String referencia, String pedidoParcial) {
         if (referencia == null || referencia.isBlank()
                 || pedidoParcial == null || pedidoParcial.isBlank()) {
             return List.of();
         }
-        String buscada = referencia.trim().toUpperCase(Locale.ROOT);
+        String buscada = buscable(referencia);
         String digitos = sufijo(pedidoParcial);
         List<FilaPedido> exactas = new ArrayList<>();
         List<FilaPedido> porSufijo = new ArrayList<>();
@@ -330,7 +332,7 @@ public final class ApcPedidoExcel {
         if (referencia == null || referencia.isBlank()) {
             return Optional.empty();
         }
-        String buscada = referencia.trim().toUpperCase(Locale.ROOT);
+        String buscada = buscable(referencia);
         boolean articuloEncontrado = false;
         Set<String> deLaReferencia = new LinkedHashSet<>();
         Set<String> porSufijo = new LinkedHashSet<>();
@@ -408,7 +410,7 @@ public final class ApcPedidoExcel {
      * sola. El color se compara sin mayúsculas ni espacios de más.
      */
     public List<Comanda> comandasDe(String referencia, String color) {
-        String ref = referencia == null ? "" : referencia.trim();
+        String ref = referencia == null ? "" : buscable(referencia);
         String col = color == null ? "" : color.trim();
         Map<String, Integer> porPedido = new LinkedHashMap<>();
         for (CantidadPorLinea linea : cantidadesPorLinea) {
@@ -476,6 +478,14 @@ public final class ApcPedidoExcel {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    /**
+     * La referencia como se compara con los Article: en su orden piel-artículo
+     * aunque llegue al revés, en mayúsculas y sin espacios alrededor.
+     */
+    private static String buscable(String referencia) {
+        return ReferenciaApc.normalizar(referencia).trim().toUpperCase(Locale.ROOT);
     }
 
     private static String clave(String referencia, String pedido) {

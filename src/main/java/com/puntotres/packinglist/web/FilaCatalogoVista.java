@@ -42,7 +42,7 @@ public record FilaCatalogoVista(Long modeloId, String codigoModelo, String nombr
 
     public record ArticuloVista(String referencia, String refPiel, String nombrePiel, String forro,
                                 List<String> combinaciones, String medidaCaja, boolean medidaConTara,
-                                Integer unidadesPorCaja, Double pesoNetoKg, List<ColorVista> colores) {
+                                Integer unidadesPorCaja, Double pesoNetoUnidadKg, List<ColorVista> colores) {
 
         public ArticuloVista {
             combinaciones = List.copyOf(combinaciones);

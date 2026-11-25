@@ -17,16 +17,19 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellReference;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.puntotres.packinglist.ResumenUtil;
 import com.puntotres.packinglist.VolumenUtil;
 import com.puntotres.packinglist.config.ClienteConfig;
+import com.puntotres.packinglist.config.ReglasTallerProperties;
 import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.CajaFisica;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.DestinoData;
+import com.puntotres.packinglist.model.MedidaPalet;
 import com.puntotres.packinglist.model.PaletData;
 
 /**
@@ -46,6 +49,19 @@ import com.puntotres.packinglist.model.PaletData;
  */
 @Service
 public class GenericoExcelBuilder implements GeneradorPackingListCliente {
+
+    /** Lo que mide el palet vacío, que se suma al alto de sus cajas. */
+    private final int alturaPaletCm;
+
+    /** Para los tests y {@code Main}: el alto de palet por defecto del programa. */
+    public GenericoExcelBuilder() {
+        this(new ReglasTallerProperties());
+    }
+
+    @Autowired
+    public GenericoExcelBuilder(ReglasTallerProperties reglas) {
+        this.alturaPaletCm = reglas.getAlturaPropiaPaletCm();
+    }
 
     private static final String RUTA_PLANTILLA = "/client-packinglist/generic-packing-list-template.xlsx";
     private static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -90,12 +106,17 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
                 porPalet.computeIfAbsent(caja.getNumeroPalet(), n -> new ArrayList<>()).add(caja);
             }
         }
-        Map<Integer, String> medidasPorPalet = new LinkedHashMap<>();
+        Map<Integer, String> medidasDeclaradas = new LinkedHashMap<>();
         Map<Integer, Double> taraPorPalet = new LinkedHashMap<>();
         for (PaletData palet : palets) {
-            medidasPorPalet.put(palet.getNumeroPalet(), palet.getMedidas());
+            medidasDeclaradas.put(palet.getNumeroPalet(), palet.getMedidas());
             taraPorPalet.put(palet.getNumeroPalet(), palet.taraOPorDefecto());
         }
+        // La medida del palet cargado: la escrita si la hay, si no la de sus
+        // cajas apiladas (MedidaPalet).
+        Map<Integer, String> medidasPorPalet = new LinkedHashMap<>();
+        porPalet.forEach((numero, cajas) -> medidasPorPalet.put(numero, MedidaPalet.deCajas(
+                medidasDeclaradas.get(numero), CajaFisica.agrupar(cajas), alturaPaletCm)));
         // Cada destinación lleva su factura: la tecleada en su cabecera de la
         // revisión o, si no hay, la del envío.
         String factura = envio.facturaPara(destino);
@@ -112,7 +133,8 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
             List<String> rangosCajas = new ArrayList<>();
             int idxFilaTotal = escribirCuerpo(hoja, porPalet, sinPalet, medidasPorPalet, taraPorPalet,
                     envio, rangosCajas);
-            escribirTotalYResumen(hoja, idxFilaTotal, destino, rangosCajas);
+            escribirTotalYResumen(hoja, idxFilaTotal, destino, rangosCajas,
+                    volumenBruto(medidasPorPalet, sinPalet));
 
             wb.setForceFormulaRecalculation(true);
             wb.write(salida);
@@ -281,8 +303,24 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
         return estilos;
     }
 
+    /**
+     * TOTAL GROSS VOLUME como fórmula: cada palet cargado (80x120 por su
+     * alto) más los cartones que van sin palet. Un palet rotulado con "?" no
+     * suma, porque su alto no se sabe. null si no hay nada que sumar.
+     */
+    private static String volumenBruto(Map<Integer, String> medidasPorPalet, List<CajaData> sinPalet) {
+        String palets = VolumenUtil.formulaVolumenM3(medidasPorPalet.values().stream()
+                .filter(MedidaPalet::tieneVolumen).toList());
+        String sueltas = VolumenUtil.formulaVolumenM3(CajaFisica.agrupar(sinPalet).stream()
+                .map(caja -> caja.lider().getTamanoCaja()).toList());
+        if (palets == null) {
+            return sueltas;
+        }
+        return sueltas == null ? palets : palets + "+" + sueltas;
+    }
+
     private void escribirTotalYResumen(Sheet hoja, int idxFilaTotal, DestinoData destino,
-                                       List<String> rangosCajas) {
+                                       List<String> rangosCajas, String formulaVolumenBruto) {
         Row filaTotal = hoja.getRow(idxFilaTotal);
         // Rango completo del cuerpo, filas "PALET n" incluidas: llevan su
         // tara en la columna de peso, así el TOTAL ya es cartones + palets
@@ -320,6 +358,8 @@ public class GenericoExcelBuilder implements GeneradorPackingListCliente {
                 .setCellFormula(letraPeso + (idxFilaTotal + 1));
         formulaOCero(conFormato(celda(hoja, 13, 8), FORMATO_M3, estilos),         // TOTAL VOLUME
                 VolumenUtil.formulaVolumenM3(medidas));
+        formulaOCero(conFormato(celda(hoja, 14, 8), FORMATO_M3, estilos),         // TOTAL GROSS VOLUME
+                formulaVolumenBruto);
         celda(hoja, 15, 8).setCellValue(cajas.size());                       // TOTAL CARTONS
         celda(hoja, 16, 8).setCellValue(ResumenUtil.resumenConteo(medidas)); // CARTON DIMENTIONS
     }

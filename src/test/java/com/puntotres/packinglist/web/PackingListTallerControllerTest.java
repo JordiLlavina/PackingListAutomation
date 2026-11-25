@@ -27,6 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
 import com.puntotres.packinglist.persistence.MemoriaReferencias;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 import com.puntotres.packinglist.testutil.PackingTallerExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 
@@ -43,6 +44,9 @@ class PackingListTallerControllerTest {
 
     @Autowired
     private MemoriaReferencias memoria;
+
+    @Autowired
+    private CatalogoModelos catalogo;
 
     /** Una sesión propia por test: el estado del taller es de sesión. */
     private MockHttpSession sesion;
@@ -448,6 +452,7 @@ class PackingListTallerControllerTest {
 
     @Test
     void generarRecuerdaLaReferenciaParaLaProximaEntrega() throws Exception {
+        catalogo.asegurarArticulo("AMI", referencia);
         digerirUnaEntrega(tallerConUnaReferencia(8));
 
         mvc.perform(post("/packing-list/taller/generar").session(sesion)
@@ -459,6 +464,20 @@ class PackingListTallerControllerTest {
                 memoria.buscar("AMI", referencia).orElseThrow();
         assertEquals("60x40x45", recordado.medidaCaja());
         assertEquals(9, recordado.unidadesPorCaja());
+    }
+
+    @Test
+    void sinElArticuloEnElCatalogoGenerarNoRecuerdaNiDaDeAlta() throws Exception {
+        // Decisión del usuario: el packing no da de alta modelos en el catálogo.
+        digerirUnaEntrega(tallerConUnaReferencia(8));
+
+        mvc.perform(post("/packing-list/taller/generar").session(sesion)
+                        .param("grupos[0].medidaCaja", "60x40x45")
+                        .param("grupos[0].unidadesPorCaja", "9"))
+                .andExpect(redirectedUrl("/revision"));
+
+        assertTrue(memoria.buscar("AMI", referencia).isEmpty());
+        assertTrue(catalogo.articulo("AMI", referencia).isEmpty());
     }
 
     @Test

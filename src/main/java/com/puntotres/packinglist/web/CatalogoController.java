@@ -416,7 +416,7 @@ public class CatalogoController {
                 nombreDePiel.getOrDefault(articulo.getRefPiel(), ""), articulo.getForro(),
                 articulo.getCasillasCombinacion(), articulo.getMedidaCaja(),
                 articulo.getMedidaCaja().isEmpty() || conTara.contains(articulo.getMedidaCaja()),
-                articulo.getUnidadesPorCaja(), articulo.getPesoNetoKg(), colores);
+                articulo.getUnidadesPorCaja(), articulo.getPesoNetoUnidadKg(), colores);
     }
 
     private static <E extends Enum<E>> E enumDe(Class<E> tipo, String nombre) {

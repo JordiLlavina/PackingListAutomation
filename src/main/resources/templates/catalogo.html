@@ -100,7 +100,7 @@
                 <th data-col="comb4">Comb. 4</th>
                 <th data-col="carton">Cartón</th>
                 <th data-col="unidades">Uds/caja</th>
-                <th data-col="peso">Peso neto caja llena (kg)</th>
+                <th data-col="peso">Peso neto por unidad (kg)</th>
                 <th data-col="acciones"></th>
             </tr>
             </thead>
@@ -177,9 +177,9 @@
                         <span class="estado-celda" aria-live="polite"></span>
                     </td>
                     <td data-col="peso">
-                        <input type="text" inputmode="decimal" class="celda c-numero" th:value="${articulo.pesoNetoKg}"
-                               data-url="/catalogo/articulo/celda" data-campo="PESO_NETO_KG"
-                               th:attr="data-referencia=${articulo.referencia}, aria-label=|Peso neto de ${articulo.referencia}|">
+                        <input type="text" inputmode="decimal" class="celda c-numero" th:value="${articulo.pesoNetoUnidadKg}"
+                               data-url="/catalogo/articulo/celda" data-campo="PESO_NETO_UNIDAD_KG"
+                               th:attr="data-referencia=${articulo.referencia}, aria-label=|Peso neto por unidad de ${articulo.referencia}|">
                         <span class="estado-celda" aria-live="polite"></span>
                     </td>
                     <td data-col="acciones" class="c-acciones">
@@ -287,7 +287,7 @@
             const TITULOS = {foto: 'Foto', modelo: 'Modelo', nombre: 'Nombre', tipo: 'Tipo', temporadas: 'Temporadas',
                 nfotos: 'Fotos', referencia: 'Referencia', piel: 'Piel', nombrePiel: 'Nombre piel', forro: 'Forro',
                 comb1: 'Comb. 1', comb2: 'Comb. 2', comb3: 'Comb. 3', comb4: 'Comb. 4', carton: 'Cartón',
-                unidades: 'Uds/caja', peso: 'Peso neto'};
+                unidades: 'Uds/caja', peso: 'Peso neto/ud'};
             const VISTAS = {
                 packaging: ['foto', 'referencia', 'nombre', 'tipo', 'carton', 'unidades', 'peso'],
                 corte: ['foto', 'referencia', 'modelo', 'nombre', 'nombrePiel', 'forro', 'comb1', 'comb2', 'comb3', 'comb4'],

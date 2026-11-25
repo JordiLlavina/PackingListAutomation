@@ -287,22 +287,43 @@ pase a `https://modelos.puntotres.com`.
 ## 8. Actualizar a una versión nueva
 
 Basta con cambiar el jar, pero **con la aplicación parada** y con **copia de
-`datos` antes**:
+`datos` antes**. Esos pasos están en el script [deploy/actualizar.sh](deploy/actualizar.sh),
+que se deja en el servidor **una sola vez**:
+
+```powershell
+# Desde el PC con Windows (PowerShell), igual que el jar en el apartado 3
+scp .\deploy\actualizar.sh usuario@192.168.0.15:/tmp/
+```
 
 ```bash
-# (antes: scp del jar nuevo a /tmp, como en el apartado 3)
+# Ya en el servidor, una sola vez
+sudo mv /tmp/actualizar.sh /opt/packinglist/actualizar.sh
+sudo chmod +x /opt/packinglist/actualizar.sh
+```
+
+Y cada actualización son dos pasos: `scp` del jar nuevo a `/tmp` (apartado 3) y
+
+```bash
+sudo /opt/packinglist/actualizar.sh      # o: sudo /opt/packinglist/actualizar.sh /tmp/otro.jar
+sudo journalctl -u packinglist -f        # comprobar que arranca sin errores
+```
+
+El script para el servicio, copia `datos` a `datos-copia-<fecha>`, guarda el jar
+que había como `packinglist.jar.anterior`, pone el nuevo con su propietario y
+arranca. Si un paso falla se detiene ahí. A mano, lo que hace es esto:
+
+```bash
 sudo systemctl stop packinglist
 sudo cp -r /opt/packinglist/datos /opt/packinglist/datos-copia-$(date +%F)
 sudo cp /tmp/packing-list-ami-1.0.0-SNAPSHOT.jar /opt/packinglist/packinglist.jar
 sudo chown packinglist:packinglist /opt/packinglist/packinglist.jar
 sudo systemctl start packinglist
-sudo journalctl -u packinglist -f        # comprobar que arranca sin errores
 ```
 
 - **Por qué la copia**: si la versión nueva trae un cambio de esquema (una
   migración nueva de Flyway), se aplica sola al arrancar, y si fallara a medias
-  H2 no la deshace. Para volver atrás: parar, poner el jar viejo y la carpeta
-  copiada, arrancar.
+  H2 no la deshace. Para volver atrás: parar, poner `packinglist.jar.anterior`
+  como `packinglist.jar` y la carpeta copiada como `datos`, arrancar.
 - **No se toca** al actualizar: `/etc/packinglist.env`, el `application.yml` de
   al lado del jar (si lo hay), el fichero del servicio ni `datos`.
 - Actualizar cuando no haya nadie trabajando: durante el reinicio la aplicación

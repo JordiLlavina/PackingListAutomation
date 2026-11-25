@@ -374,8 +374,8 @@ public class ConstructorLote {
         piel.medidaCaja = fundir(modelo, piel.claveCampo("medidaCaja"), piel.medidaCaja, articulo.getMedidaCaja());
         piel.unidadesPorCaja = fundir(modelo, piel.claveCampo("unidadesPorCaja"), piel.unidadesPorCaja,
                 articulo.getUnidadesPorCaja() == null ? "" : String.valueOf(articulo.getUnidadesPorCaja()));
-        piel.pesoNetoKg = fundir(modelo, piel.claveCampo("pesoNetoKg"), piel.pesoNetoKg,
-                articulo.getPesoNetoKg() == null ? "" : String.valueOf(articulo.getPesoNetoKg()));
+        piel.pesoNetoUnidadKg = fundir(modelo, piel.claveCampo("pesoNetoUnidadKg"), piel.pesoNetoUnidadKg,
+                articulo.getPesoNetoUnidadKg() == null ? "" : String.valueOf(articulo.getPesoNetoUnidadKg()));
         casarNombreDePiel(modelo, piel);
         for (ArticuloColor guardado : catalogo.coloresDe(modelo.cliente, articulo.getReferencia())) {
             String clave = guardado.getCodigoColor();
@@ -496,7 +496,7 @@ public class ConstructorLote {
             }
             nueva.medidaCaja = vieja.medidaCaja;
             nueva.unidadesPorCaja = vieja.unidadesPorCaja;
-            nueva.pesoNetoKg = vieja.pesoNetoKg;
+            nueva.pesoNetoUnidadKg = vieja.pesoNetoUnidadKg;
             nueva.colores.addAll(vieja.colores);
         }
         modelo.pieles.clear();
@@ -615,9 +615,9 @@ public class ConstructorLote {
                             : ModeloEnCarga.limpio(editada.medidaCaja()).toLowerCase(Locale.ROOT));
             piel.unidadesPorCaja = cambiar(modelo, piel.claveCampo("unidadesPorCaja"), piel.unidadesPorCaja,
                     editada.unidadesPorCaja() == null ? null : ModeloEnCarga.limpio(editada.unidadesPorCaja()));
-            piel.pesoNetoKg = cambiar(modelo, piel.claveCampo("pesoNetoKg"), piel.pesoNetoKg,
-                    editada.pesoNetoKg() == null ? null
-                            : ModeloEnCarga.limpio(editada.pesoNetoKg()).replace(',', '.'));
+            piel.pesoNetoUnidadKg = cambiar(modelo, piel.claveCampo("pesoNetoUnidadKg"), piel.pesoNetoUnidadKg,
+                    editada.pesoNetoUnidadKg() == null ? null
+                            : ModeloEnCarga.limpio(editada.pesoNetoUnidadKg()).replace(',', '.'));
             if (editada.colores() != null) {
                 aplicarColores(modelo, piel, editada.colores());
             }
@@ -894,7 +894,7 @@ public class ConstructorLote {
                 if (!piel.unidadesPorCaja.isEmpty() && !esEnteroPositivo(piel.unidadesPorCaja)) {
                     faltan.add("Las unidades por caja de " + piel.referencia + " son un número entero mayor que cero");
                 }
-                if (!piel.pesoNetoKg.isEmpty() && !esNumeroPositivo(piel.pesoNetoKg)) {
+                if (!piel.pesoNetoUnidadKg.isEmpty() && !esNumeroPositivo(piel.pesoNetoUnidadKg)) {
                     faltan.add("El peso de " + piel.referencia + " es un número de kilos mayor que cero");
                 }
             }

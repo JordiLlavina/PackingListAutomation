@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Hojas de Producción guardadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Hojas de Producción · Hojas guardadas')}"></header>
+<main>
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="tarjeta" th:if="${#lists.isEmpty(hojas)}">
+        <p>Todavía no hay ninguna hoja guardada. <a th:href="@{/hojas-produccion}">Hacer la primera</a>.</p>
+    </div>
+
+    <div class="embalaje-antiguos" th:unless="${#lists.isEmpty(hojas)}">
+        <nav class="tarjeta embalaje-lista" aria-label="Hojas guardadas">
+            <ul>
+                <li th:each="hoja : ${hojas}">
+                    <a th:href="@{/hojas-produccion/antiguas(id=${hoja.id()})}"
+                       th:classappend="${hoja.id() == elegidaId} ? 'elegida'"
+                       th:attr="aria-current=${hoja.id() == elegidaId} ? 'true' : null">
+                        <span class="embalaje-lista-fecha"
+                              th:text="|${#temporals.format(hoja.fecha(), 'dd/MM/yyyy')} · hoja ${hoja.numero()} · ${hoja.taller()}|">
+                            24/11/2026 · hoja 325 · C&amp;C LEATHER</span>
+                        <span class="embalaje-lista-articulo"
+                              th:text="${#strings.isEmpty(hoja.modelo())} ? ${hoja.cliente()} : |${hoja.cliente()} · ${hoja.modelo()}|">APC · F67008</span>
+                        <span class="ayuda" th:if="${hoja.nombreBolso() != null}" th:text="${hoja.nombreBolso()}">LE NEIGE</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <section class="tarjeta embalaje-panel">
+            <p th:if="${elegida == null}">La hoja elegida ya no existe: elige otra de la lista.</p>
+            <th:block th:if="${elegida != null}">
+                <h3 class="titulo-seccion"
+                    th:text="|Hoja ${elegida.numero()} · ${elegida.taller()} · ${elegida.modelo()}|">
+                    Hoja 325 · C&amp;C LEATHER · F67008</h3>
+                <div class="hp-antigua-cabecera">
+                    <img class="hp-antigua-foto" th:if="${fotoUrl != null}" th:src="${fotoUrl}" alt="Foto del modelo">
+                    <table class="embalaje-resumen">
+                        <tbody>
+                        <tr><th>Modelo</th><td th:text="${elegida.modelo()}"></td></tr>
+                        <tr><th>Nombre del bolso</th><td th:text="${elegida.nombreBolso()}"></td></tr>
+                        <tr><th>Cliente</th><td th:text="${elegida.nombreCliente()}"></td></tr>
+                        <tr><th>Temporada</th><td th:text="${elegida.temporada()}"></td></tr>
+                        <tr><th>Taller</th><td th:text="${elegida.taller()}"></td></tr>
+                        <tr><th>Nº de hoja</th><td th:text="${elegida.numero()}"></td></tr>
+                        <tr><th>Fecha de salida</th>
+                            <td th:text="${elegida.fechaSalida() != null} ? ${#temporals.format(elegida.fechaSalida(), 'dd/MM/yyyy')} : ''"></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h4>Colores</h4>
+                <div class="scroll-horizontal">
+                    <table class="hp-tabla-antigua">
+                        <thead>
+                        <tr>
+                            <th>Uds.</th><th>Piel base</th><th>Color</th><th>Piel combinación</th><th>Color</th>
+                            <th>Hilo</th><th>Marcado int.</th><th>Marcado ext.</th><th>Fornitura</th><th>Forro</th><th>Tinta</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="linea : ${elegida.lineas()}">
+                            <td th:text="${linea.unidades()}"></td>
+                            <td th:text="${linea.pielBase()}"></td>
+                            <td th:text="${linea.colorBase()}"></td>
+                            <td th:text="${linea.pielCombinacion()}"></td>
+                            <td th:text="${linea.colorCombinacion()}"></td>
+                            <td th:text="${linea.hilo()}"></td>
+                            <td th:text="${linea.marcadoInterior()}"></td>
+                            <td th:text="${linea.marcadoExterior()}"></td>
+                            <td th:text="${linea.fornitura()}"></td>
+                            <td th:text="${linea.forro()}"></td>
+                            <td th:text="${linea.tinta()}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="embalaje-acciones">
+                    <a class="boton" th:href="@{/hojas-produccion/antiguas/{id}/xlsx(id=${elegidaId})}">Descargar Excel</a>
+                    <a class="boton secundario" th:href="@{/hojas-produccion(importar=${elegidaId})}">Importar al formulario</a>
+                </div>
+            </th:block>
+        </section>
+    </div>
+
+    <a class="boton secundario" th:href="@{/hojas-produccion}">← Volver</a>
+</main>
+</body>
+</html>

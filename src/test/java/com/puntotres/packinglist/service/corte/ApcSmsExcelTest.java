@@ -15,13 +15,17 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.ShapeTypes;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.util.Units;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
 import org.apache.poi.xssf.usermodel.XSSFDrawing;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFSimpleShape;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
+import org.openxmlformats.schemas.drawingml.x2006.main.STSchemeColorVal;
 
 import com.puntotres.packinglist.testutil.FotosDePrueba;
 
@@ -192,6 +196,46 @@ class ApcSmsExcelTest {
         assertEquals(100, leida.alto());
     }
 
+    /**
+     * En el real, cada celda de COLORIS A.P.C. lleva una elipse rellena del
+     * color del bolso: en RGB ("273C18") o con un color del tema y un
+     * «más oscuro» ("accent2" al 50 %, el «Naranja, Énfasis 2, más oscuro
+     * 50 %» de Excel, que en HSL da 843C0B). Hay también elipses de alto cero, invisibles,
+     * que no cuentan; con dos en la celda manda la de encima, la última.
+     */
+    @Test
+    void laRedonditaDeLaCeldaDelColorEsElColorDeLaMuestra() throws IOException {
+        byte[] excel = libro(hoja -> {
+            fila(hoja, 1, "PXCBC-F67008", "KAF VERT FONCÉ", "ALPACA TOUCH", "2");
+            fila(hoja, 2, "PXCGY-F67008", "LZZ NOIR", "PIPER", "3");
+            fila(hoja, 3, "PXCGX-F67008", "TTG MARRON", "ALASKA", "1");
+            fila(hoja, 4, "PXCGX-F67009", "LZZ NOIR", "ALASKA", "1");
+            XSSFDrawing dibujo = hoja.createDrawingPatriarch();
+            redonda(dibujo, 1, 2).setFillColor(0x27, 0x3C, 0x18);
+            // De alto cero: no se ve y no cuenta.
+            dibujo.createSimpleShape(new XSSFClientAnchor(100, 0, 300, 0, 2, 2, 2, 2))
+                    .setShapeType(ShapeTypes.ELLIPSE);
+            redonda(dibujo, 2, 2).setFillColor(0xB4, 0, 0);
+            redonda(dibujo, 2, 2).setFillColor(0x23, 0x10, 0x03);
+            var tema = redonda(dibujo, 3, 2).getCTShape().getSpPr().addNewSolidFill().addNewSchemeClr();
+            tema.setVal(STSchemeColorVal.ACCENT_2);
+            tema.addNewLumMod().setVal(50000);
+            // Fuera de la columna del color, o un rectángulo: no es la redondita.
+            redonda(dibujo, 4, 3).setFillColor(0xB4, 0, 0);
+            XSSFSimpleShape rectangulo = dibujo.createSimpleShape(
+                    new XSSFClientAnchor(0, 0, Units.EMU_PER_POINT * 20, Units.EMU_PER_POINT * 20, 2, 4, 2, 4));
+            rectangulo.setShapeType(ShapeTypes.RECT);
+            rectangulo.setFillColor(0xB4, 0, 0);
+        });
+
+        List<LineaSms> lineas = ApcSmsExcel.leer(excel, apc).lineas();
+
+        assertEquals("273C18", lineas.get(0).colorMuestra());
+        assertEquals("231003", lineas.get(1).colorMuestra());
+        assertEquals("843C0B", lineas.get(2).colorMuestra());
+        assertEquals("", lineas.get(3).colorMuestra());
+    }
+
     @Test
     void unExcelSinLasColumnasNoEsElDeSms() throws IOException {
         byte[] excel;
@@ -230,6 +274,15 @@ class ApcSmsExcelTest {
         for (int i = 0; i < valores.length; i++) {
             fila.createCell(i + 1).setCellValue(valores[i]);
         }
+    }
+
+    /** Una elipse de 20 x 20 puntos dentro de la celda, como las del real. */
+    private static XSSFSimpleShape redonda(XSSFDrawing dibujo, int fila, int columna) {
+        XSSFSimpleShape elipse = dibujo.createSimpleShape(new XSSFClientAnchor(Units.EMU_PER_POINT * 10,
+                Units.EMU_PER_POINT * 5, Units.EMU_PER_POINT * 30, Units.EMU_PER_POINT * 25,
+                columna, fila, columna, fila));
+        elipse.setShapeType(ShapeTypes.ELLIPSE);
+        return elipse;
     }
 
     private static void imagenEn(XSSFDrawing dibujo, int indice, int fila, int columna) {

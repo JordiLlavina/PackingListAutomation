@@ -26,14 +26,24 @@ import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.ShapeTypes;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.xssf.model.ThemesTable;
 import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFColor;
 import org.apache.poi.xssf.usermodel.XSSFPicture;
 import org.apache.poi.xssf.usermodel.XSSFShape;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFSimpleShape;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTPercentage;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTPositiveFixedPercentage;
 import org.openxmlformats.schemas.drawingml.x2006.main.CTRelativeRect;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTSRgbColor;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTSchemeColor;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTShapeProperties;
+import org.openxmlformats.schemas.drawingml.x2006.main.CTSolidColorFillProperties;
 
 /**
  * Lee el excel de pedido de SMS de APC ("COMMANDE SMS_FALL27_PUNTOTRES.xlsx"):
@@ -53,7 +63,9 @@ import org.openxmlformats.schemas.drawingml.x2006.main.CTRelativeRect;
  *       referencia; si no cuadran, manda la referencia y se avisa.</li>
  *   <li>MODELE (opcional): el nombre del bolso ("LE NEIGE").</li>
  *   <li>COLORIS A.P.C.: el color del bolso, código y descripción ("LZZ
- *       NOIR"), partido con la regla de APC del excel de producción.</li>
+ *       NOIR"), partido con la regla de APC del excel de producción. En la
+ *       misma celda el cliente dibuja una redondita (una elipse) del color
+ *       de la muestra: se lee su relleno.</li>
  *   <li>ARTICLE: el nombre de la piel en el proveedor ("ALPACA TOUCH"), y
  *       COLORIS FOURNISSEURS (opcional) su color ("NEGRO", "9032 FONDANTE").
  *       Un bolso de dos pieles las junta con «+» y sus colores con «/»
@@ -153,6 +165,7 @@ public final class ApcSmsExcel {
                                  Map<String, Optional<Imagen>> imagenes, List<LineaSms> lineas,
                                  List<String> avisos) {
         Map<Integer, List<Croquis>> croquisPorFila = croquisPorFila(hoja, columnas.croquis());
+        Map<Integer, String> redonditas = redonditasPorFila(hoja, columnas.color());
         for (int numero = columnas.filaTitulos() + 1; numero <= hoja.getLastRowNum(); numero++) {
             Row fila = hoja.getRow(numero);
             if (fila == null) {
@@ -201,7 +214,7 @@ public final class ApcSmsExcel {
                         .ifPresent(croquis::add);
             }
             lineas.add(new LineaSms(hoja.getSheetName(), numero + 1, referencia, modelo,
-                    texto(fila, columnas.nombreModelo()), color,
+                    texto(fila, columnas.nombreModelo()), color, redonditas.getOrDefault(numero, ""),
                     pieles(texto(fila, columnas.piel()), texto(fila, columnas.colorPiel()),
                             texto(fila, columnas.forro())),
                     muestras, croquis));
@@ -347,6 +360,156 @@ public final class ApcSmsExcel {
     }
 
     /**
+     * Fila → el color de la redondita que el cliente dibuja en la celda del
+     * color (una elipse rellena), en RGB hexadecimal ("273C18"). Las de
+     * tamaño cero no se ven y no cuentan: el real tiene varias, restos de
+     * copiar celdas. Con dos en la misma celda manda la de encima, que es la
+     * última del dibujo.
+     */
+    private static Map<Integer, String> redonditasPorFila(Sheet hoja, int columna) {
+        Map<Integer, String> porFila = new HashMap<>();
+        if (!(hoja instanceof XSSFSheet xssf) || xssf.getDrawingPatriarch() == null) {
+            return porFila;
+        }
+        Map<String, String> tema = colores(xssf.getWorkbook().getTheme());
+        for (XSSFShape forma : xssf.getDrawingPatriarch().getShapes()) {
+            if (!(forma instanceof XSSFSimpleShape figura)
+                    || !(figura.getAnchor() instanceof XSSFClientAnchor ancla)
+                    || Math.min(ancla.getCol1(), ancla.getCol2()) > columna
+                    || Math.max(ancla.getCol1(), ancla.getCol2()) < columna || sinTamano(ancla)) {
+                continue;
+            }
+            CTShapeProperties propiedades = figura.getCTShape().getSpPr();
+            if (propiedades == null || !propiedades.isSetPrstGeom() || !propiedades.isSetSolidFill()
+                    || propiedades.getPrstGeom().getPrst().intValue() != ShapeTypes.ELLIPSE) {
+                continue;
+            }
+            colorDe(propiedades.getSolidFill(), tema).ifPresent(rgb -> porFila.put(ancla.getRow1(), rgb));
+        }
+        return porFila;
+    }
+
+    private static boolean sinTamano(XSSFClientAnchor ancla) {
+        return (ancla.getRow1() == ancla.getRow2() && ancla.getDy1() == ancla.getDy2())
+                || (ancla.getCol1() == ancla.getCol2() && ancla.getDx1() == ancla.getDx2());
+    }
+
+    /**
+     * Los colores del tema de Office, para un libro que no trae el suyo, en
+     * el orden en que los numera Excel (el de {@link ThemesTable#getThemeColor}).
+     */
+    private static final List<String> NOMBRES_TEMA = List.of("lt1", "dk1", "lt2", "dk2", "accent1", "accent2",
+            "accent3", "accent4", "accent5", "accent6", "hlink", "folHlink");
+    private static final List<String> TEMA_OFFICE = List.of("FFFFFF", "000000", "E7E6E6", "44546A", "4472C4",
+            "ED7D31", "A5A5A5", "FFC000", "5B9BD5", "70AD47", "0563C1", "954F72");
+
+    /** Nombre del color del tema ("accent2") → su RGB; los de texto y fondo, con sus dos nombres. */
+    private static Map<String, String> colores(ThemesTable tema) {
+        Map<String, String> colores = new HashMap<>();
+        for (int i = 0; i < NOMBRES_TEMA.size(); i++) {
+            XSSFColor suyo = tema == null ? null : tema.getThemeColor(i);
+            byte[] rgb = suyo == null ? null : suyo.getRGB();
+            colores.put(NOMBRES_TEMA.get(i), rgb != null && rgb.length == 3
+                    ? HexFormat.of().withUpperCase().formatHex(rgb) : TEMA_OFFICE.get(i));
+        }
+        colores.put("tx1", colores.get("dk1"));
+        colores.put("bg1", colores.get("lt1"));
+        colores.put("tx2", colores.get("dk2"));
+        colores.put("bg2", colores.get("lt2"));
+        return colores;
+    }
+
+    /**
+     * El RGB del relleno: directo ("273C18") o un color del tema, y en los
+     * dos casos con los retoques de luz que Excel pone al elegir «más oscuro»
+     * o «más claro» en la paleta (lumMod, lumOff, shade, tint).
+     */
+    private static Optional<String> colorDe(CTSolidColorFillProperties relleno, Map<String, String> tema) {
+        byte[] rgb;
+        double[] luz;
+        if (relleno.isSetSrgbClr()) {
+            CTSRgbColor color = relleno.getSrgbClr();
+            rgb = color.getVal();
+            luz = luz(color.getLumModList(), color.getLumOffList(), color.getShadeList(), color.getTintList());
+        } else if (relleno.isSetSchemeClr()) {
+            CTSchemeColor color = relleno.getSchemeClr();
+            String delTema = tema.get(color.getVal().toString());
+            if (delTema == null) {
+                return Optional.empty();
+            }
+            rgb = HexFormat.of().parseHex(delTema);
+            luz = luz(color.getLumModList(), color.getLumOffList(), color.getShadeList(), color.getTintList());
+        } else if (relleno.isSetSysClr() && relleno.getSysClr().getLastClr() != null) {
+            rgb = relleno.getSysClr().getLastClr();
+            luz = new double[] {1, 0, 1, 1};
+        } else {
+            return Optional.empty();
+        }
+        if (rgb == null || rgb.length != 3) {
+            return Optional.empty();
+        }
+        return Optional.of(HexFormat.of().withUpperCase().formatHex(retocar(rgb, luz)));
+    }
+
+    /** lumMod, lumOff, shade y tint, en fracciones; los que no están, sin efecto. */
+    private static double[] luz(List<CTPercentage> lumMod, List<CTPercentage> lumOff,
+                                List<CTPositiveFixedPercentage> shade, List<CTPositiveFixedPercentage> tint) {
+        return new double[] {
+                lumMod.isEmpty() ? 1 : porcentaje(lumMod.get(0).getVal()),
+                lumOff.isEmpty() ? 0 : porcentaje(lumOff.get(0).getVal()),
+                shade.isEmpty() ? 1 : porcentaje(shade.get(0).getVal()),
+                tint.isEmpty() ? 1 : porcentaje(tint.get(0).getVal())};
+    }
+
+    /** Oscurece (shade), aclara (tint) y cambia la luminosidad en HSL (lumMod, lumOff). */
+    static byte[] retocar(byte[] rgb, double[] luz) {
+        double[] canal = new double[3];
+        for (int i = 0; i < 3; i++) {
+            double valor = (rgb[i] & 0xFF) / 255.0;
+            valor *= luz[2];
+            valor += (1 - valor) * (1 - luz[3]);
+            canal[i] = valor;
+        }
+        double max = Math.max(canal[0], Math.max(canal[1], canal[2]));
+        double min = Math.min(canal[0], Math.min(canal[1], canal[2]));
+        double l = (max + min) / 2;
+        double s = 0;
+        double h = 0;
+        if (max != min) {
+            double d = max - min;
+            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+            h = max == canal[0] ? (canal[1] - canal[2]) / d + (canal[1] < canal[2] ? 6 : 0)
+                    : max == canal[1] ? (canal[2] - canal[0]) / d + 2
+                    : (canal[0] - canal[1]) / d + 4;
+            h /= 6;
+        }
+        l = Math.max(0, Math.min(1, l * luz[0] + luz[1]));
+        double q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        double p = 2 * l - q;
+        byte[] retocado = new byte[3];
+        double[] desplazamiento = {1.0 / 3, 0, -1.0 / 3};
+        for (int i = 0; i < 3; i++) {
+            double valor = s == 0 ? l : tono(p, q, h + desplazamiento[i]);
+            retocado[i] = (byte) Math.round(Math.max(0, Math.min(1, valor)) * 255);
+        }
+        return retocado;
+    }
+
+    private static double tono(double p, double q, double t) {
+        t = t < 0 ? t + 1 : t > 1 ? t - 1 : t;
+        if (t < 1.0 / 6) {
+            return p + (q - p) * 6 * t;
+        }
+        if (t < 0.5) {
+            return q;
+        }
+        if (t < 2.0 / 3) {
+            return p + (q - p) * (2.0 / 3 - t) * 6;
+        }
+        return p;
+    }
+
+    /**
      * Una imagen pegada en la celda CROQUIS y cuánto de ella enseña Excel:
      * el cliente recorta las imágenes en Excel (el «srcRect» del dibujo), y
      * lo que queda fuera del recorte sigue en el fichero. Cada lado es la
@@ -376,20 +539,22 @@ public final class ApcSmsExcel {
      * imagen en vez de recortarla, que aquí no hace falta: cuenta como cero.
      */
     private static double fraccion(Object valor) {
-        double fraccion;
+        return Math.max(0, Math.min(1, porcentaje(valor)));
+    }
+
+    /** Un ST_Percentage de DrawingML en fracción, sin recortar (50000 = 0,5); 0 si no se entiende. */
+    private static double porcentaje(Object valor) {
         if (valor instanceof Number numero) {
-            fraccion = numero.doubleValue() / 100_000;
-        } else {
-            String texto = String.valueOf(valor).trim();
-            try {
-                fraccion = texto.endsWith("%")
-                        ? Double.parseDouble(texto.substring(0, texto.length() - 1)) / 100
-                        : Double.parseDouble(texto) / 100_000;
-            } catch (NumberFormatException e) {
-                return 0;
-            }
+            return numero.doubleValue() / 100_000;
         }
-        return Math.max(0, Math.min(1, fraccion));
+        String texto = String.valueOf(valor).trim();
+        try {
+            return texto.endsWith("%")
+                    ? Double.parseDouble(texto.substring(0, texto.length() - 1)) / 100
+                    : Double.parseDouble(texto) / 100_000;
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /** Lo que Excel enseña de la imagen; entera si el recorte no deja nada. */

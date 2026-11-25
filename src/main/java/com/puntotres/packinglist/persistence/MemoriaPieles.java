@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -242,6 +244,41 @@ public class MemoriaPieles {
             }
         }
         return new Incorporacion(anadidas, List.of(), yaEstaban);
+    }
+
+    /**
+     * Mete en la tabla lo que trae el excel exportado de la pantalla, ya
+     * rellenado (ref de piel → nombre). El nombre del excel SÍ pisa el
+     * guardado; una casilla vacía no borra nada y una piel que no viene en el
+     * excel no se toca (como {@code TablaColores.importar}).
+     */
+    @Transactional
+    public Importacion importarPieles(String cliente, Map<String, String> nombres) {
+        List<String> anadidas = new ArrayList<>();
+        List<String> cambiadas = new ArrayList<>();
+        List<String> sinCambios = new ArrayList<>();
+        if (vacio(cliente)) {
+            return new Importacion(anadidas, cambiadas, sinCambios);
+        }
+        String elCliente = clave(cliente);
+        nombres.forEach((refPiel, nombre) -> {
+            if (vacio(refPiel)) {
+                return;
+            }
+            PielId id = new PielId(elCliente, clave(refPiel));
+            String elNombre = texto(nombre);
+            Optional<Piel> guardada = pieles.findById(id);
+            if (guardada.isEmpty()) {
+                pieles.save(new Piel(id.cliente(), id.refPiel(), elNombre));
+                anadidas.add(id.refPiel());
+            } else if (!elNombre.isEmpty() && !elNombre.equals(guardada.get().getNombre())) {
+                guardada.get().actualizar(elNombre);
+                cambiadas.add(id.refPiel());
+            } else {
+                sinCambios.add(id.refPiel());
+            }
+        });
+        return new Importacion(anadidas, cambiadas, sinCambios);
     }
 
     private static boolean vacio(String texto) {

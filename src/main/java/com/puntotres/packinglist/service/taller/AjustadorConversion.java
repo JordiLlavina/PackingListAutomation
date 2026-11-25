@@ -52,7 +52,9 @@ import com.puntotres.packinglist.service.taller.PackingFormatoPuntotres.Fila;
  * ({@link IndiceCatalogoConversion#formaCorta}) y se comprueba que el color
  * es uno de los suyos.
  *
- * Para los dos: los totales que declara la hoja contra la suma de las filas.
+ * Para todos: las cajas que el taller llena con DOS pedidos
+ * ({@link #repartirCajasCompartidas}) y los totales que declara la hoja
+ * contra la suma de las filas.
  */
 public final class AjustadorConversion {
 
@@ -67,6 +69,8 @@ public final class AjustadorConversion {
     static final String CODIGO_AMBIGUO = "el código casa con varios artículos";
     static final String REFERENCIA_NO_PEDIDA = "referencia que no está en el pedido";
     static final String COLOR_NO_ES_DE_LA_REFERENCIA = "color que no es de la referencia";
+    static final String CAJA_SIN_REPARTIR = "caja con dos pedidos: la cantidad va a mano";
+    static final String CANTIDAD_DEDUCIDA = "cantidad deducida del pedido: comprobarla";
 
     private AjustadorConversion() {
     }
@@ -80,8 +84,187 @@ public final class AjustadorConversion {
         } else if (pedido != null && pedido.ami().isPresent()) {
             filas = ajustarAmi(filas, pedido.ami().get(), avisos);
         }
+        filas = repartirCajasCompartidas(filas,
+                pedido == null ? Optional.empty() : pedido.apc(), avisos);
         avisos.addAll(contrastarTotales(packing.conFilas(filas)));
         return packing.conFilas(filas).conAvisosAnadidos(avisos);
+    }
+
+    // --- Cajas con dos pedidos ---
+
+    /** Filas seguidas (posiciones desde 0, las dos incluidas) que son una línea partida. */
+    record Tramo(int desde, int hasta) {
+    }
+
+    /** Lo que le falta a un pedido para completarse con lo que ya llevan las demás filas. */
+    private record Resto(String codigo, int pedidas, int llevan) {
+        int faltan() {
+            return pedidas - llevan;
+        }
+    }
+
+    /**
+     * Las cajas que el taller llena con dos pedidos ("WHOLSEAL 930/948"). El
+     * modelo las parte en una fila por pedido, iguales en todo y SIN cantidad,
+     * porque la hoja no dice cuántas unidades son de cada uno; aquí se intenta
+     * repartirlas con lo que el cliente pidió.
+     *
+     * Solo se deduce con dos pedidos de APC y cuando la cuenta tiene una única
+     * salida: o lo que les falta a los dos suma justo la caja, o uno de los
+     * dos se completa con menos de una caja y al otro le cabe el resto (que
+     * es por lo que el taller las junta: el pico de un pedido no llena un
+     * cartón). "Lo que falta" es lo pedido menos lo que llevan las demás filas
+     * de ESTA hoja: el programa no sabe de entregas anteriores, así que la
+     * deducción va en amarillo y con la cuenta escrita, para que alguien la
+     * compruebe. Si no sale, la cantidad se queda en blanco, por decisión del
+     * usuario: un reparto a medias inventado acabaría en el packing del cliente.
+     */
+    static List<Fila> repartirCajasCompartidas(List<Fila> filas, Optional<ApcPedidoExcel> excel,
+                                               List<Aviso> avisos) {
+        List<Fila> repartidas = new ArrayList<>(filas);
+        for (Tramo tramo : cajasCompartidas(filas)) {
+            Fila primera = filas.get(tramo.desde());
+            int total = unidadesDe(primera);
+            String cajas = (primera.numeroDeCajas() > 1 ? "Las cajas " + limpio(primera.cajas())
+                    + " llevan " : "La caja " + limpio(primera.cajas()) + " lleva ") + total
+                    + " unidades";
+            Optional<int[]> reparto = Optional.empty();
+            Resto[] restos = new Resto[2];
+            if (excel.isPresent() && tramo.hasta() == tramo.desde() + 1) {
+                restos[0] = resto(filas, tramo.desde(), excel.get());
+                restos[1] = resto(filas, tramo.hasta(), excel.get());
+                reparto = deducir(restos[0], restos[1], total);
+            }
+            if (reparto.isEmpty()) {
+                List<String> partes = new ArrayList<>();
+                for (int i = tramo.desde(); i <= tramo.hasta(); i++) {
+                    String codigo = limpio(filas.get(i).codigoCliente());
+                    partes.add(codigo.isEmpty() ? limpio(filas.get(i).destinacion()) : codigo);
+                }
+                for (int i = tramo.desde(); i <= tramo.hasta(); i++) {
+                    avisos.add(Aviso.deFila(i + 1, Columna.CANTIDAD, CAJA_SIN_REPARTIR, cajas
+                            + " de los pedidos " + String.join(" y ", partes) + " y el taller no "
+                            + "dice cuántas de cada uno: la cantidad se teclea a mano"));
+                }
+                continue;
+            }
+            // reparto = {unidades de la primera fila, cuál de las dos se completa}
+            int paraPrimera = reparto.get()[0];
+            Resto completo = restos[reparto.get()[1]];
+            Resto otro = restos[1 - reparto.get()[1]];
+            String cuenta = "Cantidad deducida del pedido, el taller no la escribe. " + cajas
+                    + " entre los pedidos " + restos[0].codigo() + " y " + restos[1].codigo()
+                    + ": al " + completo.codigo() + " le faltan " + completo.faltan()
+                    + " para las " + completo.pedidas() + " que pide (las demás filas de la hoja "
+                    + "llevan " + completo.llevan() + "), así que las otras "
+                    + (total - completo.faltan()) + " son del " + otro.codigo() + ". Compruébalo";
+            repartidas.set(tramo.desde(), primera.conCantidad(paraPrimera));
+            repartidas.set(tramo.hasta(), filas.get(tramo.hasta()).conCantidad(total - paraPrimera));
+            avisos.add(Aviso.deFila(tramo.desde() + 1, Columna.CANTIDAD, CANTIDAD_DEDUCIDA, cuenta));
+            avisos.add(Aviso.deFila(tramo.hasta() + 1, Columna.CANTIDAD, CANTIDAD_DEDUCIDA, cuenta));
+        }
+        return repartidas;
+    }
+
+    /**
+     * Los tramos de filas seguidas que son UNA línea del taller partida por
+     * pedido: las mismas cajas, las mismas unidades por caja y ninguna con
+     * cantidad. No se confunde con una caja mixta (la misma caja en dos
+     * líneas del taller), porque ahí cada línea trae su cantidad.
+     */
+    static List<Tramo> cajasCompartidas(List<Fila> filas) {
+        List<Tramo> tramos = new ArrayList<>();
+        int i = 0;
+        while (i < filas.size()) {
+            int j = i;
+            while (j + 1 < filas.size() && mismaLineaPartida(filas.get(i), filas.get(j + 1))) {
+                j++;
+            }
+            if (j > i) {
+                tramos.add(new Tramo(i, j));
+            }
+            i = j + 1;
+        }
+        return tramos;
+    }
+
+    private static boolean mismaLineaPartida(Fila una, Fila otra) {
+        return una.cantidad() == null && otra.cantidad() == null
+                && una.unidadesPorCaja() != null
+                && una.unidadesPorCaja().equals(otra.unidadesPorCaja())
+                && !limpio(una.cajas()).isEmpty()
+                && limpio(una.cajas()).equals(limpio(otra.cajas()));
+    }
+
+    /** Las unidades de la línea entera: unidades por caja por número de cajas. */
+    private static int unidadesDe(Fila fila) {
+        return fila.unidadesPorCaja() * Math.max(1, fila.numeroDeCajas());
+    }
+
+    /** Las unidades de las cajas compartidas que se han quedado sin repartir. */
+    static int unidadesSinRepartir(List<Fila> filas) {
+        return cajasCompartidas(filas).stream()
+                .mapToInt(tramo -> unidadesDe(filas.get(tramo.desde()))).sum();
+    }
+
+    /**
+     * Lo pedido en el Document d'achat de la fila, para SU artículo y SU
+     * color, y lo que ya llevan de él las demás filas de la hoja. Null si no
+     * se puede saber: sin código, con un código que casa con varios artículos
+     * o con un color que no es el de ese pedido.
+     */
+    private static Resto resto(List<Fila> filas, int posicion, ApcPedidoExcel excel) {
+        Fila fila = filas.get(posicion);
+        String codigo = limpio(fila.codigoCliente());
+        String referencia = limpio(fila.referencia());
+        String color = limpio(fila.color());
+        if (codigo.isEmpty() || referencia.isEmpty() || color.isEmpty()) {
+            return null;
+        }
+        List<ApcPedidoExcel.FilaPedido> candidatas = excel.filasPara(referencia, codigo);
+        if (candidatas.size() != 1) {
+            return null;
+        }
+        ApcPedidoExcel.FilaPedido unica = candidatas.get(0);
+        Optional<Integer> pedidas = excel.comandasDe(unica.referencia(), color).stream()
+                .filter(comanda -> comanda.pedido().equals(unica.pedido()))
+                .map(ApcPedidoExcel.Comanda::cantidad).findFirst();
+        if (pedidas.isEmpty()) {
+            return null;
+        }
+        int llevan = 0;
+        for (int i = 0; i < filas.size(); i++) {
+            Fila otra = filas.get(i);
+            if (i != posicion && otra.cantidad() != null
+                    && codigo.equalsIgnoreCase(limpio(otra.codigoCliente()))
+                    && referencia.equalsIgnoreCase(limpio(otra.referencia()))
+                    && color.equalsIgnoreCase(limpio(otra.color()))) {
+                llevan += otra.cantidad();
+            }
+        }
+        return new Resto(codigo, pedidas.get(), llevan);
+    }
+
+    /**
+     * El reparto de una caja entre dos pedidos, si la cuenta tiene una sola
+     * salida: {unidades del primero, cuál de los dos se completa (0 o 1)}.
+     */
+    private static Optional<int[]> deducir(Resto primero, Resto segundo, int total) {
+        if (primero == null || segundo == null) {
+            return Optional.empty();
+        }
+        int a = primero.faltan();
+        int b = segundo.faltan();
+        if (a > 0 && b > 0 && a + b == total) {
+            return Optional.of(new int[] {a, 0});
+        }
+        boolean seCompletaElPrimero = a > 0 && a < total && b >= total - a;
+        boolean seCompletaElSegundo = b > 0 && b < total && a >= total - b;
+        if (seCompletaElPrimero == seCompletaElSegundo) {
+            // Ninguno, o los dos con repartos distintos: no hay una sola salida.
+            return Optional.empty();
+        }
+        return Optional.of(seCompletaElPrimero ? new int[] {a, 0} : new int[] {total - b, 1});
     }
 
     // --- APC ---
@@ -291,9 +474,12 @@ public final class AjustadorConversion {
     static List<Aviso> contrastarTotales(PackingFormatoPuntotres packing) {
         List<Aviso> avisos = new ArrayList<>();
         Integer unidades = packing.resumen().unidadesTotales();
-        if (unidades != null && unidades != packing.unidadesConvertidas()) {
+        // Una caja con dos pedidos sin repartir va sin cantidad en sus filas,
+        // pero sus unidades están en la hoja: no es una línea perdida.
+        int convertidas = packing.unidadesConvertidas() + unidadesSinRepartir(packing.filas());
+        if (unidades != null && unidades != convertidas) {
             avisos.add(Aviso.general("La hoja del taller declara " + unidades
-                    + " unidades y las filas convertidas suman " + packing.unidadesConvertidas()
+                    + " unidades y las filas convertidas suman " + convertidas
                     + ": falta o sobra alguna línea, o una cantidad está mal leída. "
                     + "Revisa el excel antes de digerirlo"));
         }

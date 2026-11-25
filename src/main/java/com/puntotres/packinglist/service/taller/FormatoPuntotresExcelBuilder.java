@@ -26,6 +26,9 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.VerticalAlignment;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellReference;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFColor;
+import org.apache.poi.xssf.usermodel.XSSFFont;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 /**
@@ -40,12 +43,13 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
  * sale de aquí tiene que leerse exactamente igual que uno que hubiera hecho
  * el taller a mano en el formato bueno.
  *
- * Las NOTAS del taller van debajo, separadas por {@link #FILAS_ENTRE_TABLA_Y_NOTAS}
- * filas vacías. Esa separación es la que garantiza que no entran en el
- * packing: el lector se para tras cinco filas seguidas sin referencia, así
- * que una nota que por casualidad cayera en la columna REFERENCE nunca se
- * leería como artículo. Que el lector no las vea lo ancla
- * {@code FormatoPuntotresExcelBuilderTest}.
+ * Las NOTAS del taller van debajo, a {@link #FILAS_DEL_TOTAL_A_LAS_NOTAS}
+ * filas del total y con el color con que el taller las resalta: más lejos
+ * quedaban fuera de la pantalla y nadie las veía, por decisión del usuario.
+ * Lo que garantiza que no entran en el packing ya no es la distancia sino su
+ * título, {@link TallerColisExcel#TITULO_NOTAS}: el lector se para al
+ * encontrarlo, así que una nota que cayera en la columna REFERENCE nunca se
+ * lee como artículo. Lo ancla {@code FormatoPuntotresExcelBuilderTest}.
  */
 public final class FormatoPuntotresExcelBuilder {
 
@@ -55,13 +59,13 @@ public final class FormatoPuntotresExcelBuilder {
     static final int FILA_CABECERA = 8;
 
     /**
-     * Filas vacías entre la tabla (o su total) y las notas. Una más de las
-     * cinco con las que se para el lector del taller, para que ninguna nota
-     * llegue a mirarse.
+     * A cuántas filas del total (o de la última fila, si no hay total) empieza
+     * el título de las notas: la tercera por debajo, con dos vacías en medio.
      */
-    static final int FILAS_ENTRE_TABLA_Y_NOTAS = 6;
+    static final int FILAS_DEL_TOTAL_A_LAS_NOTAS = 3;
 
-    static final String TITULO_NOTAS = "NOTAS DEL TALLER";
+    /** El título de las notas, que es también donde se para el lector. */
+    static final String TITULO_NOTAS = TallerColisExcel.TITULO_NOTAS;
     static final String AYUDA_NOTAS = "Copiadas tal cual del packing del taller. "
             + "Solo informativas: el programa no las usa para hacer el packing.";
 
@@ -96,7 +100,9 @@ public final class FormatoPuntotresExcelBuilder {
             escribirCabecera(hoja, estilos);
             int siguiente = escribirFilas(hoja, packing, estilos);
             siguiente = escribirTotal(hoja, packing.filas(), siguiente, estilos);
-            escribirNotas(hoja, packing.notas(), siguiente + FILAS_ENTRE_TABLA_Y_NOTAS, estilos);
+            // "siguiente" es la primera fila libre: la de justo debajo del total.
+            escribirNotas(hoja, packing.notas(), siguiente - 1 + FILAS_DEL_TOTAL_A_LAS_NOTAS,
+                    estilos);
 
             libro.write(salida);
             return salida.toByteArray();
@@ -220,22 +226,23 @@ public final class FormatoPuntotresExcelBuilder {
         return filaTotal + 1;
     }
 
-    private static void escribirNotas(Sheet hoja, List<List<String>> notas, int inicio,
-                                      Estilos estilos) {
+    private static void escribirNotas(Sheet hoja, List<PackingFormatoPuntotres.Nota> notas,
+                                      int inicio, Estilos estilos) {
         if (notas.isEmpty()) {
             return;
         }
         texto(hoja, inicio, COL_INICIO, TITULO_NOTAS, estilos.tituloNotas);
         texto(hoja, inicio + 1, COL_INICIO, AYUDA_NOTAS, estilos.ayuda);
         int r = inicio + 2;
-        for (List<String> nota : notas) {
+        for (PackingFormatoPuntotres.Nota nota : notas) {
             Row fila = hoja.createRow(r++);
-            for (int i = 0; i < nota.size(); i++) {
-                String valor = nota.get(i);
+            CellStyle estilo = estilos.nota(nota.letra(), nota.fondo());
+            for (int i = 0; i < nota.celdas().size(); i++) {
+                String valor = nota.celdas().get(i);
                 if (valor != null && !valor.isBlank()) {
                     Cell celda = fila.createCell(COL_INICIO + i);
                     celda.setCellValue(valor.trim());
-                    celda.setCellStyle(estilos.nota);
+                    celda.setCellStyle(estilo);
                 }
             }
         }
@@ -265,8 +272,12 @@ public final class FormatoPuntotresExcelBuilder {
         final CellStyle tituloNotas;
         final CellStyle ayuda;
         final CellStyle nota;
+        private final Workbook libro;
+        /** Un estilo por combinación de colores: Excel limita los estilos de un libro. */
+        private final Map<String, CellStyle> notasDeColor = new HashMap<>();
 
         Estilos(Workbook libro) {
+            this.libro = libro;
             Font fuenteNegrita = libro.createFont();
             fuenteNegrita.setBold(true);
 
@@ -305,6 +316,39 @@ public final class FormatoPuntotresExcelBuilder {
 
             nota = libro.createCellStyle();
             bordes(nota);
+        }
+
+        /**
+         * El estilo de una nota con el color del taller: la letra en negrita
+         * de ese color, el fondo relleno. Los colores llegan ya validados
+         * ("#RRGGBB" o vacío) desde {@link PackingFormatoPuntotres.Nota}.
+         */
+        CellStyle nota(String letra, String fondo) {
+            if (letra.isEmpty() && fondo.isEmpty()) {
+                return nota;
+            }
+            return notasDeColor.computeIfAbsent(letra + "|" + fondo, clave -> {
+                XSSFCellStyle estilo = (XSSFCellStyle) libro.createCellStyle();
+                estilo.cloneStyleFrom(nota);
+                if (!letra.isEmpty()) {
+                    XSSFFont fuente = (XSSFFont) libro.createFont();
+                    fuente.setBold(true);
+                    fuente.setColor(color(letra));
+                    estilo.setFont(fuente);
+                }
+                if (!fondo.isEmpty()) {
+                    estilo.setFillForegroundColor(color(fondo));
+                    estilo.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+                }
+                return estilo;
+            });
+        }
+
+        private static XSSFColor color(String hex) {
+            return new XSSFColor(new byte[] {
+                    (byte) Integer.parseInt(hex.substring(1, 3), 16),
+                    (byte) Integer.parseInt(hex.substring(3, 5), 16),
+                    (byte) Integer.parseInt(hex.substring(5, 7), 16)}, null);
         }
 
         private static void bordes(CellStyle estilo) {

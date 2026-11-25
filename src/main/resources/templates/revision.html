@@ -5,6 +5,7 @@
 <header th:replace="~{fragmentos :: cabecera('2. Revisión')}"></header>
 <main>
     <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+    <div class="alerta error" th:if="${avisoGuardado}" th:text="${avisoGuardado}"></div>
 
     <!-- Solo cuando el envío viene de una entrega de taller: los dos excels
          siguen en sesión, así que se puede corregir un cartón y regenerar
@@ -32,9 +33,18 @@
     </section>
 
     <!-- action por defecto: generar. Los botones de recálculo usan formaction. -->
-    <form th:action="@{/generar}" method="post">
-        <section class="destino" th:each="destino : ${destinos}">
-            <h2 th:text="|${destino.nombre} (${destino.totalCajas} cajas)|"></h2>
+    <form id="formRevision" th:action="@{/generar}" method="post" th:data-clave-envio="${claveEnvio}">
+        <section class="destino" th:each="destino : ${destinos}" th:data-destino="${destino.indice}">
+            <!-- La flecha pliega y despliega las tablas de la destinación, para
+                 trabajar en una sin tener las demás delante. Es cosa del
+                 navegador (script del pie): lo plegado sigue en el formulario
+                 y se envía igual, y qué está plegado se recuerda al recargar. -->
+            <h2>
+                <button type="button" class="plegar-destino" aria-expanded="true"
+                        title="Plegar o desplegar esta destinación"
+                        aria-label="Plegar o desplegar esta destinación"></button>
+                <span th:text="|${destino.nombre} (${destino.totalCajas} cajas)|"></span>
+            </h2>
             <!-- La cabecera de la destinación lleva lo que es de la destinación
                  entera y no de una caja, así que va aquí y no como columna,
                  que se repetiría en cada fila y ensuciaría la compactación:
@@ -208,13 +218,21 @@
                          fila entera porque un envío recién generado llega sin
                          ningún peso, y teñir la fila entera borraría la banda
                          de color del palet en todas. -->
+                    <!-- peso-catalogo: el peso sale del peso por unidad que
+                         recuerda el catálogo de modelos, no de una caja pesada
+                         en este envío. Va en gris para que se vea qué falta
+                         por pesar; teclear otro número lo da por pesado. -->
                     <td class="celda-peso">
                         <input th:if="${fila.esLider}" type="number" step="0.01" min="0" class="c-peso"
+                               th:classappend="${fila.pesoDelCatalogo} ? 'peso-catalogo'"
+                               th:title="${fila.pesoDelCatalogo} ? 'Peso del catálogo: no se ha pesado en este envío'"
                                th:name="|cajas[${fila.indiceGlobal}].pesoBrutoKg|"
                                th:value="${fila.caja.pesoBrutoKg}">
                     </td>
                     <td class="celda-peso">
                         <input th:if="${fila.esLider}" type="number" step="0.01" min="0" class="c-peso"
+                               th:classappend="${fila.pesoDelCatalogo} ? 'peso-catalogo'"
+                               th:title="${fila.pesoDelCatalogo} ? 'Peso del catálogo: no se ha pesado en este envío'"
                                th:name="|cajas[${fila.indiceGlobal}].pesoNetoKg|"
                                th:value="${fila.caja.pesoNetoKg}">
                     </td>
@@ -245,7 +263,7 @@
              taller) y las cajas aún están por hacer. Es un submit del mismo
              formulario, así que lo tecleado se aplica antes de imprimirlo, y
              la respuesta es una descarga: la pantalla no se recarga. -->
-        <button th:if="${vieneDeTaller}" type="submit" class="gris"
+        <button th:if="${ofrecePackingPuntotres}" type="submit" class="gris"
                 th:formaction="@{/packing-puntotres}"
                 title="Descarga en Word la lista ordenada de cajas y palets para hacer el packing"><span class="icono">🖨️</span> Packing Puntotres</button>
     </form>
@@ -272,6 +290,53 @@
                     sessionStorage.setItem(CLAVE, String(window.scrollY));
                 });
             });
+        });
+    })();
+
+    // Plegar y desplegar una destinación con la flecha de su título. Lo
+    // plegado solo se esconde: sus campos siguen en el formulario y viajan
+    // con él. Qué está plegado se recuerda en sessionStorage, por envío,
+    // porque recalcular un peso o desplegar una fila recargan la página y sin
+    // eso se abriría todo otra vez.
+    (function () {
+        document.addEventListener('DOMContentLoaded', function () {
+            var form = document.getElementById('formRevision');
+            var CLAVE = 'revisionPlegadas:' + form.dataset.claveEnvio;
+            var plegadas;
+            try {
+                plegadas = JSON.parse(sessionStorage.getItem(CLAVE)) || [];
+            } catch (e) {
+                plegadas = [];
+            }
+            function pintar(seccion, plegada) {
+                seccion.classList.toggle('plegada', plegada);
+                seccion.querySelector('.plegar-destino')
+                    .setAttribute('aria-expanded', plegada ? 'false' : 'true');
+            }
+            function recordar() {
+                var lista = [];
+                document.querySelectorAll('section.destino.plegada').forEach(function (seccion) {
+                    lista.push(seccion.dataset.destino);
+                });
+                sessionStorage.setItem(CLAVE, JSON.stringify(lista));
+            }
+            document.querySelectorAll('section.destino').forEach(function (seccion) {
+                pintar(seccion, plegadas.indexOf(seccion.dataset.destino) !== -1);
+                seccion.querySelector('.plegar-destino').addEventListener('click', function () {
+                    pintar(seccion, !seccion.classList.contains('plegada'));
+                    recordar();
+                });
+            });
+            // Un campo con un valor que el navegador no acepta, dentro de una
+            // destinación plegada, pararía el envío sin enseñar por qué: se
+            // despliega para que el aviso del navegador tenga dónde salir.
+            form.addEventListener('invalid', function (evento) {
+                var seccion = evento.target.closest('section.destino.plegada');
+                if (seccion) {
+                    pintar(seccion, false);
+                    recordar();
+                }
+            }, true);
         });
     })();
 

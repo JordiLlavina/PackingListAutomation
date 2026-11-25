@@ -109,9 +109,11 @@ class GenericoExcelBuilderTest {
             assertEquals(5, (int) hoja.getRow(21).getCell(6).getNumericCellValue());
             assertEquals(10.08, hoja.getRow(21).getCell(7).getNumericCellValue());
 
-            // PALET 2 (idx 23): tara 10 por defecto.
+            // PALET 2 (idx 23): tara 10 por defecto y medida calculada de su
+            // única caja: 40 cm de carga + 11 del palet vacío.
             assertEquals("PALET 2", hoja.getRow(23).getCell(1).getStringCellValue());
             assertEquals(10.0, hoja.getRow(23).getCell(7).getNumericCellValue());
+            assertEquals("80X120X51 cm", hoja.getRow(23).getCell(8).getStringCellValue());
 
             // TOTAL (idx 25): rango completo, las filas PALET aportan su tara.
             assertEquals("SUM(G21:G25)", hoja.getRow(25).getCell(6).getCellFormula());
@@ -143,6 +145,11 @@ class GenericoExcelBuilderTest {
             assertEquals("3*0.6*0.4*0.4", hoja.getRow(13).getCell(8).getCellFormula()); // TOTAL VOLUME
             assertEquals(0.288, valor(wb, hoja, 13, 8), 0.0001);
             assertEquals("0.00\" m3\"", hoja.getRow(13).getCell(8).getCellStyle().getDataFormatString());
+            // El volumen de los palets cargados: 1.632 + 0.4896.
+            assertTrue(hoja.getRow(14).getCell(7).getStringCellValue().contains("TOTAL GROSS VOLUME"));
+            assertEquals("0.8*1.2*1.7+0.8*1.2*0.51", hoja.getRow(14).getCell(8).getCellFormula());
+            assertEquals(2.1216, valor(wb, hoja, 14, 8), 0.0001);
+            assertEquals("0.00\" m3\"", hoja.getRow(14).getCell(8).getCellStyle().getDataFormatString());
             assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());    // TOTAL CARTONS
             assertEquals("3 (60x40x40cm)", hoja.getRow(16).getCell(8).getStringCellValue()); // DIMENTIONS
         }
@@ -187,6 +194,9 @@ class GenericoExcelBuilderTest {
             // Solo las dos cajas medidas suman: 2 * 0.096 = 0.192 m3.
             assertEquals("2*0.6*0.4*0.4", hoja.getRow(13).getCell(8).getCellFormula());
             assertEquals(0.192, valor(wb, hoja, 13, 8), 0.0001);
+            // El palet de la caja 3 no se puede medir: "?" y no suma volumen.
+            assertEquals("80X120X? cm", hoja.getRow(23).getCell(8).getStringCellValue());
+            assertEquals("0.8*1.2*1.7", hoja.getRow(14).getCell(8).getCellFormula());
             assertEquals(3, (int) hoja.getRow(15).getCell(8).getNumericCellValue());
             assertEquals("3 (2*60x40x40cm+1*?cm)",
                     hoja.getRow(16).getCell(8).getStringCellValue());

@@ -70,7 +70,7 @@ class CatalogoModelosTest {
         catalogo.asegurarArticulo("AMI", "ULL901.AL0001");
         catalogo.guardarCampo("AMI", "ULL901.AL0001", CampoArticulo.MEDIDA_CAJA, "60x40x40", false);
         catalogo.guardarCampo("AMI", "ULL901.AL0001", CampoArticulo.UNIDADES_POR_CAJA, "6", false);
-        catalogo.guardarCampo("AMI", "ULL901.AL0001", CampoArticulo.PESO_NETO_KG, "3,5", false);
+        catalogo.guardarCampo("AMI", "ULL901.AL0001", CampoArticulo.PESO_NETO_UNIDAD_KG, "3,5", false);
         catalogo.asegurarArticulo("AMI", "ULL901.AL0002");
         catalogo.guardarCampo("AMI", "ULL901.AL0002", CampoArticulo.UNIDADES_POR_CAJA, "8", false);
 
@@ -78,7 +78,7 @@ class CatalogoModelosTest {
 
         assertEquals("60x40x40", tercero.getMedidaCaja(), "el cartón lo dicen igual todos los hermanos");
         assertNull(tercero.getUnidadesPorCaja(), "6 y 8 no coinciden: no se hereda");
-        assertNull(tercero.getPesoNetoKg(), "el peso cambia con la piel y nunca se hereda");
+        assertNull(tercero.getPesoNetoUnidadKg(), "el peso cambia con la piel y nunca se hereda");
     }
 
     @Test
@@ -108,10 +108,10 @@ class CatalogoModelosTest {
         catalogo.asegurarArticulo("AMI", "ULL903.AL0002");
 
         Propagacion propagacion = catalogo.guardarCampo("AMI", "ULL903.AL0001",
-                CampoArticulo.PESO_NETO_KG, "2", true);
+                CampoArticulo.PESO_NETO_UNIDAD_KG, "2", true);
 
         assertTrue(propagacion.propagadas().isEmpty());
-        assertNull(catalogo.articulo("AMI", "ULL903.AL0002").orElseThrow().getPesoNetoKg());
+        assertNull(catalogo.articulo("AMI", "ULL903.AL0002").orElseThrow().getPesoNetoUnidadKg());
     }
 
     @Test

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<!-- Fragmentos de la pantalla de Hojas de Producción. Van en su fichero y no
+     en hojas-produccion.html porque un fragmento definido en la misma
+     plantilla se renderiza además en su sitio (ver catalogo-fragmentos). -->
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Un color del modelo: el bloque que se repite por cada fila de la tabla
+     del excel y que la plantilla <template> clona para «+ Añadir color». Los
+     campos llevan data-campo y el JavaScript rehace los name="lineas[i].x"
+     tras cada alta o baja (Spring une por índice). `i` es el índice y `l` la
+     línea con valores, o null para la plantilla vacía.
+
+     Los grupos siguen los de la cabecera del excel (PIEL BASE, PIEL
+     COMBINACIÓN, MARCADO…). Cada «campo sugerido» es un texto con su
+     desplegable pegado debajo, del mismo ancho: elegir escribe en el texto y
+     el texto siempre se puede corregir a mano (decisión del usuario). Los
+     desplegables de piel se llenan con las pieles enlazadas al modelo, y los
+     de color con los colores de la piel escrita encima. -->
+<div th:fragment="linea(i, l)" class="tarjeta hp-linea">
+    <div class="hp-linea-cabecera">
+        <h3 class="hp-linea-titulo">Color <span class="hp-linea-numero" th:text="${i + 1}">1</span></h3>
+        <div class="hp-linea-acciones">
+            <button type="button" class="mini hp-duplicar" title="Añadir otro color igual que este debajo">Duplicar</button>
+            <button type="button" class="mini hp-quitar" title="Quitar este color" aria-label="Quitar este color">&times;</button>
+        </div>
+    </div>
+
+    <div class="hp-linea-campos">
+        <div class="hp-grupo hp-g-unidades">
+            <p class="hp-grupo-rotulo">Unidades</p>
+            <input type="number" data-campo="unidades" min="0" step="1" th:name="|lineas[${i}].unidades|"
+                   th:value="${l != null ? l.unidades : ''}" aria-label="Unidades">
+        </div>
+
+        <div class="hp-grupo hp-g-piel">
+            <p class="hp-grupo-rotulo">Piel base</p>
+            <div class="hp-grupo-campos hp-uno-uno">
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Piel</span>
+                    <input type="text" data-campo="pielBase" maxlength="200" th:name="|lineas[${i}].pielBase|"
+                           th:value="${l != null ? l.pielBase : ''}" aria-label="Piel base">
+                    <select class="hp-sugerencia hp-pieles" data-tipo="pieles" data-colores="colorBase"
+                            aria-label="Elegir la piel base entre las del modelo">
+                        <option value="">elegir…</option>
+                    </select>
+                </div>
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Color</span>
+                    <input type="text" data-campo="colorBase" maxlength="200" th:name="|lineas[${i}].colorBase|"
+                           th:value="${l != null ? l.colorBase : ''}" aria-label="Color de la piel base">
+                    <select class="hp-sugerencia hp-colores" aria-label="Elegir el color de la piel base">
+                        <option value="">elegir…</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="hp-grupo hp-g-combinacion">
+            <p class="hp-grupo-rotulo">Piel combinación</p>
+            <div class="hp-grupo-campos hp-uno-uno">
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Piel</span>
+                    <input type="text" data-campo="pielCombinacion" maxlength="200" th:name="|lineas[${i}].pielCombinacion|"
+                           th:value="${l != null ? l.pielCombinacion : ''}" aria-label="Piel de combinación">
+                    <select class="hp-sugerencia hp-pieles" data-tipo="combinaciones" data-colores="colorCombinacion"
+                            aria-label="Elegir la piel de combinación entre las del modelo">
+                        <option value="">elegir…</option>
+                    </select>
+                </div>
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Color</span>
+                    <input type="text" data-campo="colorCombinacion" maxlength="200" th:name="|lineas[${i}].colorCombinacion|"
+                           th:value="${l != null ? l.colorCombinacion : ''}" aria-label="Color de la piel de combinación">
+                    <select class="hp-sugerencia hp-colores" aria-label="Elegir el color de la piel de combinación">
+                        <option value="">elegir…</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="hp-grupo hp-g-hilo">
+            <p class="hp-grupo-rotulo">Hilo</p>
+            <div class="hp-grupo-campos hp-hilo">
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Marca</span>
+                    <input type="text" data-campo="marcaHilo" maxlength="60" th:name="|lineas[${i}].marcaHilo|"
+                           th:value="${l != null ? l.marcaHilo : ''}" aria-label="Marca del hilo">
+                    <select class="hp-sugerencia" aria-label="Elegir la marca del hilo">
+                        <option value="">elegir…</option>
+                        <option th:each="o : ${marcasHilo}" th:value="${o}" th:text="${o}"></option>
+                    </select>
+                </div>
+                <label><span class="hp-sub">Nº</span>
+                    <input type="text" data-campo="numeroHilo" maxlength="40" th:name="|lineas[${i}].numeroHilo|"
+                           th:value="${l != null ? l.numeroHilo : ''}" placeholder="181"></label>
+                <label><span class="hp-sub">cm</span>
+                    <input type="text" data-campo="cmHilo" maxlength="20" th:name="|lineas[${i}].cmHilo|"
+                           th:value="${l != null ? l.cmHilo : ''}" placeholder="3"></label>
+            </div>
+        </div>
+
+        <div class="hp-grupo hp-g-interior">
+            <p class="hp-grupo-rotulo">Marcado interior</p>
+            <div class="campo-sugerido">
+                <input type="text" data-campo="marcadoInterior" maxlength="100" th:name="|lineas[${i}].marcadoInterior|"
+                       th:value="${l != null ? l.marcadoInterior : ''}" aria-label="Marcado interior">
+                <select class="hp-sugerencia" aria-label="Elegir el marcado interior">
+                    <option value="">elegir…</option>
+                    <option th:each="o : ${marcadoInterior}" th:value="${o}" th:text="${o}"></option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Tres textos seguidos con sus tres desplegables debajo, del mismo
+             ancho (decisión del usuario). Lo que va al excel es la unión de
+             los tres, que se enseña a la derecha del rótulo. Los tamaños los
+             pone el JavaScript según el cliente. -->
+        <div class="hp-grupo hp-g-exterior">
+            <p class="hp-grupo-rotulo">Marcado exterior <span class="hp-marcado-vista" aria-live="polite"></span></p>
+            <div class="hp-grupo-campos hp-tres">
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Marcado</span>
+                    <input type="text" data-campo="marcadoNombre" maxlength="60" th:name="|lineas[${i}].marcadoNombre|"
+                           th:value="${l != null ? l.marcadoNombre : ''}" aria-label="Nombre del marcado exterior">
+                    <select class="hp-sugerencia" aria-label="Elegir el nombre del marcado">
+                        <option value="">elegir…</option>
+                        <option th:each="c : ${clientes}" th:value="${c.key}" th:text="${c.key}"></option>
+                        <option value="-">-</option>
+                    </select>
+                </div>
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Color</span>
+                    <input type="text" data-campo="marcadoColor" maxlength="60" th:name="|lineas[${i}].marcadoColor|"
+                           th:value="${l != null ? l.marcadoColor : ''}" aria-label="Color del marcado exterior">
+                    <select class="hp-sugerencia" data-pareja="fornitura" aria-label="Elegir el color del marcado">
+                        <option value="">elegir…</option>
+                        <option th:each="o : ${coloresMetal}" th:value="${o}" th:text="${o}"></option>
+                    </select>
+                </div>
+                <div class="campo-sugerido">
+                    <span class="hp-sub">Tamaño</span>
+                    <input type="text" data-campo="marcadoTamano" maxlength="40" th:name="|lineas[${i}].marcadoTamano|"
+                           th:value="${l != null ? l.marcadoTamano : ''}" aria-label="Tamaño del marcado exterior">
+                    <select class="hp-sugerencia hp-tamanos" aria-label="Elegir el tamaño del marcado">
+                        <option value="">elegir…</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="hp-grupo hp-g-fornitura">
+            <p class="hp-grupo-rotulo">Fornitura</p>
+            <div class="campo-sugerido">
+                <input type="text" data-campo="fornitura" maxlength="100" th:name="|lineas[${i}].fornitura|"
+                       th:value="${l != null ? l.fornitura : ''}" aria-label="Fornitura">
+                <select class="hp-sugerencia" data-pareja="marcadoColor" aria-label="Elegir la fornitura">
+                    <option value="">elegir…</option>
+                    <option th:each="o : ${fornitura}" th:value="${o}" th:text="${o}"></option>
+                </select>
+            </div>
+        </div>
+
+        <div class="hp-grupo hp-g-forro">
+            <p class="hp-grupo-rotulo">Forro</p>
+            <input type="text" data-campo="forro" maxlength="200" th:name="|lineas[${i}].forro|"
+                   th:value="${l != null ? l.forro : ''}" aria-label="Forro" placeholder="SARJA 005">
+        </div>
+
+        <div class="hp-grupo hp-g-tinta">
+            <p class="hp-grupo-rotulo">Tinta</p>
+            <input type="text" data-campo="tinta" maxlength="200" th:name="|lineas[${i}].tinta|"
+                   th:value="${l != null ? l.tinta : ''}" aria-label="Tinta" placeholder="CH 1999">
+        </div>
+    </div>
+</div>
+</body>
+</html>

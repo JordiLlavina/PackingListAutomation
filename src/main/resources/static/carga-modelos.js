@@ -159,7 +159,7 @@
                 return {
                     referencia: piel.referencia, nombrePiel: piel.nombrePiel, forro: piel.forro,
                     combinaciones: piel.combinaciones, medidaCaja: piel.medidaCaja,
-                    unidadesPorCaja: piel.unidadesPorCaja, pesoNetoKg: piel.pesoNetoKg,
+                    unidadesPorCaja: piel.unidadesPorCaja, pesoNetoUnidadKg: piel.pesoNetoUnidadKg,
                     colores: piel.colores.map(function (color) {
                         return { codigo: color.codigo, descripcion: color.codigo ? color.descripcion : color.clave,
                             colorPiel: color.colorPiel, colorForro: color.colorForro,
@@ -669,7 +669,7 @@
                 if (!referencia) { nueva.focus(); return; }
                 if (!pieles.some(function (piel) { return piel.referencia === referencia; })) {
                     pieles.push({ referencia: referencia, refPiel: '', existe: false, nombrePiel: null, forro: null,
-                        combinaciones: null, medidaCaja: null, unidadesPorCaja: null, pesoNetoKg: null, colores: [] });
+                        combinaciones: null, medidaCaja: null, unidadesPorCaja: null, pesoNetoUnidadKg: null, colores: [] });
                 }
                 pielAbierta[modelo.id] = referencia;
                 guardar(modelo);
@@ -737,8 +737,8 @@
                             { lista: 'listaCartones', placeholder: '60x40x40' }),
                         campo(modelo, k + 'unidadesPorCaja', 'Unidades por caja', piel.unidadesPorCaja,
                             function (valor) { piel.unidadesPorCaja = valor; }, { numerico: true }),
-                        campo(modelo, k + 'pesoNetoKg', 'Peso neto de la caja llena (kg)', piel.pesoNetoKg,
-                            function (valor) { piel.pesoNetoKg = valor; }, { numerico: true })))),
+                        campo(modelo, k + 'pesoNetoUnidadKg', 'Peso neto por unidad (kg)', piel.pesoNetoUnidadKg,
+                            function (valor) { piel.pesoNetoUnidadKg = valor; }, { numerico: true })))),
             coloresDe(modelo, piel));
     }
 

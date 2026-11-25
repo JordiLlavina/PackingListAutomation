@@ -23,8 +23,9 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  *
  * {@code notas} es todo lo que el taller apunta FUERA de la tabla —cajas con
  * defectos, bolsas que faltan, totales—, fila a fila y celda a celda, tal
- * cual. Se copia debajo de la tabla para que el usuario no lo pierda, pero el
- * programa no lo lee nunca: el lector se para antes de llegar.
+ * cual y con el color con que el taller las resalta. Se copia debajo de la
+ * tabla para que el usuario no lo pierda, pero el programa no lo lee nunca:
+ * el lector se para en su título.
  *
  * {@code resumen} son los totales que la hoja del taller declara, tal como
  * los lee el modelo; Java los compara con la suma de las filas convertidas.
@@ -35,7 +36,7 @@ public record PackingFormatoPuntotres(
         List<String> hojasNoConvertidas,
         Cabecera cabecera,
         List<Fila> filas,
-        List<List<String>> notas,
+        List<Nota> notas,
         Resumen resumen,
         List<Aviso> avisos) {
 
@@ -45,9 +46,7 @@ public record PackingFormatoPuntotres(
         cabecera = cabecera == null ? new Cabecera(null, null, null, null) : cabecera;
         filas = filas == null ? List.of() : List.copyOf(filas);
         notas = notas == null ? List.of()
-                : notas.stream().map(fila -> fila == null ? List.<String>of()
-                        : fila.stream().map(celda -> celda == null ? "" : celda).toList())
-                        .toList();
+                : notas.stream().map(nota -> nota == null ? Nota.de() : nota).toList();
         resumen = resumen == null ? new Resumen(null, null) : resumen;
         avisos = avisos == null ? List.of()
                 : avisos.stream().filter(a -> a != null && a.texto() != null
@@ -57,6 +56,35 @@ public record PackingFormatoPuntotres(
     /** El membrete del taller, que va encima de la tabla como en el formato Puntotres. */
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Cabecera(String taller, String direccion, String factura, String fecha) {
+    }
+
+    /**
+     * Una fila de las notas del taller: sus celdas no vacías, en orden, y el
+     * color con que el taller la resalta ("#RRGGBB"; vacío = ninguno), sea el
+     * de la {@code letra} o el del {@code fondo}. El color se conserva porque
+     * es parte del mensaje: Tánger escribe en rojo las cajas que van mal, y
+     * copiadas en negro debajo de la tabla pasan por un apunte cualquiera.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Nota(List<String> celdas, String letra, String fondo) {
+
+        public Nota {
+            celdas = celdas == null ? List.of()
+                    : celdas.stream().map(celda -> celda == null ? "" : celda).toList();
+            letra = colorValido(letra);
+            fondo = colorValido(fondo);
+        }
+
+        /** Una nota sin color, con estas celdas. */
+        public static Nota de(String... celdas) {
+            return new Nota(List.of(celdas), "", "");
+        }
+
+        /** "#RRGGBB" en mayúsculas, o vacío si lo que llega no es un color. */
+        private static String colorValido(String color) {
+            String limpio = color == null ? "" : color.trim().toUpperCase(java.util.Locale.ROOT);
+            return limpio.matches("#[0-9A-F]{6}") ? limpio : "";
+        }
     }
 
     /** Los totales que declara la hoja del taller, si los declara. */
@@ -199,6 +227,11 @@ public record PackingFormatoPuntotres(
         public Fila conColor(String nuevo) {
             return new Fila(envio, cliente, motivo, referencia, nuevo, talla, destinacion,
                     codigoCliente, unidadesPorCaja, cantidad, cajas, pesoBrutoCaja, medidaCaja);
+        }
+
+        public Fila conCantidad(Integer nueva) {
+            return new Fila(envio, cliente, motivo, referencia, color, talla, destinacion,
+                    codigoCliente, unidadesPorCaja, nueva, cajas, pesoBrutoCaja, medidaCaja);
         }
 
         public Fila conCodigoCliente(String nuevo) {

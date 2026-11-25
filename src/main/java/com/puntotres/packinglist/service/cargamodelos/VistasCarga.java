@@ -42,7 +42,7 @@ public class VistasCarga {
 
     public record VistaPiel(String referencia, String refPiel, boolean existe, String nombrePiel, String forro,
                             List<String> combinaciones, String medidaCaja, String unidadesPorCaja,
-                            String pesoNetoKg, List<VistaColor> colores) {
+                            String pesoNetoUnidadKg, List<VistaColor> colores) {
     }
 
     /** {@code fotoCatalogoId}: solo las ya guardadas, que se piden al catálogo y no al lote. */
@@ -133,7 +133,7 @@ public class VistasCarga {
                             color.colorPiel, color.colorForro, List.copyOf(color.coloresCombinacion)));
                 }
                 pieles.add(new VistaPiel(piel.referencia, piel.refPiel, piel.existe, piel.nombrePiel, piel.forro,
-                        List.copyOf(piel.combinaciones), piel.medidaCaja, piel.unidadesPorCaja, piel.pesoNetoKg,
+                        List.copyOf(piel.combinaciones), piel.medidaCaja, piel.unidadesPorCaja, piel.pesoNetoUnidadKg,
                         colores));
             }
         }

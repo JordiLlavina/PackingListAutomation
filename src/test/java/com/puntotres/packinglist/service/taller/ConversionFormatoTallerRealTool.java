@@ -48,18 +48,36 @@ class ConversionFormatoTallerRealTool {
     private static final Map<String, String> COLORES_PRUEBA = Map.of(
             "LZZ", "NOIR", "LAW", "GRIS", "KAN", "LIQUEN", "GAE", "VINO", "CAB", "CEREZA");
 
+    /**
+     * El ejemplo de la caja con dos pedidos ("WHOLSEAL 930/948"), que es de
+     * Spring 27. La tabla de colores vuelve a ser de prueba: que DAB sea
+     * "JAUNE CLAIR" es una suposición de esta prueba, no del cliente.
+     * Ejecutar: mvn test -Dtest=ConversionFormatoTallerRealTool#convertirLaCajaConDosPedidos
+     */
+    @Test
+    void convertirLaCajaConDosPedidos() throws Exception {
+        convertir("/ejemplos/APC_PEDIDO_SPRING27.xlsx",
+                Map.of("LZZ", "NOIR", "DAB", "JAUNE CLAIR", "LAW", "GRIS"),
+                "packing taller caja con dos pedidos.xlsx");
+    }
+
     @Test
     void convertirLosEjemplosReales() throws Exception {
+        convertir("/ejemplos/APC_PEDIDO_FALL26.xlsx", COLORES_PRUEBA,
+                "packing taller fez ejemplo.xlsx", "packing taller tanger ejemplos.xlsx");
+    }
+
+    private static void convertir(String excelPedido, Map<String, String> colores,
+                                  String... nombres) throws Exception {
         Files.createDirectories(SALIDA);
         PedidoParaConversion pedido = PedidoParaConversion.cargar(TipoPlantilla.APC,
-                leer("/ejemplos/APC_PEDIDO_FALL26.xlsx"), COLORES_PRUEBA, clienteApc());
+                leer(excelPedido), colores, clienteApc());
         System.out.println("Índice del pedido que viaja a Claude:\n"
                 + IndiceCatalogoConversion.para(pedido).texto());
         ConversionFormatoTallerService servicio = new ConversionFormatoTallerService(new ObjectMapper());
         ObjectMapper bonito = new ObjectMapper().enable(SerializationFeature.INDENT_OUTPUT);
 
-        for (String nombre : new String[] {
-                "packing taller fez ejemplo.xlsx", "packing taller tanger ejemplos.xlsx"}) {
+        for (String nombre : nombres) {
             long inicio = System.currentTimeMillis();
             ConversionFormatoTallerService.Resultado resultado = servicio.convertir(
                     leer("/ejemplos/taller/" + nombre), nombre, "APC", pedido, null);
@@ -81,7 +99,9 @@ class ConversionFormatoTallerRealTool {
                     + packing.unidadesConvertidas() + " unidades y " + packing.cajasConvertidas()
                     + " cajas");
             System.out.println("avisos:");
-            packing.avisos().forEach(aviso -> System.out.println("  - " + aviso.frase()));
+            packing.avisos().forEach(aviso -> System.out.println("  - [" + (aviso.revisar()
+                    ? aviso.consecuencia() + " @" + aviso.columna() : "informativo") + "] "
+                    + aviso.frase()));
 
             Map<String, Object> medida = new LinkedHashMap<>();
             medida.put("segundos", segundos);

@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.OrigenPeso;
 
 /**
  * Compacta la tabla de la pantalla de revisión: un tramo de cajas consecutivas
@@ -173,6 +174,9 @@ public final class AgrupadorFilasRevision {
                 && Objects.equals(a.getNumeroPalet(), b.getNumeroPalet())
                 && Objects.equals(a.getPesoNetoKg(), b.getPesoNetoKg())
                 && Objects.equals(a.getPesoBrutoKg(), b.getPesoBrutoKg())
+                // El peso del catálogo se pinta en gris: con los mismos
+                // números, una caja gris y una pesada no son la misma fila.
+                && (a.getOrigenPeso() == OrigenPeso.CATALOGO) == (b.getOrigenPeso() == OrigenPeso.CATALOGO)
                 && Objects.equals(a.getTalla(), b.getTalla())
                 // El canal es la destinación HIJA, y la pantalla la pinta como
                 // título de su tabla: un tramo que cruzara dos hijas quedaría

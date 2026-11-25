@@ -30,6 +30,7 @@ MODELOS_ADMIN_PASSWORD=prueba mvn spring-boot:run   # con la app de modelos: htt
 - `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx` con los dos escandallos reales, para compararlo a mano con el ejemplo de `docs/Procesado Escandallos ICSUITE/`.
 - `OrdenCorteExcelBuilderTest` y `FotosCorteDocBuilderTest` dejan `target/Ordenes de corte ejemplo.xlsx` y `target/Fotos ejemplo.docx`, con imágenes de relleno, para revisar la maquetación de los documentos del corte en Excel y en Word.
 - `InfoEmbalajeDocBuilderTest` deja `target/Info embalaje ejemplo.docx` (el caso más cargado: 6 destinaciones, 10 líneas de reparto en la columna CAJAS —cuatro destinaciones en dos filas—, 4 de comentarios) para abrirlo en Word; exportado a mano con Word por COM queda al lado `target/Info embalaje ejemplo.pdf`, que es como se comprobó que cabe en un A4.
+- `HojaProduccionExcelBuilderTest` deja `target/Hoja de produccion ejemplo.xlsx` (dos líneas, una con textos largos) para revisar en Excel la maquetación de la Hoja de Producción.
 
 ## Documentación que ya existe (y su estado)
 
@@ -143,7 +144,8 @@ El detalle de cada función vive en un fichero de `.claude/rules/` que **se carg
 | [app-modelos.md](.claude/rules/app-modelos.md) | App de modelos y modificaciones (taller y despacho, PWA en /app/) |
 | [carga-modelos.md](.claude/rules/carga-modelos.md) | Carga de modelos en batería |
 | [biblioteca-pieles.md](.claude/rules/biblioteca-pieles.md) | Biblioteca de pieles |
-| [clientes.md](.claude/rules/clientes.md) | Pantalla de clientes: alta, corrección y eliminación |
+| [clientes.md](.claude/rules/clientes.md) | Pantalla de clientes: alta, edición, inactivación y eliminación |
+| [hojas-produccion.md](.claude/rules/hojas-produccion.md) | Hojas de Producción para talleres externos: formulario, excel e histórico |
 
 Cómo se cruzan: el taller usa los destinos padre de APC, las taras y la memoria de `packing-list.md`; etiquetas y revisión dependen también de `packing-list.md`; corte, carga de modelos y app de modelos escriben en el catálogo (`catalogo.md`). Cada fichero lo dice en su primera línea.
 

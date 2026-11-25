@@ -76,6 +76,7 @@ public class PackingListTallerController {
     private final AtributosEntrada atributosEntrada;
     private final TallerEnCurso tallerEnCurso;
     private final EnvioEnCurso envioEnCurso;
+    private final SesionesGuardadas sesiones;
 
     public PackingListTallerController(DigestionTallerService digestionService,
                                        ConversionFormatoTallerService conversionService,
@@ -87,7 +88,9 @@ public class PackingListTallerController {
                                        TablaColores tablaColores,
                                        AtributosEntrada atributosEntrada,
                                        TallerEnCurso tallerEnCurso,
-                                       EnvioEnCurso envioEnCurso) {
+                                       EnvioEnCurso envioEnCurso,
+                                       SesionesGuardadas sesiones) {
+        this.sesiones = sesiones;
         this.digestionService = digestionService;
         this.conversionService = conversionService;
         this.generadorTaller = generadorTaller;
@@ -358,9 +361,15 @@ public class PackingListTallerController {
         avisosPrevios.addAll(digestion.getAvisos());
         avisosPrevios.addAll(packing.getAvisos());
 
+        // Volver al ajuste y regenerar es seguir con el MISMO envío: se
+        // reescribe su sesión guardada en vez de abrir otra cada vez.
+        Long sesionDeEstaEntrega = envioEnCurso.isDeTaller() ? envioEnCurso.getSesionId() : null;
         preparacion.preparar(packing.getEnvio(), tallerEnCurso.getCabecera(), cliente,
                 tallerEnCurso.getExcelPedido(), tallerEnCurso.getNombreExcelPedido(),
                 avisosPrevios, envioEnCurso);
+        envioEnCurso.setDeTaller(true);
+        envioEnCurso.setSesionId(sesionDeEstaEntrega);
+        sesiones.guardar(envioEnCurso);
         return "redirect:/revision";
     }
 

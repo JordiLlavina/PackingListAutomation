@@ -116,7 +116,7 @@ public class DigestionTaller {
             for (FilaDigerida fila : grupo.getFilas()) {
                 filas.add(new FilaAjustada(grupo.getReferencia(), fila.getColor(),
                         fila.getTalla(), fila.getRecibido(), grupo.getMedidaCaja(),
-                        grupo.getUnidadesPorCaja(), grupo.getPesoBrutoKg(),
+                        grupo.getUnidadesPorCaja(), grupo.getPesoParaLasCajas(),
                         fila.getObjetivos()));
             }
         }

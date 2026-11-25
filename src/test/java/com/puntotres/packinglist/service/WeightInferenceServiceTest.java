@@ -7,11 +7,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 import org.junit.jupiter.api.Test;
 
 import com.puntotres.packinglist.config.TaraProperties;
 import com.puntotres.packinglist.model.CajaData;
+import com.puntotres.packinglist.model.OrigenPeso;
 
 class WeightInferenceServiceTest {
 
@@ -256,6 +259,101 @@ class WeightInferenceServiceTest {
         assertEquals(7.0, lider.getPesoNetoKg());    // 4*1.0 + 6*0.5
         assertEquals(8.6, lider.getPesoBrutoKg());   // + una sola tara
         assertNull(segunda.getPesoNetoKg());
+    }
+
+    // --- El peso por unidad del catálogo, como último recurso ---
+
+    /** El catálogo de pesos por unidad de la prueba, como lo consulta la revisión. */
+    private static Function<String, Optional<Double>> catalogo(Map<String, Double> pesos) {
+        return referencia -> Optional.ofNullable(pesos.get(referencia));
+    }
+
+    @Test
+    void elPesoDelCatalogoRellenaUnaReferenciaSinCajasPesadas() {
+        CajaData sinPeso = linea(601, "REF-CAT", "001", 10);
+
+        service.inferirPesosDelEnvio(List.of(List.of(sinPeso)), catalogo(Map.of("REF-CAT", 0.5)));
+
+        assertEquals(5.0, sinPeso.getPesoNetoKg());     // 10 * 0.5
+        assertEquals(6.6, sinPeso.getPesoBrutoKg());    // + tara 1.6
+        assertEquals(OrigenPeso.CATALOGO, sinPeso.getOrigenPeso());
+        assertFalse(sinPeso.tienePesoMedido());
+    }
+
+    @Test
+    void unaCajaPesadaEnElEnvioGanaAlCatalogo() {
+        CajaData pesada = linea(611, "REF-ENVIO", "001", 20);
+        pesada.setPesoBrutoKg(21.6);                      // unitario (21.6-1.6)/20 = 1.0
+        CajaData sinPeso = linea(612, "REF-ENVIO", "001", 10);
+
+        service.inferirPesosDelEnvio(List.of(List.of(pesada, sinPeso)),
+                catalogo(Map.of("REF-ENVIO", 2.0)));
+
+        assertEquals(10.0, sinPeso.getPesoNetoKg(), "el del envío, no el del catálogo");
+        assertEquals(OrigenPeso.INFERIDO, sinPeso.getOrigenPeso());
+        assertTrue(pesada.tienePesoMedido(), "la pesada sigue siendo medida");
+    }
+
+    @Test
+    void enUnBultoMixtoElCatalogoCompletaLaReferenciaQueFalta() {
+        CajaData pesada = linea(621, "REF-B", "001", 10);
+        pesada.setPesoBrutoKg(6.6);                       // REF-B: unitario 0.5
+        CajaData lider = linea(622, "REF-A", "001", 4);   // REF-A solo en el catálogo: 1.0
+        CajaData segunda = linea(622, "REF-B", "001", 6);
+
+        service.inferirPesosDelEnvio(List.of(List.of(pesada, lider, segunda)),
+                catalogo(Map.of("REF-A", 1.0)));
+
+        assertEquals(7.0, lider.getPesoNetoKg());         // 4*1.0 + 6*0.5
+        assertEquals(OrigenPeso.CATALOGO, lider.getOrigenPeso(),
+                "parte del peso no se ha pesado en este envío");
+    }
+
+    @Test
+    void alReinferirLoQueVieneDelCatalogoDejaSitioALoPesado() {
+        // La revisión reinfiere tras cada edición: un peso del catálogo no se
+        // queda pegado cuando alguien pesa una caja de esa referencia.
+        CajaData primera = linea(631, "REF-RE", "001", 10);
+        CajaData segunda = linea(632, "REF-RE", "001", 10);
+        List<List<CajaData>> envio = List.of(List.of(primera, segunda));
+        service.inferirPesosDelEnvio(envio, catalogo(Map.of("REF-RE", 0.5)));
+        assertEquals(OrigenPeso.CATALOGO, segunda.getOrigenPeso());
+
+        primera.setPesoBrutoKg(11.6);                     // pesada: unitario 1.0
+        primera.setPesoNetoKg(null);
+        primera.setOrigenPeso(OrigenPeso.MEDIDO);
+        service.inferirPesosDelEnvio(envio, catalogo(Map.of("REF-RE", 0.5)));
+
+        assertEquals(10.0, segunda.getPesoNetoKg());
+        assertEquals(OrigenPeso.INFERIDO, segunda.getOrigenPeso());
+        assertEquals(10.0, primera.getPesoNetoKg());
+    }
+
+    @Test
+    void alReinferirUnPesoInferidoSigueAlCambioDeTamano() {
+        // Antes un peso inferido se quedaba fijo: cambiar el cartón de la caja
+        // no le cambiaba la tara.
+        CajaData pesada = linea(641, "REF-TAM", "001", 10);
+        pesada.setPesoBrutoKg(11.6);                      // unitario 1.0
+        CajaData inferida = linea(642, "REF-TAM", "001", 10);
+        List<List<CajaData>> envio = List.of(List.of(pesada, inferida));
+        service.inferirPesosDelEnvio(envio);
+        assertEquals(11.6, inferida.getPesoBrutoKg());
+
+        inferida.setTamanoCaja("60x40x30");
+        service.inferirPesosDelEnvio(envio);
+
+        assertEquals(11.2, inferida.getPesoBrutoKg(), "10.0 + tara 1.2 del cartón nuevo");
+    }
+
+    @Test
+    void sinCatalogoNiCajasPesadasNoSeInventaNada() {
+        CajaData sinPeso = linea(651, "REF-NADA", "001", 10);
+
+        service.inferirPesosDelEnvio(List.of(List.of(sinPeso)), catalogo(Map.of()));
+
+        assertNull(sinPeso.getPesoNetoKg());
+        assertNull(sinPeso.getOrigenPeso());
     }
 
     /** Una línea de una caja física concreta (referencia y color propios). */

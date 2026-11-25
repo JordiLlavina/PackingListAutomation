@@ -16,10 +16,15 @@ import com.puntotres.packinglist.persistence.CatalogoClientesJpa.DatosCliente;
 import com.puntotres.packinglist.persistence.Cliente;
 
 /**
- * Pantalla de clientes: alta, corrección y eliminación de los clientes de
- * plantilla genérica, que antes había que añadir al yml y reiniciar.
+ * Pantalla de clientes: alta, edición, inactivación y eliminación de los
+ * clientes de plantilla genérica, que antes había que añadir al yml y
+ * reiniciar.
  *
  * AMI y APC salen en la lista pero sin botones: su packing list es código.
+ *
+ * Hacer inactivo no pide contraseña: no borra nada y se deshace con
+ * «Reactivar». El cliente deja de salir en todos los desplegables y filtros
+ * ({@link CatalogoClientesJpa#getClientes()}) pero sigue en esta lista.
  *
  * Eliminar pide teclear la contraseña {@value #CONTRASENA_ELIMINAR} en un
  * emergente (decisión del usuario), y solo se puede con un cliente que no
@@ -83,7 +88,7 @@ public class ClientesController {
                 catalogo.alta(datos);
                 redirect.addFlashAttribute("mensaje", "Dado de alta " + datos.nombre() + ".");
             } else {
-                catalogo.corregir(clave, datos);
+                catalogo.editar(clave, datos);
                 redirect.addFlashAttribute("mensaje", "Guardado " + datos.nombre() + ".");
             }
             return "redirect:/clientes";
@@ -95,6 +100,29 @@ public class ClientesController {
             redirect.addFlashAttribute("claveEditada", esAlta ? null : clave);
             return "redirect:/clientes";
         }
+    }
+
+    @PostMapping("/clientes/inactivar")
+    public String inactivar(@RequestParam String clave, RedirectAttributes redirect) {
+        return cambiarActivo(clave, false, redirect);
+    }
+
+    @PostMapping("/clientes/reactivar")
+    public String reactivar(@RequestParam String clave, RedirectAttributes redirect) {
+        return cambiarActivo(clave, true, redirect);
+    }
+
+    private String cambiarActivo(String clave, boolean activo, RedirectAttributes redirect) {
+        String nombre = catalogo.clientePara(clave).map(config -> config.getNombre()).orElse(clave);
+        try {
+            catalogo.cambiarActivo(clave, activo);
+            redirect.addFlashAttribute("mensaje", activo
+                    ? nombre + " vuelve a estar activo: sale otra vez en los desplegables."
+                    : nombre + " está inactivo: ya no sale en los desplegables ni en los filtros.");
+        } catch (IllegalArgumentException e) {
+            redirect.addFlashAttribute("mensajeError", e.getMessage());
+        }
+        return "redirect:/clientes";
     }
 
     @PostMapping("/clientes/eliminar")

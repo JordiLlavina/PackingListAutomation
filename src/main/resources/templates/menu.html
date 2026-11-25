@@ -102,17 +102,21 @@
             </ul>
         </a>
 
-        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
+        <!-- Hojas de Producción para los talleres externos. Ocupa el sitio que
+             tenía «Escandallos para ClickUp», que bajó al pie (decisión del
+             usuario, noviembre de 2026). El icono: una hoja con su tabla. -->
+        <a class="tarjeta menu-tarjeta" th:href="@{/hojas-produccion}">
             <h2 class="menu-titulo">
                 <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M5 3h9l5 5v13H5z"/>
-                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
+                    <path d="M4 4.5h16v15H4z"/>
+                    <path d="M4 9.5h16M4 14.5h16M9.5 9.5v10"/>
                 </svg>
-                Escandallos para ClickUp
+                Hojas de Producción
             </h2>
             <ul class="menu-entrada">
-                <li>Pasa Escandallos ICSUITE → ClickUp</li>
+                <li>Excel de producción para el taller externo</li>
+                <li>Histórico de hojas por taller</li>
             </ul>
         </a>
 
@@ -132,7 +136,7 @@
                     <path d="M3 4.5h18v4H3zM5 8.5v11h14v-11"/>
                     <path d="M10 12h4"/>
                 </svg>
-                <span class="menu-panel-titulo">Guarda Temporadas y Ficheros</span>
+                <span class="menu-panel-titulo">Guarda Temporadas</span>
             </a>
 
             <!-- Debajo de las temporadas, porque es lo que sigue a guardarlas:
@@ -179,9 +183,24 @@
         </div>
     </div>
 
-    <!-- El pie: Clientes, debajo de los cinco paneles y del alto de uno. Es
-         un ajuste más, pero se toca menos que los de arriba. -->
+    <!-- El pie: a la izquierda la tarjeta de ClickUp, que bajó aquí para dejar
+         su sitio a las Hojas de Producción; a la derecha Clientes, debajo de
+         los cinco paneles y del alto de uno. Es un ajuste más, pero se toca
+         menos que los de arriba. -->
     <div class="menu-tarjetas menu-principal menu-pie">
+        <a class="tarjeta menu-tarjeta" th:href="@{/clickup}">
+            <h2 class="menu-titulo">
+                <svg class="menu-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 3h9l5 5v13H5z"/>
+                    <path d="M14 3v5h5M8.5 12.5h7M8.5 16h7"/>
+                </svg>
+                Escandallos para ClickUp
+            </h2>
+            <ul class="menu-entrada">
+                <li>Pasa Escandallos ICSUITE → ClickUp</li>
+            </ul>
+        </a>
         <a class="menu-panel" th:href="@{/clientes}">
             <svg class="menu-panel-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

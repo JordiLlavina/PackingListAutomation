@@ -12,6 +12,7 @@
         <button type="button" id="botonModoCLAUDE" data-modo="CLAUDE">CON IMAGEN</button>
         <button type="button" id="botonModoTALLER" data-modo="TALLER">CON EXCEL DE TALLER</button>
         <button type="button" id="botonModoJSON" data-modo="JSON">CON TEXTO</button>
+        <button type="button" id="botonModoSESION" data-modo="SESION">Cargar Sesión</button>
     </div>
 
     <!-- Un solo formulario en cuatro islas: el pedido (cliente, temporada y su
@@ -246,6 +247,56 @@
         <button type="submit" id="botonImportar">Importar y revisar</button>
         <span id="motivoBotonApagado" class="motivo-boton-apagado"></span>
     </form>
+    <!-- «Cargar Sesión»: los envíos que llegaron a la revisión se guardan
+         solos (menos los de CON TEXTO, que es de pruebas) y aquí se vuelve a
+         ellos. Van todas las sesiones en la página y el script enseña las
+         del cliente elegido arriba. Fuera del formulario de entrada porque
+         cada fila lleva el suyo, y sin botón al pie: «Cargar» va directo a la
+         revisión. -->
+    <section id="bloqueSesiones" class="tarjeta sesiones-guardadas" style="display: none">
+        <p class="ayuda" id="sesionesSinCliente">Elige un cliente para ver sus sesiones guardadas.</p>
+        <p class="ayuda" id="sesionesVacio" style="display: none">Este cliente no tiene ninguna sesión guardada.</p>
+        <table id="tablaSesiones" style="display: none">
+            <thead>
+            <tr>
+                <th>Creada</th>
+                <th>Temporada</th>
+                <th>Factura</th>
+                <th>Destinaciones</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="sesion : ${sesiones}" th:data-cliente="${sesion.cliente}">
+                <td class="c-fecha-sesion" th:text="${#temporals.format(sesion.creada, 'dd/MM/yyyy HH:mm')}"></td>
+                <td th:text="${sesion.temporada}"></td>
+                <td th:text="${sesion.facturas}"></td>
+                <td th:text="${sesion.destinos}"></td>
+                <td class="acciones-sesion">
+                    <form th:action="@{/packing-list/sesiones/{id}/cargar(id=${sesion.id})}" method="post">
+                        <button type="submit" class="contorno">Cargar</button>
+                    </form>
+                    <button type="button" class="contorno" data-eliminar-sesion
+                            th:data-accion="@{/packing-list/sesiones/{id}/eliminar(id=${sesion.id})}"
+                            th:data-descripcion="${#temporals.format(sesion.creada, 'dd/MM/yyyy HH:mm')}"
+                            title="Eliminar esta sesión" aria-label="Eliminar esta sesión">X</button>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <dialog class="emergente" id="dialogoEliminarSesion">
+        <form method="post" id="formEliminarSesion">
+            <h3>Eliminar sesión</h3>
+            <p>¿Eliminar la sesión creada el <strong id="descripcionSesion"></strong>? No se puede deshacer.</p>
+            <div class="acciones-emergente">
+                <button type="button" class="secundario" id="cancelarEliminarSesion">Cancelar</button>
+                <button type="submit">Eliminar</button>
+            </div>
+        </form>
+    </dialog>
+
     <p id="avisoProcesando" class="aviso-procesando" style="display: none">
         Procesando... con la IA tarda varios minutos (un PDF de 8 hojas, unos 4-5),
         no cierres ni recargues la página.
@@ -373,7 +424,50 @@
             if (clienteSelect.value) {
                 json.placeholder = '{"cliente": "' + clienteSelect.value + '", "destinos": [ ... ]}';
             }
+
+            // En «Cargar Sesión» del formulario solo queda el cliente: la
+            // temporada y el excel de pedido son de un envío nuevo.
+            if (document.getElementById('modo').value === 'SESION') {
+                document.getElementById('bloqueTemporadaGuardada').style.display = 'none';
+                document.getElementById('bloquePedidoCliente').style.display = 'none';
+            }
+            pintarSesiones();
         }
+
+        // --- Sesiones guardadas ---
+
+        // Enseña las sesiones del cliente elegido; sin cliente, o sin
+        // ninguna suya, lo dice en vez de dejar una tabla vacía.
+        function pintarSesiones() {
+            const cliente = document.getElementById('cliente').value;
+            let visibles = 0;
+            document.querySelectorAll('#tablaSesiones tbody tr').forEach(function (fila) {
+                const suya = cliente !== '' && fila.dataset.cliente === cliente;
+                fila.style.display = suya ? '' : 'none';
+                if (suya) {
+                    visibles++;
+                }
+            });
+            document.getElementById('sesionesSinCliente').style.display = cliente === '' ? '' : 'none';
+            document.getElementById('sesionesVacio').style.display =
+                cliente !== '' && visibles === 0 ? '' : 'none';
+            document.getElementById('tablaSesiones').style.display = visibles > 0 ? '' : 'none';
+        }
+
+        // Eliminar una sesión pide confirmación en un popup: no se deshace.
+        (function () {
+            const dialogo = document.getElementById('dialogoEliminarSesion');
+            document.querySelectorAll('[data-eliminar-sesion]').forEach(function (boton) {
+                boton.addEventListener('click', function () {
+                    document.getElementById('formEliminarSesion').action = boton.dataset.accion;
+                    document.getElementById('descripcionSesion').textContent = boton.dataset.descripcion;
+                    dialogo.showModal();
+                });
+            });
+            document.getElementById('cancelarEliminarSesion').addEventListener('click', function () {
+                dialogo.close();
+            });
+        })();
 
         document.getElementById('cliente').addEventListener('change', function () {
             // La conversión depende del cliente (sus referencias, su catálogo):
@@ -396,6 +490,17 @@
             document.querySelectorAll('.selector-modo button').forEach(function (boton) {
                 boton.classList.toggle('activo', boton.dataset.modo === modo);
             });
+
+            // «Cargar Sesión» no es otra forma de entrar un envío: del
+            // formulario solo queda el cliente, y debajo va la lista de sus
+            // sesiones. Sin botón al pie: cada sesión lleva el suyo.
+            const cargarSesion = modo === 'SESION';
+            document.querySelectorAll('#formEntrada .isla-envio, #formEntrada .isla-campos, '
+                    + '#formEntrada .isla-volcado, #botonImportar, #motivoBotonApagado')
+                .forEach(function (bloque) {
+                    bloque.style.display = cargarSesion ? 'none' : '';
+                });
+            document.getElementById('bloqueSesiones').style.display = cargarSesion ? '' : 'none';
 
             // El modo TALLER va a su propio flujo: digiere los dos excels y
             // lleva a la pantalla de ajuste, no directo a la revisión.
@@ -629,11 +734,15 @@
 
         // El envío en modo CLAUDE llama a la API y tarda varios minutos
         // (medido: 4-5 con un PDF de 8 hojas manuscritas); sin esto la
-        // página se queda igual y parece colgada.
+        // página se queda igual y parece colgada. El aviso de los minutos es
+        // SOLO de ese modo: en JSON y TALLER el envío no habla con la IA
+        // (la conversión del excel del taller va aparte, por su propio botón
+        // y con su propia espera), y ahí la frase prometía una espera falsa.
         document.getElementById('formEntrada').addEventListener('submit', function (evento) {
             // Enter en un campo envía el formulario aunque el botón esté
             // apagado: se para aquí con la misma regla.
-            if (motivoParaNoDigerir() !== null) {
+            if (motivoParaNoDigerir() !== null
+                    || document.getElementById('modo').value === 'SESION') {
                 evento.preventDefault();
                 return;
             }
@@ -646,7 +755,9 @@
             const boton = document.getElementById('botonImportar');
             boton.disabled = true;
             boton.textContent = 'Procesando...';
-            document.getElementById('avisoProcesando').style.display = '';
+            if (document.getElementById('modo').value === 'CLAUDE') {
+                document.getElementById('avisoProcesando').style.display = '';
+            }
         });
     </script>
 </main>

@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -87,8 +88,11 @@ public class OrdenCorteExcelBuilder {
      * temporada, modelo, nombre del bolso, color y cantidad. La fila del
      * nombre salió del aire de debajo de la cantidad (34,4 → 10,4), para que
      * la banda mida lo mismo y las fotos sigan donde el usuario las colocó.
+     * La cantidad a 55 pt (noviembre de 2026, el usuario la quería más
+     * grande) pidió una fila de 70, como la de 52 para 40 pt: 8 de lo que
+     * quedaba de aire debajo y 10 más de banda, que salen de las pieles.
      */
-    static final float[] FILAS_BANDA = {20, 52, 24, 40, 52, 10.4f};
+    static final float[] FILAS_BANDA = {20, 52, 24, 40, 70, 2.4f};
     static final double ALTO_BANDA = suma(FILAS_BANDA);
     /** Aire entre la banda y la primera piel. */
     static final float SEPARACION = 17;
@@ -161,7 +165,18 @@ public class OrdenCorteExcelBuilder {
     private static final int[] TAMANOS_CLIENTE = {12, 11, 10, 9};
     private static final int[] TAMANOS_MODELO = {40, 36, 32, 28, 24, 20};
     private static final int[] TAMANOS_NOMBRE_MODELO = {16, 14, 12, 11, 10};
-    private static final int[] TAMANOS_CANTIDAD = {40, 36, 32, 28, 24, 20};
+    private static final int[] TAMANOS_CANTIDAD = {55, 48, 44, 40, 36, 32, 28, 24, 20};
+
+    /**
+     * Detrás del color, en la banda y en el de la piel principal: un círculo
+     * del color de la muestra ({@link OrdenCorte#colorMuestra}), la redondita
+     * que el cliente dibuja en su excel de SMS. Es una letra y no un dibujo,
+     * así que va pegada al texto y crece y se encoge con él; y detrás de un
+     * espacio de no separación, para que en la casilla estrecha del color de
+     * la piel no baje sola a otra línea.
+     */
+    private static final String CIRCULO = "●";
+    static final String REDONDITA = " " + CIRCULO;
 
     private static final int COL_NOMBRE = 0;
     private static final int COL_COLOR = 1;
@@ -275,12 +290,13 @@ public class OrdenCorteExcelBuilder {
         // En mayúsculas, como el MODÈLE del packing de APC: el excel de
         // producción ya lo escribe así y la Désignation del pedido no.
         String nombreBolso = orden.nombreModelo().toUpperCase(Locale.ROOT);
+        String color = conRedondita(orden.color(), orden.colorMuestra());
         // El texto va alineado a la derecha y nunca pasa por debajo de las
         // fotos: con dos o tres, que entran en su columna, primero se encoge,
         // y si ni con la letra más pequeña cabe, las fotos se estrechan.
         double necesario = Math.max(Math.max(anchoTexto(orden.modelo(), ultimo(TAMANOS_MODELO)),
                         nombreBolso.isEmpty() ? 0 : anchoTexto(nombreBolso, ultimo(TAMANOS_NOMBRE_MODELO))), Math.max(
-                anchoTexto("Color  ", 12) + anchoTexto(orden.color(), ultimo(TAMANOS_COLOR_MODELO)),
+                anchoTexto("Color  ", 12) + anchoTexto(color, ultimo(TAMANOS_COLOR_MODELO)),
                 anchoTexto("Cantidad  ", 12) + anchoTexto(cantidad, ultimo(TAMANOS_CANTIDAD))));
         // Sin foto el hueco se queda en blanco: un rótulo ahí no le dice nada al
         // cortador. El punto de más es para que un empate de decimales no deje
@@ -300,9 +316,10 @@ public class OrdenCorteExcelBuilder {
             datoDeBanda(hoja, inicio + 2, estilos.texto(nombreBolso,
                     tamanoEnUnaLinea(nombreBolso, anchoDatos, TAMANOS_NOMBRE_MODELO), false, NEGRO), estilos.derecha);
         }
-        datoDeBanda(hoja, inicio + 3, estilos.rotuloYValor("Color  ", 12, orden.color(),
-                tamanoEnUnaLinea(orden.color(), anchoDatos - anchoTexto("Color  ", 12),
-                        TAMANOS_COLOR_MODELO)), estilos.derecha);
+        XSSFRichTextString textoColor = estilos.rotuloYValor("Color  ", 12, color,
+                tamanoEnUnaLinea(color, anchoDatos - anchoTexto("Color  ", 12), TAMANOS_COLOR_MODELO));
+        datoDeBanda(hoja, inicio + 3, estilos.pintarRedondita(textoColor, orden.colorMuestra()),
+                estilos.derecha);
         datoDeBanda(hoja, inicio + 4, estilos.rotuloYValor("Cantidad  ", 12, cantidad,
                 tamanoEnUnaLinea(cantidad, anchoDatos - anchoTexto("Cantidad  ", 12), TAMANOS_CANTIDAD)),
                 estilos.derecha);
@@ -321,10 +338,13 @@ public class OrdenCorteExcelBuilder {
             nombre.setCellStyle(estilos.nombrePiel);
             nombre.setCellValue(estilos.rotuloEncimaDeValor(renglon[0].toUpperCase(Locale.ROOT),
                     renglon[1], tamanoNombre(renglon[1], alto)));
-            XSSFCell color = filaPiel.createCell(COL_COLOR);
-            color.setCellStyle(estilos.colorPiel);
-            color.setCellValue(estilos.rotuloEncimaDeValor("COLOR", renglon[2],
-                    tamanoColor(renglon[2], alto)));
+            // La redondita, solo en la piel principal: su color es el del bolso.
+            String muestra = i == 0 ? orden.colorMuestra() : "";
+            String colorPiel = conRedondita(renglon[2], muestra);
+            XSSFCell celdaColor = filaPiel.createCell(COL_COLOR);
+            celdaColor.setCellStyle(estilos.colorPiel);
+            celdaColor.setCellValue(estilos.pintarRedondita(estilos.rotuloEncimaDeValor("COLOR", colorPiel,
+                    tamanoColor(colorPiel, alto)), muestra));
             filaPiel.createCell(COL_RECUADRO).setCellStyle(estilos.recuadro);
             if (i < renglones.size() - 1) {
                 hoja.createRow(++fila).setHeightInPoints(ESPACIO_ENTRE_PIELES);
@@ -332,6 +352,11 @@ public class OrdenCorteExcelBuilder {
             fila++;
         }
         return fila - 1;
+    }
+
+    /** El color con la redondita detrás si hay color de muestra; tal cual si no. */
+    static String conRedondita(String color, String colorMuestra) {
+        return colorMuestra.isEmpty() ? color : color.isEmpty() ? CIRCULO : color + REDONDITA;
     }
 
     /** Rótulo, nombre y color de cada piel, en el orden de la ficha. */
@@ -600,8 +625,23 @@ public class OrdenCorteExcelBuilder {
             return rico;
         }
 
+        /**
+         * Si el texto acaba en la redondita, la pinta del color de la muestra
+         * ("273C18"), al tamaño del valor que la precede.
+         */
+        XSSFRichTextString pintarRedondita(XSSFRichTextString rico, String colorMuestra) {
+            if (colorMuestra.isEmpty() || !rico.getString().endsWith(CIRCULO)) {
+                return rico;
+            }
+            int ultima = rico.length() - 1;
+            XSSFFont delValor = rico.getFontAtIndex(ultima);
+            int tamano = delValor == null ? TAMANO_ROTULO : delValor.getFontHeightInPoints();
+            rico.applyFont(ultima, rico.length(), fuente(tamano, true, HexFormat.of().parseHex(colorMuestra)));
+            return rico;
+        }
+
         private XSSFFont fuente(int tamano, boolean negrita, byte[] color) {
-            String clave = tamano + "|" + negrita + "|" + color[0];
+            String clave = tamano + "|" + negrita + "|" + HexFormat.of().formatHex(color);
             return fuentes.computeIfAbsent(clave, k -> {
                 XSSFFont fuente = libro.createFont();
                 fuente.setFontName(FUENTE);

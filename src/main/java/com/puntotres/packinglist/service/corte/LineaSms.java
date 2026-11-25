@@ -6,13 +6,17 @@ import java.util.List;
  * Una fila del excel de SMS que se corta: una referencia ("PXCBC-F67008") en
  * un color del bolso, con sus pieles y cuántas muestras hay que cortar.
  * {@code hoja} y {@code fila} (la de Excel, contando desde 1) son para los
- * avisos. {@code croquis}: las imágenes de su celda CROQUIS, sin repetir; vacío
- * si no lleva (la hoja HOMME no tiene esa columna).
+ * avisos. {@code colorMuestra}: el de la redondita que el cliente dibuja en la
+ * celda del color, en RGB hexadecimal ("273C18"); vacío si no lleva.
+ * {@code croquis}: las imágenes de su celda CROQUIS, sin repetir; vacío si no
+ * lleva (la hoja HOMME no tiene esa columna).
  */
 public record LineaSms(String hoja, int fila, String referencia, String modelo, String nombreModelo,
-                       ColorCorte color, PielesArticulo pieles, int muestras, List<Imagen> croquis) {
+                       ColorCorte color, String colorMuestra, PielesArticulo pieles, int muestras,
+                       List<Imagen> croquis) {
 
     public LineaSms {
+        colorMuestra = colorMuestra == null ? "" : colorMuestra;
         croquis = List.copyOf(croquis);
     }
 

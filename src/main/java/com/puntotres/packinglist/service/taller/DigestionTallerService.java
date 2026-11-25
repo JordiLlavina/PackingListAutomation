@@ -18,7 +18,9 @@ import com.puntotres.packinglist.config.CatalogoTaras;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.config.ReglasTallerProperties;
+import com.puntotres.packinglist.config.TipoPlantilla;
 import com.puntotres.packinglist.persistence.MemoriaReferencias;
+import com.puntotres.packinglist.service.ReferenciaApc;
 
 /**
  * Cruza las tres fuentes de la entrada por taller y deja lo que se enseña en
@@ -75,7 +77,8 @@ public class DigestionTallerService {
         digestion.getDetalle().addAll(taller.detalleAvisos());
         avisarDeLasColumnasQueFaltanYHacenFalta(clienteClave, taller, digestion);
 
-        List<LineaTaller> lineas = soloLasDelCliente(clienteClave, taller.lineas(), digestion);
+        List<LineaTaller> lineas = referenciasEnSuOrden(clienteClave,
+                soloLasDelCliente(clienteClave, taller.lineas(), digestion));
 
         ResultadoObjetivos objetivos = objetivosDe(clienteClave, lineas, excelPedido);
         digestion.getDetalle().addAll(objetivos.getDetalle());
@@ -154,6 +157,31 @@ public class DigestionTallerService {
                     + clienteClave + ". Revisa el cliente elegido o el fichero subido");
         }
         return suyas;
+    }
+
+    /**
+     * En APC, la referencia que el taller escribe al revés ("F67008-PXCBC")
+     * se pone en el orden del cliente, piel-artículo ({@link ReferenciaApc}),
+     * antes de cruzarla con nada: así encuentra su pedido, agrupa con las
+     * filas que la escriben bien y la pantalla de ajuste la enseña como la
+     * lee el cliente. Los demás clientes no se tocan: su referencia tiene
+     * otra forma.
+     */
+    private List<LineaTaller> referenciasEnSuOrden(String clienteClave, List<LineaTaller> lineas) {
+        boolean esApc = clientes.clientePara(clienteClave)
+                .map(cliente -> cliente.getPlantilla() == TipoPlantilla.APC)
+                .orElse(false);
+        if (!esApc) {
+            return lineas;
+        }
+        List<LineaTaller> enSuOrden = new ArrayList<>();
+        for (LineaTaller l : lineas) {
+            enSuOrden.add(new LineaTaller(l.fila(), l.cliente(), l.motivo(),
+                    ReferenciaApc.normalizar(l.referencia()), l.color(), l.talla(), l.destinoTaller(),
+                    l.code(), l.numeroExpedicion(), l.unidadesPorCajaTaller(), l.cantidad(),
+                    l.pesoBrutoCajaKg(), l.medidaCajaTaller()));
+        }
+        return enSuOrden;
     }
 
     /** Una fila sin cliente escrito se da por del cliente elegido. */
@@ -479,18 +507,27 @@ public class DigestionTallerService {
                         .orElse(reglas.getMedidaCajaPorDefecto());
         Integer unidades = recordado.map(MemoriaReferencias.DatosCaja::unidadesPorCaja)
                 .orElse(taller.unidadesPorCaja());
-        // El peso de la memoria se guarda en neto, así que hay que volver a
-        // ponerle el cartón, y el de AHORA: si la referencia ha cambiado de
-        // caja, la tara de la anterior ya no es la suya.
-        Double pesoMemoria = brutoDe(recordado.map(MemoriaReferencias.DatosCaja::pesoNetoKg)
-                .orElse(null), medida);
-        Double peso = taller.pesoBrutoKg() != null ? taller.pesoBrutoKg() : pesoMemoria;
+        // La memoria guarda el neto de UNA unidad: la caja llena son las
+        // unidades por caja, más el cartón de AHORA (si la referencia ha
+        // cambiado de caja, la tara de la anterior ya no es la suya).
+        Double pesoMemoria = brutoDe(netoCajaLlena(
+                memoria.pesoNetoUnidad(clienteClave, referencia).orElse(null), unidades), medida);
+        boolean pesoDeMemoria = taller.pesoBrutoKg() == null;
+        Double peso = pesoDeMemoria ? pesoMemoria : taller.pesoBrutoKg();
 
         avisarSiNoCuadranTallerYMemoria(referencia, taller, medidaTaller, recordado.orElse(null),
                 pesoMemoria, unidades, digestion);
 
-        return new GrupoReferencia(referencia, medida, unidades, peso,
+        return new GrupoReferencia(referencia, medida, unidades, peso, pesoDeMemoria,
                 origenDe(recordado.isPresent(), taller));
+    }
+
+    /** Lo que pesa la mercancía de una caja llena, o null sin peso o sin unidades. */
+    private static Double netoCajaLlena(Double pesoNetoUnidad, Integer unidadesPorCaja) {
+        if (pesoNetoUnidad == null || unidadesPorCaja == null || unidadesPorCaja <= 0) {
+            return null;
+        }
+        return pesoNetoUnidad * unidadesPorCaja;
     }
 
     /**
@@ -613,29 +650,23 @@ public class DigestionTallerService {
     }
 
     /**
-     * Guarda lo aprendido de cada referencia, solo si está completo.
+     * Guarda el cartón y las unidades por caja de cada referencia, solo si
+     * están completos y la referencia está en el catálogo (el packing no da
+     * de alta modelos).
      *
-     * Del peso se guarda el NETO, no el bruto que se teclea: el neto es de la
-     * mercancía y no cambia, mientras que el bruto lleva dentro la tara del
-     * cartón, que se corrige cada vez que se vuelve a pesar y que cambia
-     * entera si la referencia pasa a otra caja. Sin tara conocida no hay forma
-     * de separarlos, y entonces no se guarda peso: mejor pedirlo otra vez que
-     * recordar un número que no es el que se cree.
+     * El peso NO se guarda aquí: se aprende al generar los excels en la
+     * revisión, que es donde se ve cada caja y donde llega también el de las
+     * otras vías de entrada. Un solo sitio que lo guarda, con las mismas
+     * reglas para todos.
      */
     public void memorizar(String clienteClave, DigestionTaller digestion) {
         for (GrupoReferencia grupo : digestion.getGrupos()) {
-            memoria.recordar(clienteClave, grupo.getReferencia(), grupo.getMedidaCaja(),
-                    grupo.getUnidadesPorCaja(),
-                    netoDe(grupo.getPesoBrutoKg(), grupo.getMedidaCaja()));
+            memoria.recordarCaja(clienteClave, grupo.getReferencia(), grupo.getMedidaCaja(),
+                    grupo.getUnidadesPorCaja());
         }
     }
 
-    /** Lo que pesa la mercancía de una caja llena, quitándole el embalaje. */
-    private Double netoDe(Double pesoBrutoKg, String medidaCaja) {
-        return conTara(medidaCaja, pesoBrutoKg, (peso, tara) -> peso - tara);
-    }
-
-    /** Lo contrario: el bruto que se enseña en pantalla, con el embalaje puesto. */
+    /** El bruto que se enseña en pantalla: el neto con el embalaje puesto. */
     private Double brutoDe(Double pesoNetoKg, String medidaCaja) {
         return conTara(medidaCaja, pesoNetoKg, (peso, tara) -> peso + tara);
     }

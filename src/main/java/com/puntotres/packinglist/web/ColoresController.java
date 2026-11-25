@@ -1,6 +1,7 @@
 package com.puntotres.packinglist.web;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,7 +10,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -27,10 +31,12 @@ import org.springframework.web.util.UriComponentsBuilder;
 import com.puntotres.packinglist.config.ClienteConfig;
 import com.puntotres.packinglist.config.CatalogoClientes;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.Importacion;
 import com.puntotres.packinglist.persistence.Incorporacion;
 import com.puntotres.packinglist.persistence.MemoriaPieles;
 import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
+import com.puntotres.packinglist.service.catalogo.ExcelColoresPieles;
 import com.puntotres.packinglist.service.corte.ClienteCorte;
 import com.puntotres.packinglist.service.corte.DocumentosCorteService;
 
@@ -55,6 +61,9 @@ import com.puntotres.packinglist.service.corte.DocumentosCorteService;
  * meter de una vez los colores, las pieles o las dos cosas. Solo para los
  * clientes cuyo pedido se sabe leer (AMI y APC): son los mismos que tienen
  * documentos del corte, así que el lector se pide a ese servicio.
+ *
+ * Y las dos tablas de un cliente se exportan a un excel (una hoja cada una)
+ * para rellenarlas en Excel y volver a importarlas, de cualquier cliente.
  */
 @Controller
 public class ColoresController {
@@ -63,6 +72,7 @@ public class ColoresController {
             "no tiene el formato esperado: revisa que sea el excel de pedido de ese cliente";
     private static final String COLORES = "colores";
     private static final String PIELES = "pieles";
+    private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     /** Lo que llega de "Guardar todo": una fila por código, en el orden de la tabla. */
     public static class TablaForm {
@@ -229,6 +239,103 @@ public class ColoresController {
             resumen.append(" Ya estaban: ").append(incorporacion.yaEstaban().size()).append('.');
         }
         return resumen.toString();
+    }
+
+    // --- Exportar e importar el excel de las dos tablas ---
+
+    /**
+     * Las dos tablas del cliente en un excel, una por hoja, para rellenarlas
+     * en Excel y volver a subirlas con {@link #importar}.
+     */
+    @GetMapping("/colores/excel")
+    public ResponseEntity<byte[]> exportar(@RequestParam String cliente) throws IOException {
+        String elCliente = clave(cliente);
+        ClienteConfig config = catalogoClientes.clientePara(elCliente)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        byte[] excel = ExcelColoresPieles.escribir(elCliente,
+                tabla.de(elCliente).stream()
+                        .map(color -> new ExcelColoresPieles.Fila(color.getCodigo(), color.getDescripcion())).toList(),
+                pieles.pielesDe(elCliente).stream()
+                        .map(piel -> new ExcelColoresPieles.Fila(piel.getRefPiel(), piel.getNombre())).toList());
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(XLSX))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        // Sin el punto final de "A.P.C.": saldría "A.P.C..xlsx".
+                        .filename("Colores y pieles " + nombreDe(config, elCliente).replaceAll("[.\\s]+$", "")
+                                + ".xlsx", StandardCharsets.UTF_8)
+                        .build().toString())
+                .body(excel);
+    }
+
+    /**
+     * Sube el excel exportado ya rellenado. Lo que trae manda sobre lo
+     * guardado, pero una casilla vacía no borra y lo que no viene no se toca:
+     * borrar se hace en la pantalla, fila a fila. Un excel de otro cliente no
+     * se importa (lo dice su fila "Cliente"): pondría los colores de APC en
+     * la tabla de AMI.
+     */
+    @PostMapping("/colores/importar")
+    public String importar(@RequestParam String cliente, @RequestParam(required = false) MultipartFile excel,
+                           RedirectAttributes redirect) {
+        String elCliente = clave(cliente);
+        if (catalogoClientes.clientePara(elCliente).isEmpty()) {
+            redirect.addFlashAttribute("mensajeError", "Cliente desconocido: " + cliente + ".");
+            return "redirect:/colores";
+        }
+        if (excel == null || excel.isEmpty()) {
+            redirect.addFlashAttribute("mensajeError",
+                    "Elige el excel de colores y pieles que se exporta desde esta pantalla.");
+            return volver(elCliente);
+        }
+        ExcelColoresPieles.Leido leido;
+        try {
+            leido = ExcelColoresPieles.leer(excel.getBytes());
+        } catch (IllegalArgumentException | IOException e) {
+            redirect.addFlashAttribute("mensajeError", "No se pudo importar el excel: "
+                    + (e instanceof IllegalArgumentException && e.getMessage() != null ? e.getMessage()
+                            : "no se ha podido leer") + ".");
+            return volver(elCliente);
+        }
+        if (!leido.cliente().isEmpty() && !leido.cliente().equals(elCliente)) {
+            redirect.addFlashAttribute("mensajeError", "El excel es de los colores y pieles de "
+                    + leido.cliente() + " y esta pantalla es de " + elCliente
+                    + ": elige ese cliente arriba o exporta el de " + elCliente + ".");
+            return volver(elCliente);
+        }
+        List<String> frases = new ArrayList<>();
+        if (leido.colores() != null) {
+            frases.add(resumenImportacion(tabla.importar(elCliente, leido.colores()), "Colores",
+                    "añadidos", "cambiados", "ninguno"));
+        }
+        if (leido.pieles() != null) {
+            frases.add(resumenImportacion(pieles.importarPieles(elCliente, leido.pieles()), "Pieles",
+                    "añadidas", "cambiadas", "ninguna"));
+        }
+        String nombre = excel.getOriginalFilename() == null || excel.getOriginalFilename().isBlank()
+                ? "el excel" : excel.getOriginalFilename();
+        redirect.addFlashAttribute("mensaje", "Importado " + nombre + ". " + String.join(" ", frases));
+        return volver(elCliente);
+    }
+
+    /** "Colores: añadidos (1): X5; cambiados (1): X6; sin cambios: 3." */
+    static String resumenImportacion(Importacion importacion, String tablaImportada, String anadidos,
+                                     String cambiados, String ninguno) {
+        if (importacion.total() == 0) {
+            return tablaImportada + ": la hoja no trae " + ninguno + ".";
+        }
+        List<String> partes = new ArrayList<>();
+        if (!importacion.anadidos().isEmpty()) {
+            partes.add(anadidos + " (" + importacion.anadidos().size() + "): "
+                    + String.join(", ", importacion.anadidos()));
+        }
+        if (!importacion.cambiados().isEmpty()) {
+            partes.add(cambiados + " (" + importacion.cambiados().size() + "): "
+                    + String.join(", ", importacion.cambiados()));
+        }
+        if (!importacion.sinCambios().isEmpty()) {
+            partes.add("sin cambios: " + importacion.sinCambios().size());
+        }
+        return tablaImportada + ": " + String.join("; ", partes) + ".";
     }
 
     // --- Una fila, sin recargar ---

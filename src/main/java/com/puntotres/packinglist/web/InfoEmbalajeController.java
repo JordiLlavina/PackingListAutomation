@@ -369,7 +369,9 @@ public class InfoEmbalajeController {
     }
 
     private String nombreDe(String clave) {
-        ClienteConfig config = catalogoClientes.getClientes().get(clave);
+        // clientePara y no getClientes(): una hoja guardada de un cliente
+        // inactivo sigue enseñando su nombre.
+        ClienteConfig config = catalogoClientes.clientePara(clave).orElse(null);
         return config == null ? clave : nombreDe(config, clave);
     }
 

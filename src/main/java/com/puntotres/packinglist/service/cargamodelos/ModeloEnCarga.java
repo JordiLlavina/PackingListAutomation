@@ -118,7 +118,7 @@ public class ModeloEnCarga {
         final List<String> combinaciones = casillas();
         String medidaCaja = "";
         String unidadesPorCaja = "";
-        String pesoNetoKg = "";
+        String pesoNetoUnidadKg = "";
         final List<ColorEnCarga> colores = new ArrayList<>();
         /** El artículo ya está en el catálogo. */
         boolean existe;

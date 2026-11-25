@@ -231,7 +231,53 @@ class OrdenCorteExcelBuilderTest {
         assertTrue(texto(conNombre.getRow(3), 1).startsWith("Color"), texto(conNombre.getRow(3), 1));
         assertTrue(texto(conNombre.getRow(4), 1).startsWith("Cantidad"), texto(conNombre.getRow(4), 1));
         assertEquals("", texto(libro.getSheetAt(1).getRow(2), 1), "sin nombre, la fila vacía");
-        assertEquals(198.4, OrdenCorteExcelBuilder.ALTO_BANDA, 0.01);
+        // 198,4 hasta noviembre de 2026; la cantidad a 55 pt pidió 10 más.
+        assertEquals(208.4, OrdenCorteExcelBuilder.ALTO_BANDA, 0.01);
+    }
+
+    /** El número de la cantidad a 55 pt, por decisión del usuario, en una fila donde quepa entero. */
+    @Test
+    void laCantidadVaA55PuntosEnUnaFilaQueLaCabe() throws IOException {
+        XSSFSheet hoja = generar(List.of(orden("PXCBC-F67008", "LZZ NOIR", 2, sinCombinaciones(), APAISADA)))
+                .getSheetAt(0);
+
+        XSSFCell cantidad = hoja.getRow(4).getCell(1);
+        assertEquals("Cantidad  2", cantidad.getStringCellValue());
+        XSSFFont numero = cantidad.getRichStringCellValue().getFontAtIndex("Cantidad  ".length());
+        assertEquals(55, numero.getFontHeightInPoints());
+        assertTrue(hoja.getRow(4).getHeightInPoints() >= 55 * 1.22, "alto " + hoja.getRow(4).getHeightInPoints());
+    }
+
+    /**
+     * Las hojas de SMS llevan detrás del color, en la banda y en el color de
+     * la piel principal, una redondita (●) del color de la muestra.
+     */
+    @Test
+    void conColorDeMuestraElColorLlevaDetrasUnaRedonditaDeEseColor() throws IOException {
+        OrdenCorte sms = new OrdenCorte("A.P.C.", "FALL 27 | SMS", "PXCBC-F67008", "F67008", "LE NEIGE",
+                "KAF VERT FONCÉ", 2, new PielesArticulo(new PielCorte("ALPACA TOUCH", "KAF VERT FONCÉ"),
+                        new PielCorte("STILLA 999", ""), List.of()), List.of(APAISADA), false, "273C18");
+        XSSFWorkbook libro = generar(List.of(sms,
+                orden("PXCBC-F67008", "LZZ NOIR", 2, sinCombinaciones(), APAISADA)));
+
+        XSSFSheet hoja = libro.getSheetAt(0);
+        XSSFCell color = hoja.getRow(3).getCell(1);
+        // Con un espacio de no separación delante, para que no baje sola a otra línea.
+        assertEquals("Color  KAF VERT FONCÉ ●", color.getStringCellValue());
+        assertEquals("273C18", hex(color.getRichStringCellValue().getFontAtIndex(
+                color.getStringCellValue().length() - 1)));
+        XSSFCell colorPiel = renglonesDePiel(hoja).get(0).getCell(1);
+        assertEquals("COLOR\nKAF VERT FONCÉ ●", colorPiel.getStringCellValue());
+        assertEquals("273C18", hex(colorPiel.getRichStringCellValue().getFontAtIndex(
+                colorPiel.getStringCellValue().length() - 1)));
+        XSSFCell colorForro = renglonesDePiel(hoja).get(1).getCell(1);
+        assertFalse(colorForro.getStringCellValue().contains("●"), "solo la piel principal");
+
+        assertEquals("Color  LZZ NOIR", texto(libro.getSheetAt(1).getRow(3), 1), "sin color de muestra, sin redondita");
+    }
+
+    private static String hex(XSSFFont fuente) {
+        return java.util.HexFormat.of().withUpperCase().formatHex(fuente.getXSSFColor().getRGB());
     }
 
     /** Una piel sola baja al pie de la página, por decisión del usuario; con más no hay aire que repartir. */

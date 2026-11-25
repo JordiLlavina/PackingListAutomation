@@ -248,9 +248,10 @@ class ApcExcelBuilderTest {
         try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
             Sheet hoja = wb.getSheetAt(0);
 
-            // 2 palets, uno con medidas en el JSON y otro sin ellas.
+            // 2 palets: el 1 con la medida escrita en el JSON, que manda; el
+            // 2 calculado de su caja, 40 cm de carga + 11 del palet vacío.
             assertEquals("PALLETS", hoja.getRow(26).getCell(3).getStringCellValue());
-            assertEquals("2 (1*80x120x130+1*?)", hoja.getRow(26).getCell(4).getStringCellValue());
+            assertEquals("2 (1*80x120x130+1*80x120x51)", hoja.getRow(26).getCell(4).getStringCellValue());
             assertEquals("CARTONS", hoja.getRow(27).getCell(3).getStringCellValue());
             assertEquals("3 (60x40x40cm)", hoja.getRow(27).getCell(4).getStringCellValue());
             // Cartones: la fila de total de peso (O24), 31.62 kg.
@@ -266,10 +267,10 @@ class ApcExcelBuilderTest {
             assertEquals("GROSS WEIGHT", hoja.getRow(30).getCell(3).getStringCellValue());
             assertEquals("O17+O20", hoja.getRow(30).getCell(4).getCellFormula());
             assertEquals(49.66, valor(wb, hoja, 30, 4), 0.0001);
-            // Cartones + 2 palets * 0.168 = 0.624.
+            // El volumen de los palets cargados: 1.248 + 0.4896 = 1.7376.
             assertEquals("GROSS VOLUME", hoja.getRow(31).getCell(3).getStringCellValue());
-            assertEquals("E30+2*0.168", hoja.getRow(31).getCell(4).getCellFormula());
-            assertEquals(0.624, valor(wb, hoja, 31, 4), 0.0001);
+            assertEquals("0.8*1.2*1.3+0.8*1.2*0.51", hoja.getRow(31).getCell(4).getCellFormula());
+            assertEquals(1.7376, valor(wb, hoja, 31, 4), 0.0001);
         }
     }
 
@@ -357,6 +358,46 @@ class ApcExcelBuilderTest {
             // GROSS VOLUME es el de los cartones a secas: ningún palet que sumar.
             assertEquals("E29", hoja.getRow(30).getCell(4).getCellFormula());
             assertEquals(valor(wb, hoja, 28, 4), valor(wb, hoja, 30, 4), 0.0001);
+        }
+    }
+
+    /**
+     * Un palet con cajas y otras sueltas: el volumen bruto es el del palet
+     * cargado más el de los cartones que van sin palet.
+     */
+    @Test
+    void elVolumenBrutoSumaLosPaletsYLasCajasSueltas() throws Exception {
+        DestinoData destino = destinoIvry();
+        destino.getCajas().stream().filter(caja -> caja.getNumeroCaja() == 3)
+                .forEach(caja -> caja.setNumeroPalet(CajaData.SIN_PALET));
+
+        List<ExcelGenerado> excels = builder.generar(destino, List.of(palet("IVRY", 1, 1, 2)), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            // Dos cajas de 40 en un mismo nivel: 40 + 11.
+            assertEquals("1 (80x120x51)", hoja.getRow(26).getCell(4).getStringCellValue());
+            assertEquals("GROSS VOLUME", hoja.getRow(31).getCell(3).getStringCellValue());
+            assertEquals("0.8*1.2*0.51+0.6*0.4*0.4", hoja.getRow(31).getCell(4).getCellFormula());
+            assertEquals(0.4896 + 0.096, valor(wb, hoja, 31, 4), 0.0001);
+        }
+    }
+
+    /**
+     * Sin la medida de una caja no se sabe cuánto mide su palet: se rotula
+     * con "?" y ese palet no suma volumen, en vez de inventar una altura.
+     */
+    @Test
+    void unPaletConUnaCajaSinMedidaSaleConInterrogante() throws Exception {
+        DestinoData destino = destinoIvry();
+        destino.getCajas().get(2).setTamanoCaja(null); // líder de la caja 3, palet 2
+
+        List<ExcelGenerado> excels = builder.generar(destino, palets(), envio(), apc());
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(new ByteArrayInputStream(excels.get(0).getContenido()))) {
+            Sheet hoja = wb.getSheetAt(0);
+            assertEquals("2 (1*80x120x130+1*80x120x?)", hoja.getRow(26).getCell(4).getStringCellValue());
+            assertEquals("0.8*1.2*1.3", hoja.getRow(31).getCell(4).getCellFormula());
         }
     }
 

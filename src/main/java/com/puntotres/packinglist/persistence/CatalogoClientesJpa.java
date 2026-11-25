@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,8 +21,14 @@ import com.puntotres.packinglist.config.ClientesProperties;
  * programados del yml (AMI, APC) primero, en su orden, y detrás los de
  * plantilla genérica de la tabla {@code cliente}, por nombre.
  *
- * Además da de alta, corrige y elimina los genéricos para la pantalla
- * /clientes. Los programados no se tocan desde aquí: su packing list es código.
+ * Además da de alta, edita, hace inactivos y elimina los genéricos para la
+ * pantalla /clientes. Los programados no se tocan desde aquí: su packing list
+ * es código.
+ *
+ * <b>Inactivos</b>: {@link #getClientes()}, de donde salen todos los
+ * desplegables y filtros del programa, los deja fuera; {@link #clientePara}
+ * los sigue encontrando, para que lo que ya tienen guardado (temporadas,
+ * modelos, sesiones del packing) siga sabiendo de quién es y cómo se llama.
  */
 @Service
 @Primary
@@ -38,6 +45,7 @@ public class CatalogoClientesJpa implements CatalogoClientes {
             Map.entry("COLOR_CLIENTE", List.of("color", "colores")),
             Map.entry("PIEL", List.of("piel", "pieles")),
             Map.entry("HOJA_EMBALAJE", List.of("hoja de info de embalaje", "hojas de info de embalaje")),
+            Map.entry("HOJA_PRODUCCION", List.of("hoja de producción", "hojas de producción")),
             Map.entry("EVENTO_PIEL", List.of("anotación en la biblioteca de pieles",
                     "anotaciones en la biblioteca de pieles")));
 
@@ -68,16 +76,35 @@ public class CatalogoClientesJpa implements CatalogoClientes {
         }
     }
 
+    /** Los activos: los de todos los desplegables y filtros del programa. */
     @Override
     public Map<String, ClienteConfig> getClientes() {
+        return clientes(false);
+    }
+
+    /**
+     * También encuentra a los inactivos: lo que tienen guardado sigue siendo
+     * suyo aunque ya no se ofrezcan en ningún desplegable.
+     */
+    @Override
+    public Optional<ClienteConfig> clientePara(String clave) {
+        if (clave == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(clientes(true).get(ClienteConfig.normalizar(clave)));
+    }
+
+    private Map<String, ClienteConfig> clientes(boolean conInactivos) {
         Map<String, ClienteConfig> clientes = new LinkedHashMap<>(programados.getClientes());
         for (Cliente cliente : guardados()) {
-            clientes.putIfAbsent(cliente.getClave(), cliente.comoConfig());
+            if (conInactivos || cliente.isActivo()) {
+                clientes.putIfAbsent(cliente.getClave(), cliente.comoConfig());
+            }
         }
         return clientes;
     }
 
-    /** Los de plantilla genérica, por nombre, para la lista de /clientes. */
+    /** Los de plantilla genérica, activos e inactivos, por nombre, para la lista de /clientes. */
     public List<Cliente> guardados() {
         return repositorio.findAll().stream()
                 .sorted(Comparator.comparing(Cliente::getNombre, String.CASE_INSENSITIVE_ORDER))
@@ -102,29 +129,56 @@ public class CatalogoClientesJpa implements CatalogoClientes {
         if (clave.length() > 60) {
             throw new IllegalArgumentException("El nombre es demasiado largo: como mucho 60 letras.");
         }
-        if (getClientes().containsKey(clave)) {
-            throw new IllegalArgumentException("Ya hay un cliente que se llama " + datos.nombre() + ".");
-        }
+        comprobarNombreLibre(clave, datos.nombre(), "Ya hay un cliente");
         repositorio.save(new Cliente(clave, datos.nombre(), datos.nombreLegal(), datos.direccionEntrega(),
                 datos.placeholderTemporada(), datos.etiquetaPedido()));
         return clave;
     }
 
     /**
-     * Corrige los datos de un cliente genérico. La clave no cambia aunque
+     * Edita los datos de un cliente genérico. La clave no cambia aunque
      * cambie el nombre: es lo que lo une a lo que tiene guardado.
      */
     @Transactional
-    public void corregir(String clave, DatosCliente datos) {
+    public void editar(String clave, DatosCliente datos) {
         validar(datos);
         Cliente cliente = repositorio.findById(ClienteConfig.normalizar(clave)).orElseThrow(
                 () -> new IllegalArgumentException("El cliente " + clave + " ya no existe."));
         String otraClave = ClienteConfig.normalizar(datos.nombre());
-        if (!otraClave.equals(cliente.getClave()) && getClientes().containsKey(otraClave)) {
-            throw new IllegalArgumentException("Ya hay otro cliente que se llama " + datos.nombre() + ".");
+        if (!otraClave.equals(cliente.getClave())) {
+            comprobarNombreLibre(otraClave, datos.nombre(), "Ya hay otro cliente");
         }
         cliente.actualizar(datos.nombre(), datos.nombreLegal(), datos.direccionEntrega(),
                 datos.placeholderTemporada(), datos.etiquetaPedido());
+    }
+
+    /**
+     * Hace inactivo (o vuelve a activar) un cliente genérico. No borra nada:
+     * solo deja de salir en los desplegables y filtros del programa.
+     */
+    @Transactional
+    public void cambiarActivo(String clave, boolean activo) {
+        if (esProgramado(clave)) {
+            throw new IllegalArgumentException(
+                    clave + " tiene su packing list programado y no se puede hacer inactivo.");
+        }
+        Cliente cliente = repositorio.findById(ClienteConfig.normalizar(clave)).orElseThrow(
+                () -> new IllegalArgumentException("El cliente " + clave + " ya no existe."));
+        cliente.cambiarActivo(activo);
+    }
+
+    /**
+     * Un nombre no puede coincidir con la clave de otro cliente, tampoco con
+     * la de uno inactivo: compartirían la clave y todo lo que tiene guardado.
+     */
+    private void comprobarNombreLibre(String clave, String nombre, String yaHay) {
+        if (programados.clientePara(clave).isPresent()) {
+            throw new IllegalArgumentException(yaHay + " que se llama " + nombre + ".");
+        }
+        repositorio.findById(clave).ifPresent(otro -> {
+            throw new IllegalArgumentException(yaHay + " que se llama " + nombre
+                    + (otro.isActivo() ? "." : ", pero está inactivo: reactívalo en la lista de clientes."));
+        });
     }
 
     /**

@@ -3,6 +3,7 @@ package com.puntotres.packinglist.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -12,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -20,6 +23,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.service.catalogo.ExcelColoresPieles;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel;
 import com.puntotres.packinglist.testutil.PedidoAmiExcel.Fila;
 
@@ -258,6 +262,78 @@ class ColoresControllerTest {
         mvc.perform(get("/colores").param("cliente", "LGN"))
                 .andExpect(content().string(containsString("value=\"AZUL, MATE\"")))
                 .andExpect(content().string(containsString("value=\"VERDE\"")));
+    }
+
+    @Test
+    void losBotonesDeExportarEImportarVanEnLaCabeceraDelCliente() throws Exception {
+        String pagina = mvc.perform(get("/colores").param("cliente", "LGN"))
+                .andReturn().getResponse().getContentAsString();
+        String cabecera = pagina.substring(pagina.indexOf("class=\"tarjeta cabecera-cliente\""),
+                pagina.indexOf("</section>", pagina.indexOf("class=\"tarjeta cabecera-cliente\"")));
+
+        assertTrue(cabecera.contains("href=\"/colores/excel?cliente=LGN\""), cabecera);
+        assertTrue(cabecera.contains(">Exportar excel</a>"), cabecera);
+        assertTrue(cabecera.contains("action=\"/colores/importar\""), cabecera);
+        assertTrue(cabecera.contains(">Importar excel</button>"), cabecera);
+    }
+
+    @Test
+    void seExportaUnExcelConLasDosTablasDelCliente() throws Exception {
+        mvc.perform(post("/colores/colores/nuevo").param("cliente", "LGN").param("codigo", "E1").param("valor", "ROSA"));
+        mvc.perform(post("/colores/pieles/nuevo").param("cliente", "LGN").param("codigo", "EP1").param("valor", ""));
+
+        var respuesta = mvc.perform(get("/colores/excel").param("cliente", "lgn"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse();
+
+        assertTrue(respuesta.getHeader("Content-Disposition").contains("attachment"));
+        ExcelColoresPieles.Leido leido = ExcelColoresPieles.leer(respuesta.getContentAsByteArray());
+        assertEquals("LGN", leido.cliente());
+        assertEquals("ROSA", leido.colores().get("E1"));
+        assertEquals("", leido.pieles().get("EP1"));
+
+        mvc.perform(get("/colores/excel").param("cliente", "NADIE")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void alImportarSeAnadeYSeCorrigeYUnaCasillaVaciaNoBorra() throws Exception {
+        mvc.perform(post("/colores/colores/nuevo").param("cliente", "LGN").param("codigo", "I1").param("valor", "GRIS"));
+        mvc.perform(post("/colores/colores/nuevo").param("cliente", "LGN").param("codigo", "I2").param("valor", "NEGRO"));
+        mvc.perform(post("/colores/pieles/nuevo").param("cliente", "LGN").param("codigo", "IP1").param("valor", ""));
+        byte[] rellenado = ExcelColoresPieles.escribir("LGN",
+                List.of(new ExcelColoresPieles.Fila("I1", "GRIS PERLA"), new ExcelColoresPieles.Fila("I2", ""),
+                        new ExcelColoresPieles.Fila("I3", "NUEVO")),
+                List.of(new ExcelColoresPieles.Fila("IP1", "vachette")));
+
+        mvc.perform(multipart("/colores/importar").file(importado(rellenado)).param("cliente", "LGN"))
+                .andExpect(redirectedUrl("/colores?cliente=LGN"))
+                .andExpect(flash().attribute("mensaje", "Importado colores.xlsx. Colores: añadidos (1): I3; "
+                        + "cambiados (1): I1; sin cambios: 1. Pieles: cambiadas (1): IP1."));
+        String pagina = mvc.perform(get("/colores").param("cliente", "LGN"))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(pagina.contains("value=\"GRIS PERLA\""));
+        assertTrue(pagina.contains("value=\"NEGRO\""), "la casilla vacía no borra");
+        assertTrue(pagina.contains("value=\"NUEVO\""));
+        assertTrue(pagina.contains("value=\"VACHETTE\""), "el nombre de la piel, en mayúsculas como en la pantalla");
+    }
+
+    @Test
+    void unExcelDeOtroClienteOQueNoEsElDeLaPantallaNoSeImporta() throws Exception {
+        byte[] deApc = ExcelColoresPieles.escribir("APC", List.of(new ExcelColoresPieles.Fila("LZZ", "OTRO")),
+                List.of());
+        mvc.perform(multipart("/colores/importar").file(importado(deApc)).param("cliente", "LGN"))
+                .andExpect(redirectedUrl("/colores?cliente=LGN"))
+                .andExpect(flash().attribute("mensajeError", containsString("es de los colores y pieles de APC")));
+
+        mvc.perform(multipart("/colores/importar").file(importado("no".getBytes())).param("cliente", "LGN"))
+                .andExpect(flash().attribute("mensajeError", containsString("No se pudo importar el excel")));
+        mvc.perform(multipart("/colores/importar").param("cliente", "LGN"))
+                .andExpect(flash().attribute("mensajeError", containsString("Elige el excel")));
+    }
+
+    private static MockMultipartFile importado(byte[] contenido) {
+        return new MockMultipartFile("excel", "colores.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", contenido);
     }
 
     private static MockMultipartFile excel(byte[] contenido) {

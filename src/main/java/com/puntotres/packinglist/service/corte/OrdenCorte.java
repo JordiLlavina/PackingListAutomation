@@ -16,10 +16,13 @@ import java.util.Objects;
  * {@code fotos}: las del modelo que van en la ficha, de 0 a 3, en el orden en
  * que se colocan de izquierda a derecha. {@code prensa}: los bolsos de prensa
  * de ese color, en su propia hoja con PRENSA al final del nombre.
+ * {@code colorMuestra}: el RGB hexadecimal ("273C18") de la redondita que va
+ * detrás del color, la que el cliente dibuja en su excel de SMS; vacío, sin
+ * redondita.
  */
 public record OrdenCorte(String cliente, String temporada, String referencia, String modelo,
                          String nombreModelo, String color, int bolsos, PielesArticulo pieles,
-                         List<Imagen> fotos, boolean prensa) {
+                         List<Imagen> fotos, boolean prensa, String colorMuestra) {
 
     /** Lo más que cabe en la banda de arriba de la ficha. */
     public static final int MAXIMO_FOTOS = 3;
@@ -28,6 +31,14 @@ public record OrdenCorte(String cliente, String temporada, String referencia, St
         nombreModelo = nombreModelo == null ? "" : nombreModelo.trim();
         fotos = fotos == null ? List.of() : fotos.stream().filter(Objects::nonNull)
                 .limit(MAXIMO_FOTOS).toList();
+        colorMuestra = colorMuestra == null ? "" : colorMuestra;
+    }
+
+    /** Sin redondita de color: las órdenes de producción. */
+    public OrdenCorte(String cliente, String temporada, String referencia, String modelo,
+                      String nombreModelo, String color, int bolsos, PielesArticulo pieles,
+                      List<Imagen> fotos, boolean prensa) {
+        this(cliente, temporada, referencia, modelo, nombreModelo, color, bolsos, pieles, fotos, prensa, "");
     }
 
     /** Sin nombre del bolso. */

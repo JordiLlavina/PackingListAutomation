@@ -57,6 +57,15 @@ public final class TallerColisExcel {
 
     private static final int MAX_FILAS_CABECERA = 20;
     private static final int FILAS_VACIAS_PARA_PARAR = 5;
+
+    /**
+     * El título con el que el excel convertido ({@link FormatoPuntotresExcelBuilder})
+     * abre las notas del taller. La lectura SE PARA en esa fila: las notas van
+     * a tres filas de la tabla, para que quien abra el excel las vea, y eso es
+     * menos que las cinco vacías del corte. Sin esta marca, una nota con cuatro
+     * celdas cae en la columna REFERENCE y entraría al envío como un artículo.
+     */
+    public static final String TITULO_NOTAS = "NOTAS DEL TALLER";
     private static final String TALLA_UNICA = "U";
 
     /**
@@ -267,6 +276,9 @@ public final class TallerColisExcel {
 
         for (int f = primeraFilaDatos; f <= hoja.getLastRowNum(); f++) {
             Row fila = hoja.getRow(f);
+            if (abreLasNotas(fila)) {
+                break;
+            }
             String referencia = texto(fila, columnas.get(Columna.REFERENCE));
 
             // Un artículo es una fila CON REFERENCIA, y una cantidad suelta no
@@ -288,6 +300,19 @@ public final class TallerColisExcel {
                     texto(fila, columnas.get(Columna.QUANTITE)), avisos));
         }
         return lineas;
+    }
+
+    /** La fila lleva, en cualquier celda, el título de las notas del taller. */
+    private static boolean abreLasNotas(Row fila) {
+        if (fila == null) {
+            return false;
+        }
+        for (Cell celda : fila) {
+            if (TITULO_NOTAS.equalsIgnoreCase(texto(celda).trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

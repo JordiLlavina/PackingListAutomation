@@ -88,6 +88,20 @@ class ApcPedidoExcelTest {
         assertTrue(pedido.pedidoCompleto("PXBHZ-H65077", null).isEmpty());
     }
 
+    /**
+     * La operaria a veces escribe la referencia al revés, artículo-piel: sin
+     * darle la vuelta no es sufijo de ningún Article y el pedido no aparece.
+     */
+    @Test
+    void unaReferenciaEscritaAlRevesEncuentraSuPedido() throws IOException {
+        ApcPedidoExcel pedido = pedidoReal();
+
+        assertEquals(List.of(new ApcPedidoExcel.FilaPedido("PXCBC-F63024", "4100128682")),
+                pedido.filasPara("F63024-PXCBC", "682"));
+        assertEquals(Optional.of("4100128721"), pedido.pedidoCompleto("H65077-PXBHZ", "721"));
+        assertEquals(pedido.designacionDe("PXCBC-F67043"), pedido.designacionDe("F67043-PXCBC"));
+    }
+
     @Test
     void laReferenciaManuscritaCasaPorSufijoYDaLaFilaEntera() throws IOException {
         // En las hojas el operario escribe "67043" o "F63023", nunca el

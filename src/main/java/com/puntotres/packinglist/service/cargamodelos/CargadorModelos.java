@@ -248,8 +248,8 @@ public class CargadorModelos {
                 articulo.getMedidaCaja());
         escribir(enCarga, piel, "unidadesPorCaja", CampoArticulo.UNIDADES_POR_CAJA, piel.unidadesPorCaja,
                 articulo.getUnidadesPorCaja() == null ? "" : String.valueOf(articulo.getUnidadesPorCaja()));
-        escribir(enCarga, piel, "pesoNetoKg", CampoArticulo.PESO_NETO_KG, piel.pesoNetoKg,
-                articulo.getPesoNetoKg() == null ? "" : String.valueOf(articulo.getPesoNetoKg()));
+        escribir(enCarga, piel, "pesoNetoUnidadKg", CampoArticulo.PESO_NETO_UNIDAD_KG, piel.pesoNetoUnidadKg,
+                articulo.getPesoNetoUnidadKg() == null ? "" : String.valueOf(articulo.getPesoNetoUnidadKg()));
 
         if (!piel.refPiel.isEmpty()) {
             String guardado = pieles.findById(new PielId(cliente, piel.refPiel)).map(Piel::getNombre).orElse("");

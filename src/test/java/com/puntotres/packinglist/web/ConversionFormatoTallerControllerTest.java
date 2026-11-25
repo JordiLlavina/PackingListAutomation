@@ -73,7 +73,7 @@ class ConversionFormatoTallerControllerTest {
                 new PackingFormatoPuntotres.Cabecera("SWEET BAG SARL", null, null, null),
                 List.of(new PackingFormatoPuntotres.Fila(null, "AMI", null, REFERENCIA, "KAKI",
                         "U", "CHINA", null, 10, 20, "1-2", null, null)),
-                List.of(List.of("CAJA 2", "MAL")),
+                List.of(PackingFormatoPuntotres.Nota.de("CAJA 2", "MAL")),
                 null,
                 List.of(PackingFormatoPuntotres.Aviso.deFila(1, PackingFormatoPuntotres.Columna.CODIGO_CLIENTE, "varios pedidos posibles",
                         "Para F63023 en LAW el pedido tiene varios números"),

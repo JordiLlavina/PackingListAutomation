@@ -296,7 +296,7 @@ class TemporadasControllerTest {
     void elMenuLlevaAlArchivoDeTemporadas() throws Exception {
         mvc.perform(get("/menu"))
                 .andExpect(content().string(containsString("href=\"/temporadas\"")))
-                .andExpect(content().string(containsString("Guarda Temporadas y Ficheros")));
+                .andExpect(content().string(containsString("Guarda Temporadas")));
     }
 
     // --- Lo que hace por el envío ---

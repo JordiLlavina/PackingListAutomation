@@ -13,7 +13,7 @@ import jakarta.persistence.Table;
 /**
  * Un artículo del catálogo: un modelo en una piel, con la referencia entera
  * tal como la escribe el cliente ("ULL027.AL0103", "PXCBC-F67008"). Es el
- * nivel del cartón, las unidades por caja y el peso de la caja llena (antes
+ * nivel del cartón, las unidades por caja y el peso por unidad (antes
  * memoria_caja_referencia), y del forro y las combinaciones (antes
  * memoria_pieles_articulo): todo eso depende de la piel, o puede depender.
  *
@@ -67,12 +67,14 @@ public class Articulo {
     private Integer unidadesPorCaja;
 
     /**
-     * Lo que pesa la MERCANCÍA de una caja llena, sin el cartón. Se guarda el
-     * neto y no el bruto: el neto es del artículo y no cambia, el bruto lleva
-     * la tara dentro y cambia cada vez que se repesa un cartón.
+     * Lo que pesa UNA UNIDAD de la mercancía, sin embalaje. Se guarda el neto
+     * y no el bruto: el neto es del artículo y no cambia, el bruto lleva la
+     * tara dentro y cambia cada vez que se repesa un cartón. Y por unidad y no
+     * por caja llena (V15): la revisión del packing casi nunca sabe cuántas
+     * unidades caben en una caja, y el de la unidad no depende del cartón.
      */
-    @Column(name = "peso_neto_kg")
-    private Double pesoNetoKg;
+    @Column(name = "peso_neto_unidad_kg")
+    private Double pesoNetoUnidadKg;
 
     @Column(name = "fecha_actualizacion", nullable = false)
     private LocalDateTime fechaActualizacion;
@@ -143,8 +145,8 @@ public class Articulo {
         return unidadesPorCaja;
     }
 
-    public Double getPesoNetoKg() {
-        return pesoNetoKg;
+    public Double getPesoNetoUnidadKg() {
+        return pesoNetoUnidadKg;
     }
 
     public LocalDateTime getFechaActualizacion() {
@@ -198,8 +200,8 @@ public class Articulo {
         tocar();
     }
 
-    public void setPesoNetoKg(Double pesoNetoKg) {
-        this.pesoNetoKg = pesoNetoKg;
+    public void setPesoNetoUnidadKg(Double pesoNetoUnidadKg) {
+        this.pesoNetoUnidadKg = pesoNetoUnidadKg;
         tocar();
     }
 

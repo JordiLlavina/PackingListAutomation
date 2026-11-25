@@ -7,14 +7,16 @@
     <div class="alerta ok" th:if="${mensaje}" th:text="${mensaje}"></div>
     <div class="alerta error" th:if="${mensajeError}" th:text="${mensajeError}"></div>
 
-    <!-- Alta y corrección en el mismo formulario, arriba del todo: es lo que
+    <!-- Alta y edición en el mismo formulario, arriba del todo: es lo que
          se viene a hacer aquí. Con ?editar=CLAVE sale cargado con ese cliente. -->
     <section class="tarjeta" id="formulario">
         <h3 class="titulo-seccion"
-            th:text="${claveEditada} ? |Corregir ${formulario.nombre}| : 'Añadir un cliente'">Añadir un cliente</h3>
+            th:text="${claveEditada} ? |Editar ${formulario.nombre}| : 'Añadir un cliente'">Añadir un cliente</h3>
         <p class="ayuda">
             Un cliente nuevo usa la plantilla de packing list estándar de Puntotres. Sale en los
-            desplegables de todas las pantallas en cuanto se guarda.
+            desplegables de todas las pantallas en cuanto se guarda. Uno que ya no trabaja con
+            nosotros se puede <strong>hacer inactivo</strong>: deja de salir en los desplegables y
+            filtros, pero no se borra nada y se puede reactivar.
         </p>
 
         <form th:action="@{/clientes}" method="post" class="form-cliente">
@@ -69,20 +71,32 @@
             </tr>
             </thead>
             <tbody>
-            <!-- AMI y APC: su packing list es código, así que ni se corrigen ni
-                 se eliminan desde aquí. -->
+            <!-- AMI y APC: su packing list es código, así que ni se editan, ni
+                 se hacen inactivos, ni se eliminan desde aquí. -->
             <tr th:each="entrada : ${programados}">
                 <td th:text="${entrada.value.nombre}">AMI</td>
                 <td colspan="2" class="ayuda">Plantilla propia del cliente</td>
                 <td></td>
             </tr>
-            <tr th:each="cliente : ${guardados}">
-                <td th:text="${cliente.nombre}">Paloma Wool</td>
+            <!-- Un inactivo sigue aquí, atenuado y marcado, para poder
+                 reactivarlo: es el único sitio del programa donde sale. -->
+            <tr th:each="cliente : ${guardados}" th:classappend="${cliente.activo} ? '' : 'cliente-inactivo'">
+                <td>
+                    <span th:text="${cliente.nombre}">Paloma Wool</span>
+                    <span class="etiqueta-inactivo" th:unless="${cliente.activo}">Inactivo</span>
+                </td>
                 <td th:text="${cliente.nombreLegal}">PURO PASEO, S.L.</td>
                 <td th:text="${cliente.direccionEntrega}">GRUPO SEVICA</td>
                 <td class="acciones-cliente">
                     <a class="boton secundario boton-fila"
-                       th:href="@{/clientes(editar=${cliente.clave})} + '#formulario'">Corregir</a>
+                       th:href="@{/clientes(editar=${cliente.clave})} + '#formulario'">Editar</a>
+                    <form class="form-fila" method="post"
+                          th:action="${cliente.activo} ? @{/clientes/inactivar} : @{/clientes/reactivar}">
+                        <input type="hidden" name="clave" th:value="${cliente.clave}">
+                        <button type="submit" class="secundario boton-fila"
+                                th:title="${cliente.activo} ? 'Deja de salir en los desplegables y filtros; no se borra nada' : 'Vuelve a salir en los desplegables y filtros'"
+                                th:text="${cliente.activo} ? 'Hacer inactivo' : 'Reactivar'">Hacer inactivo</button>
+                    </form>
                     <button type="button" class="secundario boton-fila" th:unless="${bloqueos[cliente.clave]}"
                             th:attr="data-clave=${cliente.clave}, data-nombre=${cliente.nombre}"
                             data-eliminar>Eliminar</button>

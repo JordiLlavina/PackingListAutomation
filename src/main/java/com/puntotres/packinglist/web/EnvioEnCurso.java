@@ -40,6 +40,17 @@ public class EnvioEnCurso {
     private final Set<ClaveFila> filasDesplegadas = new HashSet<>();
     private byte[] excelPedidoCliente;
     private String nombreExcelPedidoCliente;
+    /** La sesión guardada en la que se va escribiendo este envío; null si aún no tiene. */
+    private Long sesionId;
+    /** El packing lo repartió el programa desde el excel del taller. */
+    private boolean deTaller;
+    /**
+     * El envío entró por «CON TEXTO», que es una vía de PRUEBA: no escribe
+     * nada en la base de datos —ni sesión guardada ni pesos aprendidos—.
+     */
+    private boolean dePrueba;
+    /** Por qué no se ha podido guardar la sesión la última vez, o null. */
+    private String avisoGuardado;
 
     /**
      * Una fila compactada de la tabla de revisión que el usuario ha desplegado,
@@ -69,6 +80,10 @@ public class EnvioEnCurso {
         filasDesplegadas.clear();
         excelPedidoCliente = null;
         nombreExcelPedidoCliente = null;
+        sesionId = null;
+        deTaller = false;
+        dePrueba = false;
+        avisoGuardado = null;
     }
 
     /** Despliega la fila compactada que arranca ahí, o la vuelve a plegar. */
@@ -86,6 +101,25 @@ public class EnvioEnCurso {
                 .map(ClaveFila::indice)
                 .collect(Collectors.toSet());
     }
+
+    /** Las filas desplegadas como pares (destino, índice), para guardarlas con la sesión. */
+    public List<int[]> filasDesplegadas() {
+        return filasDesplegadas.stream()
+                .map(clave -> new int[] {clave.destino(), clave.indice()})
+                .toList();
+    }
+
+    public Long getSesionId() { return sesionId; }
+    public void setSesionId(Long sesionId) { this.sesionId = sesionId; }
+
+    public boolean isDeTaller() { return deTaller; }
+    public void setDeTaller(boolean deTaller) { this.deTaller = deTaller; }
+
+    public boolean isDePrueba() { return dePrueba; }
+    public void setDePrueba(boolean dePrueba) { this.dePrueba = dePrueba; }
+
+    public String getAvisoGuardado() { return avisoGuardado; }
+    public void setAvisoGuardado(String avisoGuardado) { this.avisoGuardado = avisoGuardado; }
 
     public DatosEnvio getCabecera() { return cabecera; }
     public void setCabecera(DatosEnvio cabecera) { this.cabecera = cabecera; }

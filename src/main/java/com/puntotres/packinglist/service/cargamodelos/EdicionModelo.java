@@ -15,7 +15,7 @@ public record EdicionModelo(String cliente, String codigo, String nombrePrototip
                             String tipo, String etapa, List<EdicionPiel> pieles, List<EdicionFoto> fotos) {
 
     public record EdicionPiel(String referencia, String nombrePiel, String forro, List<String> combinaciones,
-                              String medidaCaja, String unidadesPorCaja, String pesoNetoKg,
+                              String medidaCaja, String unidadesPorCaja, String pesoNetoUnidadKg,
                               List<EdicionColor> colores) {
     }
 

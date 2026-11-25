@@ -471,6 +471,13 @@ section.destino td input.c-peso,
 section.destino td input.c-peso-palet,
 section.destino td.c-caja input[type="number"] { width: 3.5rem; }
 
+/* Peso calculado con el peso por unidad del catálogo de modelos: no se ha
+   pesado en este envío. Gris y en cursiva, para que se distinga sin color. */
+section.destino td input.c-peso.peso-catalogo {
+    color: var(--texto-suave);
+    font-style: italic;
+}
+
 /* Estrecho: la flecha más pegada al borde para no comerse la medida. */
 section.destino td select.c-tamano {
     padding: calc(0.25rem - 1px) 1.35em calc(0.25rem - 1px) 0.2rem;
@@ -890,6 +897,8 @@ ul.menu-entrada {
     grid-auto-rows: auto;
     margin-top: var(--menu-hueco);
 }
+/* La tarjeta de ClickUp, en la primera columna del pie, del alto que pida su texto. */
+.menu-pie > .menu-tarjeta { grid-column: 1 / span 1; }
 .menu-pie > .menu-panel {
     grid-column: -2 / -1;
     height: calc((var(--menu-fila) - 4 * var(--menu-hueco-paneles)) / 5);
@@ -1061,6 +1070,13 @@ a.menu-tarjeta:focus-visible, .menu-panel:focus-visible {
 /* El título "Cliente" y su desplegable en la misma línea. */
 .cabecera-cliente { display: flex; align-items: center; flex-wrap: wrap; gap: 0.6rem 1.2rem; }
 .cabecera-cliente .titulo-seccion { margin: 0; }
+/* Exportar e importar el excel: a la derecha, en la misma línea que el desplegable. */
+.acciones-excel-colores { margin-left: auto; display: flex; align-items: center; gap: 0.6rem; }
+.acciones-excel-colores form { margin: 0; }
+/* El selector de fichero lo abre el botón «Importar excel»: el atributo hidden solo no basta,
+   la regla general de input[type=file] le gana. */
+.acciones-excel-colores input[type="file"] { display: none; }
+.acciones-excel-colores .boton, .acciones-excel-colores button { margin: 0; }
 .form-pedido-colores .zona-subida { width: 24rem; max-width: 100%; }
 .form-pedido-colores .fila-cliente label { margin-top: 0; }
 .tabla-colores .codigo-color { font-weight: 600; white-space: nowrap; }
@@ -2287,10 +2303,251 @@ dialog.emergente-ficha { width: min(64rem, 94vw); max-width: none; }
 .acciones-cliente { white-space: nowrap; text-align: right; }
 .acciones-cliente .boton-fila { margin: 0 0 0 0.4rem; padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 .acciones-cliente .bloqueo-cliente { display: inline-block; max-width: 18rem; white-space: normal; text-align: left; margin: 0; }
+.acciones-cliente .form-fila { display: inline; margin: 0; }
+/* Un cliente inactivo: atenuado, pero sus botones (Editar, Reactivar) a plena vista. */
+.tabla-clientes tr.cliente-inactivo td:not(.acciones-cliente) { color: var(--texto-tenue); }
+.etiqueta-inactivo {
+    display: inline-block;
+    margin-left: 0.4rem;
+    padding: 0.05rem 0.45rem;
+    border: 1px solid var(--borde-tarjeta-fuerte);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    color: var(--texto-suave);
+    background: var(--fondo-suave);
+    vertical-align: middle;
+}
 dialog.emergente input[type="password"] {
     width: 100%;
     padding: 0.45rem 0.6rem;
     border: 1px solid var(--borde);
     border-radius: 4px;
     font: inherit;
+}
+
+/* --- Hojas de Producción -------------------------------------------------
+   Todo en una página. Arriba, de dónde sale el modelo (cliente, temporada y
+   artículo, como en la info de embalaje); debajo, la cabecera de la hoja en
+   el orden del excel (foto a la izquierda, modelo y datos a la derecha), y una
+   tarjeta por color con los campos agrupados como las columnas de la hoja.
+   Cada grupo lleva un filete fuerte encima, que es la fila de grupos del excel.
+   Un «campo sugerido» es un texto con un desplegable pegado debajo: elegir
+   escribe en el texto, y el texto siempre se puede corregir a mano. */
+main.hp { max-width: 84rem; }
+.hp-intro { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.hp-intro .ayuda { margin: 0; max-width: 50rem; }
+.hp-intro .boton { margin: 0; }
+
+.hp-formulario input[type="number"],
+.hp-formulario input[type="date"],
+.hp-formulario select {
+    width: 100%;
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 4px;
+    font: inherit;
+    background-color: var(--campo);
+}
+/* Todos los desplegables de la pantalla son el de artículos de la info de
+   embalaje (petición del usuario): letra de ancho fijo, la misma flecha. */
+.hp-formulario select {
+    padding: calc(0.45rem + 1px) 2em calc(0.45rem + 1px) 0.6rem;
+    border-radius: 6px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9rem;
+}
+.hp-formulario select:disabled { opacity: 0.6; }
+
+/* Origen: cliente y temporada estrechos, el artículo con todo el ancho que
+   pide su texto tabulado. */
+.hp-origen {
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.3fr) minmax(0, 3.7fr);
+    gap: 0.4rem 1rem;
+    align-items: start;
+}
+.hp-origen > div { min-width: 0; }
+.hp-origen label { margin-top: 0; }
+.hp-origen .ayuda { margin-top: 0.35rem; }
+.hp-origen .etiqueta-con-accion { margin-bottom: 0.25rem; }
+
+/* Cabecera de la hoja: la foto grande a la izquierda, como en el excel. */
+.hp-cabecera { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.hp-foto { display: flex; flex-direction: column; gap: 0.4rem; border-radius: 6px; }
+.hp-foto img {
+    width: 100%; height: 15rem; object-fit: contain;
+    background: var(--superficie); border: 1px solid var(--borde); border-radius: 6px;
+}
+.hp-foto-vacia {
+    height: 15rem; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.6rem; padding: 1rem; text-align: center; font-size: 0.85rem; color: var(--texto-suave);
+    border: 1.5px dashed var(--borde-tarjeta-fuerte); border-radius: 6px; background: var(--entrada);
+}
+.hp-foto-vacia svg { width: 2.4rem; height: 2.4rem; color: var(--texto-tenue); }
+.hp-foto-vacia[hidden], .hp-foto img[hidden], .hp-foto [hidden] { display: none; }
+.hp-foto-acciones { display: flex; gap: 1rem; font-size: 0.85rem; min-height: 1.2rem; }
+
+.hp-datos { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 0.4rem 1rem; align-items: start; }
+.hp-datos > div { min-width: 0; }
+.hp-datos label { margin-top: 0.2rem; }
+.hp-d-modelo { grid-column: span 4; }
+.hp-d-bolso { grid-column: span 8; }
+.hp-d-taller { grid-column: span 5; }
+.hp-d-numero { grid-column: span 3; }
+.hp-d-fecha { grid-column: span 4; }
+/* Modelo y número, grandes: es lo primero que busca el taller en el papel. */
+.hp-formulario input.hp-modelo,
+.hp-formulario input.hp-numero { font-size: 1.45rem; font-weight: 700; padding: 0.2rem 0.6rem; letter-spacing: 0.02em; }
+.hp-d-numero .ayuda { margin-top: 0.3rem; }
+.hp-d-numero .ayuda button.enlace { font-size: inherit; padding: 0; margin: 0 0 0 0.2rem; }
+
+/* Un color del modelo. */
+.hp-linea { padding: 1rem 1.25rem 1.25rem; }
+.hp-linea-cabecera { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.9rem; }
+.hp-linea-titulo { margin: 0; font-size: 1rem; }
+.hp-linea-acciones { margin-left: auto; display: flex; gap: 0.4rem; }
+
+.hp-linea-campos { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 1rem 1.1rem; }
+.hp-grupo { min-width: 0; border-top: 2px solid var(--tinta); padding-top: 0.4rem; }
+.hp-grupo-rotulo {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;
+    margin: 0 0 0.45rem; font-size: 0.82rem; font-weight: 600; color: var(--texto-suave);
+}
+.hp-marcado-vista { font-weight: 400; color: var(--tinta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp-marcado-vista:empty { display: none; }
+.hp-grupo label { margin: 0; font-weight: 400; min-width: 0; }
+.hp-sub { display: block; font-size: 0.75rem; color: var(--texto-tenue); margin-bottom: 0.2rem; }
+.hp-grupo-campos { display: grid; gap: 0.6rem; align-items: start; }
+.hp-uno-uno { grid-template-columns: 1fr 1fr; }
+.hp-tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.hp-hilo { grid-template-columns: 2fr 1fr 1fr; }
+.hp-g-unidades { grid-column: span 2; }
+.hp-g-piel, .hp-g-combinacion { grid-column: span 5; }
+.hp-g-hilo { grid-column: span 4; }
+.hp-g-interior { grid-column: span 2; }
+.hp-g-exterior { grid-column: span 6; }
+.hp-g-fornitura { grid-column: span 2; }
+.hp-g-forro, .hp-g-tinta { grid-column: span 5; }
+.hp-formulario .hp-g-unidades input[type="number"] { font-size: 1.3rem; font-weight: 700; text-align: center; }
+
+/* Campo sugerido: el desplegable se pega bajo el texto, del mismo ancho y con
+   las esquinas de en medio rectas, para que se lea como un solo control. */
+.campo-sugerido { min-width: 0; }
+.campo-sugerido input[type="text"] { border-bottom-left-radius: 0; border-bottom-right-radius: 0; position: relative; z-index: 1; }
+.hp-formulario .campo-sugerido select.hp-sugerencia {
+    margin-top: -1px;
+    border-top-left-radius: 0; border-top-right-radius: 0;
+    border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    padding: 0.28rem 1.8em 0.28rem 0.6rem;
+    font-size: 0.82rem;
+    color: var(--texto-suave);
+    background-color: var(--entrada);
+}
+
+/* «+ Añadir color», aparte de las tarjetas de color: un hueco discontinuo
+   que dice dónde aparecerá el siguiente. */
+.hp-formulario button.hp-anadir {
+    display: block; width: 100%; margin: 1.25rem 0 0; padding: 0.7rem 1rem;
+    background: transparent; color: var(--acento); font-weight: 600;
+    border: 1.5px dashed var(--borde-tarjeta-fuerte); border-radius: 6px;
+}
+.hp-formulario button.hp-anadir:hover { border-color: var(--acento); background: var(--acento-suave-fin); }
+
+.hp-pie { display: flex; align-items: center; gap: 0 0.6rem; flex-wrap: wrap; margin-top: 0.4rem; }
+.hp-pie #resultadoGenerar { flex: 1 1 100%; }
+.hp-pie .alerta { margin-top: 0.8rem; }
+
+/* El latido: lo que se ha rellenado solo tras una elección enseña un borde
+   coral que palpita dos veces y se apaga, para ver qué ha cambiado. */
+@keyframes hp-latido {
+    0% { border-color: #ff7f50; box-shadow: 0 0 0 0 rgba(255, 127, 80, 0.65); }
+    60% { border-color: #ff7f50; box-shadow: 0 0 0 6px rgba(255, 127, 80, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 127, 80, 0); }
+}
+.hp-formulario .hp-latido { animation: hp-latido 0.9s ease-out 2; border-color: #ff7f50; }
+@media (prefers-reduced-motion: reduce) {
+    .hp-formulario .hp-latido { animation: none; border-color: #ff7f50; }
+}
+
+@media (max-width: 70rem) {
+    .hp-origen { grid-template-columns: 1fr 1fr; }
+    .hp-o-articulo { grid-column: 1 / -1; }
+    .hp-g-unidades { grid-column: span 3; }
+    .hp-g-piel { grid-column: span 9; }
+    .hp-g-combinacion { grid-column: 4 / span 9; }
+    .hp-g-hilo, .hp-g-exterior { grid-column: span 6; }
+    .hp-g-interior, .hp-g-fornitura { grid-column: span 3; }
+    .hp-g-forro, .hp-g-tinta { grid-column: span 6; }
+}
+@media (max-width: 48rem) {
+    .hp-origen, .hp-cabecera { grid-template-columns: minmax(0, 1fr); }
+    .hp-d-modelo, .hp-d-bolso, .hp-d-taller, .hp-d-numero, .hp-d-fecha { grid-column: span 12; }
+    .hp-g-unidades, .hp-g-piel, .hp-g-combinacion, .hp-g-hilo, .hp-g-exterior,
+    .hp-g-interior, .hp-g-fornitura, .hp-g-forro, .hp-g-tinta { grid-column: 1 / -1; }
+}
+
+/* Las líneas de una hoja antigua: tabla ancha que hace scroll en su recuadro. */
+.scroll-horizontal { overflow-x: auto; }
+.hp-tabla-antigua { font-size: 0.85rem; min-width: 60rem; }
+.hp-tabla-antigua td { white-space: pre-line; }
+.hp-antigua-cabecera { display: flex; gap: 1.25rem; align-items: flex-start; }
+.hp-antigua-foto { width: 11rem; height: 11rem; object-fit: contain; border: 1px solid var(--borde); border-radius: 6px; background: var(--superficie); flex: none; }
+.hp-antigua-cabecera .embalaje-resumen { flex: 1; }
+
+/* --- Plegar una destinación de la revisión ---
+   La flecha del título es la misma de los desplegables (cliente, temporada):
+   hacia abajo con la destinación abierta y girada hacia la derecha plegada.
+   Lo plegado solo se esconde: sus campos siguen en el formulario y se envían. */
+section.destino h2 {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+button.plegar-destino {
+    flex: none;
+    width: 1.9rem;
+    height: 1.9rem;
+    margin: 0;
+    padding: 0;
+    font-size: 1rem;
+    border: 1px solid var(--borde);
+    border-radius: 6px;
+    background: var(--campo) var(--flecha-desplegable) no-repeat center / 0.8em auto;
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+
+section.destino.plegada button.plegar-destino { transform: rotate(-90deg); }
+
+section.destino.plegada .campo-destino,
+section.destino.plegada .bloque-hija {
+    display: none;
+}
+
+/* Plegada no hay tabla que acompañar al hacer scroll: el título fijo se
+   quedaría encima de la destinación siguiente. */
+section.destino.plegada h2 { position: static; }
+
+/* El color va siempre en mayúsculas: se ve así ya al teclear (el servidor lo
+   guarda en mayúsculas igualmente). */
+section.destino td input.c-color { text-transform: uppercase; }
+
+/* --- Sesiones guardadas de la entrada («Cargar Sesión») --- */
+.sesiones-guardadas td { vertical-align: middle; }
+.sesiones-guardadas .c-fecha-sesion { white-space: nowrap; }
+.sesiones-guardadas .acciones-sesion {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    white-space: nowrap;
+}
+.sesiones-guardadas .acciones-sesion form { margin: 0; }
+
+/* Solo borde y letra, sin fondo. */
+button.contorno {
+    margin: 0;
+    padding: 0.3rem 0.8rem;
+    background: transparent;
+    color: var(--acento);
 }

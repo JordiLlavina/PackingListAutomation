@@ -171,6 +171,43 @@ public class TablaColores {
         return new Incorporacion(anadidos, completados, yaEstaban);
     }
 
+    /**
+     * Mete en la tabla lo que trae el excel exportado de la pantalla, ya
+     * rellenado (código → descripción). Al revés que {@link #incorporar}, aquí
+     * la descripción del excel SÍ pisa la guardada: la ha escrito alguien
+     * para eso. Una casilla vacía no borra nada (se exporta todo, y una
+     * descripción borrada por descuido en el excel no se recuperaría), y un
+     * código que no viene en el excel tampoco se toca.
+     */
+    @Transactional
+    public Importacion importar(String cliente, Map<String, String> colores) {
+        List<String> anadidos = new ArrayList<>();
+        List<String> cambiados = new ArrayList<>();
+        List<String> sinCambios = new ArrayList<>();
+        if (vacio(cliente)) {
+            return new Importacion(anadidos, cambiados, sinCambios);
+        }
+        String elCliente = clave(cliente);
+        colores.forEach((codigo, descripcion) -> {
+            if (vacio(codigo)) {
+                return;
+            }
+            String elCodigo = clave(codigo);
+            String laDescripcion = descripcion == null ? "" : descripcion.trim();
+            Optional<ColorCliente> guardado = repositorio.findById(new ColorClienteId(elCliente, elCodigo));
+            if (guardado.isEmpty()) {
+                repositorio.save(new ColorCliente(elCliente, elCodigo, laDescripcion));
+                anadidos.add(elCodigo);
+            } else if (!laDescripcion.isEmpty() && !laDescripcion.equals(guardado.get().getDescripcion())) {
+                guardado.get().actualizar(laDescripcion);
+                cambiados.add(elCodigo);
+            } else {
+                sinCambios.add(elCodigo);
+            }
+        });
+        return new Importacion(anadidos, cambiados, sinCambios);
+    }
+
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void sembrarSiEstaVacia() {

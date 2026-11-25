@@ -113,6 +113,9 @@ packing-list:
   # tiene destino único, mezcla LIBRE y la altura que teclee el usuario.
   taller:
     altura-palet-por-defecto-cm: 168
+    # Lo que mide el palet vacío. Además de descontarse aquí de la altura
+    # útil, se suma al alto de las cajas para la medida del palet cargado
+    # de los packing lists (PALLETS y GROSS VOLUME, ver MedidaPalet).
     altura-propia-palet-cm: 11
     posiciones-palet: 4
     medida-caja-por-defecto: 60x40x40
