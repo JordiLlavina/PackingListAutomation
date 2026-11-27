@@ -77,6 +77,28 @@ class ClaudeEnvioExtractionServiceTest {
     }
 
     /**
+     * El color de APC va en código, buscado en la tabla de colores por
+     * parecido y nunca por el pedido. Antes se copiaba «como está» y así
+     * llegaba al packing. Solo en APC: en AMI el color es el tercer grupo de
+     * la referencia.
+     */
+    @Test
+    void elPromptDeApcPideElColorEnCodigoConLaTablaDeColores() {
+        String apc = ClaudeEnvioExtractionService.promptPara(TipoPlantilla.APC)
+                .replaceAll("\\s+", " ");
+        assertTrue(apc.contains("En \"color\" va SOLO el código"));
+        assertTrue(apc.contains("comparando el COLOR y no las letras"));
+        assertTrue(apc.contains("No elijas a ojo entre dos"));
+        assertTrue(apc.contains("\"CLOU CAMEL\" es CAMEL"));
+        assertTrue(apc.contains("UNA por nombre distinto, no una por caja"));
+        assertTrue(apc.contains("NUNCA elijas el color por el pedido"));
+        assertTrue(!apc.contains("el color como está"));
+
+        String ami = ClaudeEnvioExtractionService.promptPara(TipoPlantilla.AMI);
+        assertTrue(!ami.contains("TABLA DE COLORES"));
+    }
+
+    /**
      * La referencia completa de APC es piel-artículo, y la operaria a veces
      * la escribe al revés: el modelo tiene que darle la vuelta, y solo en
      * APC (AMI tiene otra forma de referencia).

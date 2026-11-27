@@ -5,10 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -36,9 +41,18 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
+import com.puntotres.packinglist.persistence.Etapa;
+import com.puntotres.packinglist.persistence.MemoriaPieles;
+import com.puntotres.packinglist.persistence.Modelo;
+import com.puntotres.packinglist.persistence.TablaColores;
+import com.puntotres.packinglist.service.catalogo.CatalogoModelos;
 import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
+import com.puntotres.packinglist.service.corte.LecturaSmsIa;
+import com.puntotres.packinglist.service.corte.LectorSmsIa;
 import com.puntotres.packinglist.testutil.FotosDePrueba;
 
 /** El flujo web de las hojas de corte de SMS, con los beans reales. */
@@ -51,6 +65,19 @@ class CorteSmsControllerTest {
 
     @Autowired
     private FotosCatalogo fotosCatalogo;
+
+    @Autowired
+    private CatalogoModelos catalogo;
+
+    @Autowired
+    private MemoriaPieles memoriaPieles;
+
+    @Autowired
+    private TablaColores tablaColores;
+
+    /** Sin red: lo que «lee» Claude lo pone cada test. */
+    @MockitoBean
+    private LectorSmsIa lectorIa;
 
     private final MockHttpSession sesion = new MockHttpSession();
 
@@ -75,15 +102,17 @@ class CorteSmsControllerTest {
     }
 
     @Test
-    void laEntradaSoloDejaElegirApcYNoPideFotos() throws Exception {
+    void laEntradaOfreceTodosLosClientesYArrancaEnApcSinPedirFotos() throws Exception {
         String pagina = mvc.perform(get("/documentos-corte/sms"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        assertTrue(pagina.matches("(?s).*<option value=\"APC\"(?![^>]*disabled)[^>]*selected[^>]*>A\\.P\\.C\\.</option>.*"),
+        assertTrue(pagina.matches("(?s).*<option value=\"APC\"[^>]*data-con-lector=\"true\"[^>]*selected[^>]*>"
+                + "A\\.P\\.C\\.</option>.*"), pagina);
+        assertTrue(pagina.matches("(?s).*<option value=\"AMI\"[^>]*data-con-lector=\"false\"[^>]*>AMI</option>.*"),
                 pagina);
-        assertTrue(pagina.matches("(?s).*<option value=\"AMI\"[^>]*disabled[^>]*>AMI — en desarrollo</option>.*"),
-                pagina);
+        assertFalse(pagina.matches("(?s).*<option[^>]*disabled.*") || pagina.contains("en desarrollo"),
+                "ya no hay clientes apagados: los que no tienen lector van por la IA");
         assertTrue(pagina.contains("id=\"temporada\" name=\"temporada\""));
         assertTrue(pagina.contains("id=\"excel\" name=\"excel\""));
         assertFalse(pagina.contains("data-campo-fotos") || pagina.contains("Word"), "nada del Word de fotos");
@@ -152,11 +181,110 @@ class CorteSmsControllerTest {
         }
     }
 
+    // --- Clientes sin lector propio: lectura con IA (simulada) y revisión ---
+
+    private static LecturaSmsIa.Linea leida(int fila, String referencia, String codigo, String color,
+                                            Integer muestras) {
+        return new LecturaSmsIa.Linea("SMS", fila, referencia, "", "BOLSO PRUEBA", codigo, color, "ALPACA",
+                "NEGRO", "STILLA", "999", List.of(new LecturaSmsIa.Combinacion("NOBILE", "ORO")), muestras, "");
+    }
+
+    private void simularLectura(Boolean esDelCliente, LecturaSmsIa.Linea... lineas) {
+        when(lectorIa.leer(any(), any(), eq("AMI"), any())).thenReturn(new LecturaSmsIa("SANDRO", esDelCliente,
+                "logo SANDRO en la cabecera", true, "", List.of(lineas), List.of("hoja SMS, fila 9: dudosa")));
+    }
+
     @Test
-    void unClienteSinLectorNoPasa() throws Exception {
-        mvc.perform(generar("AMI", "SS27", real()))
-                .andExpect(redirectedUrl("/documentos-corte/sms"))
-                .andExpect(flash().attribute("error", containsString("todavía están en desarrollo")));
+    void unClienteSinLectorSeLeeConIaYVaALaRevisionConLaAlertaDeOtroCliente() throws Exception {
+        simularLectura(false, leida(2, "ULL9S01.AL9S01", "9S1", "NOIR", 2), leida(3, "ULL9S01.AL9S01", "9S2",
+                "ROUGE", null));
+
+        mvc.perform(generar("AMI", "SS27", real())).andExpect(redirectedUrl("/documentos-corte/sms/revision"));
+
+        String pagina = mvc.perform(get("/documentos-corte/sms/revision").session(sesion))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertTrue(pagina.contains("Este documento parece de SANDRO, no de AMI: logo SANDRO en la cabecera"), pagina);
+        assertTrue(pagina.contains("value=\"ULL9S01.AL9S01\"") && pagina.contains("hoja SMS, fila 9: dudosa"));
+        assertTrue(casilla(pagina, 0).contains("checked"), "con muestras: " + casilla(pagina, 0));
+        assertFalse(casilla(pagina, 1).isEmpty() || casilla(pagina, 1).contains("checked"),
+                "sin muestras viene desmarcada: " + casilla(pagina, 1));
+    }
+
+    @Test
+    void unaFilaIncluidaSinMuestrasVuelveALaRevisionConSuError() throws Exception {
+        simularLectura(true, leida(2, "ULL9S01.AL9S01", "9S1", "NOIR", 2));
+        mvc.perform(generar("AMI", "SS27", real())).andExpect(redirectedUrl("/documentos-corte/sms/revision"));
+
+        mvc.perform(revisar(fila(0, "ULL9S01.AL9S01", "9S1", "NOIR", "")))
+                .andExpect(redirectedUrl("/documentos-corte/sms/revision"))
+                .andExpect(flash().attribute("errores", List.of("ULL9S01.AL9S01 (SMS, fila 2): faltan las muestras")));
+    }
+
+    @Test
+    void generarDesdeLaRevisionDescargaYEnsenaLoNuevoQueSePuedeEntrarEnElSistema() throws Exception {
+        simularLectura(true, leida(2, "ULL9S02.AL9S02", "9S3", "NOIR", 2));
+        mvc.perform(generar("AMI", "SS27", real())).andExpect(redirectedUrl("/documentos-corte/sms/revision"));
+
+        mvc.perform(revisar(fila(0, "ULL9S02.AL9S02", "9S3", "NOIR", "2"),
+                        fila(1, "ULL9S02.AL9S02", "9S4", "BLEU", "1 SMS")))
+                .andExpect(redirectedUrl("/documentos-corte/sms/resultados"));
+
+        String pagina = mvc.perform(get("/documentos-corte/sms/resultados").session(sesion))
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(pagina.contains("Nuevos en el sistema") && pagina.contains("ULL9S02")
+                && pagina.contains("AL9S02") && pagina.contains("9S4"), pagina);
+        byte[] excel = mvc.perform(get("/documentos-corte/sms/descargar").session(sesion))
+                .andReturn().getResponse().getContentAsByteArray();
+        try (Workbook libro = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            assertEquals(2, libro.getNumberOfSheets());
+            assertTrue(textos(libro.getSheetAt(1)).contains("AMI | Temporada SS27 | SMS"));
+        }
+
+        // Entrar el modelo sin nombre no deja; con nombre entra en Muestras con su piel y su forro.
+        mvc.perform(post("/documentos-corte/sms/novedades/m0").session(sesion).param("m0.nombre", " "))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje", containsString("falta el nombre")));
+        mvc.perform(post("/documentos-corte/sms/novedades/m0").session(sesion).param("m0.nombre", "BOLSO PRUEBA")
+                        .param("m0.a0.forro", "STILLA 999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.entrados[0]").value("m0"));
+        Modelo modelo = catalogo.modelo("AMI", "ULL9S02").orElseThrow();
+        assertEquals(Etapa.SMS, modelo.getEtapa());
+        assertEquals("BOLSO PRUEBA", modelo.getNombre());
+        assertEquals("STILLA 999", catalogo.articulo("AMI", "ULL9S02.AL9S02").orElseThrow().getForro());
+
+        // «Entrar todo» entra lo que queda: la piel y los colores.
+        mvc.perform(post("/documentos-corte/sms/novedades").session(sesion).param("p0.nombre", "alpaca"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendientes").value(0));
+        assertEquals("ALPACA", memoriaPieles.pielesDe("AMI").stream()
+                .filter(p -> p.getRefPiel().equals("AL9S02")).findFirst().orElseThrow().getNombre());
+        assertEquals("BLEU", tablaColores.buscar("AMI", "9S4").orElseThrow().getDescripcion());
+    }
+
+    /** La etiqueta <input> de la casilla de incluir de la fila i. */
+    private static String casilla(String pagina, int i) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(
+                "<input[^>]*name=\"filas\\[" + i + "]\\.incluir\"[^>]*>").matcher(pagina);
+        return m.find() ? m.group() : "";
+    }
+
+    private MockHttpServletRequestBuilder revisar(String[]... filas) {
+        MockHttpServletRequestBuilder peticion = post("/documentos-corte/sms/revision").session(sesion);
+        for (String[] campo : filas) {
+            for (int i = 0; i < campo.length; i += 2) {
+                peticion.param(campo[i], campo[i + 1]);
+            }
+        }
+        return peticion;
+    }
+
+    private static String[] fila(int i, String referencia, String codigo, String color, String muestras) {
+        String p = "filas[" + i + "].";
+        return new String[] {p + "incluir", "true", "_" + p + "incluir", "on", p + "hoja", "SMS",
+                p + "fila", String.valueOf(i + 2), p + "referencia", referencia, p + "codigoColor", codigo,
+                p + "descripcionColor", color, p + "muestras", muestras, p + "piel", "ALPACA",
+                p + "colorPiel", color, p + "forro", "STILLA"};
     }
 
     @Test

@@ -20,9 +20,11 @@ import com.puntotres.packinglist.service.catalogo.FotosCatalogo;
  * maquetación que las órdenes de corte de producción
  * ({@link OrdenCorteExcelBuilder}), en un solo Excel.
  *
- * De momento solo APC, y nada se guarda: ni la temporada, ni las pieles ni
- * los croquis entran al catálogo. Las SMS mezclan modelos que ya están en el
- * catálogo con modelos nuevos, y casi siempre colores nuevos.
+ * APC tiene lector propio ({@link ApcSmsExcel}, {@link #generar}); los demás
+ * clientes se leen con IA ({@link LectorSmsIa}) y se revisan en pantalla
+ * antes de llegar aquí ({@link #generarDesdeRevision}). Generar no guarda
+ * nada: lo nuevo entra en el catálogo solo desde la zona de novedades
+ * ({@link NovedadesSms}), con un botón.
  *
  * La imagen de cada ficha es el croquis de su fila; si no lleva, el de otra
  * fila del mismo modelo; y si ninguna lleva (la hoja HOMME no tiene columna
@@ -40,12 +42,17 @@ public class CorteSmsService {
     private final FotosCatalogo fotosCatalogo;
     private final OrdenCorteExcelBuilder ordenes = new OrdenCorteExcelBuilder();
 
-    /** El Excel generado, en memoria (una temporada de SMS son unas decenas de fichas). */
+    /**
+     * El Excel generado, en memoria (una temporada de SMS son unas decenas de
+     * fichas). {@code lineas}: las que han salido, de las que se sacan los
+     * modelos, pieles y colores nuevos.
+     */
     public record ResultadoSms(String nombreFichero, byte[] excel, int fichas, int muestras,
-                               List<String> avisos) {
+                               List<String> avisos, List<LineaSms> lineas) {
 
         public ResultadoSms {
             avisos = List.copyOf(avisos);
+            lineas = lineas == null ? List.of() : List.copyOf(lineas);
         }
     }
 
@@ -71,11 +78,54 @@ public class CorteSmsService {
         }
         ClienteCorte cliente = documentosCorte.clientePara(claveCliente).orElseThrow();
         ApcSmsExcel.Lectura lectura = ApcSmsExcel.leer(excel, cliente);
-        List<String> avisos = new ArrayList<>(lectura.avisos());
-        avisarRepetidas(lectura.lineas(), avisos);
+        return generar(claveCliente, nombreCliente, temporada, lectura.lineas(), lectura.avisos(), true);
+    }
+
+    /**
+     * Las hojas de un pedido de SMS leído con IA ({@link LectorSmsIa}) y
+     * revisado en pantalla: solo las líneas incluidas. El modelo de cada una
+     * sale de su referencia con la regla del cliente (un genérico no la parte:
+     * la referencia es el modelo). {@code imagenes}: hoja → fila → las
+     * imágenes de esa fila del excel ({@link ImagenesPorFila}); vacío en un PDF.
+     * Sin redondita de color: no hay elipse que leer.
+     *
+     * Lanza IllegalArgumentException si no queda ninguna línea que cortar.
+     */
+    public ResultadoSms generarDesdeRevision(String claveCliente, String nombreCliente, String temporada,
+                                             List<LineaSmsRevisada> revisadas,
+                                             Map<String, Map<Integer, List<Imagen>>> imagenes,
+                                             List<String> avisosDeLectura) throws IOException {
+        ClienteCorte reglas = documentosCorte.reglasDeProduccion(claveCliente);
+        List<LineaSms> lineas = new ArrayList<>();
+        for (LineaSmsRevisada revisada : revisadas) {
+            if (!revisada.incluir()) {
+                continue;
+            }
+            if (!revisada.errores().isEmpty()) {
+                throw new IllegalArgumentException(revisada.donde() + ": " + String.join(", ", revisada.errores()));
+            }
+            String modelo = reglas.partir(revisada.referencia()).modelo();
+            List<Imagen> croquis = revisada.fila() == null ? List.of()
+                    : imagenes.getOrDefault(revisada.hoja(), Map.of()).getOrDefault(revisada.fila(), List.of());
+            lineas.add(new LineaSms(revisada.hoja(), revisada.fila() == null ? 0 : revisada.fila(),
+                    revisada.referencia(), modelo.isEmpty() ? revisada.referencia() : modelo,
+                    revisada.nombreModelo(), revisada.color(), "", revisada.pieles(), revisada.muestras(), croquis));
+        }
+        return generar(claveCliente, nombreCliente, temporada, lineas, avisosDeLectura, false);
+    }
+
+    /**
+     * Las fichas de unas líneas ya leídas. {@code colorDelBolsoEnLaPiel}: el
+     * camino de APC pone el color del bolso en la piel principal; en el de IA
+     * ya viene puesto de la revisión, donde se ha podido cambiar.
+     */
+    private ResultadoSms generar(String claveCliente, String nombreCliente, String temporada, List<LineaSms> leidas,
+                                 List<String> avisosDeLectura, boolean colorDelBolsoEnLaPiel) throws IOException {
+        List<String> avisos = new ArrayList<>(avisosDeLectura);
+        avisarRepetidas(leidas, avisos);
 
         Map<String, List<Imagen>> croquisDelModelo = new HashMap<>();
-        for (LineaSms linea : lectura.lineas()) {
+        for (LineaSms linea : leidas) {
             if (!linea.croquis().isEmpty()) {
                 croquisDelModelo.putIfAbsent(linea.modelo(), linea.croquis());
             }
@@ -85,7 +135,7 @@ public class CorteSmsService {
         String rotuloTemporada = temporada.trim() + " | SMS";
         List<OrdenCorte> fichas = new ArrayList<>();
         int muestras = 0;
-        for (LineaSms linea : lectura.lineas()) {
+        for (LineaSms linea : leidas) {
             List<Imagen> imagenes = linea.croquis();
             if (imagenes.isEmpty()) {
                 imagenes = croquisDelModelo.getOrDefault(linea.modelo(), List.of());
@@ -95,13 +145,15 @@ public class CorteSmsService {
                         modelo -> fotoDelCatalogo(claveCliente, modelo));
             }
             fichas.add(new OrdenCorte(nombreCliente, rotuloTemporada, linea.referencia(), linea.modelo(),
-                    linea.nombreModelo(), linea.color().nombre(), linea.muestras(), conColorDelBolso(linea),
+                    linea.nombreModelo(), linea.color().nombre(), linea.muestras(),
+                    colorDelBolsoEnLaPiel ? conColorDelBolso(linea) : linea.pieles(),
                     imagenes, false, linea.colorMuestra()));
             muestras += linea.muestras();
         }
         if (fichas.isEmpty()) {
-            throw new IllegalArgumentException("ninguna fila tiene muestras que cortar en «"
-                    + ApcSmsExcel.TITULO_MUESTRAS + "»");
+            throw new IllegalArgumentException(colorDelBolsoEnLaPiel
+                    ? "ninguna fila tiene muestras que cortar en «" + ApcSmsExcel.TITULO_MUESTRAS + "»"
+                    : "no hay ninguna línea incluida que cortar");
         }
         long sinImagen = fichas.stream().filter(ficha -> ficha.fotos().isEmpty()).count();
         if (sinImagen > 0) {
@@ -110,7 +162,7 @@ public class CorteSmsService {
         }
         // Con la clave y no con el nombre: "APC FALL 27 - Hojas de Corte.xlsx", no "A.P.C. FALL 27 …".
         String nombre = sanear(claveCliente + " " + temporada.trim() + " - Hojas de Corte.xlsx");
-        return new ResultadoSms(nombre, ordenes.generar(fichas), fichas.size(), muestras, avisos);
+        return new ResultadoSms(nombre, ordenes.generar(fichas), fichas.size(), muestras, avisos, leidas);
     }
 
     /**

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Hoja de corte')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte · Hoja de corte')}"></header>
+<main class="hp">
+    <div class="alerta error" th:if="${error}" th:text="${error}"></div>
+
+    <div class="hp-intro">
+        <p class="ayuda">
+            La orden de corte de un modelo: una ficha por color, con la cantidad, la piel, el forro y las
+            combinaciones. Elige el artículo para rellenarla con lo que sabe el catálogo, o empieza desde cero si
+            el modelo aún no está en el sistema. Cada hoja queda guardada.
+            <span th:if="${importada}">Abierta desde una hoja guardada.</span>
+        </p>
+        <a class="boton secundario" th:href="@{/documentos-corte/hoja/antiguas}">Hojas guardadas</a>
+    </div>
+
+    <form id="formHojaCorte" class="hp-formulario" th:action="@{/documentos-corte/hoja/generar}" method="post"
+          enctype="multipart/form-data" th:object="${formulario}">
+
+        <!-- De dónde sale el modelo: cliente, temporada guardada y artículo, como en
+             la Hoja de Producción. Elegir el artículo rellena la cabecera y la línea
+             de su color; nada se guarda en el catálogo. -->
+        <div class="tarjeta hp-origen">
+            <div class="hp-o-cliente">
+                <label for="cliente">Cliente</label>
+                <select id="cliente" th:field="*{cliente}" required>
+                    <option value="">-- elige --</option>
+                    <option th:each="c : ${clientes}" th:value="${c.key}" th:text="${c.value}"></option>
+                </select>
+            </div>
+            <div class="hp-o-temporada campo-sugerido">
+                <label for="temporada" class="etiqueta-con-accion">
+                    <span>Temporada</span>
+                    <a class="lapiz" th:href="@{/temporadas}" target="_blank" rel="noopener"
+                       title="Añadir, editar o borrar temporadas guardadas (se abre en otra pestaña)"
+                       aria-label="Editar las temporadas guardadas">&#9998;</a>
+                </label>
+                <input type="text" th:field="*{temporada}" maxlength="60" placeholder="SS27">
+                <select id="temporadaGuardada" class="hp-sugerencia" aria-label="Elegir una temporada guardada del cliente">
+                    <option value="">todo el catálogo del cliente</option>
+                </select>
+            </div>
+            <div class="hp-o-articulo">
+                <label for="articulo">Artículo</label>
+                <select id="articulo" class="hp-articulo-select" disabled>
+                    <option value="">Elige el cliente para ver sus artículos</option>
+                </select>
+                <p class="ayuda">
+                    Rellena la cabecera y la línea de su color.
+                    <button type="button" class="enlace" id="todosLosColores" hidden>Añadir todos los colores de
+                        esta referencia</button>
+                    · <button type="button" class="enlace" id="desdeCero">Empezar desde cero</button>
+                </p>
+            </div>
+        </div>
+
+        <div class="tarjeta hp-cabecera">
+            <div class="hp-foto" id="panelFoto">
+                <img id="foto" alt="Foto del modelo" hidden>
+                <div class="hp-foto-vacia" id="fotoVacia">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                         stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="5" width="18" height="14" rx="2"/>
+                        <circle cx="9" cy="10" r="1.8"/>
+                        <path d="m21 16-5-5-8 8"/>
+                    </svg>
+                    <span id="fotoVaciaTexto">Elige el artículo para ver su foto, o sube una.</span>
+                    <button type="button" class="mini" id="subirFoto">Subir una foto</button>
+                </div>
+                <div class="hp-foto-acciones">
+                    <button type="button" class="enlace" id="cambiarFoto" hidden>Usar otra foto</button>
+                    <button type="button" class="enlace" id="quitarFotoSubida" hidden>Quitar la foto subida</button>
+                </div>
+                <input type="file" id="fotoSubida" name="fotoSubida" accept="image/*,.heic,.heif" hidden>
+                <input type="hidden" th:field="*{fotoId}">
+                <input type="hidden" th:field="*{fotoHojaId}">
+                <input type="hidden" th:field="*{codigoModelo}">
+            </div>
+
+            <div class="hp-datos">
+                <div class="hp-d-modelo">
+                    <label for="modelo">Modelo</label>
+                    <input type="text" th:field="*{modelo}" maxlength="80" class="hp-modelo" placeholder="ULL027">
+                </div>
+                <div class="hp-d-modelo">
+                    <label for="referencia">Referencia</label>
+                    <input type="text" th:field="*{referencia}" maxlength="80" placeholder="ULL027.AL0103">
+                </div>
+                <div class="hp-d-modelo">
+                    <label for="nombreBolso">Nombre del bolso</label>
+                    <input type="text" th:field="*{nombreBolso}" maxlength="200" placeholder="LE NEIGE">
+                </div>
+            </div>
+        </div>
+
+        <div class="tabla-desplazable tarjeta">
+            <table class="tabla-pieles tabla-revision-sms tabla-hoja-corte">
+                <thead>
+                <tr>
+                    <th>Código color</th>
+                    <th>Color</th>
+                    <th>Cantidad</th>
+                    <th>Piel</th>
+                    <th>Color piel</th>
+                    <th>Forro</th>
+                    <th>Color forro</th>
+                    <th>Combinaciones</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="lineas">
+                <tr th:each="l, e : *{lineas}" class="linea-corte">
+                    <td class="c-color-piel"><input type="text" data-campo="codigoColor" th:field="*{lineas[__${e.index}__].codigoColor}"></td>
+                    <td><input type="text" data-campo="descripcionColor" th:field="*{lineas[__${e.index}__].descripcionColor}"></td>
+                    <td><input type="text" inputmode="numeric" class="c-muestras" data-campo="cantidad" th:field="*{lineas[__${e.index}__].cantidad}"></td>
+                    <td><input type="text" data-campo="piel" th:field="*{lineas[__${e.index}__].piel}"></td>
+                    <td class="c-color-piel"><input type="text" data-campo="colorPiel" th:field="*{lineas[__${e.index}__].colorPiel}"></td>
+                    <td><input type="text" data-campo="forro" th:field="*{lineas[__${e.index}__].forro}"></td>
+                    <td class="c-color-piel"><input type="text" data-campo="colorForro" th:field="*{lineas[__${e.index}__].colorForro}"></td>
+                    <td>
+                        <details class="combinaciones-sms" th:open="${l.combinacionesConNombre > 0}">
+                            <summary th:text="${l.combinacionesConNombre == 0} ? '+ combinaciones'
+                                     : |${l.combinacionesConNombre} combinación(es)|"></summary>
+                            <div class="combinacion-sms" th:each="c, ec : ${l.combinaciones}">
+                                <input type="text" placeholder="Piel" th:attr="data-campo=|comb${ec.index}|"
+                                       th:field="*{lineas[__${e.index}__].combinaciones[__${ec.index}__].nombre}">
+                                <input type="text" placeholder="Color" th:attr="data-campo=|colorComb${ec.index}|"
+                                       th:field="*{lineas[__${e.index}__].combinaciones[__${ec.index}__].color}">
+                            </div>
+                        </details>
+                    </td>
+                    <td><button type="button" class="contorno quitar-linea" title="Quitar el color">✕</button></td>
+                </tr>
+                </tbody>
+            </table>
+            <button type="button" class="hp-anadir" id="anadirLinea">+ Añadir color</button>
+        </div>
+
+        <div class="hp-pie">
+            <button type="submit" id="botonGenerar">Generar hoja de corte</button>
+            <a class="boton neutro" th:href="@{/documentos-corte}">← Volver</a>
+            <div id="resultadoGenerar" role="status"></div>
+        </div>
+    </form>
+
+    <template id="plantillaLinea">
+        <tr class="linea-corte">
+            <td class="c-color-piel"><input type="text" data-campo="codigoColor" name="lineas[__i__].codigoColor"></td>
+            <td><input type="text" data-campo="descripcionColor" name="lineas[__i__].descripcionColor"></td>
+            <td><input type="text" inputmode="numeric" class="c-muestras" data-campo="cantidad" name="lineas[__i__].cantidad"></td>
+            <td><input type="text" data-campo="piel" name="lineas[__i__].piel"></td>
+            <td class="c-color-piel"><input type="text" data-campo="colorPiel" name="lineas[__i__].colorPiel"></td>
+            <td><input type="text" data-campo="forro" name="lineas[__i__].forro"></td>
+            <td class="c-color-piel"><input type="text" data-campo="colorForro" name="lineas[__i__].colorForro"></td>
+            <td>
+                <details class="combinaciones-sms">
+                    <summary>+ combinaciones</summary>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" data-campo="comb0" name="lineas[__i__].combinaciones[0].nombre"><input type="text" placeholder="Color" data-campo="colorComb0" name="lineas[__i__].combinaciones[0].color"></div>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" data-campo="comb1" name="lineas[__i__].combinaciones[1].nombre"><input type="text" placeholder="Color" data-campo="colorComb1" name="lineas[__i__].combinaciones[1].color"></div>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" data-campo="comb2" name="lineas[__i__].combinaciones[2].nombre"><input type="text" placeholder="Color" data-campo="colorComb2" name="lineas[__i__].combinaciones[2].color"></div>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" data-campo="comb3" name="lineas[__i__].combinaciones[3].nombre"><input type="text" placeholder="Color" data-campo="colorComb3" name="lineas[__i__].combinaciones[3].color"></div>
+                </details>
+            </td>
+            <td><button type="button" class="contorno quitar-linea" title="Quitar el color">✕</button></td>
+        </tr>
+    </template>
+</main>
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    window.HC = {
+        temporadas: /*[[${temporadasJs}]]*/ {},
+        urlCatalogo: /*[[@{/documentos-corte/hoja/catalogo}]]*/ '/documentos-corte/hoja/catalogo',
+        urlFotoCatalogo: /*[[@{/catalogo/foto/}]]*/ '/catalogo/foto/',
+        urlFotoHoja: /*[[@{/documentos-corte/hoja/antiguas/}]]*/ '/documentos-corte/hoja/antiguas/'
+    };
+    /*]]>*/
+</script>
+<script th:src="@{/hoja-corte.js}"></script>
+</body>
+</html>

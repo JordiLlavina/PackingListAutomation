@@ -89,6 +89,51 @@ public final class CatalogoPedido {
      * deja leer sí avisa: eso es una sorpresa.
      */
     public static Catalogo para(TipoPlantilla plantilla, byte[] excelPedido) {
+        return para(plantilla, excelPedido, Map.of());
+    }
+
+    /**
+     * El catálogo con la TABLA DE COLORES del cliente delante (código =
+     * nombre, de la pantalla Colores y Pieles). Solo la usa APC: su pedido
+     * dice los colores por código ("GAU") y la hoja manuscrita por nombre
+     * ("camel"), y sin la tabla el modelo no tiene con qué relacionarlos, así
+     * que el color llegaba al packing tal como se había leído. La tabla viaja
+     * aunque no haya excel de pedido: no depende de él.
+     */
+    public static Catalogo para(TipoPlantilla plantilla, byte[] excelPedido,
+                                Map<String, String> coloresCliente) {
+        Catalogo catalogo = soloPedido(plantilla, excelPedido);
+        String tabla = plantilla == TipoPlantilla.APC ? tablaDeColores(coloresCliente) : "";
+        return tabla.isEmpty() ? catalogo
+                : new Catalogo(tabla + (catalogo.estaVacio() ? "" : "\n" + catalogo.texto()),
+                        catalogo.avisos());
+    }
+
+    /** "LZZ = NOIR", una línea por color, o vacío si la tabla no tiene ninguno. */
+    static String tablaDeColores(Map<String, String> coloresCliente) {
+        if (coloresCliente == null || coloresCliente.isEmpty()) {
+            return "";
+        }
+        StringBuilder texto = new StringBuilder("""
+                ## Tabla de colores del cliente
+
+                Los colores del cliente, código = nombre. Es la tabla con la que se
+                escribe en "color" el CÓDIGO del color que apunta la hoja (ver el bloque
+                del cliente).
+
+                """);
+        coloresCliente.forEach((codigo, nombre) -> {
+            if (codigo != null && !codigo.isBlank()) {
+                texto.append(codigo.trim().toUpperCase(java.util.Locale.ROOT)).append(" = ")
+                        .append(nombre == null || nombre.isBlank() ? "(sin nombre en la tabla)"
+                                : nombre.trim().toUpperCase(java.util.Locale.ROOT))
+                        .append('\n');
+            }
+        });
+        return texto.toString();
+    }
+
+    private static Catalogo soloPedido(TipoPlantilla plantilla, byte[] excelPedido) {
         if (plantilla == null || excelPedido == null || excelPedido.length == 0) {
             return Catalogo.vacio();
         }

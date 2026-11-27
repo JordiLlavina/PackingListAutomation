@@ -42,8 +42,205 @@
 
     <div class="salidas-pantalla">
         <a class="boton neutro" th:href="@{/menu}">Volver al menú</a>
-        <a class="boton neutro" th:href="@{/documentos-corte/sms}">Otro excel de SMS</a>
+        <a class="boton neutro" th:if="${vieneDeRevision}" th:href="@{/documentos-corte/sms/revision}">← Volver a
+            la revisión</a>
+        <a class="boton neutro" th:href="@{/documentos-corte/sms}">Otro pedido de SMS</a>
     </div>
+
+    <!-- Lo que el pedido trae y el sistema no tiene, editable, con su botón
+         (petición del usuario). Nada entra sin pulsar; lo que ya está en el
+         catálogo no se pisa. -->
+    <section class="tarjeta novedades-sms" id="novedades" th:if="${novedades != null and !novedades.vacia()}">
+        <h3 class="titulo-seccion">Nuevos en el sistema</h3>
+        <p class="ayuda">
+            Modelos, pieles y colores de este pedido que el sistema todavía no tiene. Corrige lo que haga falta y
+            entra cada uno con su botón, o todos a la vez. Lo que ya está en el catálogo no se toca.
+        </p>
+        <div class="alerta" id="mensajeNovedades" hidden></div>
+        <p>
+            <button type="button" id="entrarTodo">Entrar todo en el Sistema</button>
+            <span class="ayuda" id="pendientesNovedades"
+                  th:text="|${novedades.pendientes()} pendiente(s)|"></span>
+        </p>
+
+        <th:block th:if="${!#lists.isEmpty(novedades.modelos)}">
+            <h4>Modelos</h4>
+            <table class="tabla-novedades">
+                <thead>
+                <tr>
+                    <th>Modelo</th>
+                    <th>Nombre del bolso</th>
+                    <th>Tipo</th>
+                    <th>Referencias (forro y combinaciones)</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="m : ${novedades.modelos}" th:attr="data-novedad=${m.id}"
+                    th:classappend="${m.entrado} ? 'entrado'">
+                    <td class="c-modelo">
+                        <strong th:text="${m.codigo}"></strong>
+                        <div class="ayuda" th:text="${m.existe} ? 'ya existe: piel nueva' : 'modelo nuevo · Muestras'"></div>
+                    </td>
+                    <td>
+                        <input type="text" th:name="|${m.id}.nombre|" th:value="${m.nombre}"
+                               th:readonly="${m.existe}" th:attr="data-obligatorio=${!m.existe}"
+                               placeholder="Obligatorio">
+                    </td>
+                    <td>
+                        <select th:name="|${m.id}.tipo|" th:disabled="${m.existe}">
+                            <option value="BOLSO" th:selected="${m.tipo.name() == 'BOLSO'}">Bolso</option>
+                            <option value="CINTURON" th:selected="${m.tipo.name() == 'CINTURON'}">Cinturón</option>
+                        </select>
+                    </td>
+                    <td>
+                        <div class="articulo-novedad" th:each="a, ea : ${m.articulos}">
+                            <span class="referencia-novedad" th:text="${a.referencia}"></span>
+                            <input type="text" placeholder="Forro" th:name="|${m.id}.a${ea.index}.forro|"
+                                   th:value="${a.forro}">
+                            <input type="text" placeholder="Combinación" th:each="c, ec : ${a.combinaciones}"
+                                   th:name="|${m.id}.a${ea.index}.c${ec.index}|" th:value="${c}">
+                        </div>
+                    </td>
+                    <td class="c-entrar">
+                        <button type="button" class="entrar-novedad" th:unless="${m.entrado}">Entrar en el Sistema</button>
+                        <span class="en-sistema" th:hidden="${!m.entrado}">✓ en el sistema</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(novedades.pieles)}">
+            <h4>Pieles</h4>
+            <table class="tabla-novedades">
+                <thead><tr><th>Ref. de piel</th><th>Nombre</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="p : ${novedades.pieles}" th:attr="data-novedad=${p.id}"
+                    th:classappend="${p.entrado} ? 'entrado'">
+                    <td class="c-modelo" th:text="${p.refPiel}"></td>
+                    <td><input type="text" th:name="|${p.id}.nombre|" th:value="${p.nombre}"></td>
+                    <td class="c-entrar">
+                        <button type="button" class="entrar-novedad" th:unless="${p.entrado}">Entrar en el Sistema</button>
+                        <span class="en-sistema" th:hidden="${!p.entrado}">✓ en el sistema</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </th:block>
+
+        <th:block th:if="${!#lists.isEmpty(novedades.colores)}">
+            <h4>Colores</h4>
+            <table class="tabla-novedades">
+                <thead><tr><th>Código</th><th>Descripción</th><th></th></tr></thead>
+                <tbody>
+                <tr th:each="c : ${novedades.colores}" th:attr="data-novedad=${c.id}"
+                    th:classappend="${c.entrado} ? 'entrado'">
+                    <td class="c-modelo" th:text="${c.codigo}"></td>
+                    <td><input type="text" th:name="|${c.id}.descripcion|" th:value="${c.descripcion}"></td>
+                    <td class="c-entrar">
+                        <button type="button" class="entrar-novedad" th:unless="${c.entrado}">Entrar en el Sistema</button>
+                        <span class="en-sistema" th:hidden="${!c.entrado}">✓ en el sistema</span>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </th:block>
+    </section>
 </main>
+<script th:inline="javascript">
+    (function () {
+        const seccion = document.getElementById('novedades');
+        if (!seccion) {
+            return;
+        }
+        const base = /*[[@{/documentos-corte/sms/novedades}]]*/ '/documentos-corte/sms/novedades';
+        const mensaje = document.getElementById('mensajeNovedades');
+
+        function decir(texto, error) {
+            mensaje.textContent = texto;
+            mensaje.className = 'alerta ' + (error ? 'error' : 'ok');
+            mensaje.hidden = false;
+        }
+
+        function campos(filas) {
+            const cuerpo = new URLSearchParams();
+            filas.forEach(function (fila) {
+                fila.querySelectorAll('input[name], select[name]').forEach(function (campo) {
+                    if (!campo.disabled) {
+                        cuerpo.append(campo.name, campo.value);
+                    }
+                });
+            });
+            return cuerpo;
+        }
+
+        function marcar(ids, pendientes) {
+            ids.forEach(function (id) {
+                const fila = seccion.querySelector('[data-novedad="' + id + '"]');
+                if (!fila) {
+                    return;
+                }
+                fila.classList.add('entrado');
+                fila.querySelectorAll('input, select').forEach(function (campo) { campo.disabled = true; });
+                const boton = fila.querySelector('.entrar-novedad');
+                if (boton) {
+                    boton.remove();
+                }
+                fila.querySelector('.en-sistema').hidden = false;
+            });
+            document.getElementById('pendientesNovedades').textContent = pendientes + ' pendiente(s)';
+            if (pendientes === 0) {
+                document.getElementById('entrarTodo').disabled = true;
+            }
+        }
+
+        function enviar(url, cuerpo, boton) {
+            boton.disabled = true;
+            return fetch(url, {method: 'POST', body: cuerpo}).then(function (respuesta) {
+                return respuesta.json().then(function (json) {
+                    if (!respuesta.ok) {
+                        throw new Error(json.mensaje || 'No se ha podido entrar en el sistema');
+                    }
+                    return json;
+                });
+            }).then(function (json) {
+                marcar(json.entrados, json.pendientes);
+                decir(json.entrados.length === 1 ? 'Entrado en el sistema.'
+                    : json.entrados.length + ' elementos entrados en el sistema.', false);
+            }).catch(function (error) {
+                boton.disabled = false;
+                decir(error.message, true);
+            });
+        }
+
+        seccion.addEventListener('click', function (evento) {
+            const boton = evento.target.closest('.entrar-novedad');
+            if (!boton) {
+                return;
+            }
+            const fila = boton.closest('[data-novedad]');
+            const obligatorio = fila.querySelector('[data-obligatorio="true"]');
+            if (obligatorio && !obligatorio.value.trim()) {
+                obligatorio.focus();
+                decir('Escribe el nombre del modelo: es obligatorio para darlo de alta.', true);
+                return;
+            }
+            enviar(base + '/' + encodeURIComponent(fila.dataset.novedad), campos([fila]), boton);
+        });
+
+        document.getElementById('entrarTodo').addEventListener('click', function () {
+            const pendientes = Array.from(seccion.querySelectorAll('[data-novedad]:not(.entrado)'));
+            const sinNombre = pendientes.map(function (fila) { return fila.querySelector('[data-obligatorio="true"]'); })
+                .filter(function (campo) { return campo && !campo.value.trim(); });
+            if (sinNombre.length) {
+                sinNombre[0].focus();
+                decir('Falta el nombre de ' + sinNombre.length + ' modelo(s): no ha entrado nada.', true);
+                return;
+            }
+            enviar(base, campos(pendientes), this);
+        });
+    })();
+</script>
 </body>
 </html>

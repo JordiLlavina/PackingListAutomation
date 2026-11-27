@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Revisar el pedido de SMS')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte · SMS')}"></header>
+<main>
+    <ul class="ficha-envio">
+        <li><span class="rotulo">Cliente</span> <strong th:text="${cliente}"></strong></li>
+        <li><span class="rotulo">Temporada</span> <strong th:text="${temporada}"></strong></li>
+        <li><span class="rotulo">Documento</span> <strong th:text="${nombreFichero}"></strong></li>
+    </ul>
+
+    <!-- A la vista y no en los avisos plegables: un documento de otro cliente
+         acaba en la mesa del cortador. Avisa, no bloquea. -->
+    <div class="alerta error alerta-documento" th:each="alerta : ${alertas}" th:text="${alerta}"></div>
+
+    <div class="alerta error" th:each="error : ${errores}" th:text="${error}"></div>
+
+    <details class="avisos-plegables" th:if="${!#lists.isEmpty(avisos)}">
+        <summary th:text="|${#lists.size(avisos)} aviso(s) de la lectura|"></summary>
+        <div class="alerta" th:each="aviso : ${avisos}" th:text="${aviso}"></div>
+    </details>
+
+    <p class="ayuda">
+        Esto es lo que la IA ha leído del pedido. Corrige lo que haga falta: solo salen las líneas marcadas.
+        Las que no tenían muestras claras vienen desmarcadas.
+    </p>
+
+    <form id="formRevisionSms" th:action="@{/documentos-corte/sms/revision}" method="post"
+          th:object="${formulario}">
+        <div class="tabla-desplazable">
+            <table class="tabla-pieles tabla-revision-sms">
+                <thead>
+                <tr>
+                    <th class="c-incluir">Incluir</th>
+                    <th>Dónde</th>
+                    <th>Referencia</th>
+                    <th>Nombre del bolso</th>
+                    <th>Código color</th>
+                    <th>Color</th>
+                    <th>Muestras</th>
+                    <th>Piel</th>
+                    <th>Color piel</th>
+                    <th>Forro</th>
+                    <th>Color forro</th>
+                    <th>Combinaciones</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody id="filasSms">
+                <tr th:each="fila, estado : *{filas}" class="fila-sms">
+                    <td class="c-incluir">
+                        <input type="checkbox" th:field="*{filas[__${estado.index}__].incluir}" value="true">
+                    </td>
+                    <td class="c-donde">
+                        <span th:text="${fila.fila != null} ? |${fila.hoja}, fila ${fila.fila}| : ${fila.hoja}"></span>
+                        <span class="sin-fotos" th:if="${fila.fila != null and conImagen.contains(fila.hoja + '#' + fila.fila)}"
+                              title="La fila lleva imagen: sale en la hoja de corte">· croquis</span>
+                        <input type="hidden" th:field="*{filas[__${estado.index}__].hoja}">
+                        <input type="hidden" th:field="*{filas[__${estado.index}__].fila}">
+                    </td>
+                    <td><input type="text" th:field="*{filas[__${estado.index}__].referencia}"></td>
+                    <td><input type="text" th:field="*{filas[__${estado.index}__].nombreModelo}"></td>
+                    <td class="c-color-piel"><input type="text" th:field="*{filas[__${estado.index}__].codigoColor}"></td>
+                    <td><input type="text" th:field="*{filas[__${estado.index}__].descripcionColor}"></td>
+                    <td><input type="text" inputmode="numeric" class="c-muestras"
+                               th:field="*{filas[__${estado.index}__].muestras}"></td>
+                    <td><input type="text" th:field="*{filas[__${estado.index}__].piel}"></td>
+                    <td class="c-color-piel"><input type="text" th:field="*{filas[__${estado.index}__].colorPiel}"></td>
+                    <td><input type="text" th:field="*{filas[__${estado.index}__].forro}"></td>
+                    <td class="c-color-piel"><input type="text" th:field="*{filas[__${estado.index}__].colorForro}"></td>
+                    <td>
+                        <details class="combinaciones-sms">
+                            <summary th:text="${fila.combinacionesConNombre == 0} ? '+ combinaciones'
+                                     : |${fila.combinacionesConNombre} combinación(es)|"></summary>
+                            <div class="combinacion-sms" th:each="c, ec : ${fila.combinaciones}">
+                                <input type="text" placeholder="Piel"
+                                       th:field="*{filas[__${estado.index}__].combinaciones[__${ec.index}__].nombre}">
+                                <input type="text" placeholder="Color"
+                                       th:field="*{filas[__${estado.index}__].combinaciones[__${ec.index}__].color}">
+                            </div>
+                        </details>
+                    </td>
+                    <td><button type="button" class="contorno quitar-fila" title="Quitar la línea">✕</button></td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" class="secundario" id="anadirFila">+ Añadir línea</button>
+
+        <div class="salidas-pantalla">
+            <button type="submit">Generar hojas de corte</button>
+            <a class="boton neutro" th:href="@{/documentos-corte/sms}">← Otro pedido</a>
+        </div>
+    </form>
+
+    <!-- La línea en blanco de «Añadir línea»: el script cambia __i__ por su número. -->
+    <template id="plantillaFila">
+        <tr class="fila-sms">
+            <td class="c-incluir">
+                <input type="checkbox" name="filas[__i__].incluir" value="true" checked>
+                <input type="hidden" name="_filas[__i__].incluir" value="on">
+            </td>
+            <td class="c-donde">a mano
+                <input type="hidden" name="filas[__i__].hoja" value="a mano">
+                <input type="hidden" name="filas[__i__].fila" value="">
+            </td>
+            <td><input type="text" name="filas[__i__].referencia"></td>
+            <td><input type="text" name="filas[__i__].nombreModelo"></td>
+            <td class="c-color-piel"><input type="text" name="filas[__i__].codigoColor"></td>
+            <td><input type="text" name="filas[__i__].descripcionColor"></td>
+            <td><input type="text" inputmode="numeric" class="c-muestras" name="filas[__i__].muestras"></td>
+            <td><input type="text" name="filas[__i__].piel"></td>
+            <td class="c-color-piel"><input type="text" name="filas[__i__].colorPiel"></td>
+            <td><input type="text" name="filas[__i__].forro"></td>
+            <td class="c-color-piel"><input type="text" name="filas[__i__].colorForro"></td>
+            <td>
+                <details class="combinaciones-sms">
+                    <summary>+ combinaciones</summary>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" name="filas[__i__].combinaciones[0].nombre"><input type="text" placeholder="Color" name="filas[__i__].combinaciones[0].color"></div>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" name="filas[__i__].combinaciones[1].nombre"><input type="text" placeholder="Color" name="filas[__i__].combinaciones[1].color"></div>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" name="filas[__i__].combinaciones[2].nombre"><input type="text" placeholder="Color" name="filas[__i__].combinaciones[2].color"></div>
+                    <div class="combinacion-sms"><input type="text" placeholder="Piel" name="filas[__i__].combinaciones[3].nombre"><input type="text" placeholder="Color" name="filas[__i__].combinaciones[3].color"></div>
+                </details>
+            </td>
+            <td><button type="button" class="contorno quitar-fila" title="Quitar la línea">✕</button></td>
+        </tr>
+    </template>
+</main>
+<script>
+    (function () {
+        const cuerpo = document.getElementById('filasSms');
+        document.getElementById('anadirFila').addEventListener('click', function () {
+            const html = document.getElementById('plantillaFila').innerHTML
+                .replaceAll('__i__', String(cuerpo.rows.length));
+            cuerpo.insertAdjacentHTML('beforeend', html);
+            cuerpo.rows[cuerpo.rows.length - 1].querySelector('input[type=text]').focus();
+        });
+        cuerpo.addEventListener('click', function (evento) {
+            const boton = evento.target.closest('.quitar-fila');
+            if (boton) {
+                boton.closest('tr').remove();
+            }
+        });
+        // Enter dentro de una casilla no genera: se genera con el botón.
+        cuerpo.addEventListener('keydown', function (evento) {
+            if (evento.key === 'Enter' && evento.target.tagName === 'INPUT') {
+                evento.preventDefault();
+            }
+        });
+        // Al enviar, las filas se numeran seguidas: quitar una deja un hueco.
+        document.getElementById('formRevisionSms').addEventListener('submit', function () {
+            Array.from(cuerpo.rows).forEach(function (fila, i) {
+                fila.querySelectorAll('[name]').forEach(function (campo) {
+                    campo.name = campo.name.replace(/^(_?filas)\[\d+]/, '$1[' + i + ']');
+                });
+            });
+        });
+    })();
+</script>
+</body>
+</html>

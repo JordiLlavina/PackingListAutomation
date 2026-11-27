@@ -14,21 +14,19 @@
             Hojas de corte de SMS
         </h3>
         <p class="ayuda">
-            Del excel de pedido de SMS sale una hoja de corte por referencia y color, con las muestras
-            de «Commande SMS», la piel y su color, el forro y el croquis de la fila. No se guarda nada:
-            la temporada solo da nombre al documento.
+            Del pedido de SMS sale una hoja de corte por referencia y color, con las muestras, la piel y su
+            color, el forro y el croquis de la fila. Generar no guarda nada: la temporada solo da nombre al
+            documento, y lo que sea nuevo se puede entrar en el sistema al final.
         </p>
 
-        <!-- Solo los clientes cuyo excel de SMS se sabe leer; los demás, apagados. -->
         <div class="fila-cliente">
             <div>
                 <label for="cliente">Cliente</label>
                 <select id="cliente" name="cliente" required>
                     <option th:each="entrada : ${clientes}"
                             th:value="${entrada.key}"
-                            th:text="${entrada.value.disponible} ? ${entrada.value.nombre}
-                                     : |${entrada.value.nombre} — en desarrollo|"
-                            th:disabled="${!entrada.value.disponible}"
+                            th:text="${entrada.value.nombre}"
+                            th:attr="data-con-lector=${entrada.value.conLector}"
                             th:selected="${entrada.key == clienteElegido}"></option>
                 </select>
             </div>
@@ -39,13 +37,49 @@
             </div>
         </div>
 
-        <label for="excel">Excel de pedido de SMS</label>
+        <!-- Lo que hará con el cliente elegido: lo cambia el script al elegir otro. -->
+        <p class="ayuda" id="caminoLector">Este cliente tiene lector propio: sube su excel de pedido de SMS y
+            se generan las hojas directamente.</p>
+        <p class="ayuda" id="caminoIa" hidden>Este cliente se lee con IA: sube su pedido de SMS (excel o PDF),
+            revisa lo que ha leído y genera. Tarda uno o dos minutos.</p>
+
+        <label for="excel" id="rotuloExcel">Excel de pedido de SMS</label>
         <input type="file" id="excel" name="excel" accept=".xlsx" required>
       </div>
 
-        <button type="submit">Generar hojas de corte</button>
+        <button type="submit" id="botonGenerar">Generar hojas de corte</button>
         <a class="boton secundario" th:href="@{/documentos-corte}">← Volver</a>
+        <p class="aviso-procesando" id="avisoProcesando" hidden>Leyendo el pedido con la IA… tarda uno o dos
+            minutos.</p>
     </form>
 </main>
+<script>
+    (function () {
+        const cliente = document.getElementById('cliente');
+        const excel = document.getElementById('excel');
+        function actualizar() {
+            const opcion = cliente.options[cliente.selectedIndex];
+            const conLector = opcion && opcion.dataset.conLector === 'true';
+            document.getElementById('caminoLector').hidden = !conLector;
+            document.getElementById('caminoIa').hidden = conLector;
+            document.getElementById('rotuloExcel').textContent = conLector
+                ? 'Excel de pedido de SMS' : 'Pedido de SMS (excel o PDF)';
+            excel.accept = conLector ? '.xlsx' : '.xlsx,.pdf';
+            document.getElementById('botonGenerar').textContent = conLector
+                ? 'Generar hojas de corte' : 'Leer con IA y revisar';
+            return conLector;
+        }
+        cliente.addEventListener('change', actualizar);
+        actualizar();
+        document.getElementById('formCorteSms').addEventListener('submit', function () {
+            const boton = document.getElementById('botonGenerar');
+            boton.disabled = true;
+            boton.textContent = 'Procesando...';
+            if (!actualizar()) {
+                document.getElementById('avisoProcesando').hidden = false;
+            }
+        });
+    })();
+</script>
 </body>
 </html>

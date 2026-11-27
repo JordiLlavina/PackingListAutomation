@@ -30,6 +30,7 @@ MODELOS_ADMIN_PASSWORD=prueba mvn spring-boot:run   # con la app de modelos: htt
 - `EscandallosFlujoRealTest` deja `target/Escandallos ICSUITE.xlsx` con los dos escandallos reales, para compararlo a mano con el ejemplo de `docs/Procesado Escandallos ICSUITE/`.
 - `OrdenCorteExcelBuilderTest` y `FotosCorteDocBuilderTest` dejan `target/Ordenes de corte ejemplo.xlsx` y `target/Fotos ejemplo.docx`, con imágenes de relleno, para revisar la maquetación de los documentos del corte en Excel y en Word.
 - `InfoEmbalajeDocBuilderTest` deja `target/Info embalaje ejemplo.docx` (el caso más cargado: 6 destinaciones, 10 líneas de reparto en la columna CAJAS —cuatro destinaciones en dos filas—, 4 de comentarios) para abrirlo en Word; exportado a mano con Word por COM queda al lado `target/Info embalaje ejemplo.pdf`, que es como se comprobó que cabe en un A4.
+- `HojaCorteServiceTest` deja `target/Hoja de corte ejemplo.xlsx` (dos colores, uno con forro y dos combinaciones) para revisar la Hoja de corte de un modelo.
 - `HojaProduccionExcelBuilderTest` deja `target/Hoja de produccion ejemplo.xlsx` (dos líneas, una con textos largos) para revisar en Excel la maquetación de la Hoja de Producción.
 
 ## Documentación que ya existe (y su estado)
@@ -137,7 +138,7 @@ El detalle de cada función vive en un fichero de `.claude/rules/` que **se carg
 | [extraccion-fotos.md](.claude/rules/extraccion-fotos.md) | Extracción del envío desde fotos y PDFs con Claude |
 | [etiquetas.md](.claude/rules/etiquetas.md) | Etiquetas de caja, de palet y de artículo (producción y SMS) |
 | [escandallos.md](.claude/rules/escandallos.md) | Procesado de escandallos ICSUITE |
-| [corte.md](.claude/rules/corte.md) | Documentos del Corte (producción) y hojas de corte de SMS |
+| [corte.md](.claude/rules/corte.md) | Documentos del Corte (producción), hojas de corte de SMS (lector de APC o IA, y «Nuevos en el sistema») y Hoja de corte de un modelo |
 | [embalaje.md](.claude/rules/embalaje.md) | Etiqueta Info de Embalaje para Taller |
 | [taller.md](.claude/rules/taller.md) | Entrada por packing list de taller y conversión de su excel con IA |
 | [catalogo.md](.claude/rules/catalogo.md) | Catálogo de modelos, temporadas guardadas y Colores y Pieles de Cliente |

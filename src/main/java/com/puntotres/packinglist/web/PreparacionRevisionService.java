@@ -1,8 +1,10 @@
 package com.puntotres.packinglist.web;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 import org.springframework.stereotype.Service;
 
@@ -12,6 +14,8 @@ import com.puntotres.packinglist.model.CajaData;
 import com.puntotres.packinglist.model.DatosEnvio;
 import com.puntotres.packinglist.model.EnvioInput;
 import com.puntotres.packinglist.persistence.MemoriaReferencias;
+import com.puntotres.packinglist.persistence.TablaColores;
+import com.puntotres.packinglist.service.ColoresApc;
 import com.puntotres.packinglist.service.EnvioImportService;
 import com.puntotres.packinglist.service.EnvioImportado;
 import com.puntotres.packinglist.service.PaletAssignmentService;
@@ -49,13 +53,16 @@ public class PreparacionRevisionService {
     private final PaletAssignmentService asignadorPalets;
     private final WeightInferenceService inferidorPesos;
     private final MemoriaReferencias memoria;
+    private final TablaColores tablaColores;
 
     public PreparacionRevisionService(EnvioImportService importador,
                                       ResolutorDestinosPadre resolutorDestinos,
                                       PedidoCompletionService completadorPedidos,
                                       PaletAssignmentService asignadorPalets,
                                       WeightInferenceService inferidorPesos,
-                                      MemoriaReferencias memoria) {
+                                      MemoriaReferencias memoria,
+                                      TablaColores tablaColores) {
+        this.tablaColores = tablaColores;
         this.importador = importador;
         this.resolutorDestinos = resolutorDestinos;
         this.completadorPedidos = completadorPedidos;
@@ -109,6 +116,11 @@ public class PreparacionRevisionService {
         if (cliente.getPlantilla() == TipoPlantilla.APC) {
             importado.getAvisos().addAll(
                     completadorPedidos.completar(importado.getDestinos(), excelPedido).getAvisos());
+            // Y el color, como lo escribe el cliente: código-nombre, con la
+            // tabla de Colores y Pieles. Detrás de completar, que es quien
+            // deja el pedido entero con el que se comprueba el color.
+            importado.getAvisos().addAll(normalizarColoresApc(
+                    importado.getDestinos(), cabecera.getClaveCliente(), excelPedido));
         }
 
         for (EnvioImportado.DestinoImportado destino : importado.getDestinos()) {
@@ -118,6 +130,23 @@ public class PreparacionRevisionService {
             envioEnCurso.getCajasSinPalet().addAll(asignacion.getCajasSinPalet());
         }
         reinferir(envioEnCurso);
+    }
+
+    /**
+     * Deja los colores de un envío de APC en la forma del cliente
+     * ("LZZ-NOIR") con la tabla de colores de ese cliente
+     * ({@link ColoresApc}). Corre al importar, venga el envío de donde venga,
+     * y otra vez al generar, por los colores tecleados en la revisión: es
+     * idempotente.
+     */
+    public List<String> normalizarColoresApc(List<EnvioImportado.DestinoImportado> destinos,
+                                             String claveCliente, byte[] excelPedido) {
+        Map<String, String> colores = new LinkedHashMap<>();
+        if (claveCliente != null && !claveCliente.isBlank()) {
+            tablaColores.de(claveCliente)
+                    .forEach(color -> colores.put(color.getCodigo(), color.getDescripcion()));
+        }
+        return ColoresApc.normalizar(destinos, colores, excelPedido);
     }
 
     /**

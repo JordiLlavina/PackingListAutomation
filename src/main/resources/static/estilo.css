@@ -2551,3 +2551,25 @@ button.contorno {
     background: transparent;
     color: var(--acento);
 }
+
+/* --- Corte de SMS leído con IA: revisión y novedades --- */
+.alerta-documento { font-weight: 600; font-size: 1.05rem; }
+.tabla-revision-sms td input[type="text"] { min-width: 7rem; }
+.tabla-revision-sms td input.c-muestras { min-width: 4rem; width: 4rem; }
+.tabla-revision-sms td.c-donde { white-space: nowrap; color: var(--texto-suave); font-size: 0.85rem; }
+.combinaciones-sms summary { cursor: pointer; white-space: nowrap; color: var(--acento); }
+.combinacion-sms { display: flex; gap: 0.3rem; margin-top: 0.3rem; }
+.tabla-novedades { width: 100%; margin-bottom: 1rem; }
+.tabla-novedades td { vertical-align: top; }
+.tabla-novedades td.c-modelo { white-space: nowrap; }
+.tabla-novedades td.c-entrar { white-space: nowrap; text-align: right; }
+.tabla-novedades input[type="text"] { min-width: 8rem; }
+.tabla-novedades input[readonly] { background: transparent; border-color: transparent; }
+.tabla-novedades .articulo-novedad { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-bottom: 0.3rem; }
+.tabla-novedades .referencia-novedad { font-weight: 600; min-width: 9rem; }
+.tabla-novedades tr.entrado { opacity: 0.65; }
+.tabla-novedades .en-sistema { color: var(--ok-borde); font-weight: 600; }
+/* --- Hoja de corte --- */
+.tabla-hoja-corte { width: 100%; }
+.tabla-hojas-corte td.c-entrar { white-space: nowrap; text-align: right; }
+.hp-o-articulo button.enlace[hidden] { display: none; }

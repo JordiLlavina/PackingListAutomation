@@ -47,6 +47,7 @@ import com.puntotres.packinglist.model.OrigenPeso;
 import com.puntotres.packinglist.model.PaletData;
 import com.puntotres.packinglist.model.VolcadoErpData;
 import com.puntotres.packinglist.persistence.ArchivoTemporadas;
+import com.puntotres.packinglist.persistence.TablaColores;
 import com.puntotres.packinglist.persistence.TemporadaGuardada;
 import com.puntotres.packinglist.service.AprendizajePesos;
 import com.puntotres.packinglist.service.CatalogoPedido;
@@ -110,6 +111,15 @@ public class PackingListController {
     private final TallerEnCurso tallerEnCurso;
     private final AprendizajePesos aprendizajePesos;
     private final SesionesGuardadas sesiones;
+    private final TablaColores tablaColores;
+
+    /** La tabla de colores de un cliente (Colores y Pieles), código → nombre. */
+    private Map<String, String> coloresDe(String claveCliente) {
+        Map<String, String> colores = new LinkedHashMap<>();
+        tablaColores.de(claveCliente)
+                .forEach(color -> colores.put(color.getCodigo(), color.getDescripcion()));
+        return colores;
+    }
 
     public PackingListController(PreparacionRevisionService preparacion,
                                  ClaudeEnvioExtractionService extractorClaude,
@@ -128,8 +138,10 @@ public class PackingListController {
                                  EnvioEnCurso envioEnCurso,
                                  TallerEnCurso tallerEnCurso,
                                  AprendizajePesos aprendizajePesos,
-                                 SesionesGuardadas sesiones) {
+                                 SesionesGuardadas sesiones,
+                                 TablaColores tablaColores) {
         this.sesiones = sesiones;
+        this.tablaColores = tablaColores;
         this.preparacion = preparacion;
         this.extractorClaude = extractorClaude;
         this.validadorResumen = validadorResumen;
@@ -201,7 +213,8 @@ public class PackingListController {
         // para sus etiquetas de caja.
         PedidoDeTemporada pedido = resolverPedidoDeTemporada(envioForm);
         CatalogoPedido.Catalogo catalogo = modoClaude
-                ? CatalogoPedido.para(cliente.getPlantilla(), pedido.excel())
+                ? CatalogoPedido.para(cliente.getPlantilla(), pedido.excel(),
+                        coloresDe(envioForm.getCliente()))
                 : CatalogoPedido.Catalogo.vacio();
 
         EnvioInput envio;
@@ -527,6 +540,11 @@ public class PackingListController {
                 avisosGeneracion.addAll(completadorPedidos.completarModelos(
                         envioEnCurso.getImportado().getDestinos(),
                         envioEnCurso.getExcelPedidoCliente()));
+                // Un color tecleado en la revisión ("GAU") sale también como
+                // código-nombre. Sus avisos ya se dieron al importar.
+                preparacion.normalizarColoresApc(envioEnCurso.getImportado().getDestinos(),
+                        envioEnCurso.getCabecera().getClaveCliente(),
+                        envioEnCurso.getExcelPedidoCliente());
             }
             List<CajaData> todasLasCajas = new ArrayList<>();
             for (EnvioImportado.DestinoImportado destino : envioEnCurso.getImportado().getDestinos()) {

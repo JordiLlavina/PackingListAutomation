@@ -129,6 +129,31 @@ class CatalogoPedidoTest {
 
     // --- sin excel, con excel ilegible, y plantillas sin pedido ---
 
+    /**
+     * La tabla de colores viaja delante del catálogo de APC, y también sin
+     * excel de pedido: es lo que relaciona el "camel" de la hoja con el GAU
+     * del pedido. AMI no la lleva: su pedido ya trae código y nombre.
+     */
+    @Test
+    void laTablaDeColoresViajaConElCatalogoDeApc() throws IOException {
+        java.util.Map<String, String> colores = new java.util.LinkedHashMap<>();
+        colores.put("lzz", "Noir");
+        colores.put("KAN", "");
+
+        String conPedido = CatalogoPedido.para(TipoPlantilla.APC, pedidoApc(), colores).texto();
+        assertTrue(conPedido.startsWith("## Tabla de colores del cliente"), conPedido);
+        assertTrue(conPedido.contains("LZZ = NOIR" + '\n' + "KAN = (sin nombre en la tabla)"),
+                conPedido);
+        assertTrue(conPedido.contains("## Catálogo del pedido de esta temporada"), conPedido);
+
+        String sinPedido = CatalogoPedido.para(TipoPlantilla.APC, null, colores).texto();
+        assertTrue(sinPedido.contains("LZZ = NOIR"), sinPedido);
+        assertTrue(!sinPedido.contains("## Catálogo del pedido"), sinPedido);
+
+        assertTrue(!CatalogoPedido.para(TipoPlantilla.AMI, null, colores).texto()
+                .contains("Tabla de colores"));
+    }
+
     @Test
     void sinExcelNoHayCatalogoYTampocoAviso() {
         CatalogoPedido.Catalogo catalogo = CatalogoPedido.para(TipoPlantilla.APC, null);

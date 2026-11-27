@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragmentos :: head('Hojas de corte guardadas')}"></head>
+<body>
+<header th:replace="~{fragmentos :: cabecera('Documentos del Corte · Hojas de corte guardadas')}"></header>
+<main>
+    <p class="ayuda">
+        Cada hoja de corte generada, la más reciente primero. «Bajar» la vuelve a generar tal como se imprimió;
+        «Abrir en el formulario» la carga para hacer otra a partir de ella.
+    </p>
+
+    <p th:if="${#lists.isEmpty(hojas)}" class="ayuda">Todavía no se ha generado ninguna hoja de corte.</p>
+
+    <table th:unless="${#lists.isEmpty(hojas)}" class="tabla-hojas-corte">
+        <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>Temporada</th>
+            <th>Modelo</th>
+            <th>Nombre del bolso</th>
+            <th>Colores</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="h : ${hojas}">
+            <td th:text="${#temporals.format(h.fecha, 'dd/MM/yyyy HH:mm')}"></td>
+            <td th:text="${h.cliente}"></td>
+            <td th:text="${h.temporada}"></td>
+            <td><strong th:text="${h.modelo}"></strong></td>
+            <td th:text="${h.nombreBolso}"></td>
+            <td th:text="${h.colores}"></td>
+            <td class="c-entrar">
+                <a class="boton mini" th:href="@{/documentos-corte/hoja/antiguas/{id}/xlsx(id=${h.id})}">Bajar</a>
+                <a class="boton mini secundario" th:href="@{/documentos-corte/hoja(importar=${h.id})}">Abrir en el
+                    formulario</a>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="salidas-pantalla">
+        <a class="boton neutro" th:href="@{/documentos-corte/hoja}">Nueva hoja de corte</a>
+        <a class="boton neutro" th:href="@{/documentos-corte}">← Documentos del Corte</a>
+    </div>
+</main>
+</body>
+</html>

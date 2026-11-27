@@ -266,7 +266,8 @@ public class ClaudeEnvioExtractionService {
             "referencias", una por combinación, cada una con su "cantidadTotal".
 
             Copia referencias, colores y pedidos EXACTAMENTE como aparecen,
-            respetando puntos, ceros a la izquierda y mayúsculas.
+            respetando puntos, ceros a la izquierda y mayúsculas, salvo lo que el
+            bloque del cliente diga de alguno de ellos.
 
             "resumenPalets" recoge los RECUENTOS de palets por destinación cuando
             alguna hoja los declara ("Japan -> 1 palet", "wh. 5 palet"): una entrada
@@ -333,8 +334,8 @@ public class ClaudeEnvioExtractionService {
                                ampliarla, y no hace falta avisar por ello.
                 "modelo"     = el nombre descriptivo -> "sac Le Neige",
                                "Pochette Neige", "Ceinture Rosette Antik"
-                "color"      = el color como está, con su código si lo lleva ->
-                               "CLOU CAMEL", "LZZ Negro", "KBE Olive"
+                "color"      = el CÓDIGO de color de APC, tres letras (LZZ, GAU,
+                               KBE...). Ver "El color" más abajo.
               Aquí es donde más se nota la barra de la regla 2: en
               "MOD 67043 SJ / sac Le Neige / CLOU CAMEL" no tienes que adivinar
               dónde acaba el nombre del modelo y empieza el color, que sin la barra
@@ -344,6 +345,30 @@ public class ClaudeEnvioExtractionService {
               donde caiga, así que "referencia" es siempre SOLO el código. Y si
               solo hay DOS trozos, el segundo es el color y este artículo se queda
               sin "modelo".
+
+            - El color. APC llama a sus colores por un código de tres letras, y con
+              los documentos puede venir la TABLA DE COLORES del cliente ("código =
+              nombre", con los nombres en francés). En "color" va SOLO el código:
+                * Si la hoja escribe el código ("LZZ Negro", "KBE Olive"), ese:
+                  "LZZ", "KBE". El nombre de detrás no se copia.
+                * Si escribe solo un nombre ("camel", "negro"), búscalo en la tabla
+                  comparando el COLOR y no las letras: la operaria lo escribe en
+                  español o a su manera. Si es el mismo color en otro idioma o con
+                  otra grafía ("negro" con "LZZ = NOIR"), o no hay uno igual pero
+                  sí UNO parecido que solo añade o quita un matiz ("amarillo" con
+                  "JAUNE CLAIR" como único amarillo), pon su código.
+                * Si hay VARIOS igual de parecidos, ninguno se parece o no viene la
+                  tabla, copia el nombre tal cual. No elijas a ojo entre dos.
+              Las palabras que no son el color —la piel, el acabado o un trozo del
+              nombre del modelo ("CLOU", "ALPACA", "LISSE")— no cuentan: "CLOU CAMEL"
+              es CAMEL.
+              Cada vez que pongas un código que la hoja no escribe, una línea en
+              "avisos" —UNA por nombre distinto, no una por caja— con lo que escribe
+              la hoja y el color de la tabla que has puesto ("'camel' leído como
+              GAU = CAMEL"); y otra por cada nombre que dejes sin código.
+              NUNCA elijas el color por el pedido: que el catálogo diga en qué color
+              está pedido un artículo no convierte en ese color lo que la hoja llama
+              de otra manera. La aplicación lo comprueba después y avisa.
 
             - Debajo va "<destinación> (<pedido>): <total> <color>", p. ej.
               "Retail (705): 2 camel". El número entre paréntesis es el NÚMERO DE

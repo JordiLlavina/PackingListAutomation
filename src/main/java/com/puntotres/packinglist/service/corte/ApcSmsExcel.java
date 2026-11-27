@@ -519,7 +519,7 @@ public final class ApcSmsExcel {
     }
 
     /** El recorte de Excel de una imagen (izquierda, arriba, derecha, abajo); sin recorte, ceros. */
-    private static double[] recorte(XSSFPicture imagen) {
+    static double[] recorte(XSSFPicture imagen) {
         double[] lados = new double[4];
         var relleno = imagen.getCTPicture().getBlipFill();
         if (relleno == null || !relleno.isSetSrcRect()) {
@@ -576,7 +576,7 @@ public final class ApcSmsExcel {
      * reducida, sobre blanco (un PNG transparente saldría negro en JPEG) y en
      * JPEG. Una que Java no sabe leer (un EMF) se queda fuera con aviso.
      */
-    private static Optional<Imagen> imagen(Croquis croquis, Map<String, Optional<Imagen>> leidas, String donde,
+    static Optional<Imagen> imagen(Croquis croquis, Map<String, Optional<Imagen>> leidas, String donde,
                                            List<String> avisos) {
         return leidas.computeIfAbsent(huella(croquis.bytes()) + Arrays.toString(croquis.recorte()), huella -> {
             try {
